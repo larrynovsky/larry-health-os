@@ -1,0 +1,22 @@
+#!/bin/bash
+# prepare-commit-msg — штамп ЭКСПОЗИЦИИ к захвату чужого файла (BL-THREAD-GATE-1, решение
+# владельца 27.09, вариант А). Захват чужого файла в коммит возможен, только когда коммит
+# делается из ГЛАВНОЙ копии при живых деревьях нитей; оба факта известны в момент коммита и
+# невосстановимы потом — поэтому штампуются сейчас трейлером:
+#   Commit-Exposure: tree=main|thread/<slug> threads=<N живых деревьев нитей>
+# Сигнал — запрос: git log --grep='Commit-Exposure: tree=main threads=[1-9]'.
+# Граница честно: это счёт случаев, когда сошлись условия захвата, а НЕ доказательство захвата.
+# Никогда не блокирует коммит: ошибка штампа — коммит без трейлера.
+MSG="$1"
+[[ -n "$MSG" && -f "$MSG" ]] || exit 0
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo detached)"
+if [[ "$(git rev-parse --git-dir 2>/dev/null)" == "$(git rev-parse --git-common-dir 2>/dev/null)" ]]; then
+    tree="main"
+else
+    tree="$branch"
+fi
+threads=$(( $(git worktree list --porcelain 2>/dev/null | grep -c '^worktree ') - 1 ))
+(( threads < 0 )) && threads=0
+git interpret-trailers --in-place --if-exists replace \
+    --trailer "Commit-Exposure: tree=${tree} threads=${threads}" "$MSG" 2>/dev/null || true
+exit 0

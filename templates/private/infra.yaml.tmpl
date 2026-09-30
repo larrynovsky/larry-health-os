@@ -1,0 +1,25 @@
+# private/infra.yaml — топология установки (пишет scripts/install.py; приватная зона).
+# Единственный читатель — infra_config.py.
+# Основная машина: здесь пишется БД и бегут фоновые сервисы (single-primary).
+primary_host: {{PRIMARY_HOST}}
+# Адрес основной машины для дашборда и скриптов с другой машины (ssh-цель). Одна машина — loopback.
+studio_host: 127.0.0.1
+studio_ssh: localhost
+tailnet_hostname: localhost
+# Облачная папка (необязательно): если вы сами кладёте бланки анализов в iCloud Drive, укажите
+# её — вотчер будет смотреть в <папка>/CR. Нет ключа — документы присылаются только через бота.
+# cloud_health_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/health
+# Необязательно: соседние проекты на той же машине. Нет ключа → нет соседей.
+# db/lessons — пути относительно path (абсолютные и ~/ тоже допустимы).
+# Бэкап db — в <path>/backups/<имя-db-без-расширения>_<дата>.db, ротация 30 дней.
+# secrets — каталог, где датчик проверяет права; значения файлов он не читает.
+# lessons включает паритет с <path>/scripts/lessons.py (проверяется на машине с этим проектом).
+# neighbors:
+#   crm:
+#     path: ~/crm
+#     db: crm.db
+#     label_prefix: org.example.crm
+#     secrets: ~/.crm_secrets
+#   lab-notes:
+#     path: ~/Projects/lab-notes
+#     lessons: lessons.yaml

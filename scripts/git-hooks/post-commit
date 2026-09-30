@@ -1,0 +1,38 @@
+#!/bin/bash
+# post-commit hook (Studio) — tracked source (audit 2026-06-17).
+#
+# Перезапускает бота ТОЛЬКО если коммит затронул .py или launchd .plist.
+# Решение «рестарт да/нет» вынесено в should_restart_bot.sh (тестируемо).
+# run_checks.sh запускается всегда (в фоне). Пропуск для "auto: daily backup".
+#
+# Ставится симлинком через scripts/install_hooks.sh (запускать на Studio).
+# Раньше жил только в .git/hooks (вне VCS) и делал безусловный рестарт
+# вопреки собственному комментарию — исправлено.
+set -uo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$HOOK_DIR/../.." && pwd)"   # репозиторий (.git/hooks → симлинк сюда тоже работает)
+# Если вызваны как .git/hooks/post-commit (симлинк), резолвим репо от git:
+SCRIPT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+SHOULD="$SCRIPT_DIR/scripts/git-hooks/should_restart_bot.sh"
+
+LAST_MSG=$(git log -1 --format="%s" 2>/dev/null || echo "")
+if [[ "$LAST_MSG" == *"auto: daily backup"* ]]; then
+    exit 0
+fi
+
+mkdir -p "$SCRIPT_DIR/logs"
+bash "$SCRIPT_DIR/run_checks.sh" >> "$SCRIPT_DIR/logs/run_checks.log" 2>&1 &
+
+CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null)
+if bash "$SHOULD" "$CHANGED"; then
+  (
+    launchctl unload ~/Library/LaunchAgents/com.larry.health.bot.plist 2>/dev/null
+    launchctl load ~/Library/LaunchAgents/com.larry.health.bot.plist && \
+      echo "$(date): bot restart OK (.py/.plist in commit)"
+  ) >> "$SCRIPT_DIR/logs/deploy.log" 2>&1 &
+else
+  echo "$(date): commit touched no .py/.plist — bot restart skipped" >> "$SCRIPT_DIR/logs/deploy.log" 2>&1
+fi
+
+exit 0

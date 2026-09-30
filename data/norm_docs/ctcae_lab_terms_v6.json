@@ -1,0 +1,234 @@
+{
+  "_doc": "Карта лабораторных термов CTCAE v6.0 (NCIt-экспорт, длинный формат: строка на грейд) → канон lab_canon. ДАННЫЕ. Отличия от v5-карты — по дифу документа 2026-09-02: 'Platelet count decreased' → 'Thrombocytopenia'; 'Lymphocyte count decreased' в v6 — 'Lymphopenia' без чисел (снят); 'CPK increased' в v6 отсутствует (снят); 'Alkaline phosphatase increased' в v6 — одна ступень '>Baseline and ULN' = референс (снят, вид 1 покрывает); 'Hyperglycemia' стала числовой (натощак) → Glucose ceiling добавлен. Остальное как в v5.",
+  "terms": [
+    {
+      "term": "Anemia",
+      "metric": "HGB",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "g/dL",
+      "unit": "g/dL"
+    },
+    {
+      "term": "Thrombocytopenia",
+      "metric": "PLT",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "/mm3",
+      "scale": 0.001,
+      "unit": "10^3/µL"
+    },
+    {
+      "term": "Neutrophil count decreased",
+      "metric": "Neutrophils_abs",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "/mm3",
+      "scale": 0.001,
+      "unit": "10^3/µL"
+    },
+    {
+      "term": "White blood cell decreased",
+      "metric": "WBC",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "/mm3",
+      "scale": 0.001,
+      "unit": "10^3/µL"
+    },
+    {
+      "term": "Leukocytosis",
+      "metric": "WBC",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "/mm3",
+      "scale": 0.001,
+      "unit": "10^3/µL"
+    },
+    {
+      "term": "Lymphocyte count increased",
+      "metric": "Lymphocytes_abs",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "/mm3",
+      "scale": 0.001,
+      "unit": "10^3/µL"
+    },
+    {
+      "term": "Alanine aminotransferase increased",
+      "metric": "ALT",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "U/L"
+    },
+    {
+      "term": "Aspartate aminotransferase increased",
+      "metric": "AST",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "U/L"
+    },
+    {
+      "term": "GGT increased",
+      "metric": "GGT",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "U/L"
+    },
+    {
+      "term": "Blood bilirubin increased",
+      "metric": "Bilirubin_total",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "Creatinine increased",
+      "metric": "Creatinine",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "Lipase increased",
+      "metric": "Lipase",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "U/L"
+    },
+    {
+      "term": "Blood lactate dehydrogenase increased",
+      "metric": "LDH",
+      "direction": "ceiling",
+      "family": "multiple",
+      "unit": "U/L"
+    },
+    {
+      "term": "Fibrinogen decreased",
+      "metric": "Fibrinogen",
+      "direction": "floor",
+      "family": "multiple",
+      "unit": "g/L"
+    },
+    {
+      "term": "Hypoalbuminemia",
+      "metric": "Albumin",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "g/dL",
+      "unit": "g/dL"
+    },
+    {
+      "term": "Hypoglycemia",
+      "metric": "Glucose",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "Hyperkalemia",
+      "metric": "Potassium",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mmol/L",
+      "unit": "mmol/L"
+    },
+    {
+      "term": "Hypokalemia",
+      "metric": "Potassium",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "mmol/L",
+      "unit": "mmol/L"
+    },
+    {
+      "term": "Hypernatremia",
+      "metric": "Sodium",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mmol/L",
+      "unit": "mmol/L"
+    },
+    {
+      "term": "Hyponatremia",
+      "metric": "Sodium",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "mmol/L",
+      "unit": "mmol/L"
+    },
+    {
+      "term": "Hypercalcemia",
+      "metric": "Calcium",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL",
+      "note": "CTCAE — по СКОРРЕКТИРОВАННОМУ кальцию; бланк даёт общий. Расхождение при низком альбумине — известная граница"
+    },
+    {
+      "term": "Hypocalcemia",
+      "metric": "Calcium",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL",
+      "note": "см. Hypercalcemia"
+    },
+    {
+      "term": "Hypermagnesemia",
+      "metric": "Magnesium",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "Hypomagnesemia",
+      "metric": "Magnesium",
+      "direction": "floor",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "Cholesterol high",
+      "metric": "Cholesterol_Total",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "Hypertriglyceridemia",
+      "metric": "Triglycerides",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL"
+    },
+    {
+      "term": "INR increased",
+      "metric": "INR",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "",
+      "unit": "INR"
+    },
+    {
+      "term": "Hyperglycemia",
+      "metric": "Glucose",
+      "direction": "ceiling",
+      "family": "absolute",
+      "unit_pick": "mg/dL",
+      "unit": "mg/dL",
+      "note": "v6: грейды по глюкозе НАТОЩАК; бланк не различает натощак/нет — profile routine.fasting_labs"
+    }
+  ],
+  "band_by_grade": {
+    "1": "warn",
+    "2": "urgent",
+    "3": "critical"
+  }
+}

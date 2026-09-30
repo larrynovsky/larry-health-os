@@ -1,0 +1,186 @@
+---
+tags:
+- meta
+- index
+title: Wiki Index
+updated: '2026-05-13'
+---
+
+# Wiki Index
+
+## Concepts
+- [[Abduction]]
+- [[Artificial Intelligence]]
+- [[Availability Bias]]
+- [[Bedside Teaching]]
+- [[Bias]]
+- [[Case Specificity]]
+- [[Case-Based Clinical Reasoning]]
+- [[Causal Model]]
+- [[CBCR Case]]
+- [[CBCR Course]]
+- [[CBCR Session]]
+- [[CBCR Test]]
+- [[Clinical Background Information]]
+- [[Clinical Case]]
+- [[Clinical Decision-Making]]
+- [[Clinical Observation]]
+- [[Clinical Problem-Solving]]
+- [[Clinical Reasoning]]
+- [[Cognitive Load]]
+- [[Computer-Assisted Instruction]]
+- [[Construct Validity]]
+- [[Consultant]]
+- [[Consultant Background Information]]
+- [[Consultant Version]]
+- [[Content Validity]]
+- [[Context Specificity]]
+- [[Contrastive Learning]]
+- [[Curriculum Development]]
+- [[Curriculum Elements]]
+- [[Curriculum Modernization]]
+- [[Deduction]]
+- [[Delivered Curriculum]]
+- [[Diagnostic Accuracy]]
+- [[Diagnostic Competence]]
+- [[Diagnostic Hypothesis]]
+- [[Diagnostic Label]]
+- [[Diagnostic Reasoning]]
+- [[Diagnostic Systems]]
+- [[Diagnostic Test]]
+- [[Differential Diagnosis]]
+- [[Dual Process Theory]]
+- [[Educational Needs Assessment]]
+- [[Electroencephalogram]]
+- [[Enabling Conditions]]
+- [[Encapsulated Knowledge]]
+- [[Expert Performance]]
+- [[Extended Matching Questions]]
+- [[Faculty Development]]
+- [[Fault]]
+- [[Final Score]]
+- [[Functional Magnetic Resonance Imaging (fMRI)]]
+- [[Hippocratean Theory]]
+- [[Hippocratic Aphorism]]
+- [[Humoral Theory]]
+- [[Hypothesis-Driven Inquiry]]
+- [[Illness Script]]
+- [[Illness Script Theory]]
+- [[Induction]]
+- [[Instances Framework]]
+- [[Intermediate Effect]]
+- [[Introduction Session]]
+- [[Kern Six Steps]]
+- [[Medical Curriculum]]
+- [[Medical Education]]
+- [[Medical Terminology]]
+- [[Miller’s Pyramid of Assessment]]
+- [[Mini-Lecture]]
+- [[Participation Score]]
+- [[Peer Teacher]]
+- [[Peer Teacher Version]]
+- [[Peer Teaching]]
+- [[Physical Examination]]
+- [[Planned Curriculum]]
+- [[Preclinical Students]]
+- [[Problem Representation]]
+- [[Problem-Based Learning]]
+- [[Prototype Theory]]
+- [[Quality Assurance]]
+- [[Reflection]]
+- [[Representative Bias]]
+- [[Script Concordance Test]]
+- [[Semantic Network Theory]]
+- [[Semantic Qualifiers]]
+- [[Situated Cognition]]
+- [[Situated Learning]]
+- [[Student Version]]
+- [[Student-Centered Learning]]
+- [[System 1 Thinking]]
+- [[System 2 Thinking]]
+- [[Teaching Certificate]]
+- [[Teaching Competency]]
+- [[Validity]]
+- [[Visual Expertise]]
+
+## Sources
+- [[ch01_01_overview]] — high
+- [[ch01_02_summary of the cbcr method]] — high
+- [[ch01_03_essential features of cbcr education]] — high
+- [[ch01_04_indications for the effectiveness of the cbcr method]] — high
+- [[ch01_05_cbcr as an approach to ignite curriculum modernization]] — high
+- [[ch02_01_overview]] — high
+- [[ch02_02_clinical reasoning in the hippocratean era]] — high
+- [[ch02_03_bedside teaching and patient demonstration]] — high
+- [[ch02_04_william osler and the differential diagnosis]] — high
+- [[ch02_05_abraham flexner and the science of clinical medicine]] — high
+- [[ch02_06_artificial intelligence and problem based learning]] — high
+- [[ch03_01_concepts and definitions]] — high
+- [[ch03_02_early thinking of clinical reasoning the computer analogy]] — high
+- [[ch03_03_deconstructing the reasoning process]] — high
+- [[ch03_04_knowledge representations to support reasoning]] — high
+- [[ch03_05_prototyping and semantic qualifiers]] — high
+- [[ch03_06_illness script theory]] — high
+- [[ch03_07_encapsulation of knowledge and the intermediate effect]] — high
+- [[ch03_08_system 1 and 2 thinking as dual processes]] — high
+- [[ch03_09_case specificity and context specificity]] — high
+- [[ch03_10_clinical reasoning and the development of expert performance]] — high
+- [[ch03_11_reflection during diagnostic thinking]] — high
+- [[ch03_12_bias and error in clinical reasoning]] — high
+- [[ch03_13_neuroscience and visual expertise in clinical reasoning]] — high
+- [[ch04_01_overview]] — high
+- [[ch04_02_clinical vocabulary]] — high
+- [[ch04_03_problem representation]] — high
+- [[ch04_04_illness script mental repository]] — high
+- [[ch04_05_contrastive learning]] — high
+- [[ch04_06_hypothesis driven inquiry]] — high
+- [[ch04_07_diagnostic verification]] — high
+- [[ch05_01_overview]] — high
+- [[ch05_02_current methods of assessing clinical reasoning]] — high
+- [[ch06_01_overview]] — medium
+- [[ch06_02_scheduling groups]] — high
+- [[ch06_03_spread of sessions over the year]] — high
+- [[ch06_04_rooms arrangement and facilities]] — high
+- [[ch06_05_a cbcr session]] — high
+- [[ch06_06_the student role]] — high
+- [[ch06_07_the peer teacher role]] — high
+- [[ch06_08_the consultant role]] — high
+- [[ch06_09_cbcr course management]] — high
+- [[ch06_10_evidence of effectiveness]] — high
+- [[ch07_01_overview]] — high
+- [[ch07_02_alignment with actual cases discussed]] — high
+- [[ch07_03_cases options lists and scenarios]] — high
+- [[ch07_04_cbcr test quality findings since 2010]] — high
+- [[ch07_05_electronic and paper versions]] — high
+- [[ch07_06_what the utrecht cbcr test does not provide]] — high
+- [[ch07_07_rules and regulations around the utrecht cbcr test]] — high
+- [[ch07_08_issues of validity of the cbcr test]] — high
+- [[ch07_09_scoring of items]] — medium
+- [[ch07_10_checklist for item writers]] — high
+- [[ch08_01_overview]] — high
+- [[ch08_02_three versions of the written case]] — high
+- [[ch08_03_student version]] — high
+- [[ch08_04_peer teacher version]] — high
+- [[ch08_05_consultant version]] — high
+- [[ch08_06_selecting themes for cbcr cases]] — high
+- [[ch08_07_an annotated template for cbcr cases]] — high
+- [[ch08_08_cbcr case stage i presentation of the patient s problem]] — high
+- [[ch08_09_stage ii results from history taking are provided]] — high
+- [[ch08_10_stage iii results from physical examination are provided]] — high
+- [[ch08_11_stage iv the results of diagnostic tests are provided]] — high
+- [[ch09_01_overview]] — high
+- [[ch09_02_a brief introduction to curriculum development]] — high
+- [[ch09_03_the process of curriculum development]] — high
+- [[ch09_04_course development for cbcr]] — high
+- [[ch09_05_the aim of faculty development]] — high
+- [[ch09_06_faculty development for cbcr]] — high
+- [[ch10_01_overview]] — high
+- [[ch10_02_the objectives of the cbcr course]] — high
+- [[ch10_03_the cbcr sessions]] — high
+- [[ch10_04_introduction session]] — high
+- [[ch10_05_preparation and self study]] — medium
+- [[ch10_06_cbcr sessions]] — high
+- [[ch10_07_tasks of peer teachers]] — high
+- [[ch10_08_the mini lecture]] — high
+
+_Auto-generated by olw. 171 entries._

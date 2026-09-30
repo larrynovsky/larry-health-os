@@ -1,0 +1,115 @@
+/* ============================================================
+   Health OS · Toscana · Design Tokens
+   ------------------------------------------------------------
+   Импорт: <link rel="stylesheet" href="tokens.css">
+   Назначение: единственный источник истины для цветов, шрифтов
+   и размеров. Все компоненты ссылаются ТОЛЬКО на переменные —
+   никаких хардкодов hex в шаблонах.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+
+  /* -- Шрифты ------------------------------------------------ */
+  --font-serif: 'Newsreader', 'Source Serif 4', Georgia, serif;
+  --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* -- Фон и поверхности ------------------------------------- */
+  --color-bg:          #4A2D26;  /* основной фон страницы — терракотовый кирпич */
+  --color-bg-deep:     #3D241F;  /* нижняя планка / tabbar / sidebar активный */
+  --color-surface:     #5A3A33;  /* карточки, инпуты */
+  --color-surface-alt: #4F322B;  /* hover / striped row */
+
+  /* -- Границы ----------------------------------------------- */
+  --color-border:      #6E4A42;  /* основная — между разделителями */
+  --color-border-soft: #8A6354;  /* пунктир / placeholder card */
+
+  /* -- Текст (тёплая шкала кремового) ------------------------ */
+  --color-text-display: #F8E8D5; /* большие display-серифы, главные заголовки */
+  --color-text:         #F0DDCB; /* обычный текст */
+  --color-text-em:      #E8C9A9; /* in-text emphasis, italic подсветка */
+  --color-text-muted:   #D8C0A9; /* body внутри длинных абзацев */
+  --color-text-hint:    #B0907E; /* подписи, италик-метки секций */
+  --color-text-dim:     #947667; /* "ещё", счётчики, метаданные */
+
+  /* -- Семантические акценты --------------------------------- */
+  --color-action:  #C58459;      /* латте — действие, ссылка, плейсхолдер */
+  --color-active:  #6B9B98;      /* патина — active, ok, в норме */
+  --color-warning: #D85A3E;      /* закат — high/low, testing, drift */
+
+  /* -- Текст на цветных пилюлях ------------------------------ */
+  --color-on-action:  #3A1F18;   /* тёмный — для текста на латунном */
+  --color-on-active:  #1F3633;   /* тёмный изумруд — на патине */
+  --color-on-warning: #3A1F18;   /* тёмный — на закате */
+
+  /* -- Размеры (font-size / line-height) --------------------- */
+  --text-display-l: 30px; --lh-display-l: 1.05;  /* "Сегодня, пятница" — главная */
+  --text-display-m: 26px; --lh-display-m: 1.1;   /* заголовки страниц */
+  --text-display-s: 22px; --lh-display-s: 1.15;  /* заголовки секций */
+  --text-card-title: 18px; --lh-card-title: 1.35; /* заголовок карточки */
+  --text-body-l: 16px; --lh-body-l: 1.75;        /* длинные нарративы (конституции) */
+  --text-body:   14px; --lh-body:   1.55;        /* обычный UI текст */
+  --text-meta:   13px; --lh-meta:   1.55;        /* подписи под заголовками */
+  --text-caption: 12px; --lh-caption: 1.5;       /* italic-hints */
+  --text-mono:   11px; --lh-mono:   1.4;         /* timestamps, IDs, значения */
+
+  /* -- Spacing ----------------------------------------------- */
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 18px;
+  --space-10: 20px;
+  --space-11: 22px;
+  --space-12: 24px;
+  --space-14: 28px;
+  --space-16: 32px;
+
+  /* -- Радиусы ----------------------------------------------- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 11px;
+  --radius-full: 9999px;
+
+  /* -- Тени (только inset — характер ламповости) ------------- */
+  --shadow-card:  inset 0 0 30px rgba(0, 0, 0, 0.15);
+  --shadow-shell: inset 0 0 80px rgba(0, 0, 0, 0.25);
+  --shadow-fab:   0 6px 16px rgba(0, 0, 0, 0.35);
+
+  /* -- Border accents для левого края карточки --------------- */
+  --accent-warning: 3px solid var(--color-warning);
+  --accent-action:  3px solid var(--color-action);
+  --accent-active:  3px solid var(--color-active);
+
+  /* -- Длина читаемой строки --------------------------------- */
+  --measure: 65ch;     /* нарративы — конституции, длинные обоснования */
+  --measure-narrow: 45ch;
+
+}
+
+/* ============================================================
+   Базовая типографика — применить к <body>
+   ============================================================ */
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-serif); color: var(--color-text-display); font-weight: 500; }
+h1 { font-size: var(--text-display-l); line-height: var(--lh-display-l); }
+h2 { font-size: var(--text-display-m); line-height: var(--lh-display-m); }
+h3 { font-size: var(--text-display-s); line-height: var(--lh-display-s); }
+
+em { color: var(--color-text-em); font-style: italic; }
+code, .mono { font-family: var(--font-mono); font-size: var(--text-mono); }

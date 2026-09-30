@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.owner-weekly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/owner_weekly.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{REPO}}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+    </dict>
+
+    <!-- Понедельничная сводка оператору: понедельник 09:10 по времени машины. -->
+    <key>StartCalendarInterval</key>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>ExitTimeOut</key>
+    <integer>120</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{REPO}}/logs/owner_weekly.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{REPO}}/logs/owner_weekly_err.log</string>
+</dict>
+</plist>

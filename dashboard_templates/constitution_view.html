@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Health OS{% endblock %}
+{% set page_name = "конституция · " ~ slug %}
+
+{% block header %}
+<div class="shell-title-block">
+  <a class="shell-breadcrumb" href="/constitutions">← все конституции</a>
+  <h1>{{ title }}</h1>
+  <p class="shell-subtitle">{{ size_kb }} КБ · обновлено {{ updated }} ({{ updated | age_days }}д назад)</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<article class="narrative constitution-body">
+  {{ html | safe }}
+</article>
+{% endblock %}

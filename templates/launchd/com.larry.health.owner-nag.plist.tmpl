@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.owner-nag</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/owner_nag.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{REPO}}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+    </dict>
+
+    <!-- Повтор раз в 3ч. основная машина — в своём часовом поясе, время местное. Окно 08-20
+         ещё раз проверяется В КОДЕ owner_nag (Дом А), поэтому список часов и
+         код-гейт согласованы; лишний wake вне окна вернётся молча. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>ExitTimeOut</key>
+    <integer>120</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{REPO}}/logs/owner_nag.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{REPO}}/logs/owner_nag_err.log</string>
+</dict>
+</plist>

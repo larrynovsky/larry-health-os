@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Сторож свежести данных Apple Health (import_watchdog.py). До 2026-09-29 жил вне репозитория
+     (~/health_ops, метка com.larry.healthops.import-watchdog) и после переезда базы в контейнер
+     смотрел бы на замороженную нативную базу; перенесён сюда решением владельца (вариант А). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.larry.health.import-watchdog</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/import_watchdog.py</string>
+    </array>
+    <key>WorkingDirectory</key><string>{{REPO}}</string>
+    <key>StartInterval</key><integer>7200</integer>
+    <key>RunAtLoad</key><true/>
+    <key>StandardOutPath</key><string>{{DATA}}/logs/import_watchdog.log</string>
+    <key>StandardErrorPath</key><string>{{DATA}}/logs/import_watchdog.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin</string>
+        <key>HOME</key><string>{{HOME}}</string>
+        <key>HEALTH_DATA_DIR</key><string>{{DATA}}</string>
+    </dict>
+</dict>
+</plist>

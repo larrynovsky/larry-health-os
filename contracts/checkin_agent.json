@@ -1,0 +1,11 @@
+{
+  "module": "checkin_agent",
+  "public": [
+    "continue_checkin",
+    "finalize_checkin",
+    "generate_opening_question"
+  ],
+  "depends_on": [],
+  "disposability": null,
+  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился."
+}

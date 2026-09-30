@@ -1,0 +1,224 @@
+#!/bin/bash
+# post-commit hook (MacBook writer-узел) — TRACKED источник.
+# Ставится симлинком: ln -sf scripts/git-hooks/post-commit-macbook .git/hooks/post-commit
+# auto-push на Studio + run_checks + restart bot + restart dashboard.
+#
+# Sprint 7-GIT (2026-05-23): заменён rsync MacBook→Studio на git push studio.
+# Раньше rsync исключал .git/ → Studio HEAD отставал от MacBook (инцидент 2026-05-23
+# во время Sprint 6: 17 commits лежали на Studio как uncommitted в working tree).
+# Теперь git push → атомарность, fast-forward check, working tree на Studio
+# обновляется через receive.denyCurrentBranch=updateInstead.
+#
+# Защиты:
+#   - push fails fast-forward — значит Studio впереди (ssh-edit + commit),
+#     надо pull сначала; ошибка в deploy.log, bot не перезапускается.
+#   - push fails при dirty working tree на Studio (updateInstead) —
+#     signal что кто-то ssh-edit'ит прямо сейчас.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# ── ЗАПИСКИ НИТЕЙ: доставка записок соседних нитей (15.09) ───────────────────
+# ПЕЧАТАЕТ И ЗАСЧИТЫВАЕТ ОДНОВРЕМЕННО, и живёт именно здесь: post-commit —
+# единственный хук git, который срабатывает ровно на СОСТОЯВШИХСЯ коммитах
+# (включая --no-verify и --amend; замерено на git 2.54). В pre-commit, где
+# доставка стояла с 13.09, отменённый коммит гасил записку соседа навсегда.
+# Стоит первым: доставка не должна зависеть от того, доехал ли деплой ниже.
+#
+# stderr НЕ глушим: скрипт жалуется туда, когда не может записать отметку, и
+# молча выключенная дельта вернула бы ровно тот шум, ради которого она сделана.
+"$SCRIPT_DIR/scripts/git-hooks/handoff_notes_notice.sh" || true
+
+# ── Сторож адресов MCP-серверов (22.09, решение владельца) ───────────────────
+# Конфиг Claude Desktop живёт только на этой машине: Studio его не видит, а у
+# ноутбука нет честного сигнала живости для суточной джобы (§14). Поэтому судим
+# на КОММИТЕ: коммитит тот же агент, что зовёт project_context-тулы, и печать
+# доходит до него. Молчит, когда все корни живы. Поломка сторожа коммит не трогает.
+PYTHONPATH="$SCRIPT_DIR" /opt/homebrew/bin/python3.11 -m project_context roots-check || true
+
+# ── Отметка запуска (2026-09-12, ревью F4) ──────────────────────────────────
+# Смысл строки: сделать так, чтобы ТИШИНА в deploy.log значила ровно одно.
+# До неё молчание было двусмысленным: то ли коммит был бэкапным и деплой
+# пропущен штатно, то ли хук вообще не запускался. Второе не гипотеза — 11.09
+# симлинки хуков указывали в удалённый /tmp/install_hooks_test_*, и семь
+# коммитов прошли мимо всех гейтов, не оставив ни следа. Теперь след оставляет
+# КАЖДЫЙ запуск, и пустой хвост лога = хук не звали.
+# Оракул: tests/unit/test_post_commit_branch_guard.py::test_каждый_запуск_оставляет_след
+echo "$(date): post-commit запущен ($(git rev-parse --short HEAD 2>/dev/null || echo '?'))" \
+    >> "$SCRIPT_DIR/logs/deploy.log"
+
+LAST_MSG=$(git log -1 --format="%s" 2>/dev/null || echo "")
+if [[ "$LAST_MSG" == *"auto: daily backup"* ]]; then
+    # backup.sh сам делает push, не запускаем second pipeline.
+    # Причина пропуска пишется явно (F4): «пропущено» и «не работало» обязаны
+    # различаться в логе, а не по памяти читающего.
+    echo "$(date): деплой пропущен — бэкапный коммит, backup.sh пушит сам" \
+        >> "$SCRIPT_DIR/logs/deploy.log"
+    exit 0
+fi
+
+# ── Guard ветки (2026-09-11, подготовка к worktree-на-задачу) ────────────────
+# Деплой из этого хука безусловен по построению: `git push studio main` не смотрит,
+# в какой ветке сделан коммит. Пока писала одна сессия прямо в main, это было верно.
+# С отдельным деревом на задачу коммит рабочей ветки дал бы ДВА ложных следствия,
+# оба молчаливых: (1) push отправил бы на Studio чужой main вместо работы нити;
+# (2) run_checks.sh побежал бы по ГЛАВНОЙ копии — SCRIPT_DIR считается от пути хука,
+# а .git/hooks общий для всех worktree. Зелёный результат относился бы не к тому коду.
+# Поэтому: не main → выход ДО run_checks и до push.
+# Выход тихий, не ошибка: пропуск деплоя из рабочей ветки — штатное событие, а не
+# отказ (§13). Detached HEAD и нечитаемый HEAD дают "HEAD"/пустую строку → тоже выход
+# (fail-closed: неизвестная ветка не деплоит).
+# Оракул: tests/unit/test_post_commit_branch_guard.py — падает, если guard снят или
+# переставлен после push.
+BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+if [[ "$BRANCH" != "main" ]]; then
+    echo "$(date): деплой пропущен — ветка '$BRANCH' (не main), штатно §13" >> "$SCRIPT_DIR/logs/deploy.log"
+    exit 0
+fi
+
+bash "$SCRIPT_DIR/run_checks.sh" >> "$SCRIPT_DIR/logs/run_checks.log" 2>&1 &
+
+# Адрес Studio — из git-remote `studio` (живёт в .git/config, не в отслеживаемых файлах):
+# тот же адрес, куда уходит `git push`, второй копии нет (pub-prep 2026-09-23).
+STUDIO="$(git remote get-url studio 2>/dev/null | cut -d: -f1)"
+if [[ -z "$STUDIO" ]]; then
+    echo "$(date): ❌ деплой: нет git-remote 'studio' — не знаю адрес Studio" >> "$SCRIPT_DIR/logs/deploy.log"
+    echo "❌ post-commit: нет git-remote 'studio' — деплой невозможен" >&2
+    exit 1
+fi
+
+# ── Деплой СИНХРОННЫЙ и ГРОМКИЙ (2026-09-12) ────────────────────────────────
+# Было: `( ... ) >> deploy.log &` — фоновая подоболочка, исход только в файле.
+# Два молчаливых следствия, оба прожиты:
+#   1. Агент коммитит через Desktop Commander: команда возвращается сразу после
+#      `git commit`, шелл умирает, фон умирает с ним. 11.09 так не доехали два
+#      коммита (8bebac5, 0fec3e5) — в deploy.log не осталось НИ СТРОКИ, то есть
+#      даже следа потери не было.
+#   2. Даже когда фон выживал, исход лежал в логе, который никто не открывает.
+#      §12 требует сверять деплой — но требование к человеку не наследуется
+#      следующей сессией, а свойство кода наследуется.
+# Теперь без `&` (коммит ждёт исхода, 10–30 с) и через `tee` (исход виден прямо
+# в выводе `git commit`). Побочная выгода: смерть самого хука тоже становится
+# видимой — нет вывода деплоя, значит хук не отработал. 12.09 оказалось, что
+# `pre-commit` и `post-commit` были битыми симлинками на удалённый /tmp-каталог
+# с 11.09 16:07, и никто этого не заметил сутки.
+# run_checks.sh остаётся фоновым: он длинный, его читают из своего лога и ночью.
+# Оракул: tests/unit/test_post_commit_branch_guard.py::test_деплой_синхронен
+(
+  # §13 ступень 1 — авто-заживление transient race: параллельная сессия могла держать
+  # Studio-tree грязным долю секунды (in-flight updateInstead / сетевой блип). Один
+  # ретрай через паузу лечит это БЕЗ тревоги человеку. Эскалируем (ступень 3) только
+  # если и ретрай упал И авто-ремонта не существует (см. классификацию ниже).
+  push_ok=false
+  if git push studio main 2>&1; then
+    push_ok=true
+  else
+    # Пауза вынесена в переменную ради оракула классификатора: чтобы дойти до
+    # ветки классификации, тест обязан уронить push дважды, и три таких теста
+    # стоили 75 с ожидания в pre-commit. Пометить их `slow` нельзя — pytest.ini
+    # обещает slow «в nightly», а ночной run_checks.sh гоняет с дефолтными
+    # addopts, то есть БЕЗ slow: помеченное туда не доезжает ни к кому.
+    # Значение по умолчанию не изменилось; переопределяет его только тест.
+    RETRY_SLEEP="${DEPLOY_RETRY_SLEEP:-25}"
+    echo "$(date): push attempt 1 FAILED — ретрай через ${RETRY_SLEEP}с (лечим transient race)"
+    sleep "$RETRY_SLEEP"
+    if git push studio main 2>&1; then
+      push_ok=true
+      echo "$(date): push retry OK — был transient (§13 авто-заживление, без тревоги)"
+    fi
+  fi
+
+  if $push_ok; then
+    # Пилот волны Б (docker-install, этап 11): где живёт владелец — метка ~/health/RUNTIME на Studio.
+    # В контейнере — НЕЛЬЗЯ `launchctl load` его нативного бота: плисты остаются для отката, и загрузка
+    # подняла бы второго бота на том же токене Telegram поверх замороженной базы. Ответ — в рамке:
+    # баннер ssh не должен стать вердиктом (урок F6 ниже). Остальные строки хука меток владельца
+    # безвредны: kickstart выгруженную службу не загружает.
+    OWNER_RT=$(ssh "$STUDIO" 'echo "__RUNTIME__$(cat ~/health/RUNTIME 2>/dev/null)"' 2>/dev/null \
+      | sed -n 's/^__RUNTIME__//p' | tail -1)
+    if [ "$OWNER_RT" = "container" ]; then
+      # Сборка образа — минуты, поэтому в фоне на Studio; отказ громкий (notify.fault в самом скрипте).
+      ssh "$STUDIO" 'cd ~/health_scripts && nohup bash scripts/deploy_container.sh >/dev/null 2>&1 &' \
+        && echo "$(date): push OK; владелец в контейнере — сборка образа и compose up запущены (Studio: ~/Library/Logs/health-container-deploy.log)" \
+        || echo "$(date): WARN контейнер владельца: деплой не запустился (владелец на старом коде)"
+    else
+    ssh "$STUDIO" "launchctl unload ~/Library/LaunchAgents/com.larry.health.bot.plist && launchctl load ~/Library/LaunchAgents/com.larry.health.bot.plist" && \
+    echo "$(date): push + bot restart OK"
+    fi
+    # Partner-бот (партнёр) — тоже несёт код брифа; хук раньше его НЕ рестартил → каждый
+    # деплой ехал у партнёра на СТАРОМ коде в памяти (2026-07-15). Отдельным best-effort
+    # statement (не в owner-цепи, чтобы падение не пряталось), kickstart -k (проверен живьём),
+    # $(id -u) резолвится на Studio (одинарные кавычки).
+    ssh "$STUDIO" 'launchctl kickstart -k gui/$(id -u)/com.larry.health.bot.partner' \
+      && echo "$(date): partner bot restart OK" \
+      || echo "$(date): WARN partner bot restart не удался (партнёр может ехать на старом коде)"
+    # Дашборд (owner+partner) несёт код эндпоинтов (dashboard_routers/*, напр. HAE-ingest);
+    # деплой без его рестарта = эндпоинты едут на СТАРОМ коде. Инцидент 2026-07-11: HAE
+    # freshness-fix не действовал, пока дашборд не перезапустили руками. Best-effort — не
+    # гейтит деплой; $(id -u) резолвится на Studio (одинарные кавычки).
+    ssh "$STUDIO" 'for s in com.larry.health.dashboard com.larry.health.dashboard.partner; do launchctl kickstart -k gui/$(id -u)/$s 2>/dev/null || true; done' \
+      && echo "$(date): dashboard restart triggered (owner+partner)" \
+      || echo "$(date): WARN dashboard restart не удался (эндпоинты могут ехать на старом коде)"
+    # Вотчеры входа (owner+partner) — тоже держат .py в ПАМЯТИ. 2026-08-01:
+    # com.larry.health.watcher.partner крутил код 16 суток, фикс лежал на диске с
+    # 29.07 и не применялся — 19278 сообщений тенанту при зелёных датчиках.
+    # Список ниже ведётся руками ОСОЗНАННО (рестарт — политика, не факт о мире:
+    # не всякую джобу можно ронять на каждом коммите), и именно поэтому его
+    # полноту стережёт ратчет integrity_tests.check_deploy_restart_completeness:
+    # завёл новую долгоживущую джобу и не вписал сюда — ночной монитор краснеет.
+    ssh "$STUDIO" 'for s in com.larry.health.lab-intake com.larry.health.watcher.partner; do launchctl kickstart -k gui/$(id -u)/$s 2>/dev/null || true; done' \
+      && echo "$(date): intake watcher restart triggered (owner+partner)" \
+      || echo "$(date): WARN watcher restart не удался (вход может ехать на старом коде)"
+  else
+    echo "$(date): push FAILED дважды — классифицирую причину (§13: эскалация — последнее средство)"
+    # §13: человека тревожим ТОЛЬКО когда эффективного авто-действия НЕ существует.
+    #  - Studio dirty  → домен uncommitted_watchdog (auto-stash в течение часа). Молчим.
+    #  - Studio clean, но push отвергнут → история разошлась (divergence). Авто-пути
+    #    нет (rebase требует человеческого суждения) → эскалируем.
+    #  - Studio недостижим → доказать наличие авто-пути нельзя → эскалируем.
+    # ── Проба в рамке (2026-09-12, ревью F6) ────────────────────────────────
+    # Было: DIRTY=$(ssh ... git status --porcelain | head -1). Классификатор
+    # верил СЫРОМУ stdout ssh, а туда попадает не только ответ git: баннер
+    # хоста, MOTD, предупреждение клиента. Любая такая строка читалась как
+    # «Studio dirty», а эта ветка — ЕДИНСТВЕННАЯ, которая НЕ эскалирует. То
+    # есть шум на канале молча отменял тревогу: самый дорогой из двух
+    # возможных промахов, потому что цена ложной тревоги — минута внимания, а
+    # цена пропущенной — деплой не уехал и никто не знает.
+    # Стало: ответ обрамлён маркерами, и судится только то, что МЕЖДУ ними.
+    # Рамка снаружи может быть засыпана чем угодно — вердикт не изменится.
+    PROBE_CMD='echo __PROBE_BEGIN__; if cd ~/health_scripts 2>/dev/null; then git status --porcelain 2>/dev/null | head -1; else echo __PROBE_NOREPO__; fi; echo __PROBE_END__'
+    PROBE_RAW=$(ssh "$STUDIO" "$PROBE_CMD" 2>/dev/null || true)
+
+    escalate=false
+    if [[ "$PROBE_RAW" != *__PROBE_BEGIN__* || "$PROBE_RAW" != *__PROBE_END__* ]]; then
+      # Рамка не доехала целиком: ssh не отработал, оборвался или ответил не он.
+      # Доказать наличие авто-пути нельзя → эскалируем (fail-open в сторону человека).
+      REASON="Studio недостижим по ssh — деплой не проверить и не разблокировать"
+      escalate=true
+    else
+      DIRTY=$(printf '%s\n' "$PROBE_RAW" \
+                | sed -n '/__PROBE_BEGIN__/,/__PROBE_END__/p' | sed '1d;$d' | head -1)
+      if [ "$DIRTY" = "__PROBE_NOREPO__" ]; then
+        REASON="на Studio нет ~/health_scripts — деплою некуда ехать, авто-пути нет"
+        escalate=true
+      elif [ -n "$DIRTY" ]; then
+        REASON="Studio dirty — uncommitted_watchdog авто-разблокирует в течение часа (§13); эскалация не нужна"
+      else
+        REASON="Studio clean, но push отвергнут → история разошлась (divergence). Авто-пути нет. Recovery: git fetch studio && git rebase studio/main"
+        escalate=true
+      fi
+    fi
+    echo "$(date): $REASON"
+    if $escalate; then
+      # Троттл 15 мин. §12. У MacBook нет TG-токена → шлём через Studio-notify (при
+      # divergence Studio clean и достижим; при SSH_FAIL попытка всё равно безвредна).
+      THROTTLE="$SCRIPT_DIR/logs/.deploy_alert_ts"
+      NOW=$(date +%s); LAST=$(cat "$THROTTLE" 2>/dev/null || echo 0)
+      if [ $((NOW - LAST)) -gt 900 ]; then
+        echo "$NOW" > "$THROTTLE"
+        ssh "$STUDIO" "cd ~/health_scripts && /opt/homebrew/bin/python3.11 -c 'import notify; notify.fault(\"post_commit: deployment blocked after retry\", person_key=None)'" >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+) 2>&1 | tee -a "$SCRIPT_DIR/logs/deploy.log"
+
+exit 0

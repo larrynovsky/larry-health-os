@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}История правок — Health OS{% endblock %}
+{% set page_name = "история правок" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>История правок</h1>
+  <p class="shell-subtitle">
+    {{ edits | length }} последних
+    {% if current_entity %} · фильтр: {{ current_entity }}{% endif %}
+  </p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="caption">фильтр по типу</div>
+<p>
+  <a href="/audit" class="chip {% if not current_entity %}chip--action{% else %}chip--outline{% endif %}">все</a>
+  {% for e in entities %}
+    <a href="/audit?entity={{ e.entity }}" class="chip {% if current_entity == e.entity %}chip--action{% else %}chip--outline{% endif %}">{{ e.entity }} ({{ e.n }})</a>
+  {% endfor %}
+</p>
+
+<div class="caption">правки</div>
+<table class="dense">
+  <thead>
+    <tr>
+      <th>когда</th>
+      <th>сущность</th>
+      <th>id</th>
+      <th>действие</th>
+      <th>поле</th>
+      <th>было</th>
+      <th>стало</th>
+      <th>кто</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in edits %}
+      <tr class="dense-row">
+        <td><time>{{ e.ts | iso_date }}</time> <span class="num-soft">{{ e.ts[11:16] }}</span></td>
+        <td><span class="chip chip--outline">{{ e.entity }}</span></td>
+        <td><span class="num-soft">{{ e.entity_id }}</span></td>
+        <td><span class="value">{{ e.action }}</span></td>
+        <td><span class="num-soft">{{ e.field or "—" }}</span></td>
+        <td><span class="num-soft">{{ (e.old_value or "") | short(60) }}</span></td>
+        <td>{{ (e.new_value or "") | short(60) }}</td>
+        <td><span class="num-soft">{{ e.actor }}</span></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

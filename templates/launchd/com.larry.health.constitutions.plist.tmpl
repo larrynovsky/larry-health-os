@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Пересборка конституций только по новым вводным (решение владельца 2026-09-25). Воскресенье,
+     после продольного анализа: флаг if-changed сверяет отпечаток вводных и молчит, если ничего
+     не сменилось. Пульс — system_config constitutions.trigger_checked_at, датчик —
+     integrity_tests.check_constitutions_trigger_alive. Шаблон добавлен 2026-09-28: служба жила
+     только на машине владельца, и чистая установка из репо её не получала. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.constitutions</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>{{PYTHON}} {{REPO}}/generate_constitutions.py --if-changed &gt;&gt; {{HOME}}/health_constitutions.log 2&gt;&amp;1</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{{REPO}}</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>5</integer>
+        <key>Minute</key><integer>30</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/health_constitutions.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/health_constitutions.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+    </dict>
+</dict>
+</plist>

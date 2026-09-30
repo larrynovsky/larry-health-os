@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.reminders-sync</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/reminders_sync.py</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>10800</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>{{DATA}}/logs/reminders_sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{DATA}}/logs/reminders_sync_error.log</string>
+</dict>
+</plist>

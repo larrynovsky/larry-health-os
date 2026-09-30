@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HEALTH_DATA_DIR</key>
+		<string>{{DATA}}</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>Label</key>
+	<string>com.larry.health.longitudinal</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>{{PYTHON}} {{REPO}}/longitudinal_analysis.py &gt;&gt; {{HOME}}/health_longitudinal.log 2&gt;&amp;1</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>{{HOME}}/health_longitudinal_error.log</string>
+	<key>StandardOutPath</key>
+	<string>{{HOME}}/health_longitudinal.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+		<key>Weekday</key>
+		<integer>0</integer>
+	</dict>
+</dict>
+</plist>

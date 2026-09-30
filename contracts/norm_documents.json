@@ -1,0 +1,28 @@
+{
+  "module": "norm_documents",
+  "public": [
+    "import_ctcae",
+    "snapshot_ctcae",
+    "load_ctcae_rows",
+    "fetch_ctcae",
+    "fetch_eflm",
+    "load_eflm",
+    "rcv_pct",
+    "documents"
+  ],
+  "depends_on": [],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — ДОКУМЕНТ нормы → СНИМОК в репо → СТРОКИ для сида. Не пишет в БД (это health_db), не судит значения (это safety_net), не решает, какой документ применим (это applies_to в реестре + эпизоды). Сеть — только в fetch_*; сид и safety_net читают снимки.",
+      "D2": "восемь публичных входов, три группы: CTCAE (import_ctcae, snapshot_ctcae, fetch_ctcae — документ с сайта NCI для публичной установки, 2026-09-25, load_ctcae_rows), EFLM (fetch_eflm, load_eflm, rcv_pct), реестр (documents). Приватны _read_xlsx_sheet1, _clauses, _parse_multiple, _parse_absolute, _sha256. Карты термов — данные (data/norm_docs/*_terms.json), не поверхность.",
+      "D3": "stdlib только: zipfile + xml.etree для xlsx (openpyxl на Studio/MacBook нет — и не нужен), urllib для API, hashlib. От модулей проекта не зависит вовсе: инструмент, который приносит норму, не должен зависеть от того, кто её потребляет.",
+      "D4": "~270 строк, четверть — докстринги с провенансом. Разбивать нечего.",
+      "D5": "tests/unit/test_norm_documents.py — характеризация против самого документа в репо. ИСПОЛНЕННЫЕ негативные контроли 2026-09-02: порча ячейки грейда (Anemia G2 → текст без числа) → ValueError с именем терма и грейда; терм из карты, отсутствующий в документе → ValueError. Coherence снимка и импорта — test_safety_net_thresholds.test_snapshot_equals_import_of_document.",
+      "D6": "инвариант, общий с health_db и safety_net: «резерв ≡ сид» теперь означает «снимок документа ≡ строки БД ≡ _FALLBACK_LAB», и он вынесен в coherence-тест, а не в допущение. Второй, общий с integrity_tests: неразобранное — ошибка, не пропуск (карта объявляет терм числовым; молчаливый пропуск дал бы дыру в предохранителе, неотличимую от «грейда нет»)."
+    },
+    "rationale": "Переписывается по контракту и тестам: вход — xlsx CTCAE + карта термов, выход — список строк (metric, direction, band, kind, baseline, value, unit); вход — JSON EFLM, выход — снимок и RCV. Невосстановимого нет: все решения (grade→band, дедуп симптом-зависимых грейдов, одна система единиц, ветка baseline abnormal не поддержана) названы в докстринге и в карте. Причина существования: пороги safety_net с апреля были пересказом CTCAE по памяти модели (PLT 100 вместо 75, ALT 7x вместо 5x) — модуль убирает шаг пересказа между документом и базой.",
+    "date": "2026-09-02",
+    "oracle": "tests/unit/test_norm_documents.py (разбор, единицы, дедуп, негативные контроли); test_safety_net_thresholds.test_snapshot_equals_import_of_document (снимок ≡ документ). Граница: ПРАВИЛЬНОСТЬ карты термов (что «Anemia» → HGB floor, что бланк даёт общий, а не скорректированный кальций) — суждение, машинно не выводится; оракул — врач в контуре, читающий бриф."
+  }
+}

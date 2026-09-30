@@ -1,0 +1,23 @@
+{
+  "module": "scripts/tutorial_run",
+  "public": [
+    "blocks",
+    "substituted",
+    "main"
+  ],
+  "depends_on": [],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — исполнить помеченные блоки урока как их прочтёт человек. Ничего не проверяет сверх кода выхода блоков: утверждения о живости системы — в .github/workflows/tutorial.yml.",
+      "D2": "blocks(text) -> [код блока], substituted(block, dist) -> код с двумя подменами, main(argv) -> код выхода; всё.",
+      "D3": "только stdlib (re, subprocess, argparse); модули проекта не импортирует.",
+      "D4": "~70 строк, треть — докстринг с перечнем подмен.",
+      "D5": "tests/unit/test_tutorial_run.py — непомеченный блок не исполняется, подмены ровно две, ru/en помечают одинаковые команды, main --list на живом уроке.",
+      "D6": "общий с уроком договор: маркер <!-- tutorial:run --> перед ```bash и адрес выпуска RELEASE_URL; урок и прогонщик меняются вместе, иначе test_both_languages_mark_the_same_blocks краснеет на числе блоков."
+    },
+    "rationale": "Переписывается за минуты: regex по маркеру, две строковые подмены, bash на блок.",
+    "date": "2026-09-30",
+    "oracle": "tests/unit/test_tutorial_run.py; в CI — шаг «урок, помеченные блоки» tutorial.yml краснеет на первом упавшем блоке с его номером."
+  }
+}

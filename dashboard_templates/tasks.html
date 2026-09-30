@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Задачи — Health OS{% endblock %}
+{% set page_name = "задачи" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Задачи</h1>
+  <p class="shell-subtitle">{{ tasks | length }} открытых</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not tasks %}
+  <p class="hint">Чистый стол.</p>
+{% endif %}
+
+{% for t in tasks %}
+  {% set accent = 'warning' if (t.priority in ['1','critical','high']) else ('action' if t.priority in ['2','medium'] else '') %}
+  <article class="card {% if accent %}card--{{ accent }}{% endif %}" id="task-{{ t.id }}">
+    <div class="card-head">
+      <div class="card-meta">№ {{ t.id }}
+        {% if t.type %} · {{ t.type }}{% endif %}
+        {% if t.source %} · {{ t.source }}{% endif %}
+        · <time>{{ t.created_at | iso_date }}</time>
+        <span class="age-suffix">({{ t.created_at | age_days }}д)</span>
+      </div>
+      <div class="card-chips">
+        {% if t.priority %}
+          {% if t.priority in ['1','critical','high'] %}<span class="chip chip--warning">{{ t.priority }}</span>
+          {% elif t.priority in ['2','medium'] %}<span class="chip chip--action">{{ t.priority }}</span>
+          {% else %}<span class="chip chip--outline">{{ t.priority }}</span>{% endif %}
+        {% endif %}
+        {% if t.status == 'open' %}<span class="chip chip--action">open</span>
+        {% elif t.status == 'snoozed' %}<span class="chip chip--outline">был snoozed</span>
+        {% elif t.status == 'answered' %}<span class="chip chip--active">answered</span>
+        {% endif %}
+        {% if t.deadline %}<span class="chip chip--outline">до {{ t.deadline }}</span>{% endif %}
+      </div>
+    </div>
+    <p class="card-description"
+       hx-get="/api/tasks/{{ t.id }}/edit"
+       hx-trigger="click"
+       hx-swap="outerHTML"
+       title="клик чтобы изменить">{{ t.content }}</p>
+    {% if t.resolved_text %}
+      <dl class="card-fields">
+        <dt>ответ</dt><dd>{{ t.resolved_text | short(300) }}</dd>
+      </dl>
+    {% endif %}
+    <footer class="card-foot card-actions">
+      <button class="action-pill action-pill--active"
+              hx-post="/api/tasks/{{ t.id }}/done"
+              hx-confirm="Отметить выполненной?"
+              hx-target="closest article"
+              hx-swap="delete">выполнено</button>
+      <button class="action-pill action-pill--ghost"
+              hx-post="/api/tasks/{{ t.id }}/snooze?days=3"
+              hx-confirm="Отложить на 3 дня?"
+              hx-target="closest article"
+              hx-swap="delete">+3д</button>
+      <button class="action-pill action-pill--ghost"
+              hx-post="/api/tasks/{{ t.id }}/snooze?days=7"
+              hx-confirm="Отложить на 7 дней?"
+              hx-target="closest article"
+              hx-swap="delete">+7д</button>
+      <button class="action-pill action-pill--ghost"
+              hx-post="/api/tasks/{{ t.id }}/snooze?days=30"
+              hx-confirm="Отложить на 30 дней?"
+              hx-target="closest article"
+              hx-swap="delete">+30д</button>
+    </footer>
+  </article>
+{% endfor %}
+
+{% endblock %}

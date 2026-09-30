@@ -1,0 +1,151 @@
+# methodology/clinical_kb/food.yaml — пищевой срез свода состояний (шаблон установки).
+# Здесь только ОБЩАЯ нутрициология (нутриент-факт, всем). Рамки под состояния тенанта
+# (by_condition) дописывает сам тенант — они ссылаются на condition_id из _index.yaml.
+# Формат payload.kind — см. docs/reference/install_config.md.
+shared:
+  benefits:
+  - food: виноград
+    tag: polyphenols
+    why: полифенолы (ресвератрол)
+  - food: персики
+    tag: vitamin_ac
+    why: витамины A/C, клетчатка
+  - food: нектарины
+    tag: vitamin_ac
+    why: витамины A/C
+  - food: сливы
+    tag: polyphenols
+    why: полифенолы, клетчатка
+  - food: абрикосы
+    tag: carotene
+    why: бета-каротин, калий
+  - food: груши
+    tag: fiber
+    why: клетчатка (пектин)
+  - food: клубника
+    tag: vitamin_c
+    why: витамин C, полифенолы
+  - food: черешня
+    tag: polyphenols
+    why: антоцианы, полифенолы
+  - food: яблоки
+    tag: fiber
+    why: клетчатка (пектин)
+  - food: киви
+    tag: vitamin_c
+    why: витамин C
+  - food: айва
+    tag: fiber
+    why: клетчатка
+  - food: цитрусовые
+    tag: vitamin_c
+    why: витамин C, флавоноиды
+  - food: апельсины
+    tag: vitamin_c
+    why: витамин C, флавоноиды
+  - food: мандарины
+    tag: vitamin_c
+    why: витамин C
+  - food: грейпфрут
+    tag: vitamin_c
+    why: витамин C, горечи
+  - food: лимоны
+    tag: vitamin_c
+    why: витамин C
+  - food: помидоры
+    tag: lycopene
+    why: ликопин, лучше тушёные
+  - food: листовая зелень
+    tag: folate
+    why: натуральный фолат
+  - food: зелень
+    tag: folate
+    why: натуральный фолат
+  - food: капуста
+    tag: cruciferous
+    why: крестоцветное, клетчатка
+  - food: цветная капуста
+    tag: cruciferous
+    why: крестоцветное, клетчатка
+  - food: артишоки
+    tag: folate_fiber
+    why: фолат + клетчатка
+  - food: бобы
+    tag: legumes
+    why: клетчатка/белок, стабильная гликемия
+  - food: горошек
+    tag: legumes
+    why: клетчатка/белок
+  - food: баклажаны
+    tag: fiber
+    why: клетчатка, кожица — антоцианы
+  - food: перец
+    tag: vitamin_c
+    why: витамин C, каротиноиды
+  - food: цукини
+    tag: fiber
+    why: клетчатка, лёгкое
+  - food: огурцы
+    tag: hydration
+    why: гидратация, лёгкое
+  - food: тыква
+    tag: carotene
+    why: бета-каротин
+  - food: сельдерей
+    tag: fiber
+    why: клетчатка
+  - food: свёкла
+    tag: folate_fiber
+    why: фолат + клетчатка
+  - food: малина
+    tag: polyphenols
+    why: полифенолы, клетчатка
+  - food: смородина
+    tag: vitamin_c
+    why: витамин C, полифенолы
+  - food: черника
+    tag: polyphenols
+    why: антоцианы, полифенолы
+  - food: морковь
+    tag: carotene
+    why: бета-каротин
+  - food: сардины
+    tag: omega3
+    why: омега-3, противовоспалительно
+  - food: анчоусы
+    tag: omega3
+    why: омега-3, противовоспалительно
+  - food: скумбрия
+    tag: omega3
+    why: омега-3, противовоспалительно
+  - food: тунец
+    tag: omega3
+    why: омега-3, постный белок
+  - food: креветки
+    tag: shellfish
+    why: постный белок, цинк
+  - food: кальмары
+    tag: shellfish
+    why: постный белок
+  - food: сельдь
+    tag: omega3
+    why: омега-3, противовоспалительно
+  - food: треска
+    tag: lean_fish
+    why: постный белок
+  - food: лосось
+    tag: omega3
+    why: омега-3, противовоспалительно
+  - food: форель
+    tag: omega3
+    why: омега-3, противовоспалительно
+  - food: пикша
+    tag: lean_fish
+    why: постный белок
+  - food: хек
+    tag: lean_fish
+    why: постный белок
+  - food: мидии
+    tag: shellfish
+    why: постный белок, цинк
+by_condition: {}

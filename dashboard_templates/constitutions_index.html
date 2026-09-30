@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Конституции — Health OS{% endblock %}
+{% set page_name = "конституции" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Конституции</h1>
+  <p class="shell-subtitle">{{ items | length }} доменов · longitudinal + genome + clinical history</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<p class="hint">Нарративные документы по 5 доменам. Регенерируются скриптом <code class="mono">generate_constitutions.py</code>.</p>
+
+<ul class="const-list">
+  {% for c in items %}
+    <li>
+      <a href="/constitutions/{{ c.slug }}">{{ c.title }}</a>
+      <div class="meta">
+        <span class="size">{{ c.size_kb }} КБ</span>
+        <span class="updated">обновлено {{ c.updated }} · {{ c.updated | age_days }}д</span>
+      </div>
+    </li>
+  {% endfor %}
+</ul>
+
+<hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border, #e0e0e0);">
+
+<h2>Геном: история обновлений ClinVar</h2>
+
+{% if genome_updates %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Дата</th>
+      <th>Проверено</th>
+      <th>Изменено</th>
+      <th>Значимые</th>
+      <th>Уведомление</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for upd in genome_updates %}
+    <tr>
+      <td>{{ upd.run_date[:10] if upd.run_date else '—' }}</td>
+      <td>{{ upd.variants_checked or '—' }}</td>
+      <td>{{ upd.variants_changed or 0 }}</td>
+      <td>{% if upd.had_significant %}<span class="badge badge--warning">есть</span>{% else %}нет{% endif %}</td>
+      <td>{% if upd.sent_to_user %}<span class="badge badge--ok">✓ TG</span>{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="hint">История обновлений отсутствует — синк запускается 1-го числа каждого месяца.</p>
+{% endif %}
+
+{% endblock %}

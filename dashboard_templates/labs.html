@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Анализы — Health OS{% endblock %}
+{% set page_name = "анализы" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Анализы</h1>
+  <p class="shell-subtitle">{{ latest | length }} тестов · последние значения + история</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="caption">последние значения</div>
+<table class="dense">
+  <thead>
+    <tr>
+      <th>тест</th>
+      <th class="num">значение</th>
+      <th>норма</th>
+      <th>дата</th>
+      <th class="num">возраст</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in latest %}
+      <tr class="dense-row {% if r.status in ['high','low','critical'] %}dense-row--warning{% endif %}">
+        <td>{{ r.test_name }}</td>
+        <td class="num">
+          {% set val_class = 'value--warning' if r.status in ['high','low','critical'] else 'value' %}
+          {% if r.value is not none %}<span class="{{ val_class }}">{{ r.value }}</span>{% endif %}
+          {% if r.value_text %} <span class="unit">{{ r.value_text }}</span>{% endif %}
+          {% if r.unit %} <span class="unit">{{ r.unit }}</span>{% endif %}
+        </td>
+        <td>
+          {% if r.ref_low is not none or r.ref_high is not none %}
+            <span class="num-soft">{{ r.ref_low if r.ref_low is not none else "" }}–{{ r.ref_high if r.ref_high is not none else "" }}</span>
+          {% endif %}
+        </td>
+        <td><span class="age">{{ r.date }}</span></td>
+        <td class="num"><span class="age">{{ r.date | age_days }}д</span></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="caption">последние 50 результатов</div>
+<table class="dense">
+  <thead>
+    <tr>
+      <th>дата</th>
+      <th>тест</th>
+      <th class="num">значение</th>
+      <th>норма</th>
+      <th>источник</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in recent %}
+      <tr class="dense-row {% if r.status in ['high','low','critical'] %}dense-row--warning{% endif %}">
+        <td><span class="age">{{ r.date }}</span></td>
+        <td>{{ r.test_name }}</td>
+        <td class="num">
+          {% set val_class = 'value--warning' if r.status in ['high','low','critical'] else 'value' %}
+          {% if r.value is not none %}<span class="{{ val_class }}">{{ r.value }}</span>{% endif %}
+          {% if r.unit %} <span class="unit">{{ r.unit }}</span>{% endif %}
+        </td>
+        <td>
+          {% if r.ref_low is not none or r.ref_high is not none %}
+            <span class="num-soft">{{ r.ref_low if r.ref_low is not none else "" }}–{{ r.ref_high if r.ref_high is not none else "" }}</span>
+          {% endif %}
+        </td>
+        <td><span class="num-soft">{{ r.source or "" }}</span></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

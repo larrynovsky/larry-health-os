@@ -1,0 +1,22 @@
+{
+  "module": "reminders_backend",
+  "public": ["caldav_configured", "put_task", "completed_task_ids", "complete_task", "completed_task_ids_in", "mark_completed", "vtodo", "alarm_at"],
+  "depends_on": [
+    {"module": "secrets_paths", "uses": ["secrets_dir"], "why": "caldav.json лежит в секретах тенанта; резолвер fail-closed не даёт взять учётку владельца", "legacy": "легаси без сайдкара; опора — только secrets_dir() → Path"},
+    {"module": "config_db", "uses": ["get_config"], "why": "час будильника — данные (reminders.alarm_hour)", "legacy": "легаси без сайдкара; опора — только get_config(key, default)"}
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "Один вопрос: «задачи человека в CalDAV-списке — положить, узнать выполненные, закрыть». Не решает, какие задачи класть (task_agent), не закрывает их в базе (reminders_sync).",
+      "D2": "Операции create/completed_task_ids/complete и configured() как переключатель; чистое ядро completed_task_ids_in/mark_completed/vtodo открыто ради теста и пробы.",
+      "D3": "secrets_paths.secrets_dir, config_db.get_config и requests (в замке) — больше ничего.",
+      "D4": "≈200 строк, треть — объяснение выбора голого HTTP и формата связи.",
+      "D5": "tests/unit/test_reminders_backend.py (ядро) + самопроверка в __main__; полный путь создать → закрыть на iPhone → прочитать исполнен на живом Radicale 29.09.",
+      "D6": "Связь задачи с напоминанием — метка [task_id:N] (общая с AppleScript-путём) и детерминированный UID; своей таблицы нет, второго дома связи нет."
+    },
+    "rationale": "Решение владельца 29.09 — свой CalDAV за Tailscale; в контейнере нет Reminders.app. Дубля нет: capabilities reminder — только AppleScript-пути task_agent/reminders_sync/test_failure_handler, по данным — одна таблица reminders у reminders_sync (читатель лога).",
+    "date": "2026-09-29",
+    "oracle": "Claude Opus 5.5 (мутации: закрытое как незакрытое · UTC вместо местного часа), приёмка — владелец на iPhone"
+  }
+}

@@ -1,0 +1,48 @@
+# Куда едет каждая фоновая служба при установке в Докере (scripts/install.py --docker).
+# ЕДИНСТВЕННЫЙ дом этого признака (нить docker-install, этап 1, 2026-09-29). Ключ — Label плиста.
+# Вид службы (по расписанию или постоянная) здесь НЕ пишется — его рендер берёт из самого шаблона
+# (StartCalendarInterval / StartInterval / KeepAlive): второй записи одного факта не заводим.
+# Состояния:
+#   container          — едет в контейнер (задача supercronic или служба compose, по шаблону)
+#   env                — не служба, а переменная окружения контейнера
+#   "host: <причина>"  — остаётся службой launchd Мака-хоста
+#   "none: <причина>"  — в установке в Докере не существует
+# Каждый шаблон обязан иметь здесь строку, и каждая строка — шаблон; иначе рендер отказывает
+# (tests/unit/test_docker_render.py).
+services:
+  com.larry.health.assessment-scheduler: container
+  com.larry.health.backup: container            # из тома, SQLite backup API — переделка на этапе 6
+  com.larry.health.bot: container
+  com.larry.health.calendar-sync: container
+  com.larry.health.consilium: container
+  com.larry.health.constitutions: container
+  com.larry.health.dashboard: container         # публикация порта только на tailnet-адрес (этап 11)
+  com.larry.health.import-watchdog: container   # вариант А владельца 29.09
+  com.larry.health.integrity-check: container
+  com.larry.health.lab-intake: container
+  com.larry.health.literature-read: container
+  com.larry.health.literature-search: container
+  com.larry.health.logrotate: container
+  com.larry.health.longitudinal: container
+  com.larry.health.night-cycle: container
+  com.larry.health.oura-import: container
+  com.larry.health.owner-nag: container
+  com.larry.health.owner-weekly: container
+  com.larry.health.pgs-discovery: container
+  com.larry.health.pipaudit: container
+  com.larry.health.probes: container
+  com.larry.health.profile-reconciler: container
+  com.larry.health.reminders-sync: container    # бэкенд CalDAV — этап 3
+  com.larry.health.survivorship: container
+  com.larry.health.test-api-report: container
+  com.larry.health.test-suite: container
+  com.larry.health.triage: container
+  com.larry.health.weekly-digest: "none: дайджест строится из истории git (weekly_digest.py, git log), а в образе её нет — .dockerignore; на Маке-хосте остаётся нативным"
+  com.larry.health.wellally-check: container
+  com.larry.health.multitenant-env: env
+  com.larry.health.night-repair: "host: ночной ремонт — автору нужен claude на Маке-хосте и клон репозитория; в образе их нет, а стол владельца он читает из контейнера (docker exec)"
+  com.larry.health.code-watcher: "host: мастерская разработчика — гоняет тесты на правку исходников машины"
+  com.larry.health.uncommitted-watchdog: "host: сторожит незакоммиченное в git-дереве машины, не данные"
+  com.larry.healthbot.morningwake: "host: caffeinate держит Мак бодрым к утреннему циклу; в контейнере смысла нет"
+  com.larry.health.import-poll: "none: приём из папки iCloud владельца; iCloud в контейнер не едет — решение владельца 29.09: в контейнере документы — только через бота (incoming → lab-intake)"
+  com.larry.health.watcher: "none: приём из папки iCloud владельца; iCloud в контейнер не едет — решение владельца 29.09: в контейнере документы — только через бота (incoming → lab-intake)"

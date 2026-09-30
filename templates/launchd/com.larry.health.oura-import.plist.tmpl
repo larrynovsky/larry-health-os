@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.oura-import</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>{{PYTHON}} {{REPO}}/import_oura.py 2 &gt;&gt; {{HOME}}/health_oura_import.log 2&gt;&amp;1</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/health_oura_import.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/health_oura_import_error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+    </dict>
+</dict>
+</plist>

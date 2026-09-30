@@ -1,0 +1,29 @@
+# Фоновые службы, которые получает каждый человек (тенант) установки — scripts/install.py --tenant.
+# Решение владельца 2026-09-28: все службы, работающие на одного человека. Рендер берёт только
+# `ready`. Прочие состояния:
+#   blocked: <причина>  — у службы есть общий с другим человеком артефакт; копия затирала бы
+#                         чужой результат. Становится ready отдельным коммитом, разводящим артефакт.
+#   excluded: <причина> — человеку не нужна по замыслу (решения владельца 28.09).
+# Классификация: plans/tenant_services_survey_2026-09-28.md; разведение общего — этап Б
+# плана plans/PLAN_tenant_install_2026-09-28.md (нити tb-checks, cx-tb-*, tb-pgs).
+# Службы машины (одна на установку: ночной цикл, бэкап, ротация логов…) сюда не входят.
+services:
+  bot: ready
+  calendar-sync: ready
+  constitutions: ready
+  dashboard: ready                 # свой порт: --dashboard-port
+  lab-intake: ready                # приём документов человека (у партнёра — под меткой watcher)
+  literature-read: ready
+  literature-search: ready
+  oura-import: ready
+  assessment-scheduler: ready      # свой каталог опросников: <DATA>/data/instruments
+  survivorship: ready              # свой каталог и конфиг
+  reminders-sync: ready            # свой список Reminders «Health (<имя>)»
+  longitudinal: ready              # свои артефакты гейта и замок: belief_contract.artifact_path
+  pgs-discovery: ready             # пересчёт по «не посчитано у меня»
+  integrity-check: ready           # вердикт в <DATA>/logs, находки — оператору
+  consilium: ready                 # пишет только в базу человека
+  profile-reconciler: ready        # пишет только в базу человека
+  triage: "excluded: находки ночной проверки человека уходят оператору строкой (run_checks), не вопросами человеку"
+  import-poll: "excluded: старый приём из папки iCloud владельца; у человека документы принимает lab-intake"
+  watcher: "excluded: старый приём из папки iCloud владельца; у человека документы принимает lab-intake"

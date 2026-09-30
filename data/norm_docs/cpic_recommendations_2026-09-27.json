@@ -1,0 +1,1412 @@
+{
+ "source": "https://api.cpicpgx.org/v1/recommendation (CPIC, публичный API)",
+ "fetched": "2026-09-27",
+ "drugs_without_cpic_rows": [
+  "flucloxacillin",
+  "irinotecan",
+  "warfarin"
+ ],
+ "rows": [
+  {
+   "drug_id": "abacavir",
+   "gene": "HLA-B",
+   "phenotype_class": "HLA-B*57:01 Carrier (het)",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Abacavir is not recommended"
+    }
+   ]
+  },
+  {
+   "drug_id": "abacavir",
+   "gene": "HLA-B",
+   "phenotype_class": "HLA-B*57:01 Carrier (hom)",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Abacavir is not recommended"
+    }
+   ]
+  },
+  {
+   "drug_id": "abacavir",
+   "gene": "HLA-B",
+   "phenotype_class": "HLA-B*57:01 Negative",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Use abacavir per standard dosing guidelines"
+    }
+   ]
+  },
+  {
+   "drug_id": "atazanavir",
+   "gene": "UGT1A1",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "There is no need to avoid prescribing of atazanavir based on UGT1A1 genetic test result. Inform the patient that some patients stop atazanavir because of jaundice (yellow eyes and skin), but that this patient's genotype makes this unlikely (less than about a 1 in 20 chance of stopping atazanavir because of jaundice)."
+    }
+   ]
+  },
+  {
+   "drug_id": "atazanavir",
+   "gene": "UGT1A1",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "There is no need to avoid prescribing of atazanavir based on UGT1A1 genetic test result. Inform the patient that some patients stop atazanavir because of jaundice (yellow eyes and skin), but that this patient's genotype makes this unlikely (less than about a 1 in 20 chance of stopping atazanavir because of jaundice)."
+    }
+   ]
+  },
+  {
+   "drug_id": "atazanavir",
+   "gene": "UGT1A1",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Consider an alternative agent particularly where jaundice would be of concern to the patient. If atazanavir is to be prescribed, there is a high likelihood of developing jaundice that will result in atazanavir discontinuation (at least 20% and as high as 60%)."
+    }
+   ]
+  },
+  {
+   "drug_id": "atazanavir",
+   "gene": "UGT1A1",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "atorvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe ≤40mg as a starting dose and adjust doses of atorvastatin based on disease-specific guidelines. Prescriber should be aware of possible increased risk for myopathy especially for 40mg dose. If dose >40mg needed for desired efficacy, consider combination therapy (i.e., atorvastatin plus non-statin guideline directed medical therapy) (PMID: 30423391)."
+    }
+   ]
+  },
+  {
+   "drug_id": "atorvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Increased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses based on disease-specific guidelines."
+    }
+   ]
+  },
+  {
+   "drug_id": "atorvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Normal Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses based on disease-specific guidelines."
+    }
+   ]
+  },
+  {
+   "drug_id": "atorvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Poor Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe ≤20mg as a starting dose and adjust doses of atorvastatin based on disease-specific guidelines. If dose >20mg is needed for desired efficacy, consider rosuvastatin or combination therapy (i.e., atorvastatin plus non-statin guideline directed medical therapy) (PMID: 30423391)."
+    }
+   ]
+  },
+  {
+   "drug_id": "atorvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Possible Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe ≤40mg as a starting dose and adjust doses of atorvastatin based on disease-specific guidelines. Prescriber should be aware of possible increased risk for myopathy especially for 40mg dose. If dose >40mg needed for desired efficacy, consider combination therapy (i.e., atorvastatin plus non-statin guideline directed medical therapy) (PMID: 30423391)."
+    }
+   ]
+  },
+  {
+   "drug_id": "atorvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "azathioprine",
+   "gene": "TPMT",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with reduced starting doses (30-80% of standard starting dose) if standard starting dose is ≥2 mg/kg/day. If starting dose is already below standard starting dose, dose reduction might not be necessary. During therapy, adjust the doses of azathioprine based on the degree of myelosuppression and disease-specific guidelines. It usually takes at least 2-4 weeks of stable dosing to reach steady state after each dose adjustment."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on TPMT, initiate therapy with reduced starting doses (30-80% of standard starting dose) if standard starting dose is ≥2 mg/kg/day. If starting dose is already below standard starting dose, dose reduction might not be necessary. During therapy, adjust the doses of azathioprine based on the degree of myelosuppression and disease-specific guidelines. It usually takes at least 2-4 weeks of stable dosing to reach steady state after each dose adjustment."
+    }
+   ]
+  },
+  {
+   "drug_id": "azathioprine",
+   "gene": "TPMT",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with standard starting dose (e.g., 2 mg/kg/day for autoimmune diseases). During therapy, adjust doses of azathioprine based on disease-specific guidelines. It usually takes at least 2 weeks to reach steady state after each dose adjustment."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on TPMT, initiate therapy with standard starting dose (e.g., 2 mg/kg/day for autoimmune diseases). During therapy, adjust doses of azathioprine based on disease-specific guidelines. It usually takes at least 2 weeks to reach steady state after each dose adjustment."
+    }
+   ]
+  },
+  {
+   "drug_id": "azathioprine",
+   "gene": "TPMT",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Consider alternative nonthiopurine immunosuppressant therapy."
+    }
+   ]
+  },
+  {
+   "drug_id": "azathioprine",
+   "gene": "TPMT",
+   "phenotype_class": "Possible Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with reduced starting doses (30-80% of standard starting dose) if standard starting dose is ≥2 mg/kg/day. If starting dose is already below standard starting dose, dose reduction might not be necessary. During therapy, adjust the doses of azathioprine based on the degree of myelosuppression and disease-specific guidelines. It usually takes at least 2-4 weeks of stable dosing to reach steady state after each dose adjustment."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on TPMT, initiate therapy with reduced starting doses (30-80% of standard starting dose) if standard starting dose is ≥2 mg/kg/day. If starting dose is already below standard starting dose, dose reduction might not be necessary. During therapy, adjust the doses of azathioprine based on the degree of myelosuppression and disease-specific guidelines. It usually takes at least 2-4 weeks of stable dosing to reach steady state after each dose adjustment."
+    }
+   ]
+  },
+  {
+   "drug_id": "azathioprine",
+   "gene": "TPMT",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on NUDT15, initiate therapy with standard starting dose (e.g., 2 mg/kg/day for autoimmune diseases). During therapy, adjust doses of azathioprine based on disease-specific guidelines. It usually takes at least 2 weeks to reach steady state after each dose adjustment."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Neither TPMT or NUDT15 phenotype could be assigned based on genotyping performed. Consider evaluating TPMT erythrocyte activity to assess TPMT phenotype. If thiopurines are required and either TPMT or NUDT15 status is unknown, monitor closely for toxicity."
+    }
+   ]
+  },
+  {
+   "drug_id": "celecoxib",
+   "gene": "CYP2C9",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended starting dose. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals."
+    },
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with lowest recommended starting dose. Titrate dose upward to clinical effect or maximum recommended dose with caution. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals. Carefully monitor adverse events such as blood pressure and kidney function during course of therapy."
+    }
+   ]
+  },
+  {
+   "drug_id": "celecoxib",
+   "gene": "CYP2C9",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with recommended starting dose. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals."
+    }
+   ]
+  },
+  {
+   "drug_id": "celecoxib",
+   "gene": "CYP2C9",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with 25-50% of the lowest recommended starting dose. Titrate dose upward to clinical effect or 25-50% of the maximum recommended dose with caution. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals. Upward dose titration should not occur until after steady state is reached (at least 8 days for celecoxib after first dose in PMs). Carefully monitor adverse events such as blood pressure and kidney function during course of therapy. Alternatively, consider an alternate therapy not metabolized by CYP2C9 or not significantly impacted by CYP2C9 genetic variants in vivo."
+    }
+   ]
+  },
+  {
+   "drug_id": "celecoxib",
+   "gene": "CYP2C9",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "Avoid standard dose (75 mg) clopidogrel if possible. Use prasugrel or ticagrelor at standard dose if no contraindication."
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "NVI",
+     "classification": "Moderate",
+     "recommendation": "Consider an alternative P2Y12 inhibitor at standard dose if clinically indicated and no contraindication."
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "Avoid standard dose clopidogrel (75 mg) if possible. Use prasugrel or ticagrelor at standard dose if no contraindication."
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "NVI",
+     "classification": "Moderate",
+     "recommendation": "Consider an alternative P2Y12 inhibitor at standard dose if clinically indicated and no contraindication."
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Poor Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "Avoid clopidogrel if possible. Use prasugrel or ticagrelor at standard dose if no contraindication."
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "Moderate",
+     "recommendation": "Avoid clopidogrel if possible. Use prasugrel or ticagrelor at standard dose if no contraindication."
+    },
+    {
+     "population": "NVI",
+     "classification": "Moderate",
+     "recommendation": "Avoid clopidogrel if possible. Consider an alternative P2Y12 inhibitor at standard dose if clinically indicated and no contraindication."
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "If considering clopidogrel, use at standard dose (75 mg/day)"
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "Strong",
+     "recommendation": "If considering clopidogrel, use at standard dose (75 mg/day)"
+    },
+    {
+     "population": "NVI",
+     "classification": "Strong",
+     "recommendation": "If considering clopidogrel, use at standard dose (75 mg/day)"
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "Avoid clopidogrel if possible. Use prasugrel or ticagrelor at standard dose if no contraindication."
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "Moderate",
+     "recommendation": "Avoid clopidogrel if possible. Use prasugrel or ticagrelor at standard dose if no contraindication."
+    },
+    {
+     "population": "NVI",
+     "classification": "Moderate",
+     "recommendation": "Avoid clopidogrel if possible. Consider an alternative P2Y12 inhibitor at standard dose if clinically indicated and no contraindication."
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Rapid Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "If considering clopidogrel, use at standard dose (75 mg/day)"
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "NVI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "Strong",
+     "recommendation": "If considering clopidogrel, use at standard dose (75 mg/day)"
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "NVI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "clopidogrel",
+   "gene": "CYP2C19",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "CVI ACS PCI ",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "CVI non-ACS non-PCI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "NVI",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "codeine",
+   "gene": "CYP2D6",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Use codeine label recommended age- or weight-specific dosing. If no response and opioid use is warranted, consider a non-tramadol opioid."
+    }
+   ]
+  },
+  {
+   "drug_id": "codeine",
+   "gene": "CYP2D6",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Use codeine label recommended age- or weight-specific dosing."
+    }
+   ]
+  },
+  {
+   "drug_id": "codeine",
+   "gene": "CYP2D6",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Avoid codeine use because of possibility of diminished analgesia. If opioid use is warranted, consider a non-tramadol opioid."
+    }
+   ]
+  },
+  {
+   "drug_id": "codeine",
+   "gene": "CYP2D6",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Avoid codeine use because of potential for serious toxicity. If opioid use is warranted, consider a non-tramadol opioid."
+    }
+   ]
+  },
+  {
+   "drug_id": "codeine",
+   "gene": "CYP2D6",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended starting dose. Consider a slower titration schedule and lower maintenance dose than normal metabolizers."
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended starting dose. Consider a slower titration schedule and lower maintenance dose than normal metabolizers."
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Consider a clinically appropriate antidepressant not predominantly metabolized by CYP2C19. If citalopram or escitalopram are clinically appropriate, consider a lower starting dose, slower titration schedule and 50% reduction of the standard maintenance dose as compared to normal metabolizers."
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with recommended starting dose"
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Consider a clinically appropriate antidepressant not predominantly metabolized by CYP2C19. If citalopram or escitalopram are clinically appropriate, consider a lower starting dose, slower titration schedule and 50% reduction of the standard maintenance dose as compared to normal metabolizers."
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Rapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Optional",
+     "recommendation": "Initiate therapy with recommended starting dose. If patient does not adequately respond to recommended maintenance dosing, consider titrating to a higher maintenance dose or switching to a clinically appropriate alternative antidepressant not predominantly metabolized by CYP2C19."
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Consider a clinically appropriate alternative antidepressant not predominantly metabolized by CYP2C19. If citalopram or escitalopram are clinically appropriate, and adequate efficacy is not achieved at standard maintenance dosing, consider titrating to a higher maintenance dose."
+    }
+   ]
+  },
+  {
+   "drug_id": "escitalopram",
+   "gene": "CYP2C19",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "fluorouracil",
+   "gene": "DPYD",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Reduce starting dose by 50% followed by titration of dose based on toxicity or therapeutic drug monitoring (if available)."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Reduce starting dose by 50% followed by titration of dose based on toxicity or therapeutic drug monitoring (if available). Patients with the c.2846A>T/c.2846A>T genotype may require >50% reduction in starting dose."
+    }
+   ]
+  },
+  {
+   "drug_id": "fluorouracil",
+   "gene": "DPYD",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on genotype, there is no indication to change dose or therapy. Use label-recommended dosage and administration."
+    }
+   ]
+  },
+  {
+   "drug_id": "fluorouracil",
+   "gene": "DPYD",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Avoid use of 5-fluorouracil or 5-fluorouracil prodrug-based regimens. In the event, based on clinical advice, alternative agents are not considered a suitable therapeutic option, 5-fluorouracil should be administered at a strongly reduced dose with early therapeutic drug monitoring."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Avoid use of 5-fluorouracil or 5-fluorouracil prodrug-based regimens."
+    }
+   ]
+  },
+  {
+   "drug_id": "ibuprofen",
+   "gene": "CYP2C9",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended starting dose. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals."
+    },
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with lowest recommended starting dose. Titrate dose upward to clinical effect or maximum recommended dose with caution. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals. Carefully monitor adverse events such as blood pressure and kidney function during course of therapy."
+    }
+   ]
+  },
+  {
+   "drug_id": "ibuprofen",
+   "gene": "CYP2C9",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with recommended starting dose. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals."
+    }
+   ]
+  },
+  {
+   "drug_id": "ibuprofen",
+   "gene": "CYP2C9",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with 25-50% of the lowest recommended starting dose. Titrate dose upward to clinical effect or 25-50% of the maximum recommended dose with caution. In accordance with the prescribing information, use the lowest effective dosage for shortest duration consistent with individual patient treatment goals. Upward dose titration should not occur until after steady state is reached (at least 8 days for celecoxib after first dose in PMs). Carefully monitor adverse events such as blood pressure and kidney function during course of therapy. Alternatively, consider an alternate therapy not metabolized by CYP2C9 or not significantly impacted by CYP2C9 genetic variants in vivo."
+    }
+   ]
+  },
+  {
+   "drug_id": "ibuprofen",
+   "gene": "CYP2C9",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "metoprolol",
+   "gene": "CYP2D6",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate standard dosing"
+    }
+   ]
+  },
+  {
+   "drug_id": "metoprolol",
+   "gene": "CYP2D6",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Initiate standard dosing"
+    }
+   ]
+  },
+  {
+   "drug_id": "metoprolol",
+   "gene": "CYP2D6",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with lowest recommended starting dose. Carefully titrate dose upward to clinical effect or guideline-recommended dose; monitor more closely for bradycardia. Alternatively, consider selecting another beta-blocker."
+    }
+   ]
+  },
+  {
+   "drug_id": "metoprolol",
+   "gene": "CYP2D6",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation for metoprolol therapy due to insufficient evidence regarding diminished metoprolol effectiveness clinically"
+    }
+   ]
+  },
+  {
+   "drug_id": "metoprolol",
+   "gene": "CYP2D6",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Optional",
+     "recommendation": "Initiate standard starting daily dose. For chronic therapy (>12 weeks) and efficacy achieved, consider 50% reduction in daily dose and monitor for continued efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Optional",
+     "recommendation": "Initiate standard starting daily dose. For chronic therapy (>12 weeks) and efficacy achieved, consider 50% reduction in daily dose and monitor for continued efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate standard starting daily dose. For chronic therapy (>12 weeks) and efficacy achieved, consider 50% reduction in daily dose and monitor for continued efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate standard starting daily dose. Consider increasing dose by 50-100% for the treatment of H. pylori infection and erosive esophagitis. Daily dose may be given in divided doses.\nMonitor for efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate standard starting daily dose. For chronic therapy (>12 weeks) and efficacy achieved, consider 50% reduction in daily dose and monitor for continued efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Rapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Initiate standard starting daily dose. Consider increasing dose by 50-100% for the treatment of H. pylori infection and erosive esophagitis. Daily dose may be given in divided doses.\nMonitor for efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Optional",
+     "recommendation": "Increase starting daily dose by 100%. Daily dose may be given in divided doses. Monitor for efficacy."
+    }
+   ]
+  },
+  {
+   "drug_id": "omeprazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "phenytoin",
+   "gene": "CYP2C9",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "PHT naive",
+     "classification": "Moderate",
+     "recommendation": "No adjustments needed from typical dosing strategies. Subsequent doses should be adjusted according to therapeutic drug monitoring, response and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN and patients should be carefully monitored according to a usual standard."
+    },
+    {
+     "population": "PHT naive",
+     "classification": "Moderate",
+     "recommendation": "For first dose, use typical initial or loading dose. For subsequent doses, use approximately 25% less than typical maintenance dose. Subsequent doses should be adjusted according to therapeutic drug monitoring, response and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN, and patients should be carefully monitored according to a usual standard."
+    },
+    {
+     "population": "PHT use >3mos",
+     "classification": "Moderate",
+     "recommendation": "No adjustments needed from typical dosing strategies. Subsequent doses should be adjusted according to therapeutic drug monitoring, response and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN and patients should be carefully monitored according to a usual standard."
+    },
+    {
+     "population": "PHT use >3mos",
+     "classification": "Moderate",
+     "recommendation": "For first dose, use typical initial or loading dose. For subsequent doses, use approximately 25% less than typical maintenance dose. Subsequent doses should be adjusted according to therapeutic drug monitoring, response and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN, and patients should be carefully monitored according to a usual standard."
+    }
+   ]
+  },
+  {
+   "drug_id": "phenytoin",
+   "gene": "CYP2C9",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "PHT naive",
+     "classification": "Strong",
+     "recommendation": "No adjustments needed from typical dosing strategies. Subsequent doses should be adjusted according to therapeutic drug monitoring, response, and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN and patients should be carefully monitored according to a usual standard."
+    },
+    {
+     "population": "PHT use >3mos",
+     "classification": "Strong",
+     "recommendation": "No adjustments needed from typical dosing strategies. Subsequent doses should be adjusted according to therapeutic drug monitoring, response, and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN and patients should be carefully monitored according to a usual standard."
+    }
+   ]
+  },
+  {
+   "drug_id": "phenytoin",
+   "gene": "CYP2C9",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "PHT naive",
+     "classification": "Strong",
+     "recommendation": "For first dose, use typical initial or loading dose. For subsequent doses use approximately 50% less than typical maintenance dose. Subsequent doses should be adjusted according to therapeutic drug monitoring, response, and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN, and patients should be carefully monitored according to a usual standard."
+    },
+    {
+     "population": "PHT use >3mos",
+     "classification": "Strong",
+     "recommendation": "For first dose, use typical initial or loading dose. For subsequent doses use approximately 50% less than typical maintenance dose. Subsequent doses should be adjusted according to therapeutic drug monitoring, response, and side effects. An HLA-B*15:02 negative test does not eliminate the risk of phenytoin-induced SJS/TEN, and patients should be carefully monitored according to a usual standard."
+    }
+   ]
+  },
+  {
+   "drug_id": "phenytoin",
+   "gene": "CYP2C9",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "PHT naive",
+     "classification": "n/a",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "PHT use >3mos",
+     "classification": "n/a",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "pravastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe desired starting dose and adjust doses of pravastatin based on disease-specific guidelines. Prescriber should be aware of possible increased risk for myopathy with pravastatin especially with doses >40mg per day."
+    }
+   ]
+  },
+  {
+   "drug_id": "pravastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Increased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses based on disease-specific guidelines."
+    }
+   ]
+  },
+  {
+   "drug_id": "pravastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Normal Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses based on disease-specific guidelines."
+    }
+   ]
+  },
+  {
+   "drug_id": "pravastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Poor Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe ≤40mg as a starting dose and adjust doses of pravastatin based on disease-specific guidelines. If patient is tolerating 40mg dose but higher potency is needed, a higher dose (>40mg) or an alternative statin (see Figure 1 of of PMID: 35152405 for recommendations for alternative statins) or combination therapy (i.e. pravastatin plus non-statin guideline directed medical therapy)(PMID: 30423391) could be considered. Prescriber should be aware of possible increased risk for myopathy especially with pravastatin doses >40mg."
+    }
+   ]
+  },
+  {
+   "drug_id": "pravastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Possible Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe desired starting dose and adjust doses of pravastatin based on disease-specific guidelines. Prescriber should be aware of possible increased risk for myopathy with pravastatin especially with doses >40mg per day."
+    }
+   ]
+  },
+  {
+   "drug_id": "pravastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "rosuvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines. Prescriber should be aware of possible increased risk for myopathy especially for doses >20mg."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on SLCO1B1 status, prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines. Prescriber should be aware of possible increased risk for myopathy especially for doses >20mg. ABCG2 genotype result is not available."
+    }
+   ]
+  },
+  {
+   "drug_id": "rosuvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Increased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on SLCO1B1 status, prescribe desired starting dose and adjust doses based on disease-specific guidelines. ABCG2 genotype result is not available."
+    }
+   ]
+  },
+  {
+   "drug_id": "rosuvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Normal Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on SLCO1B1 status, prescribe desired starting dose and adjust doses based on disease-specific guidelines. ABCG2 genotype result is not available."
+    }
+   ]
+  },
+  {
+   "drug_id": "rosuvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Poor Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Prescribe ≤20mg as a starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines. If dose > 20mg needed for desired efficacy, consider combination therapy (i.e., rosuvastatin plus non-statin guideline directed medical therapy) (PMID: 30423391)."
+    },
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Based on SLCO1B1 status, prescribe ≤20mg as a starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines If dose >20mg needed for desired efficacy, consider combination therapy (i.e. rosuvastatin plus non-statin guideline directed medical therapy) (PMID: 30423391). ABCG2 genotype result is not available."
+    }
+   ]
+  },
+  {
+   "drug_id": "rosuvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Possible Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines. Prescriber should be aware of possible increased risk for myopathy especially for doses >20mg."
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on SLCO1B1 status, prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines. Prescriber should be aware of possible increased risk for myopathy especially for doses >20mg. ABCG2 genotype result is not available."
+    }
+   ]
+  },
+  {
+   "drug_id": "rosuvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "n/a",
+     "recommendation": "n/a"
+    },
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Based on ABCG2 status, prescribe desired starting dose and adjust doses of rosuvastatin based on disease-specific and specific population guidelines. SLCO1B1 phenotype could not be assigned based on genotyping."
+    }
+   ]
+  },
+  {
+   "drug_id": "simvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe an alternative statin depending on the desired potency (see Figure 1 of PMID: 35152405 for recommendations for alternative statins). If simvastatin therapy is warranted, limit dose to <20mg/day."
+    }
+   ]
+  },
+  {
+   "drug_id": "simvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Increased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses based on disease-specific guidelines."
+    }
+   ]
+  },
+  {
+   "drug_id": "simvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Normal Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe desired starting dose and adjust doses based on disease-specific guidelines."
+    }
+   ]
+  },
+  {
+   "drug_id": "simvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Poor Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe an alternative statin depending on the desired potency (see Figure 1 of PMID: 35152405 for recommendations for alternative statins)."
+    }
+   ]
+  },
+  {
+   "drug_id": "simvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "Possible Decreased Function",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Prescribe an alternative statin depending on the desired potency (see Figure 1 of PMID: 35152405 for recommendations for alternative statins). If simvastatin therapy is warranted, limit dose to <20mg/day."
+    }
+   ]
+  },
+  {
+   "drug_id": "simvastatin",
+   "gene": "SLCO1B1",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "tamoxifen",
+   "gene": "CYP2D6",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Optional",
+     "recommendation": "Consider hormonal therapy such as an aromatase inhibitor for postmenopausal women or aromatase inhibitor along with ovarian function suppression in premenopausal women, given that these approaches are superior to tamoxifen regardless of CYP2D6 genotype (PMID 26211827). If aromatase inhibitor use is contraindicated, consideration should be given to use a higher but FDA approved tamoxifen dose (40 mg/day)(PMID 27226358). Avoid CYP2D6 strong to weak inhibitors."
+    },
+    {
+     "population": "general",
+     "classification": "Moderate",
+     "recommendation": "Consider hormonal therapy such as an aromatase inhibitor for postmenopausal women or aromatase inhibitor along with ovarian function suppression in premenopausal women, given that these approaches are superior to tamoxifen regardless of CYP2D6 genotype (PMID 26211827). If aromatase inhibitor use is contraindicated, consideration should be given to use a higher but FDA approved tamoxifen dose (40 mg/day)(PMID 27226358). Avoid CYP2D6 strong to weak inhibitors."
+    }
+   ]
+  },
+  {
+   "drug_id": "tamoxifen",
+   "gene": "CYP2D6",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Avoid moderate and strong CYP2D6 inhibitors. Initiate therapy with recommended standard of care dosing (tamoxifen 20 mg/day)."
+    }
+   ]
+  },
+  {
+   "drug_id": "tamoxifen",
+   "gene": "CYP2D6",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Recommend alternative hormonal therapy such as an aromatase inhibitor for postmenopausal women or aromatase inhibitor along with ovarian function suppression in premenopausal women given that these approaches are superior to tamoxifen regardless of CYP2D6 genotype (PMID 26211827) and based on knowledge that CYP2D6 poor metabolizers switched from tamoxifen to anastrozole do not have an increased risk of recurrence (PMID 23213055). Note, higher dose tamoxifen (40 mg/day) increases but does not normalize endoxifen concentrations and can be considered if there are contraindications to aromatase inhibitor therapy (PMID 27226358, 21768473)."
+    }
+   ]
+  },
+  {
+   "drug_id": "tamoxifen",
+   "gene": "CYP2D6",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "general",
+     "classification": "Strong",
+     "recommendation": "Avoid moderate and strong CYP2D6 inhibitors. Initiate therapy with recommended standard of care dosing (tamoxifen 20 mg/day)."
+    }
+   ]
+  },
+  {
+   "drug_id": "tamoxifen",
+   "gene": "CYP2D6",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "general",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended standard of care dosing"
+    },
+    {
+     "population": "adults",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended standard of care dosing"
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Intermediate Metabolizer",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended standard of care dosing"
+    },
+    {
+     "population": "adults",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended standard of care dosing"
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Likely Poor Metabolizer",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include liposomal amphotericin B and posaconazole. In the event that voriconazole is considered to be the most appropriate agent, based on clinical advice, for a patient with poor metabolizer genotype, voriconazole should be administered at a preferably lower than standard dosage with careful therapeutic drug monitoring."
+    },
+    {
+     "population": "adults",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include isavuconazole, liposomal amphotericin B, and posaconazole. In the event that voriconazole is considered to be the most appropriate agent, based on clinical advice, for a patient with poor metabolizer genotype, voriconazole should be administered at a preferably lower than standard dosage with careful therapeutic drug monitoring."
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Normal Metabolizer",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with recommended standard of care dosing"
+    },
+    {
+     "population": "adults",
+     "classification": "Strong",
+     "recommendation": "Initiate therapy with recommended standard of care dosing"
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Poor Metabolizer",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include liposomal amphotericin B and posaconazole. In the event that voriconazole is considered to be the most appropriate agent, based on clinical advice, for a patient with poor metabolizer genotype, voriconazole should be administered at a preferably lower than standard dosage with careful therapeutic drug monitoring."
+    },
+    {
+     "population": "adults",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include isavuconazole, liposomal amphotericin B, and posaconazole. In the event that voriconazole is considered to be the most appropriate agent, based on clinical advice, for a patient with poor metabolizer genotype, voriconazole should be administered at a preferably lower than standard dosage with careful therapeutic drug monitoring."
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Rapid Metabolizer",
+   "items": [
+    {
+     "population": "adults",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include isavuconazole, liposomal amphotericin B, and posaconazole."
+    },
+    {
+     "population": "pediatrics",
+     "classification": "Moderate",
+     "recommendation": "Initiate therapy with recommended standard of care dosing. Use therapeutic drug monitoring to titrate dose to therapeutic trough concentrations."
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "Ultrarapid Metabolizer",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include liposomal amphotericin B and posaconazole."
+    },
+    {
+     "population": "adults",
+     "classification": "Moderate",
+     "recommendation": "Choose an alternative agent that is not dependent on CYP2C19 metabolism as primary therapy in lieu of voriconazole. Such agents include isavuconazole, liposomal amphotericin B, and posaconazole."
+    }
+   ]
+  },
+  {
+   "drug_id": "voriconazole",
+   "gene": "CYP2C19",
+   "phenotype_class": "indeterminate",
+   "items": [
+    {
+     "population": "pediatrics",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    },
+    {
+     "population": "adults",
+     "classification": "No Recommendation",
+     "recommendation": "No recommendation"
+    }
+   ]
+  }
+ ]
+}

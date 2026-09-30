@@ -1,0 +1,19 @@
+{
+  "module": "project_context/lessons",
+  "public": ["load", "exists", "lesson_problems", "lesson_groups", "for_subject", "for_modules", "as_corpus", "selftest", "main"],
+  "depends_on": [],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "одна ответственность: форма и подача извлечённых уроков одного проекта (lessons.yaml в его корне); ни БД, ни писем",
+      "D2": "поверхность объявлена: проверка формы, три способа подачи (предмет, модули, группы), selftest и CLI main; внутреннее — _private",
+      "D3": "только stdlib и yaml; git зовётся для улики git:<sha> в корне самого проекта",
+      "D4": "~330 строк вместе с selftest",
+      "D5": "selftest (21 поломка) + tests/unit/test_project_context_lessons.py (форма уроков health, один дом, подача preflight)",
+      "D6": "общий с indexer инвариант «ложные пути приходят из одного дома» выражен функцией as_corpus и тестом test_single_home_manifest_has_no_corpus"
+    },
+    "rationale": "Перенесён из соседнего проекта scripts/lessons.py и обобщён: дома адресов и статусы подачи — в данных проекта. Переписывается с нуля по selftest и справке docs/reference/lessons_format.md.",
+    "date": "2026-09-28",
+    "oracle": "project_context/lessons.py::selftest + tests/unit/test_project_context_lessons.py"
+  }
+}

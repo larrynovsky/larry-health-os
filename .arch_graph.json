@@ -1,0 +1,1311 @@
+{
+  "agent_reports_db": [
+    "health_db"
+  ],
+  "alerts_db": [
+    "health_db"
+  ],
+  "api_spend_log": [
+    "_time_inject"
+  ],
+  "assessment_bot_handlers": [
+    "_fmt_helpers",
+    "_time_inject",
+    "assessment_dialog",
+    "health_db",
+    "i18n",
+    "notify"
+  ],
+  "assessment_dialog": [
+    "_fmt_helpers",
+    "_time_inject",
+    "assessment_importer",
+    "assessment_scheduler",
+    "config_db",
+    "genome_intake",
+    "health_db",
+    "i18n",
+    "notify",
+    "problems_db",
+    "profile_db",
+    "secrets_paths",
+    "treatment_db"
+  ],
+  "assessment_importer": [
+    "_time_inject",
+    "assessment_scheduler",
+    "health_db",
+    "i18n"
+  ],
+  "assessment_scheduler": [
+    "_fmt_helpers",
+    "_time_inject",
+    "assessment_importer",
+    "health_db",
+    "i18n",
+    "secrets_paths"
+  ],
+  "assessments_db": [
+    "health_db"
+  ],
+  "backfill_critical_flag": [
+    "health_db",
+    "memory_salience"
+  ],
+  "backfill_effect_alleles": [
+    "effect_allele",
+    "genome_annotator",
+    "health_db"
+  ],
+  "backfill_hae_coverage": [
+    "_time_inject",
+    "hae_checker",
+    "health_db"
+  ],
+  "belief_contract": [
+    "_time_inject",
+    "health_db",
+    "secrets_paths"
+  ],
+  "beliefs": [
+    "health_db",
+    "memory_facts_db"
+  ],
+  "brief_cards": [
+    "hai_analysis",
+    "metrics_db"
+  ],
+  "brief_pipeline": [
+    "_time_inject",
+    "brief_cards",
+    "brief_gate",
+    "calendar_client",
+    "env_context",
+    "food_profile",
+    "genome_context",
+    "health_ai",
+    "health_db",
+    "location_signal",
+    "safety_net",
+    "trails"
+  ],
+  "brief_state": [
+    "brief_gate",
+    "config_db"
+  ],
+  "calendar_client": [
+    "_time_inject",
+    "secrets_paths"
+  ],
+  "calendar_sync": [
+    "_time_inject",
+    "health_db"
+  ],
+  "cbcr_hypothesis": [
+    "_time_inject",
+    "cbcr_lookup",
+    "gp_agent",
+    "hai_core",
+    "llm_client"
+  ],
+  "check_contracts": [
+    "health_db",
+    "infra_config",
+    "secrets_paths"
+  ],
+  "check_wellally_updates": [
+    "_time_inject",
+    "i18n",
+    "notify"
+  ],
+  "checkin_agent": [
+    "_time_inject",
+    "gp_context",
+    "hai_core",
+    "health_db",
+    "llm_client",
+    "patient_context",
+    "region_pack"
+  ],
+  "checkins_db": [
+    "health_db"
+  ],
+  "clinical_kb": [
+    "_time_inject",
+    "health_db",
+    "i18n"
+  ],
+  "config_db": [
+    "health_db"
+  ],
+  "consilium_roster": [
+    "_time_inject",
+    "health_db"
+  ],
+  "constitution_analysis": [
+    "_time_inject",
+    "health_db",
+    "promethease_context"
+  ],
+  "constitutions_db": [
+    "health_db"
+  ],
+  "consult_prep": [
+    "_time_inject",
+    "config_db",
+    "genome_context",
+    "hai_core",
+    "hai_hypotheses",
+    "health_db",
+    "i18n",
+    "infra_config",
+    "labs_db",
+    "llm_client",
+    "notify",
+    "patient_context",
+    "treatment_summary"
+  ],
+  "consult_sessions_db": [
+    "health_db"
+  ],
+  "consultations_db": [
+    "health_db"
+  ],
+  "correlation_gate": [
+    "lab_canon",
+    "signal_family"
+  ],
+  "cpic_reference_db": [
+    "health_db",
+    "i18n"
+  ],
+  "daemon_liveness": [
+    "infra_config",
+    "plist_env_liveness"
+  ],
+  "dashboard": [
+    "daemon_liveness",
+    "dashboard_db",
+    "dashboard_state",
+    "health_db",
+    "infra_config"
+  ],
+  "dashboard_db": [
+    "health_db"
+  ],
+  "dashboard_filters": [
+    "_time_inject"
+  ],
+  "dashboard_state": [
+    "dashboard_filters"
+  ],
+  "dashboard_views": [
+    "i18n"
+  ],
+  "db_regression": [
+    "health_db",
+    "infra_config"
+  ],
+  "desc_translation": [
+    "hai_core",
+    "llm_client"
+  ],
+  "diagnosis_guard": [
+    "pii_census"
+  ],
+  "doc_agent": [
+    "_time_inject",
+    "doc_translation",
+    "git_facts",
+    "hai_core",
+    "i18n",
+    "intent_registry",
+    "llm_client",
+    "notify",
+    "secret_guard",
+    "secrets_paths"
+  ],
+  "doc_intake": [
+    "doc_triage",
+    "media_intake"
+  ],
+  "doc_reviews_db": [
+    "health_db"
+  ],
+  "doc_triage": [
+    "hai_core"
+  ],
+  "ecg_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "env_context": [
+    "brief_cards",
+    "config_db",
+    "env_sources",
+    "location_signal",
+    "region_pack"
+  ],
+  "env_sources": [
+    "region_pack"
+  ],
+  "events_db": [
+    "health_db"
+  ],
+  "experiments_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "field_reviews_db": [
+    "health_db",
+    "lab_canon"
+  ],
+  "fill_description_ru": [
+    "hai_core",
+    "health_db"
+  ],
+  "fix_palindromic_het": [
+    "health_db"
+  ],
+  "food_floor": [
+    "clinical_kb",
+    "health_db"
+  ],
+  "food_genome": [
+    "clinical_kb",
+    "i18n",
+    "region_pack",
+    "seasonal_produce"
+  ],
+  "food_profile": [
+    "clinical_kb",
+    "food_floor",
+    "food_genome",
+    "food_staples",
+    "generated_food_rules",
+    "health_db",
+    "i18n",
+    "repertoire",
+    "taste"
+  ],
+  "food_quarterly": [
+    "_time_inject",
+    "clinical_kb",
+    "food_profile",
+    "health_db",
+    "i18n",
+    "secrets_paths"
+  ],
+  "food_rule_generator": [
+    "_time_inject",
+    "clinical_kb",
+    "food_floor",
+    "food_genome",
+    "food_profile",
+    "food_staples",
+    "generated_food_rules",
+    "hai_core",
+    "llm_client"
+  ],
+  "food_rule_review": [
+    "cbcr_hypothesis",
+    "generated_food_rules",
+    "i18n"
+  ],
+  "food_staples": [
+    "i18n"
+  ],
+  "gen_arch_blocks": [
+    "gen_blueprint",
+    "health_db",
+    "infra_config"
+  ],
+  "gen_blueprint": [
+    "desc_translation"
+  ],
+  "gen_key_paths": [
+    "infra_config"
+  ],
+  "gen_schedule": [
+    "infra_config"
+  ],
+  "gen_testing_contracts": [
+    "gen_blueprint"
+  ],
+  "generate_constitutions": [
+    "_time_inject",
+    "belief_contract",
+    "config_db",
+    "correlation_gate",
+    "doc_translation",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "infra_config",
+    "labs_db",
+    "llm_client",
+    "profile_reconciler",
+    "secrets_paths"
+  ],
+  "generate_test": [
+    "doc_translation"
+  ],
+  "generated_food_rules": [
+    "health_db"
+  ],
+  "genome_annotator": [
+    "health_db"
+  ],
+  "genome_context": [
+    "hai_core",
+    "health_db",
+    "llm_client"
+  ],
+  "genome_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "genome_intake": [
+    "config_db",
+    "genome_pipeline",
+    "health_db",
+    "i18n",
+    "infra_config",
+    "link_fetch",
+    "notify"
+  ],
+  "genome_parser": [
+    "_time_inject",
+    "health_db"
+  ],
+  "genome_pipeline": [
+    "backfill_effect_alleles",
+    "fix_palindromic_het",
+    "generate_constitutions",
+    "genome_annotator",
+    "genome_parser",
+    "health_db",
+    "profile_reconciler",
+    "prs_pipeline"
+  ],
+  "genome_update_agent": [
+    "_fmt_helpers",
+    "_time_inject",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "llm_client"
+  ],
+  "genome_weights": [
+    "_time_inject",
+    "pgs_reference"
+  ],
+  "google_calendar_fetcher": [
+    "_time_inject",
+    "infra_config",
+    "secrets_paths"
+  ],
+  "gp_agent": [
+    "_fmt_helpers",
+    "_time_inject",
+    "beliefs",
+    "brief_pipeline",
+    "brief_state",
+    "brief_validator",
+    "config_db",
+    "env_context",
+    "food_rule_review",
+    "genome_context",
+    "gp_context",
+    "hai_core",
+    "hai_hypotheses",
+    "health_ai",
+    "health_db",
+    "i18n",
+    "labs_db",
+    "lifestyle_agents",
+    "llm_client",
+    "location_signal",
+    "patient_context",
+    "promethease_context",
+    "safety_net",
+    "wellally_consult"
+  ],
+  "gp_context": [
+    "_fmt_helpers",
+    "_time_inject",
+    "belief_contract",
+    "clinical_kb",
+    "correlation_gate",
+    "ecg_db",
+    "genome_context",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "labs_db",
+    "lifestyle_agents",
+    "patient_context"
+  ],
+  "hae_checker": [
+    "_time_inject",
+    "health_db",
+    "import_apple_health",
+    "infra_config",
+    "metrics_db"
+  ],
+  "hae_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "hai_analysis": [
+    "_time_inject",
+    "health_db",
+    "metrics_db"
+  ],
+  "hai_chat": [
+    "_time_inject",
+    "config_db",
+    "gp_context",
+    "hai_context",
+    "hai_core",
+    "hai_reports",
+    "health_db",
+    "memory_facts_db"
+  ],
+  "hai_context": [
+    "_fmt_helpers",
+    "_time_inject",
+    "calendar_client",
+    "genome_context",
+    "gp_context",
+    "health_db",
+    "lab_canon",
+    "labs_db",
+    "lifestyle_agents",
+    "metrics_db",
+    "patient_context"
+  ],
+  "hai_core": [
+    "_time_inject",
+    "calendar_client",
+    "health_db",
+    "i18n",
+    "llm_client",
+    "patient_context",
+    "region_pack"
+  ],
+  "hai_hypotheses": [
+    "_time_inject",
+    "cbcr_hypothesis",
+    "gp_context",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "patient_context",
+    "secrets_paths"
+  ],
+  "hai_reports": [
+    "_fmt_helpers",
+    "_time_inject",
+    "clinical_kb",
+    "gp_context",
+    "hai_core",
+    "health_db",
+    "infra_config",
+    "pubmed_client",
+    "wellally_consult"
+  ],
+  "health_ai": [
+    "hai_analysis",
+    "hai_chat",
+    "hai_context",
+    "hai_core",
+    "hai_hypotheses",
+    "hai_reports"
+  ],
+  "health_db": [
+    "_time_inject",
+    "agent_reports_db",
+    "alerts_db",
+    "assessments_db",
+    "checkins_db",
+    "clinical_kb",
+    "config_db",
+    "constitutions_db",
+    "consult_sessions_db",
+    "consultations_db",
+    "cpic_reference_db",
+    "doc_reviews_db",
+    "events_db",
+    "experiments_db",
+    "field_reviews_db",
+    "food_floor",
+    "generated_food_rules",
+    "genome_db",
+    "hae_db",
+    "hai_context",
+    "hypotheses_db",
+    "i18n",
+    "import_status_db",
+    "infra_config",
+    "lab_canon",
+    "labs_db",
+    "memory_db",
+    "metrics_db",
+    "norm_documents",
+    "periods_db",
+    "problems_db",
+    "profile_db",
+    "proposals_db",
+    "protocols_db",
+    "quarantine_db",
+    "rules_db",
+    "tasks_db",
+    "treatment_db",
+    "workouts_db"
+  ],
+  "heldout_readiness": [
+    "i18n"
+  ],
+  "hypotheses_db": [
+    "health_db"
+  ],
+  "hypothesis_consilium_eval": [
+    "_time_inject",
+    "consilium_roster",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "labs_db",
+    "lifestyle_agents",
+    "llm_client",
+    "patient_context",
+    "wellally_consult"
+  ],
+  "hypothesis_lab_linker": [
+    "health_db"
+  ],
+  "hypothesis_resolution": [
+    "_time_inject",
+    "hai_hypotheses",
+    "health_db",
+    "hypothesis_consilium_eval",
+    "i18n",
+    "notify"
+  ],
+  "hypothesis_semantic_check": [
+    "_time_inject",
+    "assessment_scheduler",
+    "hai_core",
+    "health_db"
+  ],
+  "i18n": [
+    "profile_db"
+  ],
+  "import_all": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "hypothesis_lab_linker",
+    "import_coordinator",
+    "infra_config",
+    "lab_intake_watcher"
+  ],
+  "import_apple_health": [
+    "_time_inject",
+    "health_db",
+    "infra_config"
+  ],
+  "import_coordinator": [
+    "config_db",
+    "health_db"
+  ],
+  "import_fitdays": [
+    "_time_inject",
+    "health_db",
+    "infra_config"
+  ],
+  "import_hr_activity": [
+    "health_db",
+    "import_apple_health"
+  ],
+  "import_medical_docs": [
+    "health_db"
+  ],
+  "import_medical_events": [
+    "config_db",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "infra_config",
+    "lab_schedule_extractor",
+    "link_fetch",
+    "llm_client",
+    "notify",
+    "problems_db",
+    "treatment_db",
+    "treatment_extractor"
+  ],
+  "import_oura": [
+    "health_db",
+    "infra_config",
+    "secrets_paths"
+  ],
+  "import_status_db": [
+    "health_db"
+  ],
+  "import_watchdog": [
+    "health_db",
+    "import_status_db",
+    "notify"
+  ],
+  "integrity_tests": [
+    "_time_inject",
+    "agent_reports_db",
+    "assessment_importer",
+    "assessment_scheduler",
+    "belief_contract",
+    "cbcr_lookup",
+    "clinical_kb",
+    "config_db",
+    "correlation_gate",
+    "cpic_reference_db",
+    "daemon_liveness",
+    "db_regression",
+    "diagnosis_guard",
+    "doc_translation",
+    "ecg_db",
+    "finding_identity",
+    "generate_constitutions",
+    "genome_db",
+    "git_facts",
+    "google_calendar_fetcher",
+    "gp_context",
+    "hae_checker",
+    "health_db",
+    "heldout_readiness",
+    "i18n",
+    "import_medical_events",
+    "infra_config",
+    "intent_registry",
+    "lab_canon",
+    "lab_intake_watcher",
+    "lab_oracles",
+    "lab_promote",
+    "labs_db",
+    "log_rotate",
+    "loinc_match",
+    "memory_facts_db",
+    "metrics_db",
+    "morning_test_summary",
+    "norm_documents",
+    "owner_weekly",
+    "parked_decisions",
+    "pgs_reference",
+    "pii_census",
+    "plist_env_liveness",
+    "producer_registry",
+    "profile_reconciler",
+    "proposals_db",
+    "pubmed_client",
+    "quarantine_db",
+    "safety_net",
+    "secrets_paths",
+    "security_sensors",
+    "signal_family",
+    "stderr_watch",
+    "time_contract_sensor",
+    "triage_agent",
+    "visual_db",
+    "weekly_digest"
+  ],
+  "lab_backfill": [
+    "_time_inject",
+    "health_db",
+    "infra_config",
+    "lab_oracles",
+    "lab_recognizer",
+    "lab_specimen",
+    "labs_db"
+  ],
+  "lab_backfill_report": [
+    "health_db"
+  ],
+  "lab_drytest": [
+    "hai_core",
+    "health_db",
+    "infra_config"
+  ],
+  "lab_extractor": [
+    "_time_inject",
+    "hai_core",
+    "infra_config",
+    "llm_client"
+  ],
+  "lab_freshness_twotier": [
+    "_time_inject",
+    "health_db",
+    "lab_canon"
+  ],
+  "lab_fuzzy": [
+    "health_db"
+  ],
+  "lab_intake_watcher": [
+    "_time_inject",
+    "daemon_liveness",
+    "genome_intake",
+    "health_db",
+    "i18n",
+    "import_all",
+    "import_medical_events",
+    "infra_config",
+    "lab_backfill",
+    "link_fetch",
+    "notify",
+    "plist_env_liveness"
+  ],
+  "lab_oracles": [
+    "lab_canon"
+  ],
+  "lab_promote": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "lab_canon",
+    "lab_oracles",
+    "labs_db"
+  ],
+  "lab_recognizer": [
+    "hai_core",
+    "lab_canon"
+  ],
+  "lab_reconcile": [
+    "_time_inject",
+    "health_db",
+    "import_all",
+    "lab_backfill"
+  ],
+  "lab_review_sheet": [
+    "health_db",
+    "lab_backfill",
+    "lab_recognizer"
+  ],
+  "lab_schedule_extractor": [
+    "hai_core",
+    "health_db",
+    "llm_client"
+  ],
+  "lab_specialized": [
+    "health_db",
+    "lab_canon",
+    "lab_promote",
+    "labs_db"
+  ],
+  "lab_staging_summary": [
+    "health_db",
+    "lab_canon",
+    "labs_db"
+  ],
+  "lab_triage": [
+    "health_db",
+    "lab_canon",
+    "lab_oracles"
+  ],
+  "labs_db": [
+    "_time_inject",
+    "clinical_kb",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "safety_net"
+  ],
+  "lifestyle_agents": [
+    "consilium_roster",
+    "genome_context",
+    "gp_context",
+    "hai_core",
+    "health_db",
+    "patient_context",
+    "promethease_context"
+  ],
+  "link_fetch": [
+    "genome_intake",
+    "i18n",
+    "notify"
+  ],
+  "literature_curator": [
+    "_time_inject",
+    "cbcr_hypothesis",
+    "hai_core",
+    "hai_hypotheses",
+    "health_db",
+    "hypothesis_semantic_check",
+    "i18n"
+  ],
+  "llm_client": [
+    "secret_guard"
+  ],
+  "location_signal": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "memory_facts_db"
+  ],
+  "log_rotate": [
+    "hae_checker",
+    "secrets_paths"
+  ],
+  "loinc_loader": [
+    "health_db"
+  ],
+  "loinc_match": [
+    "_time_inject",
+    "health_db",
+    "lab_canon",
+    "lab_promote",
+    "profile_db"
+  ],
+  "longitudinal_analysis": [
+    "_time_inject",
+    "belief_contract",
+    "correlation_gate",
+    "git_facts",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "metrics_db",
+    "notify",
+    "quarantine_db",
+    "secrets_paths",
+    "signal_family"
+  ],
+  "memory_config": [
+    "config_db"
+  ],
+  "memory_consolidation": [
+    "beliefs",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "memory_facts_db"
+  ],
+  "memory_db": [
+    "health_db"
+  ],
+  "memory_facts_db": [
+    "beliefs",
+    "health_db",
+    "memory_salience"
+  ],
+  "memory_salience": [
+    "memory_config"
+  ],
+  "memory_truthcheck": [
+    "health_db",
+    "memory_consolidation"
+  ],
+  "metrics_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "model_health_check": [
+    "hai_core",
+    "i18n",
+    "notify"
+  ],
+  "monthly_api_report": [
+    "_time_inject",
+    "i18n",
+    "model_health_check",
+    "notify"
+  ],
+  "monthly_consilium": [
+    "_time_inject",
+    "cbcr_hypothesis",
+    "consilium_roster",
+    "food_rule_generator",
+    "generated_food_rules",
+    "genome_context",
+    "gp_agent",
+    "gp_context",
+    "hai_analysis",
+    "hai_core",
+    "hai_hypotheses",
+    "health_db",
+    "hypothesis_semantic_check",
+    "i18n",
+    "llm_client",
+    "notify",
+    "patient_context",
+    "pharmaco_context",
+    "prs_context",
+    "traits_context",
+    "wellness_context"
+  ],
+  "morning_test_summary": [
+    "_time_inject",
+    "health_db",
+    "infra_config",
+    "plist_env_liveness",
+    "test_failure_handler"
+  ],
+  "night_cycle": [
+    "_fmt_helpers",
+    "_time_inject",
+    "agent_reports_db",
+    "finding_identity",
+    "i18n",
+    "morning_test_summary",
+    "night_investigator",
+    "notify",
+    "owner_gate",
+    "owner_nag",
+    "parked_decisions",
+    "weekly_digest"
+  ],
+  "night_investigator": [
+    "hai_core",
+    "i18n",
+    "llm_client",
+    "owner_gate"
+  ],
+  "night_repair": [
+    "infra_config",
+    "secrets_paths"
+  ],
+  "norm_documents": [
+    "_time_inject",
+    "lab_canon"
+  ],
+  "notify": [
+    "_time_inject",
+    "i18n",
+    "secrets_paths"
+  ],
+  "oura_freshness_check": [
+    "health_db",
+    "i18n",
+    "notify",
+    "secrets_paths"
+  ],
+  "owner_nag": [
+    "_fmt_helpers",
+    "_time_inject",
+    "i18n",
+    "notify",
+    "parked_decisions",
+    "plist_env_liveness",
+    "region_pack"
+  ],
+  "owner_weekly": [
+    "_time_inject",
+    "i18n",
+    "night_cycle",
+    "notify",
+    "owner_nag",
+    "parked_decisions",
+    "triage_agent"
+  ],
+  "parked_decisions": [
+    "_time_inject",
+    "config_db"
+  ],
+  "patient_context": [
+    "_time_inject",
+    "beliefs",
+    "health_db",
+    "labs_db",
+    "memory_config",
+    "memory_facts_db",
+    "memory_salience",
+    "problems_db",
+    "treatment_summary"
+  ],
+  "periods_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "pgs_discovery": [
+    "genome_weights",
+    "health_db",
+    "pgs_reference",
+    "prs_pipeline"
+  ],
+  "pharmaco_context": [
+    "cpic_reference_db",
+    "health_db"
+  ],
+  "pharmaco_pipeline": [
+    "_time_inject"
+  ],
+  "pii_census": [
+    "git_facts"
+  ],
+  "pilot_shadow": [
+    "notify"
+  ],
+  "plist_env_liveness": [
+    "infra_config",
+    "secrets_paths"
+  ],
+  "problems_db": [
+    "_time_inject",
+    "api_spend_log",
+    "clinical_kb",
+    "hai_core",
+    "health_db",
+    "llm_client"
+  ],
+  "producer_registry": [
+    "plist_env_liveness"
+  ],
+  "profile_db": [
+    "_time_inject",
+    "health_db",
+    "treatment_summary"
+  ],
+  "profile_reconciler": [
+    "_time_inject",
+    "health_db"
+  ],
+  "promethease_context": [
+    "_time_inject",
+    "health_db"
+  ],
+  "proposals_db": [
+    "_fmt_helpers",
+    "_time_inject",
+    "health_db",
+    "i18n",
+    "problems_db"
+  ],
+  "propose_uc": [
+    "_time_inject"
+  ],
+  "protocols_db": [
+    "_time_inject",
+    "health_db"
+  ],
+  "prs_context": [
+    "health_db"
+  ],
+  "prs_pipeline": [
+    "_time_inject",
+    "pgs_reference"
+  ],
+  "publication_reader": [
+    "_time_inject",
+    "hai_core",
+    "health_db",
+    "patient_context"
+  ],
+  "pubmed_client": [
+    "_time_inject",
+    "clinical_kb",
+    "pii_census",
+    "rules_db"
+  ],
+  "pubmed_searcher": [
+    "_time_inject",
+    "clinical_kb",
+    "health_db",
+    "pubmed_client"
+  ],
+  "quarantine_db": [
+    "health_db",
+    "signal_family"
+  ],
+  "reminders_backend": [
+    "_time_inject",
+    "config_db",
+    "secrets_paths"
+  ],
+  "reminders_sync": [
+    "health_db",
+    "notify",
+    "reminders_backend",
+    "secrets_paths"
+  ],
+  "repertoire": [
+    "i18n",
+    "taste"
+  ],
+  "rules_db": [
+    "health_db"
+  ],
+  "safety_net": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "labs_db",
+    "norm_documents",
+    "notify",
+    "rules_db"
+  ],
+  "seasonal_produce": [
+    "region_pack"
+  ],
+  "secret_guard": [
+    "secrets_paths"
+  ],
+  "security_sensors": [
+    "infra_config",
+    "plist_env_liveness"
+  ],
+  "service_trouble": [
+    "config_db",
+    "health_db"
+  ],
+  "signal_family": [
+    "_time_inject"
+  ],
+  "smoke_tests": [
+    "gp_agent",
+    "health_ai",
+    "health_db"
+  ],
+  "stderr_watch": [
+    "plist_env_liveness"
+  ],
+  "survivorship_analyzer": [
+    "_time_inject",
+    "assessment_scheduler",
+    "health_db"
+  ],
+  "survivorship_curator": [
+    "_time_inject",
+    "cbcr_hypothesis",
+    "hai_core",
+    "hai_hypotheses",
+    "health_db",
+    "hypothesis_semantic_check",
+    "i18n"
+  ],
+  "symptom_intake": [
+    "hai_core",
+    "hai_hypotheses",
+    "i18n",
+    "visual_db"
+  ],
+  "task_agent": [
+    "_fmt_helpers",
+    "_time_inject",
+    "config_db",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "labs_db",
+    "llm_client",
+    "location_signal",
+    "memory_facts_db",
+    "reminders_backend",
+    "reminders_sync",
+    "secrets_paths"
+  ],
+  "tasks_db": [
+    "gp_context",
+    "health_db"
+  ],
+  "test_failure_handler": [
+    "_time_inject",
+    "doc_translation",
+    "hai_core",
+    "i18n",
+    "infra_config",
+    "llm_client",
+    "notify"
+  ],
+  "test_oura": [
+    "secrets_paths"
+  ],
+  "time_contract_sensor": [
+    "_time_inject"
+  ],
+  "trails": [
+    "region_pack"
+  ],
+  "traits_context": [
+    "health_db"
+  ],
+  "traits_pipeline": [
+    "i18n"
+  ],
+  "treatment_db": [
+    "health_db"
+  ],
+  "treatment_extractor": [
+    "hai_core",
+    "health_db",
+    "llm_client"
+  ],
+  "treatment_summary": [
+    "health_db",
+    "i18n"
+  ],
+  "trend_alerts": [
+    "clinical_kb",
+    "health_db"
+  ],
+  "triage_agent": [
+    "_fmt_helpers",
+    "_time_inject",
+    "finding_identity",
+    "health_db",
+    "i18n",
+    "notify",
+    "task_agent"
+  ],
+  "validate_uc_index": [
+    "doc_translation"
+  ],
+  "vcf_import_pipeline": [
+    "_time_inject",
+    "genome_intake",
+    "health_db",
+    "pharmaco_pipeline",
+    "prs_pipeline",
+    "traits_pipeline",
+    "wellness_pipeline"
+  ],
+  "visual_db": [
+    "health_db"
+  ],
+  "weekly_digest": [
+    "_time_inject",
+    "config_db",
+    "diagnosis_guard",
+    "hai_core",
+    "i18n",
+    "llm_client",
+    "notify",
+    "pii_census",
+    "secrets_paths"
+  ],
+  "wellally_consult": [
+    "_fmt_helpers",
+    "_time_inject",
+    "consilium_roster",
+    "genome_context",
+    "hai_core",
+    "health_db",
+    "labs_db",
+    "lifestyle_agents",
+    "llm_client",
+    "patient_context",
+    "treatment_summary"
+  ],
+  "wellness_context": [
+    "health_db"
+  ],
+  "wellness_pipeline": [
+    "i18n",
+    "traits_pipeline"
+  ],
+  "workouts_db": [
+    "health_db"
+  ]
+}

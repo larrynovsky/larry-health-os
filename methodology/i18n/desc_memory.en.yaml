@@ -1,0 +1,2328 @@
+00987a44c320:
+  ru: Записать строку журнала за слитую нить и застейджить журнал. Возвращает строку
+  en: Write a log row for a merged thread and stage the log. Returns the row.
+00d146b9f3ff:
+  ru: 'F-14: `_canon` принимает глоссарий аргументом и не читает его ни разу — подтверждение человека отключено структурно. Зелёным станет в Области 2.'
+  en: 'F-14: `_canon` accepts the glossary as an argument and never reads it — human confirmation is structurally disabled. Will go green in Area 2.'
+01a79434ddda:
+  ru: Применяет подтверждённый тип документа из Telegram doc-review.
+  en: Applies confirmed document type from Telegram doc-review.
+01e47816dbbe:
+  ru: SQLite integrity_check ok per-tenant (нет B-tree corruption)
+  en: SQLite integrity_check ok per-tenant (no B-tree corruption)
+0225541ff21a:
+  ru: Сохраняет отчёт агента.
+  en: Saves an agent report.
+022ddaa22978:
+  ru: Возвращает {domain, title, body_md, generated_at, source_version} или None.
+  en: Returns {domain, title, body_md, generated_at, source_version} or None.
+030d8adf0a42:
+  ru: 'context_gate_orphan: каждый scheduled-производитель покрыт датчиком или'
+  en: 'context_gate_orphan: every scheduled producer is covered by a sensor or'
+031d0a4c248c:
+  ru: Сохраняет клинически значимые документы приёмом в медкарту (events + encounters).
+  en: Saves clinically significant appointment documents to the medical record (events + encounters).
+0341a1f45e90:
+  ru: Задавать ли вопрос заново, если на него уже отвечали.
+  en: Whether to ask a question again if it has already been answered.
+045285b94b6a:
+  ru: Сырые имена, которым РАЗНЫЕ форматы дали разные канонические имена.
+  en: Raw names to which DIFFERENT formats assigned different canonical names.
+050f2cba8a1e:
+  ru: открытые проблемы описаны простыми словами
+  en: open issues are described in plain language
+05a5469cd56a:
+  ru: 'Стрелка отклонения строки канона: пометка лаборатории, если напечатана; иначе'
+  en: 'Deviation arrow for a canon row: lab annotation if printed; otherwise inferred.'
+061157cd6287:
+  ru: GP monthly ≤35д.
+  en: GP monthly ≤35d.
+068d4b6dfaf3:
+  ru: Читает raw 23andMe TSV, импортирует в raw_snps.
+  en: Reads raw 23andMe TSV, imports into raw_snps.
+06aef27e8290:
+  ru: Ежемесячный отчёт с проверкой витальных метрик и задачами.
+  en: Monthly report with vital metrics check and tasks.
+075973687b12:
+  ru: True если чекин завис без завершения дольше ttl_hours часов.
+  en: True if a check-in has stalled without completion for longer than ttl_hours hours.
+075af454fad7:
+  ru: '§14 для вотчера входа: доказываем, что ЦИКЛ крутится, а не что процесс жив.'
+  en: '§14 for the entry watcher: proves the LOOP is spinning, not merely that the process is alive.'
+07fdf3f67bd9:
+  ru: Фальшивые стадии сна не должны существовать — а если появились, чинятся САМИ.
+  en: Fake sleep stages must not exist — and if they appear, they are fixed BY THEMSELVES.
+086c73fd1475:
+  ru: 'Lifecycle: pending старше порога → ''expired''. Возврат — сколько истекло.'
+  en: 'Lifecycle: pending older than threshold → ''expired''. Returns count of expired.'
+087842d0a75a:
+  ru: фармакогеномика синхронизирована с геномом (WFR)
+  en: pharmacogenomics synchronized with genome (WFR)
+08e0c1838510:
+  ru: 'специальные панели: электрофорез сходится сам с собой'
+  en: 'special panels: electrophoresis converges with itself'
+0989e812f65c:
+  ru: 'Совместимый вход для сведений: одна строка в понедельничную сводку.'
+  en: 'Compatible input for info entries: one row in the Monday digest.'
+09dd35105bee:
+  ru: Возвращает текстовый бриф для MDT-пакета данных. Использует существующий run().
+  en: Returns a text brief for the MDT data package. Uses the existing run().
+0a4d3d2381c4:
+  ru: Возвращает клинически значимые варианты, опционально фильтруя по домену.
+  en: Returns clinically significant variants, optionally filtered by domain.
+0b25c1af7c0e:
+  ru: evaluate_domain_need не должен молча падать в error-path.
+  en: evaluate_domain_need must not silently fail on the error-path.
+0ba16fc27a43:
+  ru: 'Пишет <page>.en.md рядом с русской тёплой страницей. Русскую меняет только одним:'
+  en: 'Writes <page>.en.md alongside the Russian warm page. Changes the Russian page in only one way:'
+0be5760b22d3:
+  ru: Помечает, что карточка подтверждения режима отправлена (не слать повторно).
+  en: Marks that the regimen confirmation card has been sent (do not send again).
+0c733465e13b:
+  ru: живость гейта квитанции замысла (§14, intent-receipts)
+  en: intent-receipt gate liveness (§14, intent-receipts)
+0c88c2281ad1:
+  ru: покрытие конверсии единиц лабов (несходимость)
+  en: unit conversion coverage for labs (non-convergence)
+0d0c37aeedfa:
+  ru: hai_context — контекст-блоки, tool execution, smart context.
+  en: hai_context — context blocks, tool execution, smart context.
+0d6122bd544f:
+  ru: Биометрия свежа У КАЖДОГО тенанта, а не только у владельца.
+  en: Biometrics are fresh for EVERY tenant, not only for the owner.
+0da918ab66e8:
+  ru: 'Чистая/тестируемая: какие ветки нитей старше grace_h НЕ доехали сюда.'
+  en: 'Pure/testable: which thread branches older than grace_h have NOT arrived here.'
+0dcb7b43c1c1:
+  ru: 'Текстовая строка для инжекта в контекст GP:'
+  en: 'Text string for injection into GP context:'
+0e1042fdc48c:
+  ru: Колонки daily_metrics, которые являются показателями (всё, кроме date и raw).
+  en: Columns of daily_metrics that are metric indicators (everything except date and raw).
+0e3a667d5f51:
+  ru: 6 мес — напоминание пересдать анализы
+  en: 6 months — reminder to resubmit lab tests
+0e682ec37cb1:
+  ru: Агрегированная статистика за период.
+  en: Aggregated statistics for a period.
+0e7da95f3ccb:
+  ru: Разбор поля `threads=` снимка MacBook — ОДИН дом формата для двух датчиков
+  en: Parsing the `threads=` field of a MacBook snapshot — ONE format home for two sensors.
+0eb489017174:
+  ru: monthly_consilium пишет agent_report('monthly_consilium'). Молчание = гипотезы
+  en: monthly_consilium writes agent_report('monthly_consilium'). Silence = hypotheses
+0f1b60d034cf:
+  ru: захват чужого файла в коммит (по ленте снимков)
+  en: capturing another's file into a commit (from snapshot feed)
+0f87f7fc6a6c:
+  ru: доставленные тексты судятся против канона
+  en: delivered texts are judged against the canon
+0fcadb72ebad:
+  ru: Помечает файл как импортированный. INSERT OR IGNORE — безопасен при гонках.
+  en: Marks a file as imported. INSERT OR IGNORE — safe under race conditions.
+108ceda8ca18:
+  ru: Блок «сдано один раз и не пересдавалось» для контекстов LLM.
+  en: Block «submitted once and never retaken» for LLM contexts.
+1102d24242a5:
+  ru: документы нормы свежи (sha256 / updated_at по next_check)
+  en: norm documents are fresh (sha256 / updated_at by next_check)
+11b215e4d0a1:
+  ru: 'SX-1.8: list active alerts, опционально фильтр по source LIKE pattern.'
+  en: 'SX-1.8: list active alerts, optionally filtered by source LIKE pattern.'
+1315db626412:
+  ru: копия работы нитей (не один экземпляр)
+  en: thread work copy count (not single instance)
+13238e3d0f44:
+  ru: Карта проекта (ARCH_SNAPSHOT ru/en) пересобрана после последнего закрытия нити.
+  en: Project map (ARCH_SNAPSHOT ru/en) rebuilt after the last thread closure.
+13d210ada5c0:
+  ru: Методология валидационного гейта load-bearing (спека = замысел подсистемы,
+  en: Validation gate methodology load-bearing (spec = subsystem intent,
+14045ada06b6:
+  ru: Генерирует первый вечерний вопрос с учётом контекста дня.
+  en: Generates the first evening check-in question taking the day's context into account.
+1442d70b0dcd:
+  ru: воспалит. прокси
+  en: inflammatory proxy
+149a1a8fa42b:
+  ru: Каждый инструмент — последнее заполнение не старше cadence_days + 14.
+  en: Each tool — last fill is no older than cadence_days + 14.
+14b093da96d2:
+  ru: 'Отложенный опросник, чей срок настал, снова ложится в outbox: status=''open'', sent_at=NULL.'
+  en: 'A deferred assessment whose due date has arrived is placed back in outbox: status=''open'', sent_at=NULL.'
+14cba84a8bb0:
+  ru: вид нормы вынесен (norm_kind ≠ unclassified)
+  en: norm kind declared (norm_kind ≠ unclassified)
+14e9a425c131:
+  ru: Подтверждает гипотезу (status → confirmed), возвращает payload.
+  en: Confirms the hypothesis (status → confirmed), returns payload.
+14f9ab000229:
+  ru: живость подъёмника вопросов
+  en: question elevator liveness
+150982fb61bd:
+  ru: 'Поля профиля, которые человек сообщает о себе сам: key → спецификация.'
+  en: 'Profile fields that a person reports about themselves: key → specification.'
+156b8e08c4c7:
+  ru: Открытые «судить нечем» тенанта по его соединению (read-only годится).
+  en: Open 'nothing to judge' items for the tenant by its connection (read-only is sufficient).
+15a38a71c525:
+  ru: утренний разбор человека-тенанта жив
+  en: tenant-human morning review is alive
+15b1697a09e4:
+  ru: У справочника LOINC ОДИН дом — общий `loinc.db`. Копия в каноне — ловушка.
+  en: The LOINC reference has ONE home — the shared `loinc.db`. A copy in the canon is a trap.
+160c8c5777a4:
+  ru: расписание наблюдения внутри окна гайдлайна по эпизоду
+  en: observation schedule within the guideline window per episode
+163eff8ff78c:
+  ru: Детектирует устойчивый дрейф метрик относительно личного rolling baseline.
+  en: Detects sustained metric drift relative to personal rolling baseline.
+168e0d86af45:
+  ru: Возвращает все записи со статусом needs_review.
+  en: Returns all records with status needs_review.
+168e6fafd765:
+  ru: ответ модели разбирается
+  en: model response is parsed
+1724d234a5dc:
+  ru: 'Идентичность правки (2026-09-01, решение владельца: «одна правка — одна строка, повтор — счётчик»).'
+  en: 'Edit identity (2026-09-01, owner decision: "one edit — one row, duplicate — counter").'
+17f283957e70:
+  ru: problems_db.py — доменный модуль problems. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: problems_db.py — domain module for problems. Extracted from health_db.py (Stream C, strangler façade).
+185f99ace59b:
+  ru: Полная лаб-история с пометкой давности по effective-сроку валидности.
+  en: Full lab history with recency annotation by effective validity period.
+189ee192e8f1:
+  ru: Логи вне конфига ротации
+  en: Logs outside rotation config
+1921c021c8b1:
+  ru: 'Чистая логика: значение в одной шкале, а его референс — в другой.'
+  en: 'Pure logic: a value is in one scale while its reference is in another.'
+1923a5464e3c:
+  ru: 'замер 01.09: вне конфига 160 файлов, НИ ОДНОГО >1 МБ —'
+  en: 'measurement 01.09: 160 files outside config, NOT A SINGLE ONE >1 MB —'
+1933df16dfef:
+  ru: 'разбор документов: один файл — одно событие'
+  en: 'document parsing: one file — one event'
+19dcc2605268:
+  ru: 'журнал изменений: у каждой слитой нити есть строка'
+  en: 'changelog: every merged thread has an entry'
+1a5a922d690c:
+  ru: Открытые гипотезы с resolution_type=needs_specialist.
+  en: Open hypotheses with resolution_type=needs_specialist.
+1b2ceaeba7d5:
+  ru: Возвращает CBCR-payload (parsed JSON) для memory.id или None.
+  en: Returns the CBCR-payload (parsed JSON) for memory.id or None.
+1b67be2f2f3c:
+  ru: 'Outbox опросников: открытые задачи type=''assessment'' с sent_at IS NULL.'
+  en: 'Assessment outbox: open tasks with type=''assessment'' where sent_at IS NULL.'
+1b8a12228c22:
+  ru: Предложение GP по списку проблем ждёт решения человека, но до него не доехало.
+  en: A GP suggestion on the problem list is awaiting a human decision but never reached them.
+1c062c421c8f:
+  ru: контракт единого времени (_time_inject)
+  en: unified time contract (_time_inject)
+1c1a072d1480:
+  ru: 'канон: «норма» не противоречит референсу бланка'
+  en: 'canon: «norm» does not contradict the form reference'
+1c59ee685044:
+  ru: Тракт с ПОВЕРХНОСТЬЮ для утверждения об отсутствии либо под сторожем, либо назван.
+  en: A tract with a SURFACE for an absence claim is either guarded or named.
+1cdac2156ed3:
+  ru: Парсит GP отчёт, извлекает задачи, сохраняет в DB.
+  en: Parses a GP report, extracts tasks, saves to DB.
+1e42a31244f6:
+  ru: Блокировки LLM-гарда видны в отчёте
+  en: LLM guard blocks are visible in the report
+1e60e69b9e9a:
+  ru: problem_list_proposals со status='pending' старше 21 дня.
+  en: problem_list_proposals with status='pending' older than 21 days.
+1ecd87164b82:
+  ru: Автоматически подтверждает pending-записи старше N часов.
+  en: Auto-confirms pending records older than N hours.
+1ed3b4345bd1:
+  ru: В каноне нет строк без результата — ни числа, ни текста. Оба тенанта.
+  en: The canon contains no rows without a result — neither numeric nor text. Both tenants.
+1f1599bf792d:
+  ru: канал вопрос→ответ целостен
+  en: question→answer channel is consistent
+1f7a3f6a479d:
+  ru: Режимы, ждущие подтверждения человеком (для гейт-карточек).
+  en: Regimens awaiting human confirmation (for gate cards).
+1fa6629fc639:
+  ru: 'Инвариант threshold_derived_from_document (реестр norm_from_documents): набранных'
+  en: 'Invariant threshold_derived_from_document (registry norm_from_documents): typed'
+202ed844158d:
+  ru: 'F-09: словарь распознавателя собирается из `_VOCAB` ∪ общего `lab_vocab`, а `lab_name_aliases` (единственный дом с подтверждением человека) в него не входит. Зелёным станет в Области 2.'
+  en: 'F-09: the recognizer dictionary is built from `_VOCAB` ∪ shared `lab_vocab`, but `lab_name_aliases` (the sole human-confirmed home) is not included. Will go green in Area 2.'
+20561b528b9b:
+  ru: 'литература: literature_search партнёра'
+  en: 'literature: partner literature_search'
+20ea02bc417f:
+  ru: 'Возвращает {domain: [keyword,...]}. Special key ''__full__'' содержит'
+  en: 'Returns {domain: [keyword,...]}. Special key ''__full__'' contains'
+2251dc3bf10d:
+  ru: Отказ гейта — событие с читателем, а не «строки просто нет».
+  en: Gate failure is an event with a reader, not "the row is simply absent".
+225bc9f651f0:
+  ru: Отложенное решение владельца возвращается по СОБЫТИЮ, а не по сроку.
+  en: The deferred owner decision is returned on EVENT, not on schedule.
+227c110225be:
+  ru: genome_db.py — доменный модуль genome. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: genome_db.py — domain module genome. Extracted from health_db.py (Stream C, strangler facade).
+22aef002abfb:
+  ru: CBCR-методология load-bearing (manifest = system-prompt генерации гипотез,
+  en: CBCR methodology load-bearing (manifest = system prompt for hypothesis generation,
+22b8be46f1b0:
+  ru: цели глоссария известны канону (F-14)
+  en: glossary targets are known to canon (F-14)
+23276d25e119:
+  ru: рост эпизодической памяти (Ф4.3 tripwire)
+  en: episodic memory growth (F4.3 tripwire)
+242ca3852aac:
+  ru: reminders_sync.py — синхронизация macOS Reminders → SQLite.
+  en: reminders_sync.py — macOS Reminders → SQLite synchronization.
+24509397a752:
+  ru: Переводы документации не отстают от оригинала
+  en: Documentation translations are not lagging behind the original
+246197b7f4ee:
+  ru: Ищет идентичные Oura-отпечатки между БД cur и siblings.
+  en: Finds identical Oura fingerprints between DB cur and siblings.
+2469dbcbafca:
+  ru: 'Чистая: ключи (имя, единица, материал), под которыми лежат НЕПЕРЕСЕКАЮЩИЕСЯ'
+  en: 'Pure: keys (name, unit, material) under which NON-OVERLAPPING entries reside.'
+2487330c68dd:
+  ru: поверхность отсутствия под сторожем или названа
+  en: absence surface is either guarded or named
+250b41471e7b:
+  ru: Проверяет lifestyle-метрики против абсолютных и относительных порогов.
+  en: Checks lifestyle metrics against absolute and relative thresholds.
+25662a699f6f:
+  ru: 'WARN: tenant_doc_patterns.yaml есть, но его паттерны НЕ в doc_patterns — per-tenant'
+  en: 'WARN: tenant_doc_patterns.yaml exists but its patterns are NOT in doc_patterns — per-tenant'
+2569fb56cfec:
+  ru: история не заслоняет настоящее
+  en: history does not obscure the present
+25bacf2250d2:
+  ru: КОД С MacBook НЕ ДОЕХАЛ ДО STUDIO — и об этом никто не сказал (27.09, решение владельца).
+  en: CODE FROM MacBook HAS NOT REACHED STUDIO — and nobody reported it (27.09, owner's decision).
+2709fa18cfed:
+  ru: зеркало longitudinal_analysis.PASSSET_HISTORY_MAX (cap → молчим)
+  en: mirror of longitudinal_analysis.PASSSET_HISTORY_MAX (cap → stay silent)
+273d322d484d:
+  ru: Блок «все собранные показатели» для любого врачебного контекста.
+  en: Block «all collected metrics» for any clinical context.
+27448f5a475d:
+  ru: Записывает ОДНО изменение значения в журнал. Вызывать в той же транзакции,
+  en: Writes ONE value-change entry to the log. Must be called within the same transaction,
+27565e2bd401:
+  ru: 'Чистая логика гасителя: пора ли возвращаться к партнёрскому крану литературы.'
+  en: 'Pure suppressor logic: whether it is time to return to the partner literature tap.'
+277ba2679f63:
+  ru: Краткий текст для инжекта в контекст GP. См. C-4 (P5-future).
+  en: Short text for injection into GP context. See C-4 (P5-future).
+27a7046e0a74:
+  ru: Генерирует утренний отчёт через Claude Sonnet.
+  en: Generates the morning report via Claude Sonnet.
+27ac011eb055:
+  ru: PRAGMA integrity_check per-tenant — B-tree corruption и out-of-order rowids.
+  en: PRAGMA integrity_check per-tenant — B-tree corruption and out-of-order rowids.
+27e92e4724cb:
+  ru: 'Проверяет активные эксперименты: если сегодня = start_date + check_day[N],'
+  en: 'Checks active experiments: if today = start_date + check_day[N],'
+2807bad7be4f:
+  ru: Список режимов лечения. По умолчанию только канонические (гейт пройден).
+  en: List of treatment regimens. By default only canonical ones (gate passed).
+29499122afeb:
+  ru: 'workout: список тренировок с датой.'
+  en: 'workout: list of workouts with date.'
+2a08b44f8a63:
+  ru: Очередь человека движется. Непустая очередь без движения = потерянные
+  en: Human queue is moving. Non-empty queue without movement = lost
+2a2f3b25ef3a:
+  ru: hypotheses_db.py — доменный модуль hypotheses. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: hypotheses_db.py — domain module for hypotheses. Extracted from health_db.py (Stream C, strangler facade).
+2a3e950f0266:
+  ru: 'UC-B-09: каждое `r=0.X` в свежих отчётах агентов подтверждено ПРИНЯТОЙ верой.'
+  en: 'UC-B-09: every `r=0.X` in recent agent reports is confirmed by an ACCEPTED belief.'
+2a72484fcc9f:
+  ru: 'Объявление границы окна лаб-блока: что показано и что лежит ЗА границей.'
+  en: 'Declares the boundary of a lab block window: what is shown and what lies beyond the boundary.'
+2ab0989bca54:
+  ru: 'Гаситель нити validation-gate-repair (2026-08-08): оживить held-out/лаги ДАННЫМИ, не памятью.'
+  en: 'validation-gate-repair thread suppressor (2026-08-08): revive held-out/lags with DATA, not memory.'
+2b3c28c69af0:
+  ru: Последний literature_search покрывает последний плановый запуск по живому плисту
+  en: The latest literature_search covers the latest scheduled run against the live plist
+2b9d8a2d6bba:
+  ru: 'Открытые вопросы, на которые НЕКУДА ответить: нет обратного адреса.'
+  en: 'Open questions with nowhere to reply: no return address.'
+2c46a7762264:
+  ru: Последний приём врача, опционально по специальности (написания сводятся specialty_key).
+  en: Last doctor appointment, optionally filtered by specialty (spellings are normalized via specialty_key).
+2c8b059d306e:
+  ru: Записывает метку времени последнего успешного импорта источника.
+  en: Writes the timestamp of the last successful import for a source.
+2d323e3500be:
+  ru: календарь свеж (producer)
+  en: calendar is fresh (producer)
+2d41f18701a6:
+  ru: clinical_kb реплика свежа (source==table, Ф2)
+  en: clinical_kb replica is fresh (source==table, F2)
+2d4313015c98:
+  ru: 'Импортирует клинические данные из прочитанных PDF в health.db:'
+  en: 'Imports clinical data from read PDFs into health.db:'
+2d93cdf40316:
+  ru: карта проекта пересобрана после закрытия нити
+  en: Project map rebuilt after thread closure.
+2da2d89b8f42:
+  ru: Возвращает dict[date_str → sleep_summary].
+  en: Returns dict[date_str → sleep_summary].
+2e246f8b2cfa:
+  ru: норма-референс согласна с интервалом лаборатории (внешний свидетель)
+  en: norm reference agrees with the lab interval (external witness)
+2e8e317ce305:
+  ru: FAIL порог
+  en: FAIL threshold
+2ebac46fdf24:
+  ru: Сохраняет задачу в базу.
+  en: Saves a task to the database.
+2ed554a89d2c:
+  ru: карантин без вердикта
+  en: quarantine without verdict
+2eef1334a72c:
+  ru: ответы пациента доезжают до GP-контекста
+  en: patient responses reach the GP context
+2f9d5743f162:
+  ru: Регенерит все страницы с устаревшим провенансом (реестр ушёл вперёд).
+  en: Regenerates all pages with stale provenance (registry has moved ahead).
+2fa25307dbf4:
+  ru: 'Верифицированные НОСИТЕЛИ: effect_allele_status=''resolved'' и effect_allele'
+  en: 'Verified CARRIERS: effect_allele_status=''resolved'' and effect_allele is set.'
+3070cfd1b808:
+  ru: Тренд по ВЕЩЕСТВУ через отображение LOINC, а не по нашему имени.
+  en: Trend by SUBSTANCE via LOINC mapping, not by our name.
+314adea98b5e:
+  ru: Измерения, которые промоут ОТКАЗЫВАЕТСЯ класть в канон, обязаны быть видны.
+  en: Measurements that promote REFUSES to place in canon must be visible.
+31538e40ac90:
+  ru: Финальный attribution report по завершении эксперимента.
+  en: Final attribution report upon experiment completion.
+31696230ba10:
+  ru: Trailing композиты (НОВЕЙШИЙ первым) за `days` дней — ряд для личной полосы
+  en: Trailing composites (NEWEST first) for `days` days — series for personal band.
+318d0a01489e:
+  ru: Краткий текст для инжекта в контекст GP.
+  en: Short text for injection into GP context.
+31982289584d:
+  ru: Сохраняет протокол в таблицу protocols.
+  en: Saves a protocol to the protocols table.
+322c1550917c:
+  ru: Читает параметр конфигурации из БД.
+  en: Reads a configuration parameter from the DB.
+325dcaef1627:
+  ru: 'morning_brief: не пересказывает слова владельца'
+  en: 'morning_brief: does not retell the owner''s own words'
+33ed1de9f9fa:
+  ru: Единая сборка входа модели → (system_prompt, messages). Инспектируема через
+  en: Unified model input assembly → (system_prompt, messages). Inspectable via
+33f05cb8d279:
+  ru: Активная норма с прошедшим next_review — красное у владельца. Это буквально
+  en: Active norm with a past next_review — red for the owner. This is literally
+345dc24046bd:
+  ru: 'Канон lab_results: нет физиологически невозможных значений.'
+  en: 'Canon lab_results: no physiologically impossible values.'
+349ec6327ae1:
+  ru: предохранителю есть по чему судить
+  en: the fuse has something to judge by
+353fb701ff7f:
+  ru: review_date проблем и протоколов
+  en: review_date of issues and protocols
+3570ab9bae1d:
+  ru: Возвращает outcomes, которые не были доставлены в Telegram.
+  en: Returns outcomes that have not been delivered to Telegram.
+3583e0b02653:
+  ru: 'канон lab_results: у каждой строки есть результат'
+  en: 'lab_results canon: every row has a result'
+35ed59b6f9e9:
+  ru: 'справочник LOINC: один дом, канон его не перехватывает'
+  en: 'LOINC reference: single home, canon does not intercept it'
+361b2263a08c:
+  ru: Создаёт эпизод помощи. Возвращает episode_id.
+  en: Creates a help episode. Returns episode_id.
+368c0ac73deb:
+  ru: Возвращает последний результат для каждого теста за последние n_days дней.
+  en: Returns the latest result for each test over the last n_days days.
+37964b8de76e:
+  ru: Проверяет свежесть данных по всем или указанным источникам.
+  en: Checks data freshness for all or specified sources.
+37afd3d07e10:
+  ru: ЖИВА ЛИ САМА РЕЛЬСА ДОСТАВКИ warn (integrity → triage → Telegram).
+  en: WHETHER THE WARN DELIVERY RAIL ITSELF IS ALIVE (integrity → triage → Telegram).
+37b5ed96df1f:
+  ru: повтор причин «не одноразовый» (§15/§13)
+  en: recurrence of 'not idempotent' reasons (§15/§13)
+38197d27cb34:
+  ru: Записывает документ в очередь на подтверждение типа.
+  en: Queues a document for type confirmation.
+38f53baa416f:
+  ru: Отмечает что результат доставлен в Telegram.
+  en: Marks that the result has been delivered to Telegram.
+39a0c0a970aa:
+  ru: Форматированный блок событий для AI-контекста.
+  en: Formatted event block for AI context.
+39b1b5bb2b8d:
+  ru: Запускает MDT специалистов и сохраняет результат в agent_reports.
+  en: Runs MDT specialists and saves the result to agent_reports.
+39b9cbc2b6fe:
+  ru: 'Periods, активные на дату (default: today). Excludes soft-deleted.'
+  en: 'Periods active on a given date (default: today). Excludes soft-deleted.'
+3a4a7b1e6d78:
+  ru: живость арбитра памяти
+  en: memory arbiter liveness
+3b0251e6ac4f:
+  ru: Покрытие strand-резолюции effect_allele (genome strand-fix Ф7).
+  en: strand-resolution coverage of effect_allele (genome strand-fix F7).
+3b13cb533bb1:
+  ru: Исторический блок не перерастает текущую лабораторную картину.
+  en: The historical block does not outgrow the current laboratory picture.
+3bca0fb1b8ce:
+  ru: окно реплик владельца назад от даты брифа
+  en: owner reply window looking back from brief date
+3bd92128b927:
+  ru: wellness геномика синхронизирована с геномом (WFR, Phase G)
+  en: wellness genomics synchronized with genome (WFR, Phase G)
+3bf4b17faced:
+  ru: Все результаты за конкретную дату.
+  en: All results for a specific date.
+3c038c355ec2:
+  ru: Proposed-режимы, по которым ещё НЕ отправлена карточка гейта.
+  en: Proposed regimens for which a gate card has NOT yet been sent.
+3c18123cca9d:
+  ru: Средние тенанта за его окно baseline; см. _baseline_window.
+  en: Tenant averages over its baseline window; see _baseline_window.
+3c260ee05994:
+  ru: ЧИТАТЕЛЬ журнала — читает СОДЕРЖИМОЕ, а не длину.
+  en: JOURNAL READER — reads CONTENT, not length.
+3d69890d465b:
+  ru: Реестр классов секретов против каталогов
+  en: Secret class registry vs. directories
+3d8d7f2a25b8:
+  ru: активных state+question; выше — пора строить Ф4.1
+  en: active state+question; above threshold — time to build F4.1
+3dd4354c2b52:
+  ru: 'Вторая половина предиката (§17): пульс есть, а работы нет.'
+  en: 'Second half of the predicate (§17): pulse is present but no work is done.'
+3e00a791ac05:
+  ru: Собирает компактный контекст (~2000 токенов) для генерации отчёта.
+  en: Assembles a compact context (~2000 tokens) for report generation.
+3e21b3c05f5b:
+  ru: ЧСС покоя завтра
+  en: Resting HR tomorrow
+3e554607a764:
+  ru: Поднимает вопросы из памяти в задачи, которые реально задаются человеку.
+  en: Promotes questions from memory into tasks that are actually asked to the person.
+3ea76370fc06:
+  ru: реестр производителей полон (context_gate_orphan)
+  en: producer registry is complete (context_gate_orphan)
+3fc5755139e9:
+  ru: 'Принять ответ на задачу-вопрос: закрыть задачу и доставить ответ потребителям.'
+  en: 'Accept an answer to a question-task: close the task and deliver the answer to consumers.'
+41a99c0fbdbb:
+  ru: 'WARN: копия плиста в репозитории разошлась с живой, либо джоб без копии стало больше.'
+  en: 'WARN: plist copy in repository has diverged from live, or jobs without a copy have increased.'
+41b9c4ea1f2e:
+  ru: hai_hypotheses — гипотезы, протоколы, форматирование.
+  en: hai_hypotheses — hypotheses, protocols, formatting.
+41e8db24756b:
+  ru: Открытая проблема несёт описание простыми словами (27.09, волна 4). Медицинский текст —
+  en: An open issue carries a plain-language description (27.09, wave 4). Medical text —
+4235c0c3fca7:
+  ru: Полный блок данных для генерации утреннего отчёта.
+  en: Full data block for generating the morning report.
+424758c38876:
+  ru: Модальный (ref_low, ref_high) по РАЗНЫМ документам (source); None, если документов
+  en: Modal (ref_low, ref_high) across DIFFERENT documents (source); None if documents are insufficient.
+4251d8d36f45:
+  ru: Разбор документов создаёт ровно одно событие на файл (нить intake-tails, 24.09).
+  en: Document parsing produces exactly one event per file (thread intake-tails, 24.09).
+427abf9cdd99:
+  ru: '`canon_window_note`, который НЕ бросает: отказ сборки сам становится объявлением.'
+  en: '`canon_window_note` that does NOT raise: a build failure itself becomes the declaration.'
+42844b6767dc:
+  ru: calendar_client.py — читает события из JSON-кэша Google Calendar.
+  en: calendar_client.py — reads events from Google Calendar JSON cache.
+429c297f60a1:
+  ru: 'РАТЧЕТ: ни одна строка staging не лежит в статусе, который никто не стережёт.'
+  en: 'RATCHET: no staging row sits in a status that nobody watches.'
+4386f1248446:
+  ru: Отмечает что доставка началась (защита от двойной отправки при краше).
+  en: Marks that delivery has started (protection against double-send on crash).
+43d092e2b14b:
+  ru: Сохраняет исторические консультации в медкарту (events + encounters).
+  en: Saves historical consultations to the medical record (events + encounters).
+43d26666c9da:
+  ru: 'Возвращает чекин по дате. time_of_day: ''morning'' | ''evening'' | None (последний).'
+  en: 'Returns a check-in by date. time_of_day: ''morning'' | ''evening'' | None (latest).'
+43e4507ef745:
+  ru: 'F-03: per-file ошибка посчитана и напечатана, но не доехала до кода возврата. Зелёным станет в Фазе C.'
+  en: 'F-03: per-file error is counted and printed but did not reach the return code. Will go green in Phase C.'
+45315f77db7d:
+  ru: 'Возвращает {raw_name: canonical} для confirmed aliases формата.'
+  en: 'Returns {raw_name: canonical} for confirmed aliases of the format.'
+45cf5f37529b:
+  ru: 'вход не слеп: новые файлы доезжают до staging (§17)'
+  en: 'entry is not blind: new files reach staging (§17)'
+465a0dc9696d:
+  ru: 'Held-out/лаги: гаситель оживления нити (validation-gate-repair)'
+  en: 'Held-out/lags: validation-gate-repair thread suppressor'
+46835409c50f:
+  ru: Сводные счётчики для genome_context (Ф5). 'patho' = Pathogenic/Likely
+  en: Aggregate counters for genome_context (F5). 'patho' = Pathogenic/Likely.
+46e58fc3042e:
+  ru: 'Контракт единого времени: прод-код читает часы через _time_inject.'
+  en: 'Unified time contract: production code reads the clock via _time_inject.'
+473f1dc9e05c:
+  ru: недельная статистика не пуста
+  en: weekly statistics are not empty
+48396eb2a033:
+  ru: Материал БЕЗ своей ступени неотличим от назначенного — а именно эта
+  en: A material WITHOUT its own stage is indistinguishable from an assigned one — and it is exactly this
+484cc348e992:
+  ru: расписание GP monthly
+  en: GP monthly schedule
+490d992f9be0:
+  ru: Методология валидационного гейта в git (наличие+непустота)
+  en: Validation gate methodology in git (presence+non-emptiness)
+497448bb3e05:
+  ru: 'Застрявший elicitation-диалог: кейс open >72ч без движения (liveness §14 —'
+  en: 'Stuck elicitation dialog: case open >72h with no activity (liveness §14 —'
+49c215b20299:
+  ru: Читает выполненные напоминания из списка текущего тенанта через AppleScript.
+  en: Reads completed reminders from the current tenant's list via AppleScript.
+49c336c426cc:
+  ru: '29.09: миграция дописана (было 27 на 2026-08-03, 23 на 29.09)'
+  en: '29.09: migration completed (was 27 on 2026-08-03, 23 on 29.09)'
+4a46ae822ed5:
+  ru: 'Назывной долг канона не растёт: строка из документа живёт под своим именем.'
+  en: 'Canon''s nominal debt does not grow: a row from a document lives under its own name.'
+4ab605bc7750:
+  ru: LLM-тракты без secret_guard не множатся (§19)
+  en: LLM pipelines without secret_guard do not multiply (§19)
+4ac33a3b7276:
+  ru: 'Чистая логика датчика: строки канона МОЛОЖЕ фенса, где число есть, а единицы нет.'
+  en: 'Pure sensor logic: canon rows YOUNGER than the fence where a number is present but unit is absent.'
+4b12f5f51df2:
+  ru: 'даты терапии: periods ↔ problem_list'
+  en: 'therapy dates: periods ↔ problem_list'
+4b4a30585a9a:
+  ru: 'канон CPIC засеян и консистентен (A2-full: 3 проекции, один seed_version)'
+  en: 'CPIC canon is seeded and consistent (A2-full: 3 projections, one seed_version)'
+4b886784cd42:
+  ru: Свежайший ежедневный бэкап КАЖДОГО тенанта покрывает последний плановый запуск бэкапа.
+  en: The most recent daily backup of EVERY tenant covers the last scheduled backup run.
+4b90183d3993:
+  ru: '§14 для гейта одноразовости (§15): он мог перестать защищать двумя способами —'
+  en: '§14 for the idempotency gate (§15): it may have stopped protecting in two ways —'
+4b9077c6f68d:
+  ru: 'PubMed egress нейтрален (нить diagnosis-hardcode B: нет сырого диагноза в запросе)'
+  en: 'PubMed egress is neutral (thread diagnosis-hardcode B: no raw diagnosis in query)'
+4bc15baf6fd1:
+  ru: 'партнёрский кран литературы: гаситель'
+  en: 'literature partner tap: suppressor'
+4bd213e7498f:
+  ru: 'спец-слой пустеет: сводимое имя не застревает мимо канона'
+  en: 'spec-layer drains: a resolved name does not get stuck outside the canon'
+4c26959e4159:
+  ru: Возвращает текстовый блок с клинически значимыми вариантами
+  en: Returns a text block of clinically significant variants.
+4c6384e9d762:
+  ru: усыхание лаб-истории vs бэкап (FAIL)
+  en: shrinkage of lab history vs backup (FAIL)
+4cfa612d7d11:
+  ru: конвенция имён мочи (Urine_*)
+  en: urine naming convention (Urine_*)
+4cfafa82906a:
+  ru: Подтверждает (canonical is not None) или отклоняет field review.
+  en: Confirms (canonical is not None) or rejects a field review.
+4d021356950c:
+  ru: 'Мерцание pass-set: членство прошедших пар изменилось между двумя прогонами → пара впервые'
+  en: 'pass-set flicker: membership of passing pairs changed between two runs → pair first time'
+4d13101ab113:
+  ru: Возвращает события контекста за период.
+  en: Returns context events for a time period.
+4d7f288a274b:
+  ru: покрытие temporal_class (Ф1)
+  en: temporal_class coverage (F1)
+4dd9f2cc2a3b:
+  ru: адаптация питания
+  en: nutrition adaptation
+4e0db74175bb:
+  ru: Канон lab_results НЕ содержит биллинг-мусор из инвойсов (#67, 2026-07-02).
+  en: Canon lab_results does NOT contain billing garbage from invoices (#67, 2026-07-02).
+4e37bed59296:
+  ru: Ждущие решения человека и ещё не доставленные ему (delivered_at IS NULL), старые первыми.
+  en: Pending decisions for the person that have not yet been delivered (delivered_at IS NULL), oldest first.
+4e875ed12f0e:
+  ru: 'W5K-A2 (2026-05-14): follow next_token пагинацию до конца.'
+  en: 'W5K-A2 (2026-05-14): follow next_token pagination to the end.'
+4ebacfde8f93:
+  ru: из последних 7 дней должно быть данных >= N
+  en: data from the last 7 days must be >= N
+4ee402158335:
+  ru: REM-сон ночью
+  en: REM sleep at night
+4f59506563aa:
+  ru: health_ai — публичный интерфейс intelligence layer.
+  en: health_ai — public interface of the intelligence layer.
+4f70eeefca92:
+  ru: регрессия числа строк vs бэкап
+  en: regression of row count vs backup
+4f746daa0582:
+  ru: 'биометрия свежа у каждого тенанта (producer: oura-import.partner)'
+  en: 'biometrics are fresh for every tenant (producer: oura-import.partner)'
+4fe3a56c313c:
+  ru: Текст карточки предложения — ПРОСТОЙ текст, без разметки. Один дом для outbox и /report.
+  en: Proposal card text — PLAIN text, no markup. Single home for outbox and /report.
+4ffce620af75:
+  ru: Детерминированные черты (Phase F) синхронизированы с последним импортом генома.
+  en: Deterministic traits (Phase F) synchronized with the latest genome import.
+5015389a3d7e:
+  ru: минимум активных проблем в problem_list
+  en: minimum active issues in problem_list
+50313505bc06:
+  ru: Клиент Anthropic конструируется ТОЛЬКО в llm_client — там гард секретов стоит по конструкции.
+  en: Anthropic client is constructed ONLY in llm_client — the secret guard is in place there by design.
+505cc1014aba:
+  ru: счётчик тенантов под решением о молчании (§18)
+  en: tenant counter under the silence decision (§18)
+50958352b839:
+  ru: Парсер Synevo-PDF через fitz blocks.
+  en: Synevo-PDF parser via fitz blocks.
+5169c68e9f99:
+  ru: alerts_db.py — доменный модуль alerts. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: alerts_db.py — domain module alerts. Extracted from health_db.py (Stream C, strangler facade).
+51e266b9a2d7:
+  ru: Помечает review как отклонённый (пользователь нажал Пропустить).
+  en: Marks a review as rejected (user clicked Skip).
+51f3f2e5d706:
+  ru: Еженедельный отчёт с MDT WellAlly + PubMed доказательной базой.
+  en: Weekly report with MDT WellAlly + PubMed evidence base.
+523e4b6bab3b:
+  ru: 'ЧИСТАЯ функция (тестируема без БД). periods: dict(name,type,start_date,end_date);'
+  en: 'PURE function (testable without DB). periods: dict(name,type,start_date,end_date);'
+52414462626a:
+  ru: '§14 для гейта квитанции замысла (нить intent-receipts): два способа перестать защищать —'
+  en: '§14 for the intent-receipt gate (thread intent-receipts): two ways to stop protecting —'
+526f5f4b9055:
+  ru: Самая большая полная выгрузка HealthAutoExport в облачной папке установки — или None.
+  en: The largest complete HealthAutoExport dump in the installation's cloud folder — or None.
+52917c86d25a:
+  ru: Строка канона → человекочитаемый результат. Никогда не отдаёт сырой текст.
+  en: Canon row → human-readable result. Never returns raw text.
+52c480ed8562:
+  ru: Ответ модели, который не удалось разобрать ВООБЩЕ, обязан быть видимым.
+  en: A model response that could not be parsed AT ALL must be visible.
+53626e2bfaec:
+  ru: 'Возвращает метрики которые нужно алертить: status=''new'' AND'
+  en: 'Returns metrics that need to be alerted: status=''new'' AND'
+537eb8f9c65f:
+  ru: Объявленный класс секрета против того, что реально лежит в каталогах (02.09).
+  en: Declared secret class vs. what actually resides in the directories (02.09).
+53bf8994d55c:
+  ru: Утренний разбор ЧЕЛОВЕКА-ТЕНАНТА жив (28.09, решение владельца «партнёру — свой разбор»).
+  en: 'TENANT-HUMAN morning review is alive (28.09, owner decision: ''partner gets own review'').'
+53e2295098cb:
+  ru: PGS reference-БД на месте и населена
+  en: PGS reference DB is in place and populated
+5422df01dcf7:
+  ru: 'Ратчет полноты рестарта: множество долгоживущих джоб == множество, которое'
+  en: 'Ratchet of restart completeness: set of long-lived jobs == set that'
+545a1986e0c3:
+  ru: MDT-консилиум свеж (producer)
+  en: MDT consilium is fresh (producer)
+5464a0250ef7:
+  ru: Имена строк канона из ДОКУМЕНТОВ, которых канон не знает. Чистая логика.
+  en: Names of canon rows from DOCUMENTS that the canon does not know. Pure logic.
+5486de77b452:
+  ru: 'F-19: ключ дубля консультаций не включает `source_file` — два РАЗНЫХ документа одного типа за одну дату схлопываются в один. Зелёным станет в Фазе C.'
+  en: 'F-19: the consultation duplicate key does not include `source_file` — two DIFFERENT documents of the same type on the same date collapse into one. Will go green in Phase C.'
+549fe851a6f2:
+  ru: GP monthly report не старше N дней
+  en: GP monthly report is no older than N days
+54db7f14c8da:
+  ru: конституции не полые (effect_allele заполнен до генерации)
+  en: constitutions are not hollow (effect_allele populated before generation)
+5504172a4715:
+  ru: 'канон lab_results: единственный писатель (нет biochemical-json)'
+  en: 'canon lab_results: single writer (no biochemical-json)'
+555c2e83a2d8:
+  ru: Сохраняет Telegram message_id уведомления для reply-to-message ввода.
+  en: Saves the Telegram message_id of the notification for reply-to-message input.
+55dec7a6dbc1:
+  ru: 'Слепое пятно ротации: лог РАСТЁТ, а в конфиге ротации его нет.'
+  en: 'Rotation blind spot: log is GROWING but is absent from the rotation config.'
+55f18a4fd6b0:
+  ru: Вызывает Claude и получает структурированное описание изменений.
+  en: Calls Claude and retrieves a structured description of changes.
+56901682737b:
+  ru: Референс обязан быть в той же шкале, что значение.
+  en: The reference must be in the same scale as the value.
+571b73dea88b:
+  ru: Активные трендовые/оконные пороги (N дней подряд / скользящее среднее).
+  en: Active trend/window thresholds (N consecutive days / moving average).
+57bafa2ad394:
+  ru: Компактный геномный блок для lifestyle-агентов.
+  en: Compact genomic block for lifestyle agents.
+57e0ea362fcb:
+  ru: Один цикл диалоговой консультации.
+  en: One cycle of a dialogue consultation.
+582a37abfe5d:
+  ru: LLM генерирует поведенческий протокол из подтверждённой гипотезы.
+  en: LLM generates a behavioural protocol from a confirmed hypothesis.
+58b43303f81e:
+  ru: '§14 для НОСИТЕЛЯ ПРОБ: у датчика, на котором стоят обещания реестра, обязан быть пульс.'
+  en: '§14 for the SAMPLE CARRIER: the sensor on which registry promises rest must have a heartbeat.'
+59696d57988e:
+  ru: профиль генотипа тенанта в публичной зоне
+  en: tenant genotype profile in public zone
+59d5a252648e:
+  ru: живость гейта одноразовости (§14/§15)
+  en: idempotency gate liveness (§14/§15)
+5a387fe4801a:
+  ru: memory(category='constitution_conflict') со status='open' старше 45 дней.
+  en: memory(category='constitution_conflict') with status='open' older than 45 days.
+5a3ef4ef84d6:
+  ru: 'Решение владельца 2026-09-28: сбои идут в ночной цикл, не в Telegram.'
+  en: 'Owner decision 2026-09-28: failures go into the nightly cycle, not into Telegram.'
+5ad4ebc501a7:
+  ru: 'Возвращает {test_name: {interval_days, priority, source, note}} из БД.'
+  en: 'Returns {test_name: {interval_days, priority, source, note}} from the database.'
+5b43e91cf1af:
+  ru: 'Референсные интервалы: КЭШ моды бланков (system_config.lab_refs, пишет'
+  en: 'Reference intervals: CACHE of form modes (system_config.lab_refs, written by the system).'
+5c537736348f:
+  ru: §14 для НОЧНОЙ задачи тестов (`com.larry.health.test-suite`, 00:00).
+  en: §14 for the NIGHTLY test task (`com.larry.health.test-suite`, 00:00).
+5c61c2fb0fb6:
+  ru: dashboard_db — низкоуровневый DB слой для FastAPI dashboard.
+  en: dashboard_db — low-level DB layer for FastAPI dashboard.
+5cbf9d0ee837:
+  ru: свежесть lab_results
+  en: freshness of lab_results
+5cfeab04723e:
+  ru: Открытая задача, к сообщению которой прилетел реплай.
+  en: Open task to whose message a reply arrived.
+5d3ccf68af15:
+  ru: MDT-участие через Claude API.
+  en: MDT participation via Claude API.
+5d7007d9b0ff:
+  ru: Ротатор жив И отработал чисто (§14, находка producer_registry 01.09).
+  en: Rotator is alive AND completed cleanly (§14, producer_registry finding 01.09).
+5d98d326487e:
+  ru: ночной цикл жив (§14)
+  en: nightly cycle is alive (§14)
+5e38158d51fb:
+  ru: Есть ли в медкарте приём этой даты и специальности — ключ идемпотентности импортёров.
+  en: Whether the medical record contains an appointment for this date and specialty — idempotency key for importers.
+5e816b816e20:
+  ru: Reference-БД полигенных весов (pgs_catalog+pgs_weights) вынесена из канона
+  en: Reference DB of polygenic weights (pgs_catalog+pgs_weights) is extracted from the canon
+5ea116db6dc1:
+  ru: Wellness-геномика (Phase G) синхронизирована с последним импортом генома.
+  en: Wellness genomics (Phase G) synchronized with the latest genome import.
+5f2e7ea8afaa:
+  ru: Смотрит ли ЭТОТ процесс в боевую БД владельца.
+  en: Checks whether THIS process is looking at the owner's production DB.
+5f2f617619e3:
+  ru: 'conit-идентификатор забора для co-draw: (basename без doc:-префикса, дата).'
+  en: 'conit identifier of a draw for co-draw: (basename without doc: prefix, date).'
+5fb499e735fa:
+  ru: Вера — это КЭШ, посчитанный из `daily_metrics`. У кэша не было инвалидации.
+  en: Belief is a CACHE computed from `daily_metrics`. The cache had no invalidation.
+5fc1258bcc95:
+  ru: 'Пульс пересборки конституций по новым вводным (решение владельца 2026-09-25: «дальше'
+  en: 'Pulse of constitution rebuild on new inputs (owner decision 2026-09-25: «further'
+6097dfb6c242:
+  ru: Фармакогеномика синхронизирована с последним импортом генома.
+  en: Pharmacogenomics is synchronized with the last genome import.
+60c253a1078e:
+  ru: Ставит список неизвестных полей в очередь ревью.
+  en: Queues a list of unknown fields for review.
+6160d2585b47:
+  ru: Каждый класс, который РЕАЛЬНО есть в данных, имеет вердикт человека.
+  en: Every class that ACTUALLY exists in the data has a human verdict.
+61a2eefc0ea1:
+  ru: Агрегирует точки по дате (среднее), пробует разные ключи для значения.
+  en: Aggregates data points by date (average), tries different keys for the value.
+622a602734ad:
+  ru: Лечение — производное из документов (medications), не ручная строка.
+  en: Treatment is derived from documents (medications), not a hand-written string.
+6235c9d5891d:
+  ru: 'launchd: инвентарь джоб против репозитория'
+  en: 'launchd: job inventory vs repository'
+625f0ad35493:
+  ru: rules_db.py — доменный модуль rules. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: rules_db.py — domain module for rules. Extracted from health_db.py (Stream C, strangler façade).
+63b3694afbc7:
+  ru: tasks_db.py — доменный модуль tasks. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: tasks_db.py — domain module for tasks. Extracted from health_db.py (Stream C, strangler façade).
+642b3f78b31e:
+  ru: Модель для семантической роли задачи (ROLE_MODELS → get_model(tier)).
+  en: Model for the semantic role of a task (ROLE_MODELS → get_model(tier)).
+642b43994ce0:
+  ru: 'Каждый лабораторный порог обязан ВСТРЕЧАТЬ данные: имя = канон lab_canon.normalize,'
+  en: 'Every lab threshold must MEET data: name = canon lab_canon.normalize,'
+64e688b5089f:
+  ru: нормы не просрочены (next_review)
+  en: norms not expired (next_review)
+6552a3c426ce:
+  ru: Рекомендации сдать аналит, у которого строка СВЕЖЕЕ окна мониторинга и дата не названа.
+  en: Recommendations to retest an analyte whose record is NEWER than the monitoring window and whose date has not been named.
+65f6566bf0a0:
+  ru: Форматирует список открытых задач (для weekly follow-up).
+  en: Formats a list of open tasks (for weekly follow-up).
+65f768ff8e09:
+  ru: Разные аналиты под одним именем — тихая порча тренда.
+  en: Different analytes sharing the same name silently corrupt the trend.
+65f7cda1dc2f:
+  ru: 'Срочное сообщение человеку: заголовок, строки показателей, что делать.'
+  en: 'Urgent message to the person: heading, metric lines, what to do.'
+66343539e389:
+  ru: FAIL-CLOSED гард для операций, которым НЕЛЬЗЯ трогать боевое состояние.
+  en: FAIL-CLOSED guard for operations that MUST NOT touch production state.
+6656796815d5:
+  ru: носитель проб жив и зелен (§14)
+  en: sample carrier is alive and green (§14)
+66b1ce38c6d7:
+  ru: Возвращает domain-signals для evaluate_domain_need.
+  en: Returns domain-signals for evaluate_domain_need.
+67825ebaf7c9:
+  ru: Активный хук без бита исполнения = ВСЕ гейты выключены разом, и молча.
+  en: An active hook without the execute bit = ALL gates disabled at once, silently.
+678d294ca793:
+  ru: 'σ: порог предупреждения; выход за диапазон квалификации требует повторной проверки'
+  en: 'σ: warning threshold; exceeding the qualification range requires re-verification.'
+688cce93a76c:
+  ru: 'patient_profile: не отстаёт от живых источников'
+  en: 'patient_profile: does not fall behind live sources'
+689e29dc3d92:
+  ru: Оконные правила с причинами на языке человека; хранилище — get_trend_thresholds (rules_db).
+  en: Window rules with human-language reasons; storage — get_trend_thresholds (rules_db).
+68b71b33658c:
+  ru: артефакты гейта после applied-прогона
+  en: gate artifacts after applied-run
+68e138f5ad98:
+  ru: лечение извлечено из документов
+  en: treatment extracted from documents
+698808b93cfb:
+  ru: 'Guard безопасной позы: промпт elicitation не потерял запрет успокоения;'
+  en: 'Safe-pose guard: elicitation prompt has not lost the reassurance prohibition;'
+69af73bd6a94:
+  ru: §14 для САМОГО НАГРУЖЕННОГО датчика проекта — набора тестов.
+  en: §14 for the MOST LOADED sensor in the project — the test suite.
+6a2a1b2fb9cb:
+  ru: 'SX-1.8: create new assessment session row. Возвращает id.'
+  en: 'SX-1.8: create new assessment session row. Returns id.'
+6b2218b0338d:
+  ru: Возвращает лимит свежести для источника данных (часы).
+  en: Returns the freshness limit for a data source (hours).
+6b9be253440f:
+  ru: 'R1/R2 (split-brain prevention, 2026-06-18): ровно один health.db, не в синк-папке.'
+  en: 'R1/R2 (split-brain prevention, 2026-06-18): exactly one health.db, not in sync folder.'
+6c0654f344dd:
+  ru: Строка таблицы журнала за нить. None — в нити не было работы кода.
+  en: Log table row per thread. None — no code work occurred in the thread.
+6c4c3bd33098:
+  ru: WARN порог
+  en: WARN threshold
+6d83c2fdcb81:
+  ru: 'замер 14.09: открытых трактов не осталось'
+  en: 'measurement 14.09: no open tracts remaining'
+6d865f76668b:
+  ru: Переводит planned event → completed. Обновляет diagnostic_events если есть.
+  en: Transitions a planned event → completed. Updates diagnostic_events if present.
+6dac27e9b004:
+  ru: Подключить общий справочник к соединению как схему `ref`.
+  en: Attach the shared reference dictionary to the connection as schema `ref`.
+6e9835cb8e77:
+  ru: 'F-14: глоссарий запрашивается константой `format_id=0`, а id форматов непредсказуемы (synevo=1, imd_berlin=4242). Зелёным станет в Области 2.'
+  en: 'F-14: the glossary is requested with constant `format_id=0`, but format ids are unpredictable (synevo=1, imd_berlin=4242). Will go green in Area 2.'
+6ead445a6c4e:
+  ru: telegram_bot.py — thin entry-point для launchd plist com.larry.health.bot.
+  en: telegram_bot.py — thin entry-point for launchd plist com.larry.health.bot.
+6eff8b0ed406:
+  ru: lifestyle_agents.py — 4 lifestyle specialists для ежедневного утреннего отчёта.
+  en: lifestyle_agents.py — 4 lifestyle specialists for the daily morning report.
+6f088533cb80:
+  ru: Phase 0.5 — Smoke tests для Health OS.
+  en: Phase 0.5 — Smoke tests for Health OS.
+6f74c130f9ab:
+  ru: жива ли рельса доставки warn (integrity→triage→Telegram)
+  en: whether the warn delivery rail is alive (integrity→triage→Telegram)
+6f91427c0d30:
+  ru: Прямой FAIL без обёртки в check().
+  en: Direct FAIL without wrapping in check().
+70233e76c05d:
+  ru: Сохраняет (или обновляет) in-progress /consult сессию в БД.
+  en: Saves (or updates) an in-progress /consult session in the DB.
+706a1e5c004e:
+  ru: Электрофорез сходится сам с собой (см. `electrophoresis_offenders`).
+  en: Electrophoresis converges with itself (see `electrophoresis_offenders`).
+707b58e93ca6:
+  ru: Возвращает все паттерны классификации документов из БД.
+  en: Returns all document classification patterns from the DB.
+70b4ebf4bdda:
+  ru: 'UC-B-09: производители корреляций объявлены'
+  en: 'UC-B-09: correlation producers are declared'
+70b84d3f7368:
+  ru: 'Консистентность шагов: если steps есть в flat daily_metrics.steps —'
+  en: 'Steps consistency: if steps exist in flat daily_metrics.steps —'
+70f0fa356161:
+  ru: Готовность СИБЛИНГ-тенанта к пер-тенант стратификации A/D.
+  en: SIBLING-tenant readiness for per-tenant A/D stratification.
+710a65a564de:
+  ru: 'Список конституций без body_md: domain, title, generated_at, size_bytes.'
+  en: 'List of constitutions without body_md: domain, title, generated_at, size_bytes.'
+719eac8db42f:
+  ru: квитанция прогона гейта
+  en: gate run receipt
+71f65bb4edfa:
+  ru: 'specialized_lab_results: целостность (panel_type + значение)'
+  en: 'specialized_lab_results: integrity (panel_type + value)'
+7217e81d4625:
+  ru: symptom-intake дисциплина промпта (поза+§9)
+  en: symptom-intake prompt discipline (pose+§9)
+721afb8d16f5:
+  ru: назывной долг канона не растёт
+  en: canon's nominal debt does not grow
+72219ba4cdd9:
+  ru: safety_net.py — детерминированный safety net.
+  en: safety_net.py — deterministic safety net.
+722584604d35:
+  ru: integrity_tests.py — проверка целостности системы Larry Health OS.
+  en: integrity_tests.py — integrity checks for Larry Health OS.
+7236f5faf5eb:
+  ru: нет кросс-тенант загрязнения Oura (fail-closed belt-and-suspenders)
+  en: no cross-tenant Oura contamination (fail-closed belt-and-suspenders)
+72bfbf49a58d:
+  ru: ClinVar-first извлечение (ref, alts) для ОДНОГО rsid из хитов myvariant.
+  en: ClinVar-first extraction of (ref, alts) for ONE rsid from myvariant hits.
+72ca22d240ae:
+  ru: Статистика точности по source (auto_consilium, manual, и т.д.).
+  en: Accuracy statistics by source (auto_consilium, manual, etc.).
+72f7218e33d2:
+  ru: agent_reports_db.py — доменный модуль agent_reports. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: agent_reports_db.py — domain module agent_reports. Extracted from health_db.py (Stream C, strangler facade).
+73ef823a2017:
+  ru: doc_agent.py — авто-документирование изменений в Larry Health OS.
+  en: doc_agent.py — auto-documentation of changes in Larry Health OS.
+746f72c8aaa4:
+  ru: Записывает/обновляет нарратив конституции по домену (sleep|nutrition|...).
+  en: Writes/updates the constitution narrative for a domain (sleep|nutrition|...).
+748ada64a072:
+  ru: Oura-колонки заполняются свежими данными (#169)
+  en: Oura columns are populated with fresh data (#169)
+74d2fe0f5fdc:
+  ru: баланс стресс/восст.
+  en: stress/recovery balance
+750c1cd5f593:
+  ru: SECURITY.md «Квартальный чеклист» → код (security_sensors.py).
+  en: SECURITY.md 'Quarterly checklist' → code (security_sensors.py).
+7510af6d4c4e:
+  ru: '§14 для КОЛОКОЛА, поведенческий: молчание = launchd owner_nag мёртв (WARN);'
+  en: '§14 for the BELL, behavioral: silence = launchd owner_nag is dead (WARN);'
+7531a11e7c39:
+  ru: под одним именем не склеены разные аналиты (нормы не расходятся)
+  en: different analytes are not merged under one name (reference ranges do not diverge)
+7568982bad3e:
+  ru: 'Проблема медкарты, которую предложение «добавить» ДУБЛИРУЕТ: живая (не resolved) строка'
+  en: 'The medical-record problem that an ''add'' proposal DUPLICATES: a live (not resolved) row.'
+75d7d2392861:
+  ru: 'Возвращает {rsid: genotype} для списка rsID.'
+  en: 'Returns {rsid: genotype} for a list of rsIDs.'
+7675343665f0:
+  ru: '§9: единственный рантайм-источник клинической нормы — таблица absolute_thresholds.'
+  en: '§9: the sole runtime source of clinical norms is the absolute_thresholds table.'
+7681d3f9fa71:
+  ru: 'Блокировки гарда не молчат: счётчик за сутки виден человеку.'
+  en: 'Guard blocks are not silent: the daily counter is visible to a human.'
+76876fa0b300:
+  ru: архив сырья HAE сжат (ротатор, старше 15 дней)
+  en: HAE raw archive is compressed (rotator, older than 15 days)
+770b3e15f21c:
+  ru: у каждого класса лаб-строк есть вердикт о доме
+  en: every lab-row class has a house verdict
+770fdfce66ec:
+  ru: 'hypothesis: оценка консилиумом'
+  en: 'hypothesis: consilium assessment'
+77101e301918:
+  ru: Помечает ремайндер в macOS как выполненный по task_id в теле заметки.
+  en: Marks a reminder in macOS as completed by task_id in the note body.
+773405b14761:
+  ru: Назначение врача (lab_monitoring_schedule, source encounter:*) — первично; гайдлайн по
+  en: Physician assignment (lab_monitoring_schedule, source encounter:*) — primary; guideline for
+77aa9ac40e06:
+  ru: 'Внешний свидетель нормы. Красное — только для norm_kind=''reference_interval'':'
+  en: 'External witness of the norm. Red — only for norm_kind=''reference_interval'':'
+77b4c6be0f50:
+  ru: 'W5K-#169 (2026-05-14): свежесть Oura-колонок в daily_metrics.'
+  en: 'W5K-#169 (2026-05-14): freshness of Oura columns in daily_metrics.'
+782d9fa4fa4f:
+  ru: Сохраняет новый outcome по гипотезе (история оценок, не upsert).
+  en: Saves a new outcome for a hypothesis (evaluation history, not upsert).
+78bd01494488:
+  ru: Ошибки, ДОПИСАННЫЕ в stderr-логи джоб с прошлой проверки.
+  en: Errors APPENDED to stderr logs of jobs since the last check.
+793dd8901534:
+  ru: config_db.py — доменный модуль config. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: config_db.py — domain module config. Extracted from health_db.py (Stream C, strangler facade).
+7941aa3a3821:
+  ru: 'MC-зазор: любой прошедший BY-вердикт лёг в ±2·MCSE от своей линии отбора → решение об'
+  en: 'MC gap: every passing BY-verdict fell within ±2·MCSE of its selection line → decision on'
+7974c83fcf5b:
+  ru: Сохраняет или обновляет аннотированный вариант.
+  en: Saves or updates an annotated variant.
+7a4ab6d20d24:
+  ru: 'промоут: отказ слить два значения виден человеку'
+  en: 'promote: refusal to merge two values is visible to the user'
+7aeab225254b:
+  ru: PRS (Wave 4, Phase H) синхронизированы с последним импортом генома.
+  en: PRS (Wave 4, Phase H) synchronized with the latest genome import.
+7b0fdabe7bb5:
+  ru: Записать/заменить вердикт о норме аналита. Имя нормализуется через lab_canon
+  en: Write/replace an analyte norm verdict. Name is normalized via lab_canon.
+7b9364988ecc:
+  ru: doc_reviews_db.py — доменный модуль doc_reviews. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: doc_reviews_db.py — domain module doc_reviews. Extracted from health_db.py (Stream C, strangler facade).
+7b9b1519ff5d:
+  ru: Переносит все существующие JSON-файлы в SQLite.
+  en: Migrates all existing JSON files into SQLite.
+7bb45401b99f:
+  ru: Импортирует один файл из папки biochemical/. Возвращает кол-во импортированных строк.
+  en: Imports one file from the biochemical/ folder. Returns the number of imported rows.
+7c3fcdb4601c:
+  ru: frozen-relative → transient (Ф1/Ф2)
+  en: frozen-relative → transient (F1/F2)
+7c8e8c778e0b:
+  ru: покрытие effect_allele (strand)
+  en: effect_allele coverage (strand)
+7cde3b06fdb3:
+  ru: Записывает приём врача в медкарту (events + encounters) — в тот же вид, что
+  en: Writes a doctor appointment to the medical record (events + encounters) — in the same format as
+7d263e09ddb6:
+  ru: Карантин без вердикта дольше QUARANTINE_STUCK_DAYS — затор, а не порядок.
+  en: Quarantine without verdict longer than QUARANTINE_STUCK_DAYS is a blockage, not order.
+7d31b7e21706:
+  ru: '§14 для движка ночного цикла: тихо умерший движок = падения ночью никто не'
+  en: '§14 for the nightly cycle engine: a silently dead engine means nightly failures go unnoticed.'
+7d34c7abc407:
+  ru: Срез по заборам за последние `days` дней (источник + дата).
+  en: Slice of fence readings for the last `days` days (source + date).
+7d4eac3361f2:
+  ru: активность задач за 14 дней
+  en: task activity over 14 days
+7d92c9f7226b:
+  ru: Таблица упала >50% против пика последних бэкапов → тихое стирание данных.
+  en: Table dropped >50% against the peak of recent backups → silent data erasure.
+7dccc4cedd42:
+  ru: очередь ревью движется (детект-без-доставки)
+  en: review queue is moving (detect-without-delivery)
+7dd246a3a9ca:
+  ru: код MacBook доехал до Studio (по снимку)
+  en: MacBook code has reached Studio (from snapshot)
+7efcb1af6979:
+  ru: 'WARN: 12ч-job пересчёта местного пояса брифа (reschedule_local) молчит у тенанта.'
+  en: 'WARN: 12h-job for recalculating the brief''s local timezone (reschedule_local) is silent for the tenant.'
+7f2fa5baa50d:
+  ru: 'labs freshness per-tenant (нить diagnosis-hardcode B6: онкомаркеры не в общей базе)'
+  en: 'labs freshness per-tenant (thread diagnosis-hardcode B6: oncomarkers not in shared base)'
+7f31c93929de:
+  ru: живость reschedule брифа (местный tz)
+  en: liveness of brief reschedule (local tz)
+7f5010894adc:
+  ru: Инвариант единственного писателя канона (BL-LAB-CANON-1, Primary-Based
+  en: Single-writer invariant of the canon (BL-LAB-CANON-1, Primary-Based
+7f53bd30c8c8:
+  ru: пульс пересборки конституций по новым вводным
+  en: pulse of constitution rebuild on new inputs
+7f64fa332e40:
+  ru: 'WARN: owner-джоба с HEALTH_DATA_DIR в плисте, но БЕЗ него в загруженном'
+  en: 'WARN: owner job has HEALTH_DATA_DIR in plist but WITHOUT it in the loaded'
+7fa7d28b6871:
+  ru: 'решение владельца 22.09: свежую нить не шуметь двое суток'
+  en: 'owner decision 22.09: do not treat a fresh thread as noise for two days'
+7fda1f4e2587:
+  ru: longitudinal_analysis запускается по расписанию `com.larry.health.longitudinal`.
+  en: longitudinal_analysis runs on schedule `com.larry.health.longitudinal`.
+80139429e3cd:
+  ru: 'Чистая логика: электрофорез белка обязан сходиться сам с собой.'
+  en: 'Pure logic: protein electrophoresis must converge with itself.'
+8053c887d9fb:
+  ru: Перезаписывает раздел МОДУЛЬНЫЙ РЕЕСТР в ARCH_SNAPSHOT.md между GEN-маркерами.
+  en: Overwrites the MODULE REGISTRY section in ARCH_SNAPSHOT.md between GEN markers.
+8062f37b443d:
+  ru: visual-intake застрявшие диалоги (>72ч)
+  en: visual-intake stuck dialogs (>72h)
+81b75ad19a3b:
+  ru: История снимков короче календаря → её подчистили или файл пересоздали.
+  en: Snapshot history is shorter than the calendar → it was trimmed or the file was recreated.
+81e13e26c471:
+  ru: Краткий блок для инжекта в контекст GP — активные гипотезы.
+  en: Short block for injection into GP context — active hypotheses.
+81f439c21d5a:
+  ru: 'F-03 внутри функции: отказ записи гаснет в `except Exception: print(...)` и наружу уходит None — вызывающий не может отразить его в коде возврата. Зелёным — в Фазе C.'
+  en: 'F-03 inside function: a write failure is silenced in `except Exception: print(...)` and None propagates outward — the caller cannot reflect it in the return code. Will go green in Phase C.'
+81fcbf1ab67c:
+  ru: 'Покрытие нормой: аналит с ≥norm.coverage_min_n измерений без нормы ни в одном доме —'
+  en: 'Norm coverage: analyte with ≥norm.coverage_min_n measurements and no norm in any house —'
+82551e53d4a5:
+  ru: минимальная длина GP-отчёта в chars
+  en: minimum length of GP report in chars
+82a55aa63beb:
+  ru: вера свежее правок данных
+  en: belief is fresher than data edits
+82b712388c16:
+  ru: 'Вывод документа приёма для медкарты: от раздела «Summary/Impression/Conclusion/Заключение»'
+  en: 'Render the intake document for the medical record: starting from the Summary/Impression/Conclusion section.'
+82ea9672754b:
+  ru: Импортирует pending_labs JSON в lab_results после Telegram-подтверждения.
+  en: Imports pending_labs JSON into lab_results after Telegram confirmation.
+831cf188f692:
+  ru: 'FAIL: снятый онко-литерал вернулся в промпт-билдер (нить diagnosis-hardcode).'
+  en: 'FAIL: a removed onco-literal has returned to a prompt-builder (thread diagnosis-hardcode).'
+83338f42848f:
+  ru: Отвечает на вопрос о предрасположенности.
+  en: Answers a question about predisposition.
+83614a7ec12c:
+  ru: доля слов первого предложения, пришедших из его реплики
+  en: fraction of words in the first sentence that came from the owner's reply
+83f38a4af3db:
+  ru: Подтверждает (или создаёт) alias. Проверяет orphan-статус.
+  en: Confirms (or creates) an alias. Checks orphan status.
+847f8b2f8edc:
+  ru: Оператор сравнения и число живут ТОЛЬКО вместе.
+  en: A comparison operator and a number exist ONLY together.
+85043493783f:
+  ru: Идемпотентный upsert режима лечения в medications.
+  en: Idempotent upsert of a treatment regimen into medications.
+8619d372e2fc:
+  ru: Сохраняет предложения по изменению problem list — ОДНА ПРАВКА = ОДНА СТРОКА.
+  en: Saves proposals to change the problem list — ONE EDIT = ONE ROW.
+86a02e65cf17:
+  ru: Возвращает профиль пациента как словарь key→value.
+  en: Returns the patient profile as a key→value dictionary.
+8729baf7b890:
+  ru: 'Нить weekly-digest (2026-09-05). Понедельник: файл дайджеста ПРОШЛОЙ недели есть и'
+  en: 'weekly-digest thread (2026-09-05). Monday: the digest file for the PREVIOUS week exists and'
+876c7b2252eb:
+  ru: 'specialized_lab_results (BL-LAB-CANON-2): целостность спец-панелей. Каждая'
+  en: 'specialized_lab_results (BL-LAB-CANON-2): integrity of specialized panels. Each'
+87dc43f1da03:
+  ru: 'канон lab_results: референс в той же шкале, что значение'
+  en: 'lab_results canon: reference is in the same scale as the value'
+8808c83312b1:
+  ru: CBCR-методология в git (наличие+непустота)
+  en: CBCR methodology in git (presence+non-emptiness)
+882fc37c5793:
+  ru: Аннотирует конкретный список rsID (для ad-hoc запросов из /genome).
+  en: Annotates a specific list of rsIDs (for ad-hoc requests from /genome).
+88b12506199f:
+  ru: 'WARN: §14 terminus — сам uncommitted_watchdog мог тихо умереть (launchd'
+  en: 'WARN: §14 terminus — uncommitted_watchdog itself may have silently died (launchd'
+8967ff2293cd:
+  ru: В свежем longitudinal-саммари статистический гейт обязан быть применён.
+  en: A fresh longitudinal summary must have the statistical gate applied.
+89750c9e05d5:
+  ru: два периода снимка (backup-wip каждые 3ч), решение владельца 16.09
+  en: two snapshot periods (backup-wip every 3h), owner decision 16.09
+8a2b6f5aa899:
+  ru: Правила порогов с причинами на языке человека (засеянный текст переводится при чтении).
+  en: Threshold rules with human-language reasons (seeded text is translated at read time).
+8a661818e795:
+  ru: Перепроверяет список вариантов через myvariant.info.
+  en: Re-checks a list of variants via myvariant.info.
+8af7801fc360:
+  ru: Все уникальные canonical-имена в lib (для fuzzy-matching).
+  en: All unique canonical names in lib (for fuzzy-matching).
+8b767bdd56e8:
+  ru: Возвращает (is_stale, age_hours) для источника данных.
+  en: Returns (is_stale, age_hours) for a data source.
+8d4e11203e85:
+  ru: Upsert расписания мониторинга. default не перебивает encounter/manual.
+  en: Upsert monitoring schedule. default does not override encounter/manual.
+8d6f1b997593:
+  ru: SQLite-слой для health системы.
+  en: SQLite layer for the health system.
+8d86bd6ece07:
+  ru: Записывает или обновляет поле профиля пациента.
+  en: Writes or updates a patient profile field.
+8d8ebfa1f27c:
+  ru: Записать в профиль то, что человек сказал о себе, — если у сказанного есть поле.
+  en: Write to the profile what the person said about themselves — if the statement has a matching field.
+8dbb527cb541:
+  ru: experiments_db.py — РЕТАЙР (BL-EXP-1, 2026-07-10).
+  en: experiments_db.py — RETIRED (BL-EXP-1, 2026-07-10).
+8dd47bcec9d2:
+  ru: gp_context.py — сборка текстового контекста для отчётов GP.
+  en: gp_context.py — assembles text context for GP reports.
+8dd50c1984d5:
+  ru: field_reviews_db.py — доменный модуль field_reviews. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: field_reviews_db.py — domain module field_reviews. Extracted from health_db.py (Stream C, strangler facade).
+8ece8bb0aed1:
+  ru: набор тестов гонялся недавно (§14 для носителя доказательств)
+  en: test suite ran recently (§14 for the evidence carrier)
+8eeb69678c55:
+  ru: Текст советует сдать анализ, который уже сдан СВЕЖЕЕ окна мониторинга.
+  en: A text advises running a test that has already been run within the monitoring window.
+8f5b5a5c4ebc:
+  ru: Поиск литературы партнёра покрывает свой последний плановый запуск (решение владельца 27.09).
+  en: Partner literature search covers its latest scheduled run (owner decision 27.09).
+8f6e99af3450:
+  ru: 'Общий путь перевода: форма и stamp прежние; статус замысла проверяется при наличии entry.'
+  en: 'General translation path: form and stamp unchanged; intent status is checked when entry is present.'
+8f8fc8096fa3:
+  ru: Обновляет статус гипотезы (open → testing → confirmed | rejected).
+  en: Updates hypothesis status (open → testing → confirmed | rejected).
+8fe6bea82ca3:
+  ru: genome_update_agent не запускался > N дней
+  en: genome_update_agent has not run for > N days
+9026fd806521:
+  ru: Записанное решение не смеет ссылаться на код, невозможный для этого человека.
+  en: A recorded decision must not reference a code impossible for this person.
+90b9cd71a173:
+  ru: Последний survivorship_analysis не старше 18 дней.
+  en: The last survivorship_analysis is no older than 18 days.
+924d30534bff:
+  ru: 'weekly_digest: доставлен всем тенантам (понедельник)'
+  en: 'weekly_digest: delivered to all tenants (Monday)'
+9271f05b1f02:
+  ru: решения LOINC не противоречат отсеву по фактам о человеке
+  en: LOINC decisions do not contradict filtering by facts about the person
+9329a977b8c7:
+  ru: Возвращает эпизоды, опционально фильтруя по статусу и/или проблеме.
+  en: Returns episodes, optionally filtered by status and/or problem.
+93452688bb8b:
+  ru: Создаёт схему если не существует.
+  en: Creates the schema if it does not exist.
+9394eaa237ef:
+  ru: пульс вотчера входа (§14)
+  en: heartbeat of the entry watcher (§14)
+93a7e27ccaab:
+  ru: build_context(yesterday) содержит данные
+  en: build_context(yesterday) contains data
+93eeb6874b24:
+  ru: Помечает запись как 'уведомление отправлено' (ждём ответа пользователя).
+  en: Marks a record as 'notification sent' (awaiting user reply).
+9461495403c8:
+  ru: Очередь вопросов обязана СЛИВАТЬСЯ за время, которое сама себе назначает.
+  en: The question queue MUST FLUSH within the deadline it sets for itself.
+94812188a052:
+  ru: Граница двух домов лабораторных данных стережётся (работа B, 2026-08-01).
+  en: Boundary between the two lab-data houses is enforced (work B, 2026-08-01).
+94dc7708c700:
+  ru: Гипотезы в status='testing', чей ТЕКУЩИЙ круг не получил outcome.
+  en: Hypotheses with status='testing' whose CURRENT round has not received an outcome.
+95000f2af607:
+  ru: Создаёт ремайндеры для списка задач. Возвращает количество созданных.
+  en: Creates reminders for a list of tasks. Returns the number created.
+9506e0c9550e:
+  ru: 'Чистая часть: [(источник, имя, материал, дата)] → ключи с более чем одной датой.'
+  en: 'Pure part: [(source, name, material, date)] → keys with more than one date.'
+951a56f8237e:
+  ru: 'классификатор документов: per-tenant сид засеян (A3 liveness)'
+  en: 'document classifier: per-tenant seed is seeded (A3 liveness)'
+95ba355f0c6b:
+  ru: 'ЭКГ: не-синусовый ритм'
+  en: 'ECG: non-sinus rhythm'
+969cdf5e1bfb:
+  ru: 'канон lab_results: нет невозможных значений и конфликтов'
+  en: 'lab_results canon: no impossible values or conflicts'
+96b836eadfed:
+  ru: 'Чистая функция: для каждой БД возвращает пометку, если у неё есть'
+  en: 'Pure function: for each DB returns a flag if it has'
+96e8328f8ee5:
+  ru: Компактный блок данных (~500 токенов) для подстановки в чат-запрос.
+  en: Compact data block (~500 tokens) for substitution into a chat request.
+9720f8652887:
+  ru: Создаёт задачу в macOS Reminders (список Health).
+  en: Creates a task in macOS Reminders (Health list).
+9746a5ae2f3b:
+  ru: 'метрики прибора: у каждой есть хозяин (HAE)'
+  en: 'device metrics: each one has an owner (HAE)'
+97d77a4fc7ff:
+  ru: обратная совместимость → weekly
+  en: backward compatibility → weekly
+97f2be43a4ee:
+  ru: 'UC-B-09: ратчет журнала необоснованных корреляций'
+  en: 'UC-B-09: ratchet log of unjustified correlations'
+98013d41af05:
+  ru: recovery завтра
+  en: recovery tomorrow
+988c487b8b9d:
+  ru: 'Единый судья «это вопрос К ЧЕЛОВЕКУ»: {id: {verdict, reason, ru}}.'
+  en: 'Unified judge ''this is a question TO THE PERSON'': {id: {verdict, reason, ru}}.'
+98aa887c383f:
+  ru: env-консистентность launchd-плистов (мультитенант)
+  en: env consistency of launchd plists (multitenant)
+98f4969ad2d2:
+  ru: Удаляет персистентную сессию (вызывается при /end или таймауте).
+  en: Deletes a persistent session (called on /end or timeout).
+99ab0755ed13:
+  ru: check_contracts.py — проверка целостности межмодульных связей.
+  en: check_contracts.py — inter-module integrity check.
+99d08db99571:
+  ru: Возвращает все активные протоколы.
+  en: Returns all active protocols.
+99ff333f2aab:
+  ru: 'mc_gap: открытия на разрешении Монте-Карло (триггер Фаз 1/3-а)'
+  en: 'mc_gap: discoveries at Monte Carlo resolution (Phase 1/3-a trigger)'
+99ff4b58d3cc:
+  ru: Legacy single-shot consultation (для совместимости).
+  en: Legacy single-shot consultation (for compatibility).
+9a7561505e6c:
+  ru: Запускает все проверки.
+  en: Runs all checks.
+9a7bcb20920b:
+  ru: хуки исполняемы на диске (§14)
+  en: hooks are executable on disk (§14)
+9ad05da2569e:
+  ru: 'Полный цикл: извлечь задачи → создать ремайндеры → форматировать краткое сообщение.'
+  en: 'Full cycle: extract tasks → create reminders → format brief message.'
+9af18d843386:
+  ru: шаги из flat daily_metrics видны через get_day()
+  en: steps from flat daily_metrics are accessible via get_day()
+9cbb174f820a:
+  ru: Модель для роли. system_config.model.<role> > MODEL_DEFAULTS.
+  en: Model for a role. system_config.model.<role> > MODEL_DEFAULTS.
+9cc07ca28c2c:
+  ru: граница двух домов лабораторных данных цела
+  en: boundary between the two lab-data houses is intact
+9d531f419594:
+  ru: 'SX-1.8: загрузить одну сессию по id.'
+  en: 'SX-1.8: load one session by id.'
+9d82ca811d2e:
+  ru: 'Возвращает {metric_name: row_dict} для всего реестра.'
+  en: 'Returns {metric_name: row_dict} for the entire registry.'
+9dfc76d4a883:
+  ru: все doc-файлы на месте, CHANGELOG и SECURITY.md валидны
+  en: all doc-files are present, CHANGELOG and SECURITY.md are valid
+9e7f857e933f:
+  ru: После УСПЕШНОГО прогона гейта обязательные артефакты обязаны существовать и быть не
+  en: After a SUCCESSFUL gate run, mandatory artifacts must exist and be non-
+9ebde974b798:
+  ru: провенанс стадий сна (чинит сам)
+  en: sleep stage provenance (self-healing)
+9f4e0180665d:
+  ru: pass-set мерцание (Фаза 4 триггер онлайн-контроллера)
+  en: pass-set flickering (Phase 4 online-controller trigger)
+9f961bb102f1:
+  ru: 'Остаток без вердикта о виде нормы — WARN-счётчик владельцу. Не красное: вердикт'
+  en: 'Remainder without a norm_kind verdict — WARN counter for the owner. Not red: verdict'
+9fcbc6e7a51b:
+  ru: Референс каждого аналита = МОДА напечатанного интервала бланка по ≥min_docs РАЗНЫМ
+  en: Reference for each analyte = MODE of the printed form interval across ≥min_docs DIFFERENT documents.
+a00fcebb6366:
+  ru: Число без шкалы непригодно для клинического вывода — а канон его принимает.
+  en: A number without a scale is unsuitable for clinical inference — yet the canon accepts it.
+a01fa9ad33bc:
+  ru: Возвращает активные (status != confirmed/rejected) гипотезы из memory.
+  en: Returns active (status != confirmed/rejected) hypotheses from memory.
+a0c5f9402741:
+  ru: Детерминированный keyword-маппинг доменов. Быстро, без API.
+  en: Deterministic keyword mapping of domains. Fast, no API.
+a1353c91d0d2:
+  ru: Импортирует heart_rate и active_energy из HealthAutoExport JSON в daily_metrics.
+  en: Imports heart_rate and active_energy from HealthAutoExport JSON into daily_metrics.
+a13e00973683:
+  ru: Размер DB < 500MB
+  en: DB size < 500MB
+a1a8a0456a27:
+  ru: Читает профиль пациента. DB-first (patient_profile), fallback на JSON.
+  en: Reads the patient profile. DB-first (patient_profile), fallback to JSON.
+a1df519efd9e:
+  ru: events_db.py — доменный модуль events. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: events_db.py — domain module events. Extracted from health_db.py (Stream C, strangler facade).
+a1e15a9328a7:
+  ru: живость доставки консолидации/disagree
+  en: consolidation/disagree delivery liveness
+a2f6a804f653:
+  ru: слепота stderr-датчика
+  en: stderr sensor blindness
+a316f73849e1:
+  ru: Свежесть бэкапа (каждый плановый запуск)
+  en: Backup freshness (every scheduled run)
+a32527920d0a:
+  ru: доля ожидаемых по календарю снимков, ниже которой история неполна
+  en: fraction of calendar-expected snapshots below which history is incomplete
+a336ad07606f:
+  ru: стресс-нагрузка
+  en: stress load
+a33c73734e7c:
+  ru: 'Чистая часть датчика (как `unitless_offenders` и `ref_scale_mismatch`):'
+  en: 'Pure part of the sensor (like `unitless_offenders` and `ref_scale_mismatch`):'
+a3a2a0d684a5:
+  ru: 'F-03: отказ обработчика не доезжает до кода возврата процесса. Зелёным станет в Фазе C.'
+  en: 'F-03: handler failure does not reach the process return code. Will go green in Phase C.'
+a3c2c038cb2b:
+  ru: GP-отчёт есть и не старше 8 дней
+  en: GP report exists and is not older than 8 days
+a4955f5d618f:
+  ru: protocols_db.py — доменный модуль protocols.
+  en: protocols_db.py — domain module protocols.
+a4c0686b956a:
+  ru: 'WARN: экстрактор памяти (арбитр) отстал от СВЕЖИХ сообщений. Класс «тихая'
+  en: 'WARN: memory extractor (arbiter) has fallen behind FRESH messages. Class ''silent'
+a5001050ec80:
+  ru: гипотеза без эксперимента/лога > N дней
+  en: hypothesis without experiment/log for > N days
+a52a25928af5:
+  ru: Проблемы со статусом наблюдения, которых нет строкой в СВОЕЙ секции контекста.
+  en: Observation-status issues not present as a line in THEIR OWN context section.
+a5572bee46e8:
+  ru: 'Целостность visual-intake: фото без кейса / кейс без фото / handed_off без'
+  en: 'visual-intake integrity: photo without case / case without photo / handed_off without'
+a567b16bb336:
+  ru: UPDATE последнего чекина за day+time_of_day с тремя scores.
+  en: UPDATE the last check-in for day+time_of_day with three scores.
+a58d8ed0f31b:
+  ru: Возвращает problem list, опционально фильтруя по статусу.
+  en: Returns the problem list, optionally filtered by status.
+a6738b929f1b:
+  ru: calendar_cache.json кормит GP-контекст; fetcher hourly. Молчание = устаревший
+  en: calendar_cache.json feeds the GP context; fetcher runs hourly. Silence = stale
+a68faf7832a0:
+  ru: Вопрос, закрытый без ответа; недоставленный вопрос; ответ без следа в памяти.
+  en: A question closed without an answer; an undelivered question; an answer with no trace in memory.
+a70582cef78f:
+  ru: Норма — реплика внешнего документа; единственная ось согласованности — устаревание,
+  en: A norm is a replica of an external document; the sole axis of consistency is staleness,
+a7596e149bff:
+  ru: 'Чистая часть: (value, value_op) → нарушения. Оператор без числа бессмыслен,'
+  en: 'Pure part: (value, value_op) → violations. An operator without a number is meaningless,'
+a77a52e4f862:
+  ru: Проверяет последние лабораторные данные против порогов.
+  en: Checks the latest lab data against thresholds.
+a7c20cbf1445:
+  ru: HRV из ночных сессий — берём average_hrv из long_sleep.
+  en: HRV from night sessions — take average_hrv from long_sleep.
+a8a436beb34a:
+  ru: Синхронная обёртка для скриптов и cron.
+  en: Synchronous wrapper for scripts and cron.
+a8bd89355f6f:
+  ru: проблемы под наблюдением доезжают до недельного разбора
+  en: monitored issues reach the weekly review
+a8e34dec6fc5:
+  ru: Запрашивает аннотации для батча rsID через myvariant.info POST.
+  en: Requests annotations for a batch of rsIDs via myvariant.info POST.
+a8f9b912e06a:
+  ru: 'WellAlly-Health: полный рекурсивный импорт всей папки health/'
+  en: 'WellAlly-Health: full recursive import of the entire health/ folder.'
+a995077f3dfb:
+  ru: Возвращает прежние значения по журналу прогона. Возвращает число откаченных записей.
+  en: Returns previous values from the run log. Returns the number of rolled-back records.
+a9ba4ce4b4d8:
+  ru: колокол решений жив (§14, поведенческий)
+  en: decision bell is alive (§14, behavioral)
+aa384d8cf597:
+  ru: ЧИСТАЯ логика блока. rows — строки канона (dict/Row) с полями
+  en: Pure block logic. rows — canon rows (dict/Row) with fields
+aa445c5fca96:
+  ru: 'WARN burn-in (plan_consilium_under_manifest 2026-07-08 Фаза 1): аналит в'
+  en: 'WARN burn-in (plan_consilium_under_manifest 2026-07-08 Phase 1): analyte in'
+aa59fb96ff1a:
+  ru: Отчёты с находками за период — для сборки итогового отчёта. СВЕЖИЕ ПЕРВЫМИ.
+  en: Reports with findings for a period — for building the summary report. NEWEST FIRST.
+aaa2eacbe720:
+  ru: genome_update_agent не старше GENOME_UPDATE_ALERT_DAYS.
+  en: genome_update_agent is not older than GENOME_UPDATE_ALERT_DAYS.
+aaf8a30ee395:
+  ru: Активные пороги ЛАБОРАТОРНЫХ трендов (safety-net-thresholds, §9-вынос E1).
+  en: Active LAB trend thresholds (safety-net-thresholds, §9 extraction E1).
+ab01bc6b724a:
+  ru: 'WARN: делверинг-джоб disagree/supersede (run_nightly_consolidation, daily) мог тихо'
+  en: 'WARN: delivering job disagree/supersede (run_nightly_consolidation, daily) may have silently'
+ab19748848d3:
+  ru: ключевые метрики (HRV + sleep) присутствуют
+  en: key metrics (HRV + sleep) are present
+ab658bfcc697:
+  ru: протоколы читаются
+  en: protocols are readable
+ac0ac232dd10:
+  ru: FAIL, если конституции сгенерированы на ПУСТОМ effect_allele (полые).
+  en: FAIL if constitutions are generated on EMPTY effect_allele (hollow).
+aca25bba758d:
+  ru: Записывает или обновляет CBCR-payload, привязанный к memory.id.
+  en: Writes or updates a CBCR-payload linked to memory.id.
+ad127f97843e:
+  ru: Детерминированная рекомендация по шагам на день.
+  en: Deterministic step recommendation for the day.
+ad435fc7bf3f:
+  ru: Импортирует все файлы из папки biochemical/.
+  en: Imports all files from the biochemical/ folder.
+ad8a61879b31:
+  ru: '{raw_name.lower(): canonical} по ВСЕМ форматам — глоссарий для промоута.'
+  en: '{raw_name.lower(): canonical} across ALL formats — glossary for promotion.'
+adee20b10335:
+  ru: когнитивное восст.
+  en: cognitive recovery
+ae446b3c192c:
+  ru: Создаёт событие в events + subtable атомарно. Возвращает event_id.
+  en: Creates an event in events + subtable atomically. Returns event_id.
+aef3b6b3be86:
+  ru: кандидаты в вопросы не выбрасываются молча
+  en: question candidates are not silently discarded
+aef768b0f604:
+  ru: 'ЗАПАЗДЫВАЮЩИЙ сигнал качества elicitation: доля symptom_intake-гипотез,'
+  en: 'LAGGING elicitation quality signal: share of symptom_intake hypotheses,'
+af1012f94fea:
+  ru: 'Ежедневный утренний отчёт: lifestyle-агенты → GP синтез.'
+  en: 'Daily morning report: lifestyle agents → GP synthesis.'
+af4d87b1ae03:
+  ru: незакоммиченная работа на MacBook (по снимку)
+  en: uncommitted work on MacBook (from snapshot)
+af73deefed74:
+  ru: ресурс для активности
+  en: resource for activity
+afcfa87ab899:
+  ru: 'Чистая логика датчика затора: сколько строк ждут промоута и сколько дней.'
+  en: 'Pure congestion sensor logic: how many rows are pending promotion and how many days.'
+b0b77520015a:
+  ru: Гипотезы со status='open' старше 60 дней без перехода в testing.
+  en: Hypotheses with status='open' older than 60 days without transition to testing.
+b0d0033aba43:
+  ru: 'Дата документа — от надёжного признака к угадыванию:'
+  en: 'Document date — from reliable signal to best-guess fallback:'
+b1378e8fda3d:
+  ru: readiness завтра
+  en: readiness tomorrow
+b17d5f2f3f09:
+  ru: Анализирует пару user↔assistant и сохраняет артефакты.
+  en: Analyzes a user↔assistant pair and saves artifacts.
+b23124c1ff27:
+  ru: 'Строки для промпта (GP, куратор): одна на решение, с автором, сроком и провенансом.'
+  en: 'Prompt lines (GP, curator): one per decision, with author, deadline and provenance.'
+b240c1ebdce5:
+  ru: Сон от одного прибора, ВСР от другого — в одной строке веры. Ратчет, не порог.
+  en: Sleep from one device, HRV from another — in one belief row. Ratchet, not threshold.
+b245055646e6:
+  ru: Создаёт новые таблицы архитектуры v2.
+  en: Creates new v2 architecture tables.
+b291cfe2b182:
+  ru: лаб-пороги доезжают до данных (канон-имя + строка в lab_results)
+  en: lab thresholds reach data (canon name + row in lab_results)
+b297c4cc628a:
+  ru: 'замер 2026-08-03 по AST: 21 тракт, гард у 1'
+  en: 'measurement 2026-08-03 by AST: 21 tracts, guard present in 1'
+b2bff53c7ce8:
+  ru: 'Главная функция: берёт все rsID из raw_snps,'
+  en: 'Main function: takes all rsIDs from raw_snps,'
+b2ccd5927327:
+  ru: treatment_db.py — доменный модуль treatment. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: treatment_db.py — domain module for treatment. Extracted from health_db.py (Stream C, strangler façade).
+b2d4d2ad3c1a:
+  ru: Извлекает структурированные данные из завершённого разговора.
+  en: Extracts structured data from a completed conversation.
+b30e3eb9874d:
+  ru: Проверяет направленные тренды в лабораторных данных.
+  en: Checks directional trends in lab data.
+b343f3dfb857:
+  ru: Каждое объявленное имя семьи валид-гейта должно разрешаться в ЖИВЫЕ данные.
+  en: Every declared validation gate family name must resolve to LIVE data.
+b3ade3aecd34:
+  ru: Конструкторы Anthropic мимо llm_client не множатся
+  en: Anthropic constructors outside llm_client do not multiply
+b3f9a68346a3:
+  ru: 'daily_spo2: spo2_percentage.average (число %), breathing_disturbance_index.'
+  en: 'daily_spo2: spo2_percentage.average (number %), breathing_disturbance_index.'
+b4ba6e23da8a:
+  ru: PRS синхронизированы с геномом (WFR, Phase H)
+  en: PRS synchronized with genome (WFR, Phase H)
+b4e7b9ed14fa:
+  ru: Возвращает текст брифа если данные есть, None если нет.
+  en: Returns the brief text if data is present, None if not.
+b4e7dbef334f:
+  ru: 'канон lab_results: нет биллинг-мусора (валюта/процедуры)'
+  en: 'canon lab_results: no billing garbage (currency/procedures)'
+b4fb9a8e44d3:
+  ru: Снимает протокол (status → retired).
+  en: Retires a protocol (status → retired).
+b53464ffc027:
+  ru: свежесть genome_update_agent
+  en: genome_update_agent freshness
+b535ad85313e:
+  ru: Возвращает генотип из raw_snps по rsID.
+  en: Returns a genotype from raw_snps by rsID.
+b5c60c746cdc:
+  ru: 'литература: literature_search freshness'
+  en: 'literature: literature_search freshness'
+b5d77003f8c4:
+  ru: 'Действующие решения: не retired и (valid_until IS NULL или ≥ on_date).'
+  en: 'Active decisions: not retired and (valid_until IS NULL or ≥ on_date).'
+b6e165eee416:
+  ru: Сводка specialized_lab_results (микробиом/аутоантитела/метаболомика/…) для
+  en: Summary of specialized_lab_results (microbiome/autoantibodies/metabolomics/…) for
+b709fa150072:
+  ru: Дефолтный специалист для /visit — per-tenant из system_config, иначе нейтральный 'general'.
+  en: Default specialist for /visit — per-tenant from system_config, otherwise neutral 'general'.
+b783623f01de:
+  ru: нет зашитого диагноза в промпт-билдерах (нить diagnosis-hardcode)
+  en: no hardcoded diagnosis in prompt-builders (thread diagnosis-hardcode)
+b7ea17838955:
+  ru: Ротация логов жива и чиста
+  en: Log rotation is alive and clean
+b897cd1d0f8b:
+  ru: Множество канонических имён, на которые указывает подтверждённый глоссарий.
+  en: Set of canonical names referenced by the confirmed glossary.
+b8a091e0c62b:
+  ru: 'Мета-датчик против ТИХОЙ УСЕЧЁНКИ (RST, partner-integrity 2026-07-17). Ловушка:'
+  en: 'Meta-sensor against SILENT TRUNCATION (RST, partner-integrity 2026-07-17). Trap:'
+b8e2d6011d3a:
+  ru: 'F-03: `main()` не возвращает код — успешный прогон отдаёт None. Зелёным станет в Фазе C.'
+  en: 'F-03: `main()` returns no code — a successful run returns None. Will go green in Phase C.'
+b97585b93c8d:
+  ru: checkins_db.py — доменный модуль checkins. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: checkins_db.py — domain module checkins. Extracted from health_db.py (Stream C, strangler facade).
+b9ae99d9e96e:
+  ru: Сцепление carrier-статус ⟹ effect_allele NOT NULL (инвариант
+  en: Coupling carrier-status ⟹ effect_allele NOT NULL (invariant
+b9f3a57d798d:
+  ru: SEC-датчики отработали (perms/ports/tokens)
+  en: SEC sensors completed (perms/ports/tokens)
+ba11d695025b:
+  ru: 'WARN: КТО в периметре считает корреляцию — объявлен либо находка.'
+  en: 'WARN: WHO inside the perimeter computes correlation — is declared or is a finding.'
+ba30849b7942:
+  ru: Вставляет или обновляет запись в реестре.
+  en: Inserts or updates a record in the registry.
+bb079683e023:
+  ru: Возвращает последний outcome для гипотезы или None.
+  en: Returns the latest outcome for a hypothesis or None.
+bb0de4061381:
+  ru: Фразы отчёта «X не сдавался», где X — аналит со строкой в каноне.
+  en: Report phrases 'X was not submitted', where X is an analyte with a row in the canon.
+bb1fa8cdddfa:
+  ru: готовность партнёра к пер-тенант стратификации (Группа 3 триггер)
+  en: partner readiness for per-tenant stratification (Group 3 trigger)
+bb7d53a66279:
+  ru: Переводит тёплые страницы, у которых перевода нет или он устарел.
+  en: Translates warm pages that have no translation or an outdated one.
+bc44b582ffd1:
+  ru: 'repo_only (docker-install, этап 6): предмет проверки — РЕПОЗИТОРИЙ (git, хуки, приватная'
+  en: 'repo_only (docker-install, stage 6): subject of check — REPOSITORY (git, hooks, private'
+bc8f61698cf4:
+  ru: profile_db.py — доменный модуль profile. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: profile_db.py — domain module for profile. Extracted from health_db.py (Stream C, strangler façade).
+bcd5a5d4f230:
+  ru: Языки OCR тенанта для `tesseract -l` (system_config `ocr.languages`, вид «eng+rus»).
+  en: Tenant OCR languages for `tesseract -l` (system_config `ocr.languages`), format e.g. «eng+rus».
+bd0d5d157fde:
+  ru: последние данные HRV не старше 48ч
+  en: latest HRV data not older than 48h
+bd2d805f6279:
+  ru: промоут не стоит (очередь staging движется)
+  en: promote is not stalled (staging queue is moving)
+bd376242da92:
+  ru: Создаёт новый период (active=1, deleted_at=NULL по дефолту).
+  en: Creates a new period (active=1, deleted_at=NULL by default).
+be8cee306871:
+  ru: 'FAIL: в архиве сырья HAE лежат несжатые выгрузки старше 15 дней (решение владельца 26.09).'
+  en: 'FAIL: HAE raw archive contains uncompressed exports older than 15 days (owner decision 26.09).'
+bf0d14c44bf5:
+  ru: Профиль генотипа тенанта в публичной зоне (2026-09-25, нить genotype-scrub).
+  en: Tenant genotype profile in public zone (2026-09-25, thread genotype-scrub).
+bfb6b79edfd0:
+  ru: Механизм авто-возврата lab-пути при достаточном покрытии.
+  en: Auto-revert mechanism for lab path upon sufficient coverage.
+bfbcaf81c96a:
+  ru: Записать решение врача/владельца по теме наблюдения. Прежнее активное решение по той же
+  en: Write a doctor/owner decision on a monitoring topic. The previous active decision on the same
+c0768ee1e296:
+  ru: Помечает что задача отправлена в Telegram.
+  en: Marks a task as sent to Telegram.
+c09084544791:
+  ru: Извлекает клинически значимые поля из ответа myvariant.
+  en: Extracts clinically significant fields from a myvariant response.
+c0c7e4af0b67:
+  ru: Регенерит docs/explanation/<id>.md из записи реестра. G2 (status-honesty)
+  en: Regenerates docs/explanation/<id>.md from a registry entry. G2 (status-honesty)
+c0cbe027e283:
+  ru: глубина истории pass-set (тихая потеря базы сравнения)
+  en: pass-set history depth (silent loss of comparison baseline)
+c0cca7843f0b:
+  ru: ЗАХВАТ ЧУЖОГО ФАЙЛА В КОММИТ — вопрос человеку, не вердикт машины.
+  en: CAPTURING ANOTHER'S FILE INTO A COMMIT — question to the person, not a machine verdict.
+c0e2056fc1cf:
+  ru: Корреляции в отчётах обоснованы (UC-B-09)
+  en: Correlations in reports are justified (UC-B-09)
+c0ee82a25bc8:
+  ru: очередь вопросов сливается за свой срок
+  en: question queue flushes within its deadline
+c1c29f947782:
+  ru: Анализы не старше LAB_ALERT_DAYS (9 мес = тревога, 6 мес = предупреждение).
+  en: Results are no older than LAB_ALERT_DAYS (9 months = alert, 6 months = warning).
+c1de7b9dbbf7:
+  ru: Цель подтверждённого алиаса обязана быть ИЗВЕСТНЫМ каноническим именем.
+  en: The target of a confirmed alias must be a KNOWN canonical name.
+c228ff8be67f:
+  ru: 'Декоратор сборщика system-промпта: дописывает answer_language() в конец.'
+  en: 'System-prompt builder decorator: appends answer_language() at the end.'
+c2374d9663f7:
+  ru: 'Чистая/тестируемая: нити, чья ветка жива дольше grace_h, а строки в'
+  en: 'Pure/testable: threads whose branch has been alive longer than grace_h, and whose rows in'
+c25756e754b3:
+  ru: assessments_db.py — доменный модуль assessments. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: assessments_db.py — domain module assessments. Extracted from health_db.py (Stream C, strangler facade).
+c268a5cd5b18:
+  ru: proposals_db.py — доменный модуль proposals. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: proposals_db.py — domain module for proposals. Extracted from health_db.py (Stream C, strangler façade).
+c2a887810114:
+  ru: ВСЕ числовые результаты одного теста за n_days, хронологически, с референсом бланка.
+  en: ALL numeric results for a single test over n_days, chronologically, with the form reference.
+c2c0c3977b18:
+  ru: Число LLM-трактов БЕЗ secret_guard не растёт (§19, решение владельца 2026-08-03).
+  en: The number of LLM pipelines WITHOUT secret_guard does not grow (§19, owner decision 2026-08-03).
+c2e2b4a5f081:
+  ru: Не ослеп ли сам датчик stderr. ОБЯЗАН стоять ДО check_stderr_errors.
+  en: Whether the stderr sensor itself is blind. MUST be placed BEFORE check_stderr_errors.
+c3605f5aaca4:
+  ru: 'FAIL: clinical_kb в БД тенанта РАЗОШЁЛСЯ с git-источником (yaml сменился, init_db не'
+  en: 'FAIL: clinical_kb in the tenant DB HAS DIVERGED from the git source (yaml changed, init_db not'
+c406ed2b9c72:
+  ru: имена семьи валид-гейта разрешаются в живые данные
+  en: validation gate family names resolve to live data
+c4d475442077:
+  ru: ВСР завтра
+  en: HRV tomorrow
+c4f0541400a6:
+  ru: «Норма» не противоречит напечатанному референсу. Оба тенанта (волна 4, 27.09).
+  en: «Norm» does not contradict the printed reference. Both tenants (wave 4, 27.09).
+c510ece134c1:
+  ru: покрытие нормой измеряемых аналитов
+  en: norm coverage of measured analytes
+c53af738fd22:
+  ru: 'FAIL: инварианты memory_facts (E, долг из аудита 5 июля).'
+  en: 'FAIL: memory_facts invariants (E, debt from 5 July audit).'
+c5424de8ce52:
+  ru: РАБОТА НИТИ В ОДНОМ ЭКЗЕМПЛЯРЕ — вопрос ПОСТРАДАВШЕГО, не строителя.
+  en: THREAD WORK IN A SINGLE INSTANCE — question for the AFFECTED party, not the builder.
+c5750f870649:
+  ru: Belt-and-suspenders к fail-closed secrets_dir() (2026-07-03).
+  en: Belt-and-suspenders for fail-closed secrets_dir() (2026-07-03).
+c58f59042346:
+  ru: 'survivorship: PRO-балл в одной размерности'
+  en: 'survivorship: PRO score in one dimension'
+c694c724fd61:
+  ru: 'daily_stress: day_summary, stress_high (сек), recovery_high (сек).'
+  en: 'daily_stress: day_summary, stress_high (sec), recovery_high (sec).'
+c6bd1bafcb95:
+  ru: 'Чистая/тестируемая: свежесть ежедневного бэкапа по тенантам.'
+  en: 'Clean/testable: daily backup freshness per tenant.'
+c76ab1edf2ff:
+  ru: Возвращает pending field reviews (опционально фильтр по format_id).
+  en: Returns pending field reviews (optionally filtered by format_id).
+c7ab5f3cbe50:
+  ru: 'Outbox задач одного типа: открытые, с sent_at IS NULL, старшие первыми.'
+  en: 'Outbox for tasks of one type: open, with sent_at IS NULL, oldest first.'
+c7cf2e3931e8:
+  ru: hai_analysis — индекс восстановления, детекция дрейфа метрик.
+  en: hai_analysis — recovery index, metric drift detection.
+c839d1cddbf5:
+  ru: Возвращает варианты из genetic_variants по списку генов.
+  en: Returns variants from genetic_variants for a list of genes.
+c870f6ddfe2a:
+  ru: 'Квитанция в точке потребления: свежий ответ ВИДЕН в собранном GP-контексте.'
+  en: 'Receipt at the consumption point: a fresh response IS VISIBLE in the assembled GP context.'
+c8719055b9c6:
+  ru: черты генома синхронизированы с геномом (WFR, Phase F)
+  en: genome traits synchronized with genome (WFR, Phase F)
+c91fa976e16f:
+  ru: актуальность клинических периодов
+  en: clinical periods currency
+ca1384dbf033:
+  ru: сжатие — после 14 дней (hae_checker.compress_raw_archive) + сутки запаса
+  en: compression — after 14 days (hae_checker.compress_raw_archive) + one day margin
+ca2468e410e9:
+  ru: visual-intake сироты (фото/кейс/гипотеза)
+  en: visual-intake orphans (photo/case/hypothesis)
+cae6d8e04c92:
+  ru: Анализирует изображение в контексте здоровья пользователя.
+  en: Analyzes an image in the context of the user's health.
+cb3834978ec6:
+  ru: 'WARN (Ф4.3 tripwire, план «ПЕРЕСБОРКА ФАЗЫ 4»): активные ЭПИЗОДИЧЕСКИЕ'
+  en: 'WARN (F4.3 tripwire, plan "PHASE 4 REBUILD"): active EPISODIC'
+cc485d2653b3:
+  ru: 'F-03: `main()` не имеет ни одного return — успех неотличим от любого исхода. Зелёным станет в Фазе C — тогда XPASS(strict) заставит снять пометку.'
+  en: 'F-03: `main()` has no return statement at all — success is indistinguishable from any other outcome. Will go green in Phase C — then XPASS(strict) will force removal of the mark.'
+ccb59a12ec1d:
+  ru: 'F-03: `__main__` зовёт `main()` без SystemExit — shell всегда видит 0. Зелёным станет в Фазе C.'
+  en: 'F-03: `__main__` calls `main()` without SystemExit — shell always sees 0. Will go green in Phase C.'
+ccc4abee298b:
+  ru: memory_db.py — доменный модуль memory. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: memory_db.py — domain module for memory. Extracted from health_db.py (Stream C, strangler facade).
+ccdf32b6d080:
+  ru: пороги safety_net выведены из документа (не набраны)
+  en: safety_net thresholds are derived from the document (not typed in)
+ccf1b53e7887:
+  ru: Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках).
+  en: Therapy dates in `periods` (primary) vs `problem_list` (copies in fields and headings).
+cd74a02c0515:
+  ru: Плоская строка ВСЕГО контекста, что видит модель (system + все ходы) — для
+  en: Flat string of ALL context visible to the model (system + all turns) — for
+cdaf9a077259:
+  ru: hai_reports — утренний, еженедельный, ежемесячный отчёты + расширенный контекст-блок.
+  en: hai_reports — morning, weekly, monthly reports + extended context block.
+ce45cc800cc5:
+  ru: longitudinal гейт применён
+  en: longitudinal gate applied
+ce536def9132:
+  ru: gen_blueprint.py — автообновление МОДУЛЬНОГО РЕЕСТРА в ARCH_SNAPSHOT.md.
+  en: gen_blueprint.py — auto-update of the MODULE REGISTRY in ARCH_SNAPSHOT.md.
+ce584c42f8a7:
+  ru: 'HV-6: гипотезы в testing, лабные данные есть, outcome отсутствует > 7 дней.'
+  en: 'HV-6: hypotheses in testing, lab data present, outcome absent > 7 days.'
+ce60d0d1eea2:
+  ru: Находит pending field review по Telegram message_id уведомления.
+  en: Finds a pending field review by Telegram notification message_id.
+ceee4fad4043:
+  ru: '§15/§13: одна и та же причина отрицательного вердикта, всплывшая в N РАЗНЫХ календарных'
+  en: '§15/§13: the same negative-verdict reason surfacing across N DIFFERENT calendar'
+cef6b8be425c:
+  ru: Первый doc_type, чья подстрока (без учёта регистра) есть в haystack; where = name|text.
+  en: First doc_type whose substring (case-insensitive) is found in haystack; where = name|text.
+cf0a2587998c:
+  ru: import_status_db.py — доменный модуль import_status. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: import_status_db.py — domain module for import_status. Extracted from health_db.py (Stream C, strangler facade).
+cf1945818787:
+  ru: 'FAIL: онкомаркеры в НЕЙТРАЛЬНОЙ базе лаб-свежести → навязаны всем тенантам, или'
+  en: 'FAIL: oncomarkers are in the NEUTRAL lab-freshness base → imposed on all tenants, or'
+cf6202033ea0:
+  ru: GP weekly report не старше N дней
+  en: GP weekly report is no older than N days
+cfde7888e883:
+  ru: 'FAIL: канон CPIC (3 проекции) не засеян или рассогласован по seed_version/ссылкам.'
+  en: 'FAIL: CPIC canon (3 projections) is not seeded or is inconsistent in seed_version/references.'
+d03247e5a891:
+  ru: 'seed (§9 п.4): пишется в system_config, читается оттуда'
+  en: 'seed (§9 p.4): written to system_config, read from there'
+d05092e260ac:
+  ru: 'FAIL: egress-guard пропускает сырую специфику диагноза в PubMed, или онко-паттерн'
+  en: 'FAIL: egress-guard lets raw diagnosis specifics through to PubMed, or onco-pattern'
+d0726dcd0f4a:
+  ru: Запускает все lifestyle-агенты.
+  en: Runs all lifestyle agents.
+d07fe2903017:
+  ru: GP генерирует нарратив по значимым изменениям.
+  en: GP generates a narrative on significant changes.
+d132e72a41cb:
+  ru: labs_db.py — доменный модуль labs. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: labs_db.py — domain module for labs. Extracted from health_db.py (Stream C, strangler facade).
+d17418847b67:
+  ru: Все лабные результаты за последние N дней, хронологически.
+  en: All lab results for the last N days, chronologically.
+d1c5aa8cf1a8:
+  ru: 'Английский перевод отстал от русского оригинала (28.09.2026, решение владельца:'
+  en: 'The English translation has fallen behind the Russian original (28.09.2026, owner decision:'
+d1d8d1d42449:
+  ru: Последние N приёмов врача (из медкарты).
+  en: Last N doctor visits (from the medical record).
+d21367cbad55:
+  ru: 'PRO-балл под одним именем хранится в ОДНОЙ размерности (§16 клауза идентичности:'
+  en: 'A PRO score under one name is stored in EXACTLY ONE dimension (§16 identity clause:'
+d22ae2a67f08:
+  ru: Возвращает все неподтверждённые пропозалы.
+  en: Returns all unconfirmed proposals.
+d2b277dcc654:
+  ru: KeepAlive-демоны должны иметь живой PID. Закрывает класс «сервис тихо умер»
+  en: KeepAlive daemons must have a live PID. Covers the class 'service died silently'.
+d2ef5ee7a7bb:
+  ru: 'staging: строка «к авто-промоуту» ждёт > N дней = затор'
+  en: 'staging: row ''pending auto-promote'' has been waiting > N days = bottleneck'
+d2fdf4403a2b:
+  ru: Сохраняет лог месячного обновления генома.
+  en: Saves the log of a monthly genome update.
+d376f3c97a2c:
+  ru: 'Судья гипотезы «человеку плохо от системы» (§17: НЕ тот вызов, что отвечал).'
+  en: 'Hypothesis judge ''system is making the person feel bad'' (§17: NOT the call that responded).'
+d3c32cfe5d66:
+  ru: Внутри ОДНОГО документа один аналит в одном материале не может иметь две даты.
+  en: Within ONE document, one analyte in one material cannot have two dates.
+d3e62cc6773d:
+  ru: Ежемесячный GP отчёт — стратегический взгляд, 30/90 дней.
+  en: Monthly GP report — strategic view, 30/90 days.
+d4195c5326b4:
+  ru: НЕЗАКОММИЧЕННАЯ РАБОТА НА MacBook — судится отсюда, по снимку, а не по опросу ноутбука.
+  en: UNCOMMITTED WORK ON MACBOOK — judged from here, from snapshot, not by polling the laptop.
+d44701fcf1d8:
+  ru: 'канон lab_results: один аналит в документе — одна дата'
+  en: 'lab_results canon: one analyte in a document — one date'
+d468b2b3fbdd:
+  ru: Форматирует список задач для Telegram.
+  en: Formats a task list for Telegram.
+d47c2dea01ab:
+  ru: ЧИСТАЯ доля слов первого предложения брифа, пришедших из реплики владельца.
+  en: PURE fraction of words in the first sentence of the brief that came from the owner reply.
+d5d5f0f78e12:
+  ru: 'Индекс восстановления: сравнивает текущие показатели с доболезненным'
+  en: 'Recovery index: compares current metrics against pre-illness baseline.'
+d5dba75dbc80:
+  ru: recommendation engine здоров
+  en: recommendation engine is healthy
+d6012d3f4a12:
+  ru: 'Спец-слой — комната ожидания канона: строка с вердиктом дом=канон живёт здесь,'
+  en: 'The spec-layer is the canon''s waiting room: a row with verdict home=canon lives here,'
+d62a0ef6b273:
+  ru: 'Чистое ядро датчика слепоты: (имя, mtime) → возрасты застрявших, в секундах.'
+  en: 'Pure sensor core for blindness: (name, mtime) → ages of stuck entries, in seconds.'
+d64e1a89dc0b:
+  ru: 'Вердикт гипотезы: ''confirmed'' | ''rejected'' | None (открыта/не найдена).'
+  en: 'Hypothesis verdict: ''confirmed'' | ''rejected'' | None (open/not found).'
+d65bc6456443:
+  ru: новые ошибки в stderr джоб
+  en: new errors in stderr of jobs
+d669fbc32763:
+  ru: Каждая проблема со статусом наблюдения видна в контексте недельного разбора GP.
+  en: Every issue with monitoring status is visible in the GP weekly review context.
+d6a426f61ab9:
+  ru: 'WARN: у метрики, которую прибор реально присылает, нет хозяина (решение владельца 26.09).'
+  en: 'WARN: the metric that the device actually sends has no owner (owner decision 26.09).'
+d72b2d74348c:
+  ru: 'канон lab_results: у нового значения есть единица'
+  en: 'lab_results canon: a new value has a unit'
+d7441a4adce4:
+  ru: Проверяет что ключевые doc-файлы существуют после Diataxis-реструктуризации.
+  en: Checks that key doc-files exist after Diataxis restructuring.
+d74600094691:
+  ru: '9 мес — тревога: агент работает по stale labs'
+  en: '9 months — alert: agent is operating on stale labs'
+d7745a8a6888:
+  ru: предложения по списку проблем доставлены
+  en: suggestions on the problem list are delivered
+d782f85c74e4:
+  ru: Возвращает перцентильный ранг вчерашних ключевых метрик
+  en: Returns the percentile rank of yesterday's key metrics
+d8258f7688c5:
+  ru: 'FAIL: clinical_kb ПУСТ → medical_frame вырождается в standard-рамку И assert_floor молчит →'
+  en: 'FAIL: clinical_kb IS EMPTY → medical_frame degenerates into a standard frame AND assert_floor is silent →'
+d86773048969:
+  ru: 'содержание GP-отчёта: есть ключевые разделы'
+  en: 'GP report content: key sections are present'
+d8ab7a4fbba6:
+  ru: workouts_db.py — доменный модуль workouts. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: workouts_db.py — domain module for workouts. Extracted from health_db.py (Stream C, strangler façade).
+d8c61c30d0bf:
+  ru: Закрывает задачу по порядковому номеру в списке.
+  en: Closes a task by its index number in the list.
+dab50bc74593:
+  ru: Одна специальность под разными словами сводится к общему ключу.
+  en: One specialty under different wordings is reduced to a common key.
+db49fd864038:
+  ru: ВСЕ открытые вопросы, доставленные и нет — множество, против которого
+  en: ALL open questions, delivered and not — the set against which
+db856f301c29:
+  ru: metrics_db.py — доменный модуль metrics. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: metrics_db.py — domain module for metrics. Extracted from health_db.py (Stream C, strangler facade).
+dbb0451e7154:
+  ru: сцепление carrier-статус⟹effect_allele (null≠чисто)
+  en: carrier-status⟹effect_allele coupling (null≠clean)
+dc013789e3e1:
+  ru: 'Проактивный контекст: анализирует вопрос, загружает нужные данные.'
+  en: 'Proactive context: analyses the question, loads the required data.'
+dc96239dafe7:
+  ru: Загружает сохранённую сессию. Возвращает dict или None если нет.
+  en: Loads a saved session. Returns dict or None if not found.
+dcae9725a4bb:
+  ru: Главная функция ежемесячного обновления.
+  en: Main function of the monthly update.
+dceb365bdf26:
+  ru: 'Гейт анти-повтора жив: context_cards пополняется. Если гейт тихо упал в'
+  en: 'Anti-repeat gate is alive: context_cards is being populated. If the gate silently fails,'
+dd35f6214c51:
+  ru: hae_db.py — доменный модуль hae. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: hae_db.py — domain module for hae. Extracted from health_db.py (Stream C, strangler facade).
+dd6f7f9657fc:
+  ru: единственный канонический health.db (R1/R2 split-brain)
+  en: single canonical health.db (R1/R2 split-brain)
+ddb802a6c5d9:
+  ru: ночной прогон тестов состоялся (§14)
+  en: nightly test run completed (§14)
+de2933e5ddf6:
+  ru: Конвенция имён мочевого домена — Urine_* (решение владельца 2026-08-31).
+  en: Urine domain naming convention is Urine_* (owner decision 2026-08-31).
+de76351ae124:
+  ru: 'Применяет пропозал: вносит изменения в problem_list.'
+  en: 'Applies a proposal: makes changes to problem_list.'
+dea44770b89a:
+  ru: значение и оператор сравнения не разошлись
+  en: value and comparison operator have not diverged
+deb20a403a76:
+  ru: 'Маркеры типа документа тенанта (system_config `docs.type_markers`):'
+  en: 'Tenant document type markers (system_config `docs.type_markers`):'
+df19cd7298fc:
+  ru: 'WARN: patient_profile разошёлся с живым источником — reconciler отстал или мёртв.'
+  en: 'WARN: patient_profile has diverged from the live source — reconciler is lagging or dead.'
+dfea537e2aef:
+  ru: Дописывает к тексту задачи дату последней сдачи аналитов, которые он советует сдать.
+  en: Appends to the task text the date of the last submission of analytes it recommends to retest.
+e14130aebc6e:
+  ru: 0 = только проверяем что таблица читается
+  en: 0 = only check that the table is readable
+e1ab7573daba:
+  ru: Все даты, по которым есть анализы.
+  en: All dates for which lab results exist.
+e1bbe112b3ed:
+  ru: 'SX-1.8: найти активную (in_progress) сессию для chat_id, опционально по инструменту.'
+  en: 'SX-1.8: find an active (in_progress) session for chat_id, optionally by tool.'
+e1ea260e9c3c:
+  ru: Источники, от которых за окно реально пришли данные (по колонкам-подписям).
+  en: Sources from which data actually arrived within the window (by column signatures).
+e2232d882ff8:
+  ru: 'SX-1.8: insert into alerts. Возвращает id.'
+  en: 'SX-1.8: insert into alerts. Returns id.'
+e24b402bab2b:
+  ru: constitutions_db.py — доменный модуль constitutions. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: constitutions_db.py — domain module constitutions. Extracted from health_db.py (Stream C, strangler facade).
+e2ac54b00493:
+  ru: 'Строки, нарушающие сцепление: carrier-статус ⟹ effect_allele заполнен.'
+  en: 'Rows violating linkage: carrier status ⟹ effect_allele is populated.'
+e2e931a29369:
+  ru: (ждут и не доставлены всего, id застрявших дольше двух ритмов outbox).
+  en: (Total pending and undelivered count, id of items stuck longer than two outbox cycles).
+e4a47b744601:
+  ru: consultations_db.py — приёмы врача. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: consultations_db.py — doctor appointments. Extracted from health_db.py (Stream C, strangler facade).
+e4b9970c5340:
+  ru: покрытие статусов staging (ни одна строка не молчит)
+  en: staging status coverage (no row is silent)
+e585a803c6bd:
+  ru: Возвращает множество полных относительных путей уже импортированных файлов.
+  en: Returns the set of full relative paths of already-imported files.
+e5c0156db450:
+  ru: полнота рестарта после деплоя (§12)
+  en: restart completeness after deploy (§12)
+e5fbd4e3ea48:
+  ru: Последние N событий медкарты с деталями encounters/diagnostics.
+  en: Last N medical record events with encounters/diagnostics details.
+e636b37a82ef:
+  ru: 'Расписание свежести для тенанта: BASE + условные тесты его активных классов.'
+  en: 'Freshness schedule for the tenant: BASE + conditional tests of its active classes.'
+e642ff274826:
+  ru: 'staging: материал пробы и его ступень не разошлись'
+  en: 'staging: sample material and its stage have not diverged'
+e6d2d3a87b8f:
+  ru: Записи ЭКГ с тревожным ритмом (AFib / High HR) за последние 48ч → кардио-алерт.
+  en: ECG records with alarming rhythm (AFib / High HR) in the last 48 h → cardio alert.
+e6e7c312344a:
+  ru: Сохраняет факт в память. Если key задан — обновляет существующую запись.
+  en: Saves a fact to memory. If key is provided — updates the existing record.
+e77d906ce520:
+  ru: Возвращает незакрытые задачи, отсортированные по приоритету.
+  en: Returns unclosed tasks sorted by priority.
+e84702ad651d:
+  ru: живость uncommitted_watchdog (§14)
+  en: uncommitted_watchdog liveness (§14)
+e84c92dc17db:
+  ru: Возвращает SQLite-коннект.
+  en: Returns an SQLite connection.
+e875731a6a62:
+  ru: Дом класса по вердикту человека. None = вердикта нет, решать не машине.
+  en: Domain of a class by human verdict. None = no verdict, not for the machine to decide.
+e9242ab06b3a:
+  ru: 'WARN: active state с temporal_class IS NULL — путь записи обошёл деривацию'
+  en: 'WARN: active state with temporal_class IS NULL — write path bypassed derivation'
+e947468b627e:
+  ru: у носителя проб недельный ритм и порог 10; свой ритм не заводим
+  en: the sample carrier has a weekly rhythm and threshold of 10; we do not introduce our own rhythm
+ea5d3134e840:
+  ru: 'Какие наши имена образуют ОДИН тренд с этим. Чистая: индекс аргументом.'
+  en: 'Which of our names form ONE trend with this one. Pure: index as argument.'
+ea9a0a513dff:
+  ru: тенант-БД достижимы (анти-усечёнка per-tenant чеков)
+  en: tenant DBs reachable (anti-silent-truncation for per-tenant checks)
+ead256981938:
+  ru: Импорт данных Oura Ring через API v2.
+  en: Oura Ring data import via API v2.
+ebb614983141:
+  ru: Записывает тренировку. Дедуплицирует по дате + start_time.
+  en: Saves a workout. Deduplicates by date + start_time.
+ec11cc5ba7b9:
+  ru: (commit_message, diff_text) для последнего коммита.
+  en: (commit_message, diff_text) for the last commit.
+ec3ffd82f226:
+  ru: Находки «`r=0.X`, которого нет в ПРИНЯТОЙ вере»
+  en: Findings '`r=0.X` not present in ACCEPTED belief'
+ec5da50e4100:
+  ru: 'НИТЬ-СИРОТА: ветка жива, а в реестре нитей её нет — её не видит ни одна сессия.'
+  en: 'ORPHAN THREAD: branch is alive but absent from the thread registry — no session can see it.'
+ed19ebd6b76f:
+  ru: Последние n результатов конкретного теста для построения тренда.
+  en: Last n results for a specific test for trend construction.
+ed8b6dc19f18:
+  ru: смешение приборов в вере (ратчет)
+  en: device mixing in belief (ratchet)
+ee38963c7616:
+  ru: Канон-ждущие строки спец-слоя по идентичности ИМЯ+МАТЕРИАЛ+РАЗМЕРНОСТЬ.
+  en: Canon-pending rows of the special layer by NAME+MATERIAL+DIMENSION identity.
+ee7e7f1a868d:
+  ru: Счётчик под решением «молчание человека признаком не считать» (§18).
+  en: Counter under the decision 'human silence is not treated as a signal' (§18).
+eea90f46d352:
+  ru: longitudinal_analysis свежесть
+  en: longitudinal_analysis freshness
+eeb77669b497:
+  ru: Отклоняет гипотезу (status → rejected).
+  en: Rejects the hypothesis (status → rejected).
+eef6c3db6558:
+  ru: Сохраняет подтверждённый тип, переводит статус в confirmed.
+  en: Saves the confirmed type, transitions status to confirmed.
+ef43838b9fcf:
+  ru: 'Судья отсутствия для ЛЮБОГО тракта: (хиты, готовая поправка одной строкой).'
+  en: 'Absence judge for ANY tract: (hits, ready single-line correction).'
+ef46a5268c33:
+  ru: Извлекает текст из PDF. Для digital PDF использует fitz (быстро, точно).
+  en: Extracts text from PDF. For digital PDF uses fitz (fast, accurate).
+efd22a87ceac:
+  ru: 'Чистая/тестируемая: находки про кэш календаря по тенантам.'
+  en: 'Clean/testable: findings about calendar cache per tenant.'
+f13cb850ef3c:
+  ru: Исправляет только противоречия install_facts; проверяет ответ ДО записи, затем переводит.
+  en: Fixes only install_facts contradictions; validates the response BEFORE writing, then translates.
+f15234253510:
+  ru: liveness демонов (KeepAlive)
+  en: daemon liveness (KeepAlive)
+f15982591743:
+  ru: Еженедельный GP отчёт.
+  en: Weekly GP report.
+f16d0ff78019:
+  ru: Сохраняет событие жизненного контекста.
+  en: Saves a life-context event.
+f1b6c89999c6:
+  ru: 'Сданные анализы коротко — по забору (draw_key: файл + дата), для медкарты.'
+  en: 'Submitted tests in brief — by draw (draw_key: file + date), for the medical record.'
+f28752b0ff21:
+  ru: Отклоняет пропозал без изменений в problem_list.
+  en: Rejects a proposal without changes to problem_list.
+f2e0de87e0af:
+  ru: Закрывает ОТКРЫТУЮ (или отложенную) задачу. True — закрыта; False — такой нет
+  en: Closes an OPEN (or deferred) task. True — closed; False — not found.
+f3c48a6a9868:
+  ru: то же в днях (обратная совместимость)
+  en: same in days (backward compatibility)
+f4085fe15539:
+  ru: Claude сам запрашивает нужные данные через tool use.
+  en: Claude requests the needed data itself via tool use.
+f41c38d6241b:
+  ru: Кандидат выпал за окно, НИ РАЗУ не побывав у судьи.
+  en: A candidate fell outside the window without EVER reaching the judge.
+f47056351053:
+  ru: «Судить нечем» у предохранителя — долг системы в инженерную очередь.
+  en: '"Nothing to judge by" at the fuse — system debt to engineering queue.'
+f4c974ab6c43:
+  ru: 'FAIL (health-критично): lab_results резко усохла vs последний бэкап — класс'
+  en: 'FAIL (health-critical): lab_results shrank sharply vs last backup — class'
+f4ec95d2149d:
+  ru: Продолжает разговор чекина.
+  en: Continues a check-in conversation.
+f543c5593a4e:
+  ru: задачи читаются (open + overdue)
+  en: tasks are readable (open + overdue)
+f548fa006504:
+  ru: 'Человек-гейт: подтвердить/отклонить извлечённый режим.'
+  en: 'Human gate: confirm/reject an extracted regimen.'
+f57273414e04:
+  ru: нить без строки в реестре (сирота)
+  en: thread without a registry row (orphan)
+f58cd840d4b8:
+  ru: Создаёт или обновляет проблему в problem list.
+  en: Creates or updates a problem in the problem list.
+f5deef73e290:
+  ru: Квитанция доставки — ставится ПОСЛЕ успешной отправки (отказ оставляет в outbox).
+  en: Delivery receipt — set AFTER successful send (failure leaves the record in outbox).
+f61ecdb82cf8:
+  ru: 'этап2: добавляет запись динамики серии в гипотезу (поле dynamics[]) — врач видит'
+  en: 'Stage 2: appends a series-dynamics record to the hypothesis (dynamics[] field) — visible to the doctor.'
+f645df071651:
+  ru: Записывает или обновляет параметр конфигурации системы.
+  en: Writes or updates a system configuration parameter.
+f6ceeee19349:
+  ru: Возвращает активные абсолютные пороги. Опциональный фильтр по direction.
+  en: Returns active absolute thresholds. Optional filter by direction.
+f70ed062b1a1:
+  ru: 'Клинические периоды: фазы watchful_waiting с истёкшей датой без next phase.'
+  en: 'Clinical periods: watchful_waiting phases with an expired date and no next phase.'
+f720ec5c82fb:
+  ru: 'WARN: утренний бриф открывается пересказом того, что владелец сказал системе сам.'
+  en: 'WARN: the morning brief opens by retelling what the owner said to the system themselves.'
+f7308d9e1ec8:
+  ru: Задачи которые открыты дольше N дней без ответа.
+  en: Tasks that have been open longer than N days without a response.
+f79c820ff423:
+  ru: DDL гейта «вопрос не закрывается пустотой» — ОДИН дом текста триггеров.
+  en: DDL for the 'question not closed by void' gate — the single home of trigger text.
+f83733101323:
+  ru: Проблемы и протоколы с просроченным review_date.
+  en: Issues and protocols with an expired review_date.
+f8625ffb2b8b:
+  ru: Последние N отчётов агента.
+  en: Last N agent reports.
+f9130fb17130:
+  ru: Последние N строк таблицы CHANGELOG.md для контекста.
+  en: Last N rows of the CHANGELOG.md table for context.
+fa0c4f57b18a:
+  ru: periods_db.py — доменный модуль periods. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: periods_db.py — domain module for periods. Extracted from health_db.py (Stream C, strangler facade).
+fadacf6893ce:
+  ru: consult_sessions_db.py — доменный модуль consult_sessions. Вынесен из health_db.py (Поток C, strangler-фасад).
+  en: consult_sessions_db.py — domain module consult_sessions. Extracted from health_db.py (Stream C, strangler facade).
+fb918e43d69d:
+  ru: Сохраняет гипотезу в memory (category='hypothesis').
+  en: Saves a hypothesis to memory (category='hypothesis').
+fba1f597e580:
+  ru: Детектирует пары метрик с резко изменившейся корреляцией.
+  en: Detects metric pairs with sharply changed correlation.
+fc1713ab12ee:
+  ru: Детектирует многострочный формат Synevo по грузинским символам в тексте.
+  en: Detects multi-line Synevo format by Georgian characters in the text.
+fc2e51db51a4:
+  ru: снимок раз в 3ч; трое суток тишины уже не «ноут поспал»
+  en: snapshot every 3h; three days of silence is no longer 'laptop was asleep'
+fc72bade4945:
+  ru: 'WARN: подъёмник кандидатов в вопросы мог тихо умереть.'
+  en: 'WARN: the candidate-to-question elevator may have silently died.'
+fcc6ec096bf5:
+  ru: 'M1-обёртка: читает канон (read-only) + манифест-ядро, считает дрейф. НЕ падает — warn.'
+  en: 'M1 wrapper: reads canon (read-only) + manifest core, computes drift. Does NOT raise — warns.'
+fd49d232d891:
+  ru: Язык ответа модели = язык человека (нить model-lang, 28.09).
+  en: Model response language = user language (thread model-lang, 28.09).
+fd878d4fc8e0:
+  ru: Чистый парсер 23andMe TSV → list of {rsid, chromosome, position, genotype}.
+  en: Pure 23andMe TSV parser → list of {rsid, chromosome, position, genotype}.
+fdb4307827f9:
+  ru: clinical_kb населён (пол/рамка еды не вырождены, Ф2)
+  en: clinical_kb is populated (sex/food frame are non-degenerate, F2)
+fe090e70e676:
+  ru: 'BL-DOCAGENT-DEAD-1: у каждой слитой нити с работой кода есть строка журнала.'
+  en: 'BL-DOCAGENT-DEAD-1: every merged thread with code work has a changelog entry.'
+fe3b581bd5c1:
+  ru: 'Для weekly follow-up в воскресенье:'
+  en: 'For weekly follow-up on Sunday:'
+fe7a1b89f858:
+  ru: Сбои бота и служб за сутки
+  en: Bot and service failures per day
+fe910555c149:
+  ru: '{test_name: n_docs} и дата расчёта — провенанс кэша референсов.'
+  en: '{test_name: n_docs} and calculation date — provenance of the reference cache.'
+fed82f51752e:
+  ru: Труба распознавания не должна забиваться на ВЫХОДЕ молча.
+  en: The recognition pipeline must not silently block at the OUTPUT.
+feeda007bdfa:
+  ru: '15.28 → 15.29: шаг последнего разряда, как в журнале с июля.'
+  en: '15.28 → 15.29: last-digit step, as in the journal since July.'
+fefa144e0105:
+  ru: 'инварианты memory_facts (E: no-double-active-key + R11)'
+  en: 'memory_facts invariants (E: no-double-active-key + R11)'
+fefab1d3bafa:
+  ru: 'WARN: active state с «сегодня/вчера» в ТЕКСТЕ, но НЕ классифицированное transient →'
+  en: 'WARN: active state with «today/yesterday» in TEXT but NOT classified as transient →'

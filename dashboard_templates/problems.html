@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Проблемы — Health OS{% endblock %}
+{% set page_name = "проблемы" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Проблемы</h1>
+  <p class="shell-subtitle">{{ count_active }} активных · {{ count_total }} всего</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% set active = [] %}
+{% set archive = [] %}
+{% for p in problems %}
+  {% set s = p.status or '' %}
+  {% if 'active' in s or 'watch' in s %}{% set _ = active.append(p) %}{% else %}{% set _ = archive.append(p) %}{% endif %}
+{% endfor %}
+
+{% if active %}
+<div class="caption">в поле зрения</div>
+{% for p in active %}
+  {% set kind = 'warning' if 'active' in (p.status or '') else 'action' %}
+  <article class="card card--{{ kind }}" id="prob-{{ p.id }}">
+    <div class="card-head">
+      <div class="card-meta">{{ p.problem_id or p.id }}
+        {% if p.domain %} · {{ p.domain }}{% endif %}
+        {% if p.first_seen %} · с <time>{{ p.first_seen | short(10) }}</time>
+          <span class="age-suffix">({{ p.first_seen | age_days }}д назад)</span>
+        {% endif %}
+      </div>
+      <div class="card-chips">
+        {% if 'active' in (p.status or '') %}<span class="chip chip--warning">{{ p.status }}</span>
+        {% elif 'watch' in (p.status or '') %}<span class="chip chip--action">{{ p.status }}</span>
+        {% else %}<span class="chip chip--outline">{{ p.status }}</span>{% endif %}
+        {% if p.priority %}<span class="chip chip--outline">priority {{ p.priority }}</span>{% endif %}
+        {% if p.watch_deadline %}<span class="chip chip--outline">до {{ p.watch_deadline }}</span>{% endif %}
+      </div>
+    </div>
+    <h3 class="card-title">{{ p.title }}</h3>
+    {% if p.plain_summary %}<p class="card-description">{{ p.plain_summary }}</p>{% endif %}
+    <dl class="card-fields">
+      {% if p.description %}<dt>{% if p.plain_summary %}для врача{% else %}описание{% endif %}</dt><dd>{{ p.description }}</dd>{% endif %}
+      {% if p.watch_trigger %}<dt>триггер</dt><dd>{{ p.watch_trigger }}</dd>{% endif %}
+      {% if p.notes %}<dt>заметки</dt><dd>{{ p.notes }}</dd>{% endif %}
+    </dl>
+    <footer class="card-foot card-actions">
+      {% if p.last_updated %}
+      <span class="card-closure">обновлено <time>{{ p.last_updated | iso_date }}</time>
+        <span class="age-suffix">({{ p.last_updated | age_days }}д)</span>
+      </span>
+      {% endif %}
+      <button class="action-pill action-pill--ghost"
+              hx-post="/api/problems/{{ p.id }}/archive"
+              hx-confirm="Снять с наблюдения проблему {{ p.problem_id or p.id }}?"
+              hx-target="closest article"
+              hx-swap="delete"
+              style="margin-left: auto">снять с наблюдения</button>
+    </footer>
+  </article>
+{% endfor %}
+{% endif %}
+
+{% if archive %}
+<div class="caption">архив ({{ archive | length }})</div>
+{% for p in archive %}
+  <article class="card">
+    <div class="card-head">
+      <div class="card-meta">{{ p.problem_id or p.id }}
+        {% if p.domain %} · {{ p.domain }}{% endif %}
+      </div>
+      <div class="card-chips"><span class="chip chip--outline">{{ p.status or '—' }}</span></div>
+    </div>
+    <h3 class="card-title">{{ p.title }}</h3>
+    {% if p.description %}<p class="card-description">{{ p.description | short(220) }}</p>{% endif %}
+  </article>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

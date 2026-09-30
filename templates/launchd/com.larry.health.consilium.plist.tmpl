@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HEALTH_DATA_DIR</key>
+		<string>{{DATA}}</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>Label</key>
+	<string>com.larry.health.consilium</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>{{PYTHON}} {{REPO}}/monthly_consilium.py 30 &gt;&gt; {{REPO}}/logs/consilium.log 2&gt;&amp;1</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>{{REPO}}/logs/consilium_error.log</string>
+	<key>StandardOutPath</key>
+	<string>{{REPO}}/logs/consilium.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Day</key>
+		<integer>1</integer>
+		<key>Hour</key>
+		<integer>4</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>ExitTimeOut</key>
+	<integer>3600</integer>
+</dict>
+</plist>

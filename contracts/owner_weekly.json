@@ -1,0 +1,75 @@
+{
+  "module": "owner_weekly",
+  "public": [
+    "run",
+    "last_scheduled_at",
+    "receipt_path"
+  ],
+  "depends_on": [
+    {
+      "module": "notify",
+      "uses": [
+        "weekly_path",
+        "notify_operator",
+        "fault",
+        "FALLBACK_TEXT_LIMIT"
+      ],
+      "why": "общий журнал, существующий транспорт и инженерный журнал отказов",
+      "legacy": "notify — существующий модуль; weekly_path объявляет общий путь журнала"
+    },
+    {
+      "module": "owner_nag",
+      "uses": [
+        "engineering_queue_line",
+        "HOME_TZ"
+      ],
+      "why": "один дом строки инженерной очереди и домашней зоны",
+      "legacy": "существующий колокол владельца"
+    },
+    {
+      "module": "parked_decisions",
+      "uses": [
+        "list_open"
+      ],
+      "why": "прочитать инженерную очередь; отказ должен быть виден в сводке",
+      "legacy": "существующий стор решений"
+    },
+    {
+      "module": "triage_agent",
+      "uses": [
+        "PROVEN_CHANNELS"
+      ],
+      "why": "один список транспортов, подтверждающих доставку",
+      "legacy": "существующий дом критерия доставки"
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "тексты ru/en"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "время запуска инъектируется",
+      "legacy": "общий seam времени"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "Одна ответственность: доставка недельных сведений с квитанцией для бюджета молчания канала.",
+      "D2": "run исполняет сводку; last_scheduled_at и receipt_path — явный контракт с integrity_tests.",
+      "D3": "Использует существующие транспорт, строку очереди, часы и i18n; новых зависимостей нет.",
+      "D4": "117 строк на 2026-09-28.",
+      "D5": "tests/unit/test_owner_weekly.py и test_triage_rail_liveness.py: доставка, отказ, тихая неделя, очередь, идемпотентность. Написаны; не запускались по запрету пользователя.",
+      "D6": "HEALTH_OWNER_WEEKLY изолирует журнал и соседнюю квитанцию. flock того же журнала разделяют notify.weekly и run. Успех — только via из PROVEN_CHANNELS; п.3 integrity принимает эту квитанцию."
+    },
+    "rationale": "Поведение можно восстановить по докстрингу, контракту и тестам. Состояние ограничено журналом и квитанцией; при сбое записи квитанции строки не удаляются.",
+    "date": "2026-09-28",
+    "oracle": "tests/unit/test_owner_weekly.py"
+  }
+}

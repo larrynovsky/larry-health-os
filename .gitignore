@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.pyo
+*.bak
+*.db
+*.db-shm
+*.db-wal
+logs/
+.DS_Store
+*.log
+
+# Auto-generated test/analysis artefacts (added 2026-05-19, INFRA-1 follow-up)
+outputs/
+tests/reports/
+tests/.diagnosis_cache/
+
+# Local backups перед destructive ops (CLAUDE.md §3)
+*.before_*
+
+# Constitutions: DB-as-source (Option 3 2026-06-18); файлы — производные
+constitutions/
+.git_facts.json
+.wellally_upstream_state.json
+
+# плисты, собранные установщиком (scripts/install.py --launchd)
+build/
+
+# рендер scripts/install.py --docker из publication_zones.yaml (docker-install, этап 5)
+/.dockerignore

@@ -1,0 +1,23 @@
+{
+  "_comment": "Проектная политика для project_context (health). Движок домен-агностичен; вся health-специфика — здесь. D3-списки: владелец владеет. Другой проект = свой такой файл в своём корне (нет файла → нейтраль).",
+  "sensitive_tables": [
+    "absolute_thresholds",
+    "lab_trend_thresholds",
+    "genetic_variants",
+    "lab_results",
+    "pharmaco_phenotypes"
+  ],
+  "sensitive_modules": [
+    "safety_net",
+    "diagnosis_guard",
+    "clinical_kb",
+    "cbcr_hypothesis",
+    "cbcr_lookup"
+  ],
+  "plumbing": [
+    "validation_gate",
+    "telegram_bot",
+    "dashboard"
+  ],
+  "dup_allowlist": []
+}

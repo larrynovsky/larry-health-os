@@ -1,0 +1,746 @@
+{
+  "_": "Дом исполненных негативных контролей для датчиков integrity_tests. Формат блока negative_control — ТОТ ЖЕ, что у проб в contracts/plans/*.json (судья: project_context/dispgate._probe_evidence_problems). Второй формат для того же предмета не заводится.",
+  "legacy_without_negative_control": [
+    "check_absence_surface_guarded",
+    "check_arbiter_liveness",
+    "check_assessments_freshness",
+    "check_backup_freshness",
+    "check_belief_fresh_vs_data",
+    "check_brief_does_not_retell_owner",
+    "check_build_context",
+    "check_calendar_freshness",
+    "check_canon_naming_debt",
+    "check_canon_one_date_per_analyte_in_doc",
+    "check_canon_rows_have_a_result",
+    "check_captured_files",
+    "check_carrier_status_allele_coupling",
+    "check_cbcr_methodology_present",
+    "check_censored_values_coherent",
+    "check_clinical_kb_populated",
+    "check_clinical_kb_replica_fresh",
+    "check_consilium_freshness",
+    "check_consolidation_delivery_liveness",
+    "check_constitution_conflicts_unresolved",
+    "check_constitutions_not_hollow",
+    "check_core_metrics",
+    "check_correlation_producers_declared",
+    "check_correlations_grounded",
+    "check_cpic_canon_consistent",
+    "check_cross_tenant_contamination",
+    "check_daemons_alive",
+    "check_data_freshness",
+    "check_data_window",
+    "check_db_integrity",
+    "check_db_row_regression",
+    "check_db_size",
+    "check_deploy_restart_completeness",
+    "check_dispgate_liveness",
+    "check_disposability_causes",
+    "check_doc_classifier_seeded",
+    "check_doc_structure",
+    "check_domain_boundary",
+    "check_ecg_nonsinus",
+    "check_effect_allele_coverage",
+    "check_electrophoresis_sums",
+    "check_family_names_resolve",
+    "check_frozen_relative_not_current",
+    "check_gate_artifacts_liveness",
+    "check_gate_run_receipt",
+    "check_genome_update",
+    "check_git_hooks_executable",
+    "check_glossary_targets_known",
+    "check_gp_reports",
+    "check_gp_schedule",
+    "check_heldout_ready",
+    "check_intentgate_liveness",
+    "check_lab_canon_health",
+    "check_lab_class_verdicts_complete",
+    "check_lab_freshness",
+    "check_lab_history_regression",
+    "check_lab_intake_blind_spot",
+    "check_lab_intake_pulse",
+    "check_lab_names_not_glued",
+    "check_lab_no_billing_rows",
+    "check_lab_ref_scale",
+    "check_lab_review_queue_movement",
+    "check_lab_single_writer",
+    "check_lab_unit_present",
+    "check_labs_freshness_per_tenant",
+    "check_launchd_inventory",
+    "check_literature_freshness",
+    "check_literature_partner_gate",
+    "check_llm_answer_parsed",
+    "check_llm_direct_constructors",
+    "check_llm_guard_blocks_reported",
+    "check_llm_tracts_guarded",
+    "check_logrotate_liveness",
+    "check_logs_all_listed",
+    "check_loinc_decisions_possible",
+    "check_longitudinal_gate_applied",
+    "check_macbook_uncommitted",
+    "check_memory_facts_growth",
+    "check_memory_facts_invariants",
+    "check_morning_brief_gate_liveness",
+    "check_no_hardcoded_diagnosis",
+    "check_norm_coverage",
+    "check_norm_documents_fresh",
+    "check_norm_kind_unclassified",
+    "check_norm_review_overdue",
+    "check_norm_vs_lab_reference",
+    "check_open_hypotheses_ageing",
+    "check_oura_column_completeness",
+    "check_partner_epochs_ready",
+    "check_passset_history_depth",
+    "check_pending_proposals_ageing",
+    "check_periods_expiry",
+    "check_pgs_reference",
+    "check_pharmaco_genome_sync",
+    "check_plist_env_consistency",
+    "check_pro_score_unit_single",
+    "check_probe_liveness",
+    "check_problem_list",
+    "check_producer_registry",
+    "check_profile_reconciler_fresh",
+    "check_promote_conflicts",
+    "check_promotion_backlog_stale",
+    "check_protocols",
+    "check_prs_genome_sync",
+    "check_pubmed_egress_neutral",
+    "check_quarantine_stuck",
+    "check_question_answer_integrity",
+    "check_question_answers_reach_doctor",
+    "check_question_queue_drains",
+    "check_recent_task_activity",
+    "check_reco_repeats_fresh_lab",
+    "check_recommendation_engine_health",
+    "check_reference_tables_not_in_canon",
+    "check_report_content",
+    "check_reschedule_liveness",
+    "check_review_dates",
+    "check_schedule_vs_guideline",
+    "check_secret_scope_matches_reality",
+    "check_security_sensors",
+    "check_single_canonical_db",
+    "check_sleep_device_mixing",
+    "check_sleep_stage_provenance",
+    "check_specialized_canon_waiting",
+    "check_specialized_lab_health",
+    "check_staging_specimen_provenance",
+    "check_staging_status_coverage",
+    "check_stale_visual_cases",
+    "check_stats_non_empty",
+    "check_stderr_errors",
+    "check_stderr_watch_blindness",
+    "check_steps_visible_via_get_day",
+    "check_suite_freshness",
+    "check_survivorship_agent_freshness",
+    "check_symptom_prompt_discipline",
+    "check_tasks_pipeline",
+    "check_temporal_class_coverage",
+    "check_tenant_biometrics_freshness",
+    "check_tenant_count_vs_silence_decision",
+    "check_tenant_dbs_reachable",
+    "check_threshold_names_reach_data",
+    "check_threshold_source_is_document",
+    "check_time_contract",
+    "check_traits_genome_sync",
+    "check_treatment_dates_agree",
+    "check_treatment_history_extracted",
+    "check_triage_delivery_liveness",
+    "check_ungrounded_corr_ratchet",
+    "check_unit_conversion_coverage",
+    "check_unrepeated_draw_not_swamping",
+    "check_unresolved_evaluations",
+    "check_urine_name_convention",
+    "check_validation_gate_methodology_present",
+    "check_visual_orphans",
+    "check_visual_verdict_rate",
+    "check_watchdog_liveness",
+    "check_weekly_digest_delivered",
+    "check_wellness_genome_sync"
+  ],
+  "negative_control": {
+    "check_question_candidates_not_discarded": {
+      "harness": "plans/mutate_question_discard_axis_2026-09-14.sh",
+      "ran_at": "2026-09-14",
+      "mutations": [
+        {
+          "tag": "retire-removed",
+          "statement": "судья перестаёт оставлять след: явное «не пациенту» не снимает кандидата с активных",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "bury-unparsed",
+          "statement": "хороним и артефакт разбора, а не только явное суждение",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "active-filter-off",
+          "statement": "датчик перестаёт различать активных и снятых кандидатов",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "upper-bound-void",
+          "statement": "верхняя граница возраста обессмыслена — считается запас, а не поток",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "ratio-restored",
+          "statement": "возврат прежней семантики: потеря называется только если её больше, чем заданного",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "parse-default-rejects",
+          "statement": "дефолт разбора снова выносит приговор вместо пометки «не суждение»",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_promote_questions_liveness": {
+      "harness": "plans/mutate_promote_liveness_2026-09-14.sh",
+      "ran_at": "2026-09-14",
+      "mutations": [
+        {
+          "tag": "receipt-before-work",
+          "statement": "квитанция ставится раньше вызова — датчик зеленеет на факте входа в функцию",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "receipt-outside-try",
+          "statement": "запись квитанции вынесена из try — упавший подъём оставляет отметку «жив»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "threshold-void",
+          "statement": "порог свежести обессмыслен — протухшая квитанция читается как свежая",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "judges-harvest",
+          "statement": "датчик начинает судить урожай, а не факт запуска",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_thread_work_has_a_second_copy": {
+      "harness": "plans/mutate_thread_second_copy_20260916.sh",
+      "ran_at": "2026-09-16",
+      "mutations": [
+        {
+          "tag": "grace-off",
+          "statement": "отсрочка 6 ч убрана — датчик звенит на нити, которая просто моложе периода снимка; нить живёт медиану 12 минут, значит звенел бы почти на каждой здоровой",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unknown-goes-quiet",
+          "statement": "снимок без поля threads= читается как «копий нет надобности»: старый backup.sh не копирует ветки вовсе, и молчание здесь неотличимо от «всё хорошо»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "trust-the-report",
+          "statement": "вместо наличия объекта у себя датчик верит рапорту отправителя об успешном push — прокси вместо квитанции в точке потребления (§17)",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_threads_have_index_row": {
+      "harness": "plans/mutate_orphan_threads_2026-09-22.sh",
+      "ran_at": "2026-09-22",
+      "mutations": [
+        {
+          "tag": "index-ignored",
+          "statement": "реестр не читается — каждая ветка старше порога объявляется сиротой, и датчик выучат пролистывать",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "grace-off",
+          "statement": "порог 48 ч убран — датчик звенит на свежей нити, у которой строки в INDEX законно ещё нет (автор пишет её на закрытии)",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unknown-goes-quiet",
+          "statement": "снимок без поля threads= читается как «сирот нет» — «не знаю» неотличимо от «чисто»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "wrong-row-format",
+          "statement": "разбор строки реестра разошёлся с настоящей разметкой INDEX — сиротами становятся все нити либо ни одна",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_nightly_suite_liveness": {
+      "harness": "plans/mutate_nightly_liveness_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "fire-ignored",
+          "statement": "дата итога не сравнивается с плановым запуском — любая запись «свежа»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "missing-row-green",
+          "statement": "итога нет вовсе, а читается как «свежо»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unknown-goes-quiet",
+          "statement": "«расписание не выводится» молчит вместо warn",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "stale-read-as-green",
+          "statement": "красная серия снова судит по двум последним записям, а не ночам",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "weekday-off-by-one",
+          "statement": "код дня недели launchd принят за питоновский",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_night_cycle_liveness": {
+      "harness": "plans/mutate_schedule_liveness_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "cycle-schedule-ignored",
+          "statement": "ночной цикл снова не сверяется с расписанием — пропуск сегодняшнего запуска молчит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unjudged-quiet",
+          "statement": "«расписание не выводится» молчит вместо warn",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "list-first",
+          "statement": "из списка триггеров берётся первый, а не самый поздний",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "moment-as-day",
+          "statement": "момент квитанции сравнивается только днём — запись в 07:00 «покрывает» запуск 08:00",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_doorbell_liveness": {
+      "harness": "plans/mutate_schedule_liveness_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "bell-schedule-ignored",
+          "statement": "колокол не сверяется с расписанием — пропущенный дневной запуск молчит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "list-first",
+          "statement": "из списка триггеров берётся первый, а не самый поздний",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "moment-as-day",
+          "statement": "момент квитанции сравнивается только днём — запись в 07:00 «покрывает» запуск 08:00",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_longitudinal_freshness": {
+      "harness": "plans/mutate_schedule_liveness_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "longitudinal-schedule-ignored",
+          "statement": "недельная задача не сверяется с расписанием — пропущенное воскресенье молчит",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_mc_gap": {
+      "harness": "plans/mutate_schedule_liveness_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "mcgap-schedule-ignored",
+          "statement": "артефакт mc_gap «всегда свеж»",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_passset_flicker": {
+      "harness": "plans/mutate_schedule_liveness_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "passset-schedule-ignored",
+          "statement": "снимок pass-set «всегда свеж»",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_changelog_freshness": {
+      "harness": "plans/mutate_changelog_at_merge_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "not-called",
+          "statement": "закрытие нити не зовёт писателя строки журнала",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "left-staged",
+          "statement": "строка пишется, но не коммитится",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "docs-counted",
+          "statement": "записки и документация считаются работой нити",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sensor-silent",
+          "statement": "слитая нить с кодом без строки не звенит",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_proposals_delivered": {
+      "harness": "plans/mutate_proposal_delivery_2026-09-23.sh",
+      "ran_at": "2026-09-23",
+      "mutations": [
+        {
+          "tag": "threshold-void",
+          "statement": "порог застревания обессмыслен — недоставленное никогда не считается застрявшим",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "delivered-ignored",
+          "statement": "датчик не отличает доставленное от недоставленного",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "receipt-before-send",
+          "statement": "квитанция ставится до отправки — отказ Telegram читается как доставка",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "outbox-unregistered",
+          "statement": "outbox-job не зарегистрирован в расписании бота",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "markdown-back",
+          "statement": "карточка снова уходит с разметкой Markdown — текст модели с «_»/«*» отбивает отправку",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_one_document_one_event": {
+      "harness": "plans/mutate_one_document_one_event_2026-09-24.sh",
+      "ran_at": "2026-09-24",
+      "mutations": [
+        {
+          "tag": "having-void",
+          "statement": "порог группы обессмыслен — повторный разбор файла не считается дублем",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "wrong-writer",
+          "statement": "предикат смотрит события не того писателя — дубли разбора документов невидимы",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "group-by-id",
+          "statement": "группировка по событию, а не по файлу — каждая группа из одного, дублей нет никогда",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_constitutions_trigger_alive": {
+      "harness": "plans/mutate_constitutions_trigger_2026-09-25.sh",
+      "ran_at": "2026-09-25",
+      "mutations": [
+        {
+          "tag": "pulse-not-beaten",
+          "statement": "спокойная неделя не отмечает пульс — мёртвое расписание неотличимо от тихого",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "threshold-void",
+          "statement": "порог молчания обессмыслен — датчик не называет недели без пересборки",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "series-invisible",
+          "statement": "лабораторный ряд длиной от горизонта не считается вводной — конституция стареет молча (до 25.09 вечера мутацией был «новый забор»; по решению владельца отдельный забор больше не вводная, нить constitution-horizon)",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_public_genotype_profile": {
+      "harness": "plans/mutate_genotype_profile_2026-09-25.sh",
+      "ran_at": "2026-09-25",
+      "mutations": [
+        {
+          "tag": "common-counted",
+          "statement": "частый генотип, совпадающий у всех тенантов, засчитан как выдающий человека",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "threshold-void",
+          "statement": "порог различающих совпадений обессмыслен — профиль тенанта не называется",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "enumeration-as-profile",
+          "statement": "одиночный вызов «генотип → фенотип» принят за профиль человека",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_hae_arrivals_have_owner": {
+      "harness": "plans/mutate_hae_owner_2026-09-26.sh",
+      "ran_at": "2026-09-26",
+      "mutations": [
+        {
+          "tag": "unowned-silent",
+          "statement": "крик только по событию new: вердикт судьи unowned больше не доходит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "blind-judge",
+          "statement": "живость судьи выключена: реестр, не видящий приход, не кричит",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_hae_raw_archive_compressed": {
+      "harness": "plans/mutate_hae_owner_2026-09-26.sh",
+      "ran_at": "2026-09-26",
+      "mutations": [
+        {
+          "tag": "stale-raw-invisible",
+          "statement": "датчик сжатия смотрит в пустоту: несжатая выгрузка старше 15 дней не видна",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_literature_freshness_partner": {
+      "harness": "plans/mutate_literature_partner_2026-09-27.sh",
+      "ran_at": "2026-09-27",
+      "mutations": [
+        {
+          "tag": "missed-run-silent",
+          "statement": "пропущенный плановый запуск партнёрского поиска не кричит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "no-report-silent",
+          "statement": "заведённый кран без единого отчёта молчит",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_canon_normal_flag_matches_reference": {
+      "harness": "plans/mutate_normal_flag_sensor_2026-09-27.sh",
+      "ran_at": "2026-09-27",
+      "mutations": [
+        {
+          "tag": "low-bound-off",
+          "statement": "нижняя граница референса перестаёт судиться — «норма» ниже референса не видна",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "silent",
+          "statement": "находка считается, но не доставляется (warn снят)",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_problem_plain_summary": {
+      "harness": "plans/mutate_problem_plain_sensor_2026-09-27.sh",
+      "ran_at": "2026-09-27",
+      "mutations": [
+        {
+          "tag": "all-count",
+          "statement": "закрытые проблемы тоже считаются непокрытыми",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "silent",
+          "statement": "находка считается, но не доставляется (warn снят)",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_macbook_head_deployed": {
+      "harness": "plans/mutate_macbook_head_deployed_2026-09-27.sh",
+      "ran_at": "2026-09-27",
+      "mutations": [
+        {
+          "tag": "always-deployed",
+          "statement": "сверка HEAD ноутбука с main выключена — застрявший код считается доехавшим",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "silent",
+          "statement": "находка «не доехал» не доставляется",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unjudged-as-clean",
+          "statement": "«снимка нет» читается молча как «чисто»",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_safety_net_can_judge": {
+      "harness": "plans/mutate_safety_cannot_judge_2026-09-28.sh",
+      "ran_at": "2026-09-28",
+      "mutations": [
+        {
+          "tag": "split-off",
+          "statement": "«судить нечем» остаётся в alerts — долг системы снова едет человеку в бриф",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "tag-trend",
+          "statement": "тренд без отображения перестаёт помечаться как «судить нечем»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "tag-norm",
+          "statement": "кратный порог без референса перестаёт помечаться как «судить нечем»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "normal-claim",
+          "statement": "при непроверенных порогах контекст врача снова говорит «все показатели в норме»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "freshness-off",
+          "statement": "старая запись читается как текущий долг",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sensor-blind",
+          "statement": "датчик перестаёт видеть открытые долги тенанта",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sibling-names",
+          "statement": "сиблингу в сообщении датчика уходят имена аналитов вместо счётчиков",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_translations_fresh": {
+      "harness": "plans/mutate_stale_translations_2026-09-28.sh",
+      "ran_at": "2026-09-28",
+      "mutations": [
+        {
+          "tag": "hash-blind",
+          "statement": "детектор перестаёт сравнивать хеш оригинала — отставший перевод считается свежим",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "warn-off",
+          "statement": "проверка находит отставшие переводы, но не поднимает предупреждение",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_fault_journal": {
+      "harness": "plans/mutate_fault_journal_2026-09-28.sh",
+      "ran_at": "2026-09-28",
+      "mutations": [
+        {
+          "tag": "write-off",
+          "statement": "fault() перестаёт писать запись в журнал — сбой не доходит до ночной проверки",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "warn-off",
+          "statement": "проверка видит записи, но не поднимает предупреждение — ночной цикл не узнаёт о сбое",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "window-off",
+          "statement": "окно «за сутки» снято — старые сбои читаются как сегодняшние",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "group-off",
+          "statement": "группировка по месту сломана — один сбой рождает находку на каждый текст",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_tenant_triage_alive": {
+      "harness": "plans/mutate_tenant_triage_alive_2026-09-28.sh",
+      "ran_at": "2026-09-28",
+      "mutations": [
+        {
+          "tag": "order-off",
+          "statement": "датчик перестаёт сравнивать дату квитанции разбора с датой вердикта — пропущенный разбор считается живым",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "receipt-blind",
+          "statement": "датчик читает вместо квитанции разбора сам вердикт монитора — отсутствие разбора не видно",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_watched_problems_reach_review": {
+      "harness": "plans/mutate_watched_problems_reach_review_2026-09-29.sh",
+      "ran_at": "2026-09-29",
+      "mutations": [
+        {
+          "tag": "anywhere-in-context",
+          "statement": "датчик ищет проблему во всём контексте, а не в секции списка проблем — упоминание в другом блоке сойдёт за «учитываю»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "assert-off",
+          "statement": "датчик находит пропущенные проблемы, но не краснеет",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "status-blind",
+          "statement": "датчик судит только active_monitoring — watchful_waiting и monitoring выпадают из обещания молча",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_arch_map_fresh": {
+      "harness": "plans/mutate_arch_map_fresh_2026-09-29.sh",
+      "ran_at": "2026-09-29",
+      "mutations": [
+        {
+          "tag": "stale-silent",
+          "statement": "штамп реестра старше последнего слияния не звенит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "tolerance-lost",
+          "statement": "сутки допуска потеряны — свежий штамп звенит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "untranslated-blind",
+          "statement": "пояснения без перевода не считаются",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "missing-stamp-ok",
+          "statement": "отсутствие штампа считается свежестью",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# methodology/food_rules.yaml — пол безопасности питания (шаблон установки).
+# Нерушимые клинические гарантии для пищевого профиля: trigger (problem_regex | bmi_below) →
+# assert (energy_in / energy_exclude / constraints_exclude / micro_include). Оракул — тенант
+# и его врач. Пусто — пол не ограничивает ничего.
+floor: []

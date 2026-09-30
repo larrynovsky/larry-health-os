@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security issue privately
+    url: https://github.com/larrynovsky/larry-health-os/blob/HEAD/SECURITY.md
+    about: Open a private security advisory on GitHub or see SECURITY.md. Please don't report vulnerabilities in public issues.

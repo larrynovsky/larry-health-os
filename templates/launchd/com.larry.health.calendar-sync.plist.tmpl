@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.calendar-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/google_calendar_fetcher.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{REPO}}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+        <key>HEALTH_SECRETS_DIR</key>
+        <string>{{SECRETS}}</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+    </dict>
+
+    <!-- Каждый час в :05 (чтобы не конфликтовать с другими джобами) -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Minute</key><integer>5</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>ExitTimeOut</key>
+    <integer>120</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{REPO}}/logs/calendar_sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{REPO}}/logs/calendar_sync_err.log</string>
+</dict>
+</plist>

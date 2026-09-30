@@ -1,0 +1,2741 @@
+# жанр: справочник. Единственный дом извлечённых уроков health_scripts.
+# До 28.09.2026 — project_context.json::corpus (C-01…C-86, только «ложный путь» и модули).
+# Переезд — нить lessons-home: у каждой записи появились причина в устройстве, адрес,
+# исход, цена и улика. Формат и страж — project_context/lessons.py (общий движок для
+# health_scripts и два соседних проекта); справка — docs/reference/lessons_format.md.
+#
+# ЧЕСТНОСТЬ ПЕРЕНОСА. C-01…C-24 заведены 22.07 без разбора (коммит b00a94c): у них был
+# только текст ложного пути. Причина у таких записей помечена «[восстановлено]» — она
+# выведена из текста самой записи при переезде, а не взята из разбора; стоимость, которой
+# в источнике не было, так и названа. У C-25 и позже причина, исход и цена взяты из текста
+# записи и из коммита, который её завёл (evidence: git:<sha>).
+#
+# ПОДАЧА. preflight печатает записи с полем modules при любом статусе — ровно так, как
+# печатал corpus (подача не ослабла от переезда). `lessons --subject` на старте работы
+# подаёт статусы из deliver_statuses (ниже).
+#
+# status: observation — копится · in_work — заведена задача на изменение
+#         adopted — изменение сделано, есть change · failed — после adopted повторилось
+#         confirmed — следующая работа с тем же предметом прошла без той же причины
+schema_version: 1
+
+# Вид адреса отвечает на «что именно менять».
+address_kinds: [runtime, registry_rule, ritual, data, methodology_page]
+# С 29.09 подаются и наблюдения: 47 из 83 уроков были observation и до исполнителя на
+# старте не доезжали вовсе (решение 29.09, нить lessons-adopted-on; так же в соседнем проекте).
+# Цена — длина подачи: у крупных предметов до ~20 строк.
+deliver_statuses: [observation, in_work, adopted, failed]
+# У каждого внедрённого урока — дата внедрения. Урок той же группы (адрес + предмет),
+# записанный позже неё, красит проверку формы: правило не сработало → failed.
+# Уроки, внедрённые до 28.09, датированы днём переноса корпуса — это верхняя граница,
+# а не день внедрения: повтор между настоящим внедрением и 28.09 сигнал пропустит.
+adoption_dates: required
+
+subjects:
+  dead_code: признание кода мёртвым — читатели имени, формы вызова, каналы без отправителя
+  writers_readers: писатели и читатели данных — провенанс, второй писатель, аудитория поля
+  hypothesis_before_fact: утверждение или гипотеза, высказанные до замера фактом
+  existing_home: уже существующий дом знания, словаря, писателя или функции
+  context_horizon: давность и горизонт контекста, который получает рассуждатель
+  duplicate_data: дубли, дедуп и слияние данных — что теряется, что двоится
+  contract_change: смена контракта или канала — все вызывающие, формы и старые читатели
+  sensor_perimeter: периметр датчика или сторожа — слепые зоны, положительный контроль
+  pipeline_order: порядок стадий конвейера
+  vendor_data: данные поставщика (Apple Health, HAE, Oura) — замер вместо документации
+  classifier_rules: словари и правила классификаторов
+  concurrency: асинхронность, потоки, ограничители
+  filesystem_icloud: файловая система, iCloud, границы контейнеров, вытеснение
+  git_hooks: хуки git — события, биты исполнения, доставка через хук
+  test_stand: стенд теста против боевого состояния, мутации, среда полного прогона
+  shell_scripts: ловушки bash и shell
+  intent_registry: реестр замысла, yaml, критерии закрытия, промпты задач
+  run_version: на какой версии шёл прогон
+  time_dates: даты, пояса, ритм задач
+  pii: личные данные в публичной зоне и стражи против них
+  measurement_path: замер тем путём, которым ходит потребитель
+  ocr: распознавание документов
+  message_delivery: доставка сообщений владельцу
+  tenant: тенанты и значения, снятые с одного человека
+  state_lifetime: жизнь состояния в памяти процесса
+  secrets: секреты и их отправители
+  probes: пробы вне pytest
+  agent_delegation: задания другим агентам-исполнителям
+  llm_output: ответы модели — обрезка, разметка, разбор
+
+lessons:
+- id: C-01
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - hai_core
+  - monthly_consilium
+  - cbcr_hypothesis
+  - correlation_analysis
+  - patient_context
+  event: 'нет читателей ИМЕНИ ≠ мёртвый код: грепни ВСЕ формы, включая foo( вызовы; тест-сеам = живой
+    контракт'
+  cost: в источнике не записана
+  cause: '[восстановлено] поиск читателей шёл по имени символа, а вызовы бывают в других формах (через
+    атрибут, строкой, из теста-сеама) — у поиска не было перечня форм'
+  address:
+    kind: runtime
+    ref: project_context/indexer.py
+  subject:
+  - dead_code
+  outcome:
+    kind: rule
+    text: прежде чем объявить код мёртвым — грепнуть все формы обращения и считать тест-сеам живым контрактом
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-02
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - lab_promote
+  - import_coordinator
+  - import_medical_docs
+  - health_db
+  - labs_db
+  event: '«грязь данных, чистить» вместо «второй писатель в таблицу»: проверь провенанс/writers ДО чистки'
+  cost: в источнике не записана
+  cause: '[восстановлено] у таблицы не было видно всех писателей — симптом второго писателя выглядел как
+    грязь данных'
+  address:
+    kind: runtime
+    ref: project_context/indexer.py
+  subject:
+  - writers_readers
+  outcome:
+    kind: check
+    text: preflight печатает внешних писателей таблиц подсистемы (строка «ВНЕШНИЕ writers таблиц (C-02)»)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: project_context/indexer.py::preflight
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-04
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - memory_facts_db
+  - patient_context
+  - monthly_consilium
+  - memory_consolidation
+  event: чинить producer/extraction вместо consumer read-path (пишется, но не читается); не с vector-search
+  cost: в источнике не записана
+  cause: '[восстановлено] отказ «пишется, но не доходит» по симптому неотличим от отказа записи; порядок
+    диагностики (сначала путь чтения) нигде не был записан'
+  address:
+    kind: methodology_page
+    ref: docs/how-to/discovery_before_build.md
+  subject:
+  - writers_readers
+  outcome:
+    kind: rule
+    text: при «факта нет в ответе» сначала проверить путь чтения потребителя, потом извлечение
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-05
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - triage_agent
+  - morning_report
+  - genome_update_agent
+  event: правдоподобная гипотеза (split-brain) до проверки фактом; смотри процессный контекст job (Popen
+    в короткоживущем)
+  cost: в источнике не записана
+  cause: '[восстановлено] в разборе отказа джобы не было шага «проверить процессный контекст» (кто родитель,
+    живёт ли он), и правдоподобная гипотеза заняла его место'
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - hypothesis_before_fact
+  outcome:
+    kind: rule
+    text: гипотеза о причине отказа джобы проверяется фактом процесса (родитель, время жизни) до правки
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-06
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - gp_agent
+  - labs_db
+  event: дописать ключ свежести не увидев существующий словарь + БД-seed (lab_monitoring_schedule primary)
+  cost: в источнике не записана
+  cause: '[восстановлено] у знания о свежести анализов два носителя (словарь в коде и сид в БД), и первичный
+    — БД; из кода этого не видно'
+  address:
+    kind: runtime
+    ref: gp_agent.py
+  subject:
+  - existing_home
+  outcome:
+    kind: rule
+    text: ключ свежести заводится в lab_monitoring_schedule (первичный дом), не дописывается в словарь
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-07
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - health_db
+  - protocols_db
+  - hai_hypotheses
+  event: написал 2-ю функцию тем же именем не грепнув def (Python молча перекрыл)
+  cost: в источнике не записана
+  cause: Python молча перекрывает одноимённую функцию модуля; гейта на дубль имени не было
+  address:
+    kind: runtime
+    ref: project_context/dupgate.py
+  subject:
+  - existing_home
+  outcome:
+    kind: check
+    text: дубль-гейт на коммите блокирует точный дубль имени (dupgate)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: project_context/dupgate.py
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-08
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - monthly_consilium
+  - hai_analysis
+  event: доверился выходу на ПУСТОМ входе + угадал имя символа (detect_drift не существует)
+  cost: в источнике не записана
+  cause: '[восстановлено] проверка результата не спрашивала, был ли вход непустым, а имя символа бралось
+    по догадке, без discovery'
+  address:
+    kind: ritual
+    ref: the-end
+  subject:
+  - hypothesis_before_fact
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: вывод по результату — только после проверки, что вход непуст; имя символа — из capabilities,
+      не по догадке
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-09
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - monthly_consilium
+  event: агрегат (avg за месяц) принят за поточный факт («каждый день»)
+  cost: в источнике не записана
+  cause: '[восстановлено] в контексте консилиума агрегат и поточный факт выглядят одинаково — у значения
+    не было подписи «за что посчитано»'
+  address:
+    kind: runtime
+    ref: monthly_consilium.py
+  subject:
+  - hypothesis_before_fact
+  outcome:
+    kind: rule
+    text: значение в контексте несёт подпись агрегации (среднее за период), вывод «каждый день» из агрегата
+      не делается
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-10
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - generate_constitutions
+  - longitudinal_analysis
+  event: «нет данных» вместо «схема producer разошлась с ключами consumer» → молчаливый скип
+  cost: в источнике не записана
+  cause: '[восстановлено] потребитель трактовал отсутствующий ключ как отсутствие данных — рассогласование
+    схем не отличалось от пустоты'
+  address:
+    kind: runtime
+    ref: longitudinal_analysis.py
+  subject:
+  - writers_readers
+  - contract_change
+  outcome:
+    kind: rule
+    text: отсутствующий ключ у потребителя — громкая ошибка схемы, не пропуск
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-11
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - lifestyle_agents
+  - _create_lifestyle_prompts
+  - _lifestyle_profile
+  event: правка вокруг stale-хардкода клин-значений вместо источника-из-данных
+  cost: в источнике не записана
+  cause: '[восстановлено] клинические значения жили литералами в промптах, и правка латала литерал, не
+    переводя его на данные'
+  address:
+    kind: runtime
+    ref: lifestyle_agents.py
+  subject:
+  - existing_home
+  - context_horizon
+  outcome:
+    kind: rule
+    text: клиническое значение в промпте берётся из данных, литерал заменяется, а не правится
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-12
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - memory_consolidation
+  event: «авторитет содержит факт → спрятать» без проверки containment (потеря дороже дубля)
+  cost: в источнике не записана
+  cause: '[восстановлено] решение «спрятать дубль» принималось без проверки, что авторитетная запись действительно
+    содержит весь факт'
+  address:
+    kind: runtime
+    ref: memory_consolidation.py
+  subject:
+  - duplicate_data
+  outcome:
+    kind: rule
+    text: прятать запись как дубль — только после проверки containment; при сомнении оставлять дубль
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-13
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - notify
+  - hai_hypotheses
+  - task_agent
+  - secrets_paths
+  event: «миграция уже пофиксила» — не грепнул ВСЕХ отправителей секрета (параллельные пропущены)
+  cost: в источнике не записана
+  cause: '[восстановлено] у секрета было несколько параллельных отправителей, и перечня пользователей
+    секрета не существовало'
+  address:
+    kind: runtime
+    ref: secrets_paths.py
+  subject:
+  - secrets
+  - contract_change
+  outcome:
+    kind: rule
+    text: миграция секрета закрывается только после грепа всех его отправителей
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-15
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - db_regression
+  - pgs_reference
+  - pgs_discovery
+  event: «таблица усохла = потеря» без учёта переноса (уехало в reference)
+  cost: в источнике не записана
+  cause: '[восстановлено] датчик регрессии БД считал строки одной таблицы и не знал о законном переносе
+    данных в reference-базу'
+  address:
+    kind: runtime
+    ref: db_regression.py
+  subject:
+  - sensor_perimeter
+  - hypothesis_before_fact
+  outcome:
+    kind: rule
+    text: усыхание таблицы проверяется на перенос в соседний дом до вывода о потере
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-17
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - hai_core
+  - patient_context
+  event: 'старая chat-заметка как сегодняшняя (staleness deviation): штампуй даты, не чини генерацию'
+  cost: в источнике не записана
+  cause: '[восстановлено] заметки чата попадали в контекст без даты — модель не могла отличить старое
+    от сегодняшнего'
+  address:
+    kind: runtime
+    ref: patient_context.py
+  subject:
+  - context_horizon
+  outcome:
+    kind: rule
+    text: элемент контекста несёт дату; давность лечится штампом, не правкой генерации
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-18
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - patient_context
+  - beliefs
+  event: 'завести 2-й путь записи вместо синхронного conversation_history (R6: разъедутся)'
+  cost: в источнике не записана
+  cause: '[восстановлено] существующий синхронный путь записи был невиден с места правки, и второй путь
+    выглядел дешевле'
+  address:
+    kind: runtime
+    ref: patient_context.py
+  subject:
+  - existing_home
+  - writers_readers
+  outcome:
+    kind: rule
+    text: новая запись в историю идёт через conversation_history, второй путь не заводится
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-19
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - calendar_client
+  - calendar_sync
+  - integrity_tests
+  event: датчик на 1 тенанта принят за покрытие всех (tenant-слепота)
+  cost: в источнике не записана
+  cause: '[восстановлено] датчик писался на одном тенанте, и его периметр не перечислял тенантов'
+  address:
+    kind: runtime
+    ref: integrity_tests.py
+  subject:
+  - sensor_perimeter
+  - tenant
+  outcome:
+    kind: rule
+    text: датчик перечисляет тенантов из реестра установки, а не проверяет одного
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-20
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - hae_checker
+  - import_apple_health
+  event: «зелёный датчик = свежо» без positive-control (падает ли на вводящем дефекте?)
+  cost: в источнике не записана
+  cause: '[восстановлено] у датчика свежести не было положительного контроля — зелёный не отличался от
+    слепого'
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §14
+  subject:
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: датчик принимается только с исполненным негативным контролем (внесённый дефект краснеет)
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-22
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - health_db
+  event: смена контракта (get_conn factory) без счёта ВСЕХ callers/форм использования
+  cost: в источнике не записана
+  cause: '[восстановлено] смена общего контракта не начиналась с перечня вызывающих'
+  address:
+    kind: runtime
+    ref: project_context/indexer.py
+  subject:
+  - contract_change
+  outcome:
+    kind: check
+    text: preflight печатает ключевые символы подсистемы с числом вызывающих («кто сломается»)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: project_context/indexer.py::preflight
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-23
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - hai_hypotheses
+  - hypothesis_semantic_check
+  event: дедуп заблокировал ОБОГАЩЁННУЮ версию как дубль (fail-open, различай enrichment)
+  cost: в источнике не записана
+  cause: '[восстановлено] дедуп сравнивал записи по смыслу и не различал обогащение уже существующей записи'
+  address:
+    kind: runtime
+    ref: hypothesis_semantic_check.py
+  subject:
+  - duplicate_data
+  outcome:
+    kind: rule
+    text: дедуп пропускает обогащённую версию (fail-open), блокирует только равную
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-24
+  date: '2026-07-22'
+  thread: project-context-spine
+  modules:
+  - genome_pipeline
+  - backfill_effect_alleles
+  - generate_constitutions
+  event: запуск стадии вне последовательности (S6 до S3 → полые); hard-gate на порядок
+  cost: в источнике не записана
+  cause: '[восстановлено] порядок стадий геномного конвейера держался памятью исполнителя, а не гейтом'
+  address:
+    kind: runtime
+    ref: genome_pipeline.py
+  subject:
+  - pipeline_order
+  outcome:
+    kind: rule
+    text: стадия проверяет, что предыдущие выполнены, и отказывает иначе (hard-gate на порядок)
+  status: observation
+  evidence:
+  - git:b00a94c
+  owner: владелец
+- id: C-25
+  date: '2026-07-23'
+  thread: project-context-spine
+  modules:
+  - doc_agent
+  - project_context
+  event: 'собрал артефакт руками мимо штатного писателя (regen-конвейер с вычиткой): прежде чем СОЗДАВАТЬ
+    артефакт — найди, КТО его уже создаёт; writers бывают файловые, не только табличные — capabilities
+    их не видит'
+  cost: дубль процедуры мимо конвейера с вычиткой (инцидент в catch-log)
+  cause: capabilities видит писателей таблиц, а писатели файлов (regen-конвейеры) ему невидимы — discovery
+    по данным их не находил
+  address:
+    kind: runtime
+    ref: project_context/indexer.py
+  subject:
+  - existing_home
+  outcome:
+    kind: rule
+    text: прежде чем создавать артефакт — найти его штатного писателя, в том числе файлового
+  status: observation
+  evidence:
+  - git:9525660
+  - docs/reference/duplicate_catch_log.md
+  owner: владелец
+- id: C-26
+  date: '2026-08-03'
+  thread: blueprint-close
+  modules:
+  - health_db
+  - gp_agent
+  - morning_report
+  - lifestyle_agents
+  - labs_db
+  event: 'одно измерение в БД лежит в ДВУХ формах: get_day() отдаёт JSON (sleep.totalSleep), daily_metrics
+    — плоские колонки (sleep_total); правка одной формы не чинит читателя другой'
+  cost: в источнике не записана
+  cause: у измерения два носителя (JSON дня и плоские колонки) без объявленного первичного
+  address:
+    kind: runtime
+    ref: health_db.py
+  subject:
+  - writers_readers
+  - existing_home
+  outcome:
+    kind: rule
+    text: правка измерения проверяет обоих читателей — get_day() и daily_metrics
+  status: observation
+  evidence:
+  - git:048abeb
+  owner: владелец
+- id: C-27
+  date: '2026-08-03'
+  thread: blueprint-close
+  modules:
+  - checkin_agent
+  - telegram_bot
+  - bot/helpers
+  event: 'чинить логику диалога вместо ЖИЗНИ состояния: CheckinState — singleton в памяти бота, рестарт
+    = сброс; лечится TTL (is_stale), не ветвлением'
+  cost: в источнике не записана
+  cause: состояние диалога жило в памяти процесса без срока жизни — рестарт выглядел как ошибка логики
+  address:
+    kind: runtime
+    ref: checkin_agent.py
+  subject:
+  - state_lifetime
+  outcome:
+    kind: rule
+    text: состояние в памяти несёт TTL (is_stale); отказ диалога сначала проверяется на жизнь состояния
+  status: observation
+  evidence:
+  - git:048abeb
+  owner: владелец
+- id: C-28
+  date: '2026-08-03'
+  thread: blueprint-close
+  modules:
+  - lifestyle_agents
+  - gp_agent
+  - import_oura
+  event: 'ветвиться по документации вендора вместо ЗАМЕРА его данных: вендор обещает несколько значений поля,
+    а в данных встречается не каждое → мёртвые ветки; GROUP BY, не хардкод'
+  cost: мёртвые ветки в агентах
+  cause: ветки писались по документации поставщика, распределения реальных значений никто не мерил
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - vendor_data
+  - hypothesis_before_fact
+  outcome:
+    kind: rule
+    text: ветвление по значениям поставщика — только после GROUP BY по базе
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:048abeb
+  owner: владелец
+- id: C-29
+  date: '2026-08-03'
+  thread: blueprint-close
+  modules:
+  - calendar_client
+  - calendar_sync
+  event: 'словари классификатора пересеклись: «Check in to Hotel» уезжает в перелёты; проверь CHECKIN_KEYWORDS
+    ∩ FLIGHT_KEYWORDS до правки правил'
+  cost: в источнике не записана
+  cause: словари классов классификатора пересекаются, и пересечение ничем не проверяется
+  address:
+    kind: runtime
+    ref: calendar_sync.py
+  subject:
+  - classifier_rules
+  outcome:
+    kind: rule
+    text: правка правил классификатора начинается с проверки пересечения словарей
+  status: observation
+  evidence:
+  - git:048abeb
+  owner: владелец
+- id: C-30
+  date: '2026-08-03'
+  thread: blueprint-close
+  modules:
+  - wellally_consult
+  - hai_core
+  - monthly_consilium
+  - hai_chat
+  event: 'sync Anthropic-клиент под run_in_executor даёт [Errno 11] EDEADLK на macOS: только AsyncAnthropic;
+    симптом выглядит как зависший API, а не как дедлок'
+  cost: в источнике не записана
+  cause: синхронный клиент в executor на macOS дедлочит, а симптом похож на зависший API
+  address:
+    kind: runtime
+    ref: hai_core.py
+  subject:
+  - concurrency
+  outcome:
+    kind: rule
+    text: в асинхронном коде — только AsyncAnthropic
+  status: observation
+  evidence:
+  - git:048abeb
+  owner: владелец
+- id: C-31
+  date: '2026-08-03'
+  thread: blueprint-close
+  modules:
+  - wellally_consult
+  - lifestyle_agents
+  event: 'guard применён к ЧАСТИ множества и выглядит рабочим: Semaphore охватывал 9 медиков из 13, lifestyle
+    шли мимо — пик вдвое выше объявленного; считай ВСЕХ проходящих через ограничитель'
+  cost: пик параллельности вдвое выше объявленного
+  cause: ограничитель ставился на тот путь, где писали, а не на множество всех вызывающих
+  address:
+    kind: runtime
+    ref: wellally_consult.py
+  subject:
+  - concurrency
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: ограничитель проверяется подсчётом всех, кто через него проходит
+  status: observation
+  evidence:
+  - git:048abeb
+  owner: владелец
+- id: C-32
+  date: '2026-08-01'
+  thread: blueprint-close
+  modules:
+  - import_apple_health
+  - import_all
+  - import_coordinator
+  event: 'правка не той папки HAE: живая — .../HealthExport/Documents/Health/, а «New Automation/» НЕ
+    используется; пустой результат читается как «нет данных», а не как «смотрю не туда»'
+  cost: в источнике не записана
+  cause: пустой результат импорта не отличался от «смотрю не туда» — живая папка нигде не объявлена
+  address:
+    kind: methodology_page
+    ref: docs/reference/data_ingestion_paths.md
+  subject:
+  - vendor_data
+  - measurement_path
+  outcome:
+    kind: rule
+    text: путь к данным HAE берётся из справочника путей, пустота проверяется на правильность папки
+  status: observation
+  evidence:
+  - git:7358fdd
+  - docs/reference/data_ingestion_paths.md
+  owner: владелец
+- id: C-33
+  date: '2026-08-01'
+  thread: blueprint-close
+  modules:
+  - import_apple_health
+  - import_all
+  event: 'os.rename между iCloud-контейнерами не работает: архивировать только shutil.copy2; ошибка выглядит
+    как проблема прав, а не как граница контейнера'
+  cost: в источнике не записана
+  cause: rename между контейнерами iCloud невозможен, а ошибка маскируется под права
+  address:
+    kind: runtime
+    ref: import_apple_health.py
+  subject:
+  - filesystem_icloud
+  outcome:
+    kind: rule
+    text: между контейнерами iCloud — только shutil.copy2
+  status: observation
+  evidence:
+  - git:7358fdd
+  owner: владелец
+- id: C-34
+  date: '2026-08-01'
+  thread: blueprint-close
+  modules:
+  - import_apple_health
+  - safety_net
+  - gp_agent
+  event: 'давление «пропало» не в коде: если Blood Pressure не включён в Settings→Metrics приложения HAE,
+    его нет в JSON вовсе; путь через .hae-бинарник (regex по ASCII systol/iastol, 60–200) — обходной,
+    проверь ИСТОЧНИК до правки парсера'
+  cost: в источнике не записана
+  cause: состав экспорта задаётся настройкой приложения на телефоне, а не кодом — из кода её не видно
+  address:
+    kind: methodology_page
+    ref: docs/reference/data_ingestion_paths.md
+  subject:
+  - vendor_data
+  outcome:
+    kind: rule
+    text: пропажа метрики сначала проверяется в настройках источника, потом в парсере
+  status: observation
+  evidence:
+  - git:7358fdd
+  owner: владелец
+- id: C-35
+  date: '2026-08-23'
+  thread: hooks-exec-bit
+  modules:
+  - scripts/git-hooks/pre-commit
+  - integrity_tests
+  - affected_claims
+  event: 'правка исполняемого файла через смонтированную ФС Cowork СНИМАЕТ бит исполнения (2026-08-20:
+    pre-commit был 100755 → стал 100644 и на диске, и в индексе; git молча перестал запускать хук, выключив
+    разом dispgate, dupgate, intent, L2, ruff и отбор тестов — поймал побочный hint git, а не сторож).
+    После записи в любой хук/скрипт через монтирование: chmod 755 + git update-index --chmod=+x, затем
+    сверить `git ls-files -s`. Сторожа: tests/consistency/test_git_hooks_executable.py (режим в индексе)
+    и integrity_tests.check_git_hooks_executable (диск, ночной, вне хуков — проверка ВНУТРИ хука бесполезна:
+    мёртвый хук не запустится)'
+  cost: все гейты pre-commit выключены до случайного hint git
+  cause: запись через смонтированную ФС Cowork снимает бит исполнения, а у хуков не было стража режима
+  address:
+    kind: runtime
+    ref: tests/consistency/test_git_hooks_executable.py
+  subject:
+  - git_hooks
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: режим хуков стережётся в индексе (test_git_hooks_executable) и на диске ночью (check_git_hooks_executable)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tests/consistency/test_git_hooks_executable.py
+  evidence:
+  - git:a8cde54
+  - tests/consistency/test_git_hooks_executable.py
+  owner: владелец
+- id: C-36
+  date: '2026-09-02'
+  thread: tenant-leak-guard
+  modules:
+  - check_contracts
+  - integrity_tests
+  - lab_canon
+  - safety_net
+  - secrets_paths
+  - security_sensors
+  event: 'ПЕРИМЕТР СТОРОЖА ЗАДАЮТ ЯЗЫКИ КАНАЛОВ, А НЕ ЯЗЫК, НА КОТОРОМ УДОБНО СКАНИРОВАТЬ. 2026-09-02:
+    оба сторожа кросс-тенант утечки (check_contracts «per-tenant секреты» и tests/consistency/test_telegram_delivery_coverage)
+    делали rglob(''*.py'') — а канал был на shell: watch_and_test.sh слал телеграм прямым curl с хардкодом
+    $HOME/.health_secrets и был невидим ОБОИМ, icloud_conflict_check.sh тоже. Сторож был зелёный и честный
+    — он просто не смотрел туда, где жила утечка. Тот же класс шире: security_sensors._secrets_perms итерировал
+    iterdir() и не заходил в подкаталоги — 12 файлов 644 в _env_cache были слепым пятном внутри каталога
+    700. ПРОВЕРЬ ПРИ ПОСТРОЙКЕ ЛЮБОГО СТОРОЖА: на каких языках/в каких формах бывает охраняемое явление,
+    и покрывает ли их обход. Периметр держи в ОДНОМ доме (secrets_paths.GUARDED_SUFFIXES), а не копией
+    в каждом стороже — две копии разойдутся молча. И не перечисляй охраняемые ИМЕНА в предикате: список
+    из трёх имён отстал, и календарь партнёра с location_ingest_token не охранялись ничем — имена живут
+    в реестре (secrets_paths.SECRET_SCOPE). ТРЕТИЙ ЭКЗЕМПЛЯР ТОГО ЖЕ КЛАССА (2026-09-02, решение владельца:
+    не C-37, а сюда — три извода одной причины = вопрос об архитектуре, §15): датчик класса «имя порога
+    ≠ имя данных» (check_family_names_resolve, 25.07) был осознанно сужен до валид-гейта, и область жила
+    в ДОКСТРИНГЕ — без читателя и без триггера пересмотра. Через 39 дней те же два имени (CA19.9↔CA19-9,
+    Cholesterol↔Cholesterol_Total) глушили safety_net: онкомаркер с тремя уровнями тревоги молчал неотличимо
+    от «в норме». Сужение было верным, ошибка — область как проза. ОБЩЕЕ ПРАВИЛО ТРЁХ СЛУЧАЕВ: периметр
+    сторожа ВЫЧИСЛЯЕТСЯ из того, где живёт явление (языки каналов, подкаталоги, все таблицы с metric+direction
+    по sqlite_master), а не записывается тем, что удобно было перечислить; если сужение неизбежно — у
+    области обязан быть триггер «появился новый носитель класса». Носитель правила: integrity_tests.check_threshold_names_reach_data
+    (периметр по схеме).'
+  cost: утечка канала на shell невидима обоим сторожам; онкомаркер с тремя уровнями тревоги молчал 39
+    дней
+  cause: периметр сторожа записывался тем, что удобно перечислить, а не вычислялся из того, где живёт
+    явление; у сужения не было триггера пересмотра
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §15
+  subject:
+  - sensor_perimeter
+  - secrets
+  outcome:
+    kind: check
+    text: периметр вычисляется из носителей явления (integrity_tests.check_threshold_names_reach_data;
+      secrets_paths.GUARDED_SUFFIXES, SECRET_SCOPE)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: integrity_tests.py::check_threshold_names_reach_data
+  evidence:
+  - git:d0a3977
+  owner: владелец
+- id: C-37
+  date: '2026-09-14'
+  thread: review-findings
+  modules:
+  - tests/unit/test_thread_lifecycle.py
+  - scripts/thread_finish.sh
+  event: 'СТЕНД, НЕ ВОСПРОИЗВОДЯЩИЙ БОЕВОЕ СОСТОЯНИЕ, ДЕЛАЕТ ЧЕК ВЕЧНО ЗЕЛЁНЫМ. 2026-09-14, внешнее ревью:
+    оракул закрытия нити клал CHANGELOG.md UNTRACKED, а в бою он отслеживаемый. `git status --untracked-files=no`
+    на untracked отдаёт ПУСТО, весь блок `if [[ -n "$DIRTY" ]]` не исполнялся, и тест зеленел по ветке
+    «untracked не блокирует» вместо той, которую называет. Три мутации, включая «вырезать проверяемый
+    блок целиком», прошли незамеченными, а правка была МЕРТВА в боевом репозитории с момента написания.
+    Модель Баха `Anatomy of a Check`: шаги выполняются при неверном предположении о состоянии продукта,
+    и чек проходит при настоящем дефекте. ПРОВЕРЬ У ЛЮБОГО НОВОГО ОРАКУЛА: в каком состоянии предмет бывает
+    в БОЮ (отслеживаемый/грязный/staged, какая ветка у HEAD, сколько реплик) и совпадает ли с этим стенд.
+    Признак беды: мутация «вырезать проверяемое целиком» не краснеет.'
+  cost: правка закрытия нити мертва в боевом репозитории с момента написания
+  cause: стенд оракула строился без сверки с боевым состоянием предмета (tracked/untracked, ветка, реплики)
+  address:
+    kind: ritual
+    ref: the-end
+  subject:
+  - test_stand
+  outcome:
+    kind: rule
+    text: новый оракул сверяет состояние стенда с боевым; мутация «вырезать проверяемое целиком» обязана
+      краснеть
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:the-end, редакция 2026-09-28 (вечер) — признаки «стенд ≠ бой» и честной мутации в Validation/Сторож; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:eccf520
+  owner: владелец
+- id: C-38
+  date: '2026-09-14'
+  thread: review-findings
+  modules:
+  - backup.sh
+  event: 'ПОД `set -e` СОБСТВЕННАЯ ВЕТКА «FAILED» НЕДОСТИЖИМА, ЕСЛИ ХОТЬ ОДИН ШАГ СТОИТ ВНЕ ЦЕПОЧКИ `&&`.
+    2026-09-14: в backup.sh был написан явный путь отказа с логом «manual recovery нужен», а `cp .git/index`
+    стоял перед цепочкой — скрипт умирал на нём, и в логе оставалось только «started». Отказ был замаскирован
+    дважды: сверху ложился датчик, который про застывший ref сам говорит, что «ноутбук выключен» и «джоба
+    мертва» отсюда неразличимы. ЛЕЧЕНИЕ ОБЩЕЕ, А НЕ ПОШТУЧНОЕ: ловушка `trap ... EXIT` плюс флаг штатного
+    завершения — тогда слышен ЛЮБОЙ обрыв, а не тот единственный, который автор предугадал. И заводи лог
+    ДО разбора аргументов: иначе опечатка в режиме (в plist) даёт молчащую джобу без следа.'
+  cost: отказ бэкапа замаскирован дважды (молчащий лог и неразличающий датчик)
+  cause: путь отказа писался под предугаданный шаг; обрыв на любом другом шаге под set -e ничего не пишет
+  address:
+    kind: runtime
+    ref: backup.sh
+  subject:
+  - shell_scripts
+  outcome:
+    kind: rule
+    text: trap … EXIT плюс флаг штатного завершения; лог заводится до разбора аргументов
+  status: observation
+  evidence:
+  - git:eccf520
+  owner: владелец
+- id: C-39
+  date: '2026-09-14'
+  thread: review-findings
+  modules:
+  - git_facts.py
+  - scripts/git-hooks/handoff_notes_notice.sh
+  event: 'ПОЧИНЕННЫЙ КЛАСС НЕ ПЕРЕНОСИТСЯ НА СОСЕДНЕГО ЧИТАТЕЛЯ САМ. 2026-09-13 в доставку записок добавлен
+    `core.quotepath=false` (без него git отдаёт не-ASCII пути в октальном экранировании и фильтр по имени
+    молча теряет строку), и в тот же день это НЕ было применено к `git_facts._git` — читателю снимка,
+    который сравнивает имена файлов ТОЧНО, вычитая MACHINE_REGENERATED_FILES. Нашло внешнее ревью 14.09.
+    ПРАВИЛО: починив класс в одном читателе, грепни ВСЕХ, кто делает тот же вызов к тому же источнику,
+    и либо почини, либо назови вслух, почему им не нужно.'
+  cost: находка внешнего ревью
+  cause: починка класса не сопровождалась перечнем всех читателей того же источника
+  address:
+    kind: ritual
+    ref: the-end
+  subject:
+  - contract_change
+  outcome:
+    kind: rule
+    text: починив класс в одном читателе — грепнуть всех, кто делает тот же вызов, и починить или назвать,
+      почему не нужно
+  status: observation
+  evidence:
+  - git:eccf520
+  owner: владелец
+- id: C-40
+  date: '2026-09-14'
+  thread: review-findings
+  modules:
+  - scripts/thread_finish.sh
+  - backup.sh
+  event: 'BASH И НЕ-ASCII: ДВА РАЗНЫХ ТИХИХ ОТКАЗА, ОБА ЗА ОДИН ЧАС 2026-09-14. (1) Имена переменных только
+    ASCII: `for _К in ...` даёт «not a valid identifier», ветка уходит в пустое значение и fail-closed
+    срабатывает на ровном месте. (2) Не-ASCII символ СРАЗУ ПОСЛЕ подстановки съедает переменную: в `"«$MODE»"`
+    закрывающая ёлочка это два байта (C2 BB), bash в этой локали считает C2 частью ИМЕНИ, подставляется
+    пустая `${MODE\xc2}`, а 0xBB остаётся битым байтом в выводе. ЛЕЧЕНИЕ: имена переменных латиницей всегда;
+    вокруг подстановки в русском тексте — фигурные скобки `${MODE}`. Оба случая поймал оракул за минуты;
+    чтением кода не видны ни тот ни другой.'
+  cost: ложный fail-closed и битый вывод
+  cause: bash в этой локали считает байты UTF-8 частью имени переменной
+  address:
+    kind: runtime
+    ref: scripts/thread_finish.sh
+  subject:
+  - shell_scripts
+  outcome:
+    kind: rule
+    text: имена переменных латиницей; вокруг подстановки в русском тексте — ${VAR}
+  status: observation
+  evidence:
+  - git:eccf520
+  owner: владелец
+- id: C-41
+  date: '2026-09-15'
+  thread: handoff-notes
+  modules:
+  - subsystem_intent.yaml
+  - tests/consistency/test_intent_yaml_no_duplicate_keys.py
+  event: 'ПОВТОРНЫЙ КЛЮЧ В YAML МОЛЧА СЪЕДАЕТ НАПИСАННОЕ. 15.09 в agent_coordination у двух инвариантов
+    оказалось по ДВА блока `limits:` — дописал рядом вместо правки на месте. YAML оставляет последний:
+    из четырёх написанных границ до реестра доехали две, и ни дифф, ни гейт intent_receipt, ни глаз ревьюера
+    этого не показали. Потерялась в том числе граница «отметка прочитано лежит в служебном каталоге ДЕРЕВА,
+    а у главной копии он общий» — ровно та, ради признания которой limits и заводились. ОПАСНО ИМЕННО
+    ЗДЕСЬ: реестр — авторитет по замыслу, утверждение остаётся, оговорка исчезает, и holds начинает значить
+    больше, чем заслужил. ЛЕЧЕНИЕ: tests/consistency/test_intent_yaml_no_duplicate_keys.py — SafeLoader,
+    падающий на дубле ключа. ПРИЗНАК: правишь запись реестра — правь блок НА МЕСТЕ, не дописывай второй
+    рядом.'
+  cost: две границы инвариантов потеряны молча
+  cause: YAML оставляет последний из повторных ключей; правка дописывалась рядом, а не на месте
+  address:
+    kind: runtime
+    ref: tests/consistency/test_intent_yaml_no_duplicate_keys.py
+  subject:
+  - intent_registry
+  outcome:
+    kind: check
+    text: SafeLoader, падающий на дубле ключа
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tests/consistency/test_intent_yaml_no_duplicate_keys.py
+  evidence:
+  - git:eb12993
+  - tests/consistency/test_intent_yaml_no_duplicate_keys.py
+  owner: владелец
+- id: C-42
+  date: '2026-09-15'
+  thread: handoff-notes
+  modules:
+  - scripts/git-hooks/handoff_notes_notice.sh
+  - scripts/git-hooks/post-commit-macbook
+  event: 'ХУК ВЫБИРАЮТ ПО СОБЫТИЮ, А НЕ ПО ОХВАТУ. 13.09 доставку записок повесили на pre-commit по замеру
+    «через него прошёл КАЖДЫЙ коммит, 84 за неделю». Замер верный, вывод неверный: pre-commit — событие
+    ПОПЫТКИ коммита, а отметка «прочитано» осмысленна только для СОСТОЯВШЕГОСЯ. Отменённый коммит (выход
+    из редактора без сообщения) гасил записку соседа навсегда. Починка «развести печать и зачёт по двум
+    хукам через .pending» выглядела аккуратной и завела ВТОРУЮ дыру: `--no-verify` пропускает pre-commit,
+    но НЕ post-commit, поэтому .pending отменённой попытки засчитывался коммитом, который записку не печатал.
+    Связать два хука общим идентификатором попытки нечем — git его не даёт. ЛЕЧЕНИЕ ОКАЗАЛОСЬ МЕНЬШЕ ПРОБЛЕМЫ:
+    post-commit печатает видимо и срабатывает ровно на состоявшихся коммитах (включая --no-verify и --amend,
+    git 2.54) — один хук, одно действие, и весь класс гонок исчезает вместе с .pending. ПРИЗНАК: если
+    чинишь механизм добавлением фазы и файла состояния между хуками — сначала проверь, нет ли у git ОДНОГО
+    события, которое и есть нужный тебе смысл.'
+  cost: записки соседей гасились без прочтения
+  cause: хук выбран по охвату замера, а не по смыслу события
+  address:
+    kind: runtime
+    ref: scripts/git-hooks/post-commit-macbook
+  subject:
+  - git_hooks
+  outcome:
+    kind: rule
+    text: сначала найти одно событие git, которое и есть нужный смысл, до фаз и файлов состояния
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: scripts/git-hooks/post-commit-macbook
+  evidence:
+  - git:eb12993
+  owner: владелец
+- id: C-43
+  date: '2026-09-15'
+  thread: thread-gates
+  modules:
+  - scripts/thread_finish.sh
+  event: 'BASH НЕ УМЕЕТ ХРАНИТЬ NUL. Чиня разбор имён файлов, взял `git status -z` и положил вывод в переменную:
+    `DIRTY="$(git status -z ...)"`. Подстановка команды выбрасывает нулевые байты МОЛЧА — записи склеились
+    в одну строку, и чужая незакоммиченная работа перестала находиться вообще, то есть правка «ради надёжности
+    имён» выключила сам гейт. Переменная при этом выглядела совершенно обычной. ЛЕЧЕНИЕ: читать прямо
+    из процесса — `while IFS= read -r -d '''' L; do ...; done < <(git status -z ...)`, а признак «было
+    ли грязно» нести флагом, а не длиной строки. ПРИЗНАК: увидел `-z`/`-0`/`--null` рядом с `$( )` — это
+    ошибка независимо от того, что показывает echo. Поймал оракул, не чтение.'
+  cost: гейт чужой незакоммиченной работы выключен
+  cause: подстановка команды молча выбрасывает NUL-байты
+  address:
+    kind: runtime
+    ref: scripts/thread_finish.sh
+  subject:
+  - shell_scripts
+  outcome:
+    kind: rule
+    text: -z/-0/--null читать только через while read -d "" из процесса
+  status: observation
+  evidence:
+  - git:8efd7d6
+  owner: владелец
+- id: C-44
+  date: '2026-09-15'
+  thread: thread-gates
+  modules:
+  - git_facts.py
+  - integrity_tests.py
+  event: 'ТРИ ИСХОДА, ДВЕ ВЕТКИ: «не знаю» уехало в «чисто». `captured_files` честно различает список
+    (находка), `[]` (чисто) и `None` (судить не на чем), а доставка писала `if поймано:` — обе последние
+    ветки ложны, и датчик молчал одинаково в обоих случаях. Замер 15.09: 10 из 20 коммитов не судятся
+    вовсе, то есть «не знаю» — ОБЫЧНОЕ состояние этого датчика, а не край. Тот же класс дал срез `[:20]`:
+    хвост не судился, и об этом не говорилось. ПРИЗНАК: функция возвращает Optional[list] — значит `if
+    x:` почти наверняка неверно, нужно `if x is None`. И шире: у датчика, который умеет не знать, «не
+    знаю» обязано быть ТРЕТЬИМ сообщением, а не тишиной, неотличимой от чистоты.'
+  cost: датчик молчал на половине коммитов
+  cause: Optional[list] проверялся на истинность — «не знаю» и «чисто» неразличимы
+  address:
+    kind: runtime
+    ref: integrity_tests.py
+  subject:
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: «не знаю» — третье сообщение датчика; Optional проверяется is None
+  status: observation
+  evidence:
+  - git:8efd7d6
+  owner: владелец
+- id: C-45
+  date: '2026-09-15'
+  thread: probe-carrier
+  modules:
+  - CLAUDE.md §12
+  - tests/unit/test_probe_carrier.py
+  event: 'КРАСНЫЙ НА НЕ-ТОЙ ВЕРСИИ — ЗЕРКАЛО §12, И ОНО ДОРОЖЕ. §12 стережёт ложно-ЗЕЛЁНЫЙ («прогон не
+    на том коммите»). 15.09 та же гонка дала ложно-КРАСНЫЙ: полный прогон на Studio стартовал на 8efd7d6,
+    а ратчет пропусков подняли 3→4 в 57dae75, который в предки 8efd7d6 не входил. Вывод «у соседа красный»
+    был бы неверен, а хуже — адресован не тому: у соседа всё сделано, отставала МОЯ копия. Проверка занимает
+    одну команду: `git merge-base --is-ancestor <коммит-починки> <коммит-прогона>`. ПРИЗНАК: увидел красный
+    в чужой области — СНАЧАЛА спроси, на каком коммите шёл прогон и есть ли в его предках починка, и только
+    потом пиши соседу. Ложно-красный дороже ложно-зелёного тем, что тратит чужое время и учит не доверять
+    датчику.'
+  cost: почти ушедшая соседу ложная тревога
+  cause: §12 стерёг только ложно-зелёный; ложно-красный на отставшей копии не был назван
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §12
+  subject:
+  - run_version
+  outcome:
+    kind: rule
+    text: красный в чужой области — сначала git merge-base --is-ancestor <починка> <прогон>
+  status: observation
+  evidence:
+  - git:f6cfaf8
+  owner: владелец
+- id: C-46
+  date: '2026-09-15'
+  thread: judge-verdict
+  modules:
+  - tasks_db.py
+  - task_agent.py
+  event: 'ПОЛЕ С ИМЕНЕМ `reason` МОЖЕТ ОКАЗАТЬСЯ ПУБЛИКАЦИЕЙ, А НЕ ДАННЫМИ. Закрывая BL-JUDGE-VERDICT-UNRECORDED-1,
+    я чуть не положил машинное обоснование судьи в `tasks.reason` — «поле же есть и называется правильно».
+    Проверка читателей показала: `task_agent.format_tasks_message` рендерит его человеку в Telegram курсивом
+    под текстом задачи. То есть колонка несёт ТЕКСТ ДЛЯ ЧЕЛОВЕКА, а выглядит как служебная. ПРИЗНАК: прежде
+    чем писать в существующее поле, грепни его ЧИТАТЕЛЕЙ, а не только писателей — у поля может быть аудитория.
+    Дёшево и обязательно: `grep -n "\[''<поле>''\]" --include=*.py`. Цена ошибки здесь не поломка, а утечка
+    внутренностей модели в глаза владельца, которую никакой тест не ловит, если его не написать заранее.'
+  cost: почти случившаяся утечка внутренностей модели в глаза владельца
+  cause: у поля есть аудитория-читатель, а поиск перед записью шёл только по писателям
+  address:
+    kind: methodology_page
+    ref: docs/how-to/discovery_before_build.md
+  subject:
+  - writers_readers
+  outcome:
+    kind: rule
+    text: перед записью в существующее поле — грепнуть его читателей
+  status: observation
+  evidence:
+  - git:b541396
+  owner: владелец
+- id: C-47
+  date: '2026-09-15'
+  thread: judge-verdict
+  modules:
+  - tasks_db.py
+  event: 'НОВАЯ КОЛОНКА В ЖЁСТКОМ INSERT ЛОМАЕТ ВСЕХ, ЧЬЯ СХЕМА СТАРШЕ. Добавил judge_verdict/judge_reason
+    в список колонок INSERT — и уронил `assessment_scheduler` в бою («table tasks has no column named
+    judge_verdict») плюс три соседних теста с рукодельной схемой. Прод спасала бы миграция на старте,
+    но функция стала ТРЕБОВАТЬ, чтобы та уже отработала. ЛЕЧЕНИЕ: дописывать необязательные поля в INSERT
+    только когда значение не None — тогда вызов без судьи идёт ровно прежним набором колонок, и обратная
+    совместимость не обещание, а свойство. ПРИЗНАК: расширяешь INSERT в общей функции записи — спроси,
+    у КОГО схема может быть старше; «у нас же миграция» верно для прода и неверно для всех остальных читателей
+    кода.'
+  cost: падение assessment_scheduler в бою и три теста
+  cause: общая функция записи стала требовать выполненную миграцию от всех вызывающих
+  address:
+    kind: runtime
+    ref: tasks_db.py
+  subject:
+  - contract_change
+  outcome:
+    kind: rule
+    text: необязательные поля в INSERT — только когда значение не None
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tasks_db.py::save_task
+  evidence:
+  - git:b541396
+  owner: владелец
+- id: C-48
+  date: '2026-09-15'
+  thread: judge-verdict
+  modules:
+  - tests/unit/test_judge_verdict_recorded.py
+  event: 'ТЕСТ ПРИЁМНИКА НЕ ЕСТЬ ТЕСТ ПРОВОДКИ. Шесть тестов проверяли, что поля есть и что `save_task`
+    их пишет — и все шесть пережили мутацию «убрать передачу вердикта из `promote_memory_questions`».
+    Приёмник работал, судья до него не доезжал, датчик молчал. Тот же класс, что «файл доставки записок
+    жив, но его никто не зовёт» (О-14, M3) — третье попадание за трое суток. ПРИЗНАК: если тесты зовут
+    записывающую функцию НАПРЯМУЮ, они судят её, а не механизм. Нужен хотя бы один, который проходит весь
+    путь от источника решения до строки в базе, с подставным только внешним миром (моделью), а не своими
+    же слоями.'
+  cost: датчик молчал при отключённой передаче вердикта; третье попадание класса за трое суток
+  cause: тесты звали записывающую функцию напрямую и судили её, а не путь от источника решения
+  address:
+    kind: ritual
+    ref: the-end
+  subject:
+  - test_stand
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: хотя бы один тест проходит весь путь от источника решения до строки в базе
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:the-end, редакция 2026-09-28 (вечер) — признаки «стенд ≠ бой» и честной мутации в Validation/Сторож; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:b541396
+  owner: владелец
+- id: C-49
+  date: '2026-09-23'
+  thread: cadence-thresholds
+  modules:
+  - integrity_tests
+  - agent_reports_db
+  event: 'ДАТА ОТЧЁТА АГЕНТА — НЕ МОМЕНТ ЗАПУСКА. `agent_reports.date` у агентов бывает датой ПЕРИОДА:
+    консилиум за август пишет 31.08 в запуске 01.09 04:00. Датчик живости, сверяющий `date` с плановым
+    запуском по плисту, объявлял бы консилиум «не бежавшим» каждый месяц (поймано 23.09 сверкой на живых
+    данных Studio до коммита, нить cadence-thresholds). ЛЕЧЕНИЕ: след живости — `created_at` (момент записи).
+    Второй слой той же ловушки: SQLite `datetime(''now'')` — UTC БЕЗ пояса; прочитанный как местный, момент
+    01:06 UTC «опаздывает» к запуску 04:00 по местному времени на три часа (integrity_tests._utc_trace
+    добавляет +00:00). ПРИЗНАК: судишь живость по колонке с датой — спроси, дата ЧЕГО это: события, периода
+    или записи.'
+  cost: ложный «не бежал» у консилиума каждый месяц (пойман до коммита)
+  cause: колонка date несёт дату периода, а живость судилась по ней; SQLite datetime без пояса
+  address:
+    kind: runtime
+    ref: integrity_tests.py
+  subject:
+  - time_dates
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: живость — по created_at (момент записи), с явным UTC
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: integrity_tests.py::_utc_trace
+  evidence:
+  - git:3520850
+  owner: владелец
+- id: C-50
+  date: '2026-09-23'
+  thread: cadence-thresholds
+  modules:
+  - integrity_tests
+  - producer_registry
+  - scripts/run_survivorship_pipeline.sh
+  event: 'РИТМ ЗАДАЧИ ЖИВЁТ НЕ ТОЛЬКО В ПЛИСТЕ. Плист survivorship — еженедельный, а анализ пишется раз
+    в ДВЕ недели: чётность ISO-недели проверяет сам scripts/run_survivorship_pipeline.sh. Сверка «след
+    покрывает последний плановый запуск по плисту» кричала бы каждую нечётную неделю. У джобов бота ритм
+    вообще не в плисте, а в run_repeating/run_daily (jobs/scheduled.py) — поэтому с 23.09 джоб пишет свой
+    ритм в квитанцию (`_rhythm`), и датчик читает его оттуда. ПРИЗНАК: переводишь датчик живости «на расписание»
+    — найди, КТО на самом деле решает, бежать ли в этот раз (плист, скрипт-обёртка, планировщик внутри
+    процесса). Двух домов ритма быть не должно; если ритм в скрипте — переносить его в плист, а не копировать
+    в датчик.'
+  cost: ложная тревога каждую нечётную неделю (поймана до коммита)
+  cause: у ритма задачи три возможных дома (плист, скрипт-обёртка, планировщик внутри процесса)
+  address:
+    kind: runtime
+    ref: jobs/scheduled.py
+  subject:
+  - time_dates
+  - existing_home
+  outcome:
+    kind: rule
+    text: ритм пишется в квитанцию джоба (_rhythm), датчик читает оттуда
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: jobs/scheduled.py::_rhythm
+  evidence:
+  - git:3520850
+  owner: владелец
+- id: C-51
+  date: '2026-09-23'
+  thread: cadence-thresholds
+  modules:
+  - run_checks.sh
+  event: 'BSD `date -j -f ''%Y-%m-%d''` ПОДСТАВЛЯЕТ ТЕКУЩЕЕ ВРЕМЯ СУТОК. В pytest_failed_diff «сегодня»
+    и «первый провал» брались двумя вызовами date; щёлкнула секунда между ними — трое суток давали 259199
+    с = «2 дня», и одноразовое напоминание «тест красный третий день» не уходило (в бою тоже). Тест test_third_day_escalates_once
+    краснел через раз: замер 3 промаха из 400 прогонов функции, после правки 0 из 400. ЛЕЧЕНИЕ: обе точки
+    — полдень своей даты (`"$d 12:00:00"`), разность с округлением (держит и сутки 23/25 ч на смене времени).
+    ПРИЗНАК: тест, краснеющий «иногда» на арифметике дат в shell, — сначала ищи второй вызов часов, а
+    не флейк.'
+  cost: 3 промаха из 400 прогонов; напоминание «третий день» не уходило
+  cause: две точки времени брались двумя вызовами date с разным временем суток
+  address:
+    kind: runtime
+    ref: run_checks.sh
+  subject:
+  - shell_scripts
+  - time_dates
+  outcome:
+    kind: rule
+    text: обе точки — полдень своей даты, разность с округлением
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: run_checks.sh::pytest_failed_diff
+  evidence:
+  - git:3520850
+  owner: владелец
+- id: C-52
+  date: '2026-09-23'
+  thread: cadence-thresholds
+  modules:
+  - pii_census
+  - tests/conftest
+  event: 'РЕАЛЬНЫЙ ПОЯС И ГОРОД В ТЕСТЕ — ЛИЧНЫЕ ДАННЫЕ. Дважды за 23.09 перепись pii_census отбила коммит
+    нити: название страны дома в комментарии теста и живое имя пояса дома (регион/город) в фикстуре —
+    вторую поймал уже полный прогон на Studio, а не pre-commit (строка шла в новом файле). Цена — лишний
+    шестиминутный прогон. ЛЕЧЕНИЕ: в тестах пояс — `Etc/GMT-3` (то же смещение, без места), в прозе —
+    «по местному времени дома». ПРИЗНАК: пишешь фикстуру с часовым поясом или комментарий про время —
+    не бери живой пояс владельца из памяти; проект готовится к публикации (решение владельца 23.09).'
+  cost: лишний шестиминутный прогон
+  cause: в фикстуры времени бралось живое значение пояса дома
+  address:
+    kind: runtime
+    ref: tests/conftest.py
+  subject:
+  - pii
+  - time_dates
+  outcome:
+    kind: rule
+    text: в тестах пояс Etc/GMT-3, в прозе — «по местному времени дома»
+  status: observation
+  evidence:
+  - git:3520850
+  owner: владелец
+- id: C-53
+  date: '2026-09-24'
+  thread: doctor-parity
+  modules:
+  - gp_agent
+  - metrics_db
+  - wellally_consult
+  event: 'ПОДКЛЮЧИЛ К ПОТРЕБИТЕЛЮ, НЕ ПРОЧИТАВ ЕГО ЗАМЫСЕЛ. 24.09 (data-parity) общий блок «все показатели»
+    положен в утренний бриф наравне с недельным отчётом — а замысел morning_brief (llm_renders_only, анти-повтор)
+    прямо запрещает модели выбирать самой из сырья. Замечено только когда preflight коммита потребовал
+    квитанцию morning_brief; квитанция старта брала замысел по модулю-дому (metrics_db), а не по каждому
+    потребителю. Цена — переделка канала брифа на дрейф и откат реестра каналов. ЛЕЧЕНИЕ: при раздаче
+    одного блока N потребителям — project_intent КАЖДОГО потребителя (project_intent module=<файл>) ДО
+    кода. ПРИЗНАК: правка вида «подключить X ко всем, кто …».'
+  cost: переделка канала брифа и откат реестра каналов
+  cause: квитанция замысла бралась по модулю-дому блока, а не по каждому потребителю
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - intent_registry
+  - contract_change
+  outcome:
+    kind: rule
+    text: раздача блока N потребителям — project_intent каждого потребителя до кода
+  status: observation
+  evidence:
+  - git:fd6c45d
+  owner: владелец
+- id: C-54
+  date: '2026-09-24'
+  thread: doctor-parity
+  modules:
+  - correlation_gate
+  - longitudinal_analysis
+  event: 'СТРУКТУРНЫЕ ПАРЫ ОБЪЯВЛЕНЫ ПО ОДНОЙ, А НЕ ЗАМЫКАНИЕМ КОНВЕЙЕРА. v8 семьи сигналов (24.09) объявила
+    steps×distance и active⊂total_kcal, но не их следствия; репетиция гейта на снапшоте дала ровно две
+    «связи» — active_kcal×distance_km и steps×total_kcal, арифметику трекера. Пришлось дописывать пары
+    ПОСЛЕ взгляда на результат (раскрыто в yaml, парк владельцу). ЛЕЧЕНИЕ: при ре-объявлении семьи для
+    каждого конвейера устройства (шаги→дистанция→ккал; стадии сна→total→inbed) выписать ВСЕ пары внутри
+    множества его величин до прогона. ПРИЗНАК: добавляешь в семью колонку, которую трекер вычисляет из
+    уже объявленной.'
+  cost: пары дописаны после взгляда на результат (парк владельцу)
+  cause: семья сигналов объявлялась парами, без выписывания всех величин конвейера устройства
+  address:
+    kind: data
+    ref: methodology/validation_gate/signal_family.yaml
+  subject:
+  - hypothesis_before_fact
+  outcome:
+    kind: rule
+    text: при ре-объявлении семьи — все пары внутри величин одного конвейера до прогона
+  status: observation
+  evidence:
+  - git:fd6c45d
+  owner: владелец
+- id: C-55
+  date: '2026-09-24'
+  thread: document-intake
+  modules:
+  - lab_intake_watcher
+  - handlers/messages
+  - doc_intake
+  event: 'ЗАМЕР НЕ ТЕМ ПУТЁМ, КОТОРЫМ ХОДИТ ПОТРЕБИТЕЛЬ. 24.09 «входящие обоих тенантов пусты» — измерено
+    в ~/<тенант>/data/incoming, а входящие живут в ~/<тенант>/incoming (формула — lab_intake_watcher._incoming
+    / handlers._tenant_inbox). Ложь ушла в сообщение коммита empty-profile и в записку; на деле там
+    лежали документы, которые никто не читал. ЛЕЧЕНИЕ: путь для замера берётся вызовом
+    той функции, которой пользуется потребитель (lab_intake_watcher._incoming(), heartbeat_for), а не
+    собирается руками. ПРИЗНАК: пишешь путь к данным тенанта литералом в ssh-команде замера.'
+  cost: документы тенанта без читателя; ложь в коммите и записке
+  cause: путь для замера собирался литералом, а не вызовом функции потребителя
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - measurement_path
+  - tenant
+  outcome:
+    kind: rule
+    text: путь для замера — вызовом функции потребителя (lab_intake_watcher._incoming)
+  status: observation
+  evidence:
+  - git:43c99f9
+  owner: владелец
+- id: C-56
+  date: '2026-09-24'
+  thread: document-intake
+  modules:
+  - import_medical_events
+  - events_db
+  event: 'ИДЕМПОТЕНТНОСТЬ ПО СТРОКЕ, ХРАНИМОЙ В ДРУГОЙ КОДИРОВКЕ. already_imported искал имя файла LIKE
+    как есть, а events.attachments хранит JSON, закодированный дважды с ensure_ascii — кириллица лежит
+    как \\u0410…. Несколько файлов разбирались заново при каждом импорте месяцами: большинство событий —
+    дубли, и столько же платных вызовов модели, все датчики зелёные. Всплыло только когда новый маршрут
+    входящих начал повторять раз в минуту и это увидели в журнале сразу после деплоя. ЛЕЧЕНИЕ: поиск по
+    всем формам хранения + датчик инварианта «один документ — одно событие» (check_one_document_one_event,
+    негативный контроль исполнен). ПРИЗНАК: проверка «уже было» сравнивает текст с полем, которое пишет
+    json.dumps.'
+  cost: большинство событий — дубли, и столько же платных вызовов модели
+  cause: проверка «уже было» сравнивала текст с полем, которое json.dumps кодирует ещё раз
+  address:
+    kind: runtime
+    ref: import_medical_events.py
+  subject:
+  - duplicate_data
+  outcome:
+    kind: check
+    text: датчик «один документ — одно событие» (check_one_document_one_event)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: integrity_tests.py::check_one_document_one_event
+  evidence:
+  - git:43c99f9
+  owner: владелец
+- id: C-57
+  date: '2026-09-24'
+  thread: document-intake
+  modules:
+  - import_medical_events
+  event: 'OCR-ПРОБНИК В /tmp НИЧЕГО НЕ ЧИТАЕТ. leptonica в tesseract Homebrew подменяет путь, начинающийся
+    с /tmp, на пользовательский temp: картинка в /tmp не находится, если cwd не /tmp, и OCR молча возвращает
+    пустоту («OCR символов: 0») — легко принять за «распознавание не работает». Боевые снимки лежат во
+    входящих тенанта, их это не касается. ЛЕЧЕНИЕ: пробные картинки класть в ~ или во временный каталог
+    tempfile.mkdtemp(). ПРИЗНАК: stderr tesseract «failed to open locally with tail».'
+  cost: ложный вывод «OCR не работает» (почти)
+  cause: leptonica в Homebrew подменяет пути /tmp на пользовательский temp
+  address:
+    kind: runtime
+    ref: import_medical_events.py
+  subject:
+  - ocr
+  - filesystem_icloud
+  outcome:
+    kind: rule
+    text: пробные картинки — в ~ или tempfile.mkdtemp()
+  status: observation
+  evidence:
+  - git:43c99f9
+  owner: владелец
+- id: C-58
+  date: '2026-09-25'
+  thread: regimen-scrub
+  modules:
+  - pii_census
+  - tests/unit
+  event: 'СТОРОЖ СО СПИСКОМ ЗАПРЕЩЁННОГО САМ СТАНОВИТСЯ ДОСЬЕ. 25.09 (нить regimen-scrub) шесть публичных
+    тестов-стражей держали литералами то, что стерегли: полное имя, дату рождения, схемы и препараты курса
+    владельца — перепись их не видела, потому что это «тесты про запрет». Одна «нейтральная заглушка»
+    оказалась частью досье. ПРИЧИНА В УСТРОЙСТВЕ: у списка запрещённого не было своего дома, и страж клал
+    его рядом с собой. ЛЕЧЕНИЕ: список для стража — только pc.literals([класс]) из private/pii_terms.yaml;
+    в публичном файле — ни одного слова из списка. ИСХОД: правило. ЦЕНА: 6 файлов стражей переписаны,
+    класс owner_clinical (23 слова) заведён задним числом.'
+  cost: 6 файлов стражей переписаны, класс owner_clinical заведён задним числом
+  cause: у списка запрещённого не было своего дома, и страж клал его рядом с собой
+  address:
+    kind: data
+    ref: private/pii_terms.yaml
+  subject:
+  - pii
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: список для стража — только pc.literals([класс]) из private/pii_terms.yaml
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: private/pii_terms.yaml
+  evidence:
+  - git:c29ff49
+  owner: владелец
+- id: C-59
+  date: '2026-09-25'
+  thread: chrono-scrub
+  modules:
+  - pii_census
+  event: 'ПЕРЕПИСЬ = 0 НЕ ЗНАЧИТ «ЛИЧНОГО НЕТ». pii_census ищет только названные литералы и шаблоны; хронология
+    лечения (номера бланков, даты заборов в комментариях, дома и координаты поездок) неделями проходила
+    при отчёте 0. ПРИЧИНА В УСТРОЙСТВЕ: словарь описывал «кто», а досье выдаёт «когда и где». ЛЕЧЕНИЕ:
+    у каждого нового рода утечки — свой класс шаблонов в private/pii_terms.yaml и оракул-проба (tests/unit/test_pii_chronology.py,
+    образцы собраны конкатенацией, чтобы сам тест не был находкой). Отчёт 0 читать как «0 по известным
+    классам». ИСХОД: проверка. ЦЕНА: нить chrono-scrub целиком.'
+  cost: нить chrono-scrub целиком
+  cause: словарь описывал «кто», а досье выдаёт «когда и где»
+  address:
+    kind: data
+    ref: private/pii_terms.yaml
+  subject:
+  - pii
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: класс шаблонов хронологии и оракул tests/unit/test_pii_chronology.py
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tests/unit/test_pii_chronology.py
+  evidence:
+  - git:c29ff49
+  owner: владелец
+- id: C-60
+  date: '2026-09-25'
+  thread: new-sources
+  modules:
+  - correlation_gate
+  event: 'НАПРАВЛЕНИЕ СМЕЩЕНИЯ ОЦЕНЩИКА НЕ ЗАЯВЛЯТЬ БЕЗ ЗАМЕРА. 25.09 (нить new-sources) прежний перестановочный
+    p был назван «анти-консервативным» — замер ошибки I рода дал 0.033 при 0.05, по парам направление
+    меняется (0.013–0.125). Формулировка успела попасть в signal_family.yaml. ПРИЧИНА В УСТРОЙСТВЕ: оракул
+    новой оценки был сформулирован через свойство старой («старая завышала»), а не через инвариант новой.
+    ЛЕЧЕНИЕ: оракул — свойство, которое проверяется на новой оценке сама по себе (p не зависит от пустой
+    подбивки сетки); слова о смещении — только с числом прогона. ИСХОД: правило. ЦЕНА: один круг правки
+    yaml и теста.'
+  cost: один круг правки yaml и теста
+  cause: оракул новой оценки формулировался через свойство старой
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - hypothesis_before_fact
+  outcome:
+    kind: rule
+    text: слова о смещении — только с числом прогона; оракул — инвариант новой оценки
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:c29ff49
+  owner: владелец
+- id: C-61
+  date: '2026-09-25'
+  thread: document-intake
+  modules:
+  - generate_constitutions
+  - notify
+  event: 'МОДЕЛЬНЫЙ ТЕКСТ С parse_mode НЕ ДОХОДИТ. 25.09 ревью алертов конституций (текст модели) ушло
+    в Telegram с parse_mode Markdown и вернулось HTTP 400 — владелец его не получил, ошибка ушла в лог.
+    ПРИЧИНА В УСТРОЙСТВЕ: разметку выбирал отправитель, а текст писала модель, которая не знает про экранирование.
+    ЛЕЧЕНИЕ: при 400 кусок повторяется без parse_mode (tests/unit/test_constitutions_tg_fallback.py).
+    Другие отправители модельного текста с parse_mode не проверены — это follow-up, не вывод. ИСХОД: проверка.
+    ЦЕНА: одно недоставленное ревью, ручная переотправка.'
+  cost: одно недоставленное ревью, ручная переотправка
+  cause: разметку выбирал отправитель, а текст писала модель, не знающая про экранирование
+  address:
+    kind: runtime
+    ref: generate_constitutions.py
+  subject:
+  - message_delivery
+  - llm_output
+  outcome:
+    kind: check
+    text: при 400 кусок повторяется без parse_mode (test_constitutions_tg_fallback)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tests/unit/test_constitutions_tg_fallback.py
+  evidence:
+  - git:c29ff49
+  owner: владелец
+- id: C-62
+  date: '2026-09-25'
+  thread: document-intake
+  modules:
+  - generate_constitutions
+  - patient_context
+  - labs_db
+  event: 'ОБЩИЙ БЛОК КОНТЕКСТА ПЕРЕНОСИТ ГОРИЗОНТ ОДНОГО ЧИТАТЕЛЯ В ДРУГОГО. 25.09 владелец прочёл конституцию
+    сна: «чистой воды конъюнктура». Замер: во всех 10 конституциях 1–13 привязок к последним месяцам.
+    Источники — reasoning_block («единый источник, потребители вставляют ЭТО», 07-05: свежие заметки чата),
+    recovery_vs_baseline (current = 90 дней), build_lab_history_context («ТЕКУЩЕЕ»), разовые заборы. Каждый
+    блок был верен для своего первого читателя (бриф, консилиум), конституция получила их окно вместе
+    с данными. ПРИЧИНА В УСТРОЙСТВЕ: единица переиспользования — блок ДАННЫХ, а горизонт ЧИТАТЕЛЯ нигде
+    не объявлен и не проверяется. ЛЕЧЕНИЕ: читатель объявляет горизонт (system_config constitutions.horizon_days),
+    вход отбирается по нему (phase_in_horizon, build_lab_history_context(horizon_days)), выход судит оракул
+    (recent_mentions). ПРИЗНАК: подключаешь общий блок контекста к новому рассуждателю — спроси, какое
+    у блока окно и совпадает ли оно с горизонтом читателя. ИСХОД: проверка. ЦЕНА: конституции ~2.5 мес.
+    (с 07-05) писались с конъюнктурой; заметил человек, не датчик.'
+  cost: конституции ~2.5 мес. писались с конъюнктурой; заметил человек
+  cause: единица переиспользования — блок данных, а горизонт читателя нигде не объявлен
+  address:
+    kind: runtime
+    ref: generate_constitutions.py
+  subject:
+  - context_horizon
+  outcome:
+    kind: check
+    text: читатель объявляет горизонт (constitutions.horizon_days), выход судит оракул recent_mentions
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: generate_constitutions.py
+  evidence:
+  - git:6c45b90
+  owner: владелец
+- id: C-63
+  date: '2026-09-25'
+  thread: document-intake
+  modules:
+  - intent_registry
+  event: 'ЗАПЛАНИРОВАННАЯ ЗАДАЧА ПЕРЕСКАЗЫВАЛА КРИТЕРИЙ РЕЕСТРА — И РАЗОШЛАСЬ СО СВОДОМ. Задача 04.10
+    (создана 23.09) велела поднять family_frozen_in_params до holds по критерию closes_when_by: claude
+    — клауза §13 от 21.09 это запрещает, сторож unapproved_promotions отбил бы подъём кодом 9 (негативный
+    контроль исполнен 25.09). ПРИЧИНА В УСТРОЙСТВЕ: промпт задачи держал ВТОРУЮ копию критерия и процедуры
+    закрытия, у копии нет гасителя (§18). ЛЕЧЕНИЕ: промпт запланированной задачи ссылается на поле реестра
+    (closes_when, closes_when_by) и читает его в момент запуска, сам критерий не пересказывает; при не-owner
+    — статус не трогает. ИСХОД: правило. ЦЕНА: один сгоревший бы прогон 04.10 и соблазн обхода отметкой
+    «owner».'
+  cost: сгоревший бы прогон 04.10 и соблазн обхода
+  cause: промпт задачи держал вторую копию критерия без гасителя
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §18
+  subject:
+  - intent_registry
+  - existing_home
+  outcome:
+    kind: rule
+    text: промпт задачи ссылается на поле реестра и читает его при запуске
+  status: observation
+  evidence:
+  - git:6c45b90
+  owner: владелец
+- id: C-64
+  date: '2026-09-25'
+  thread: pub-zone
+  modules:
+  - generate_constitutions
+  - pii_census
+  event: '«НЕТ В ДАННЫХ» ПО ОДНОМУ ЧИТАТЕЛЮ. 25.09 вечером автор сказал владельцу, что деталь операции
+    в конституции «додумана моделью, в данных её нет» — посмотрел на название фазы в longitudinal; деталь
+    лежала в примечании периода, которое промпт получает через _get_medical_history. В тот же вечер обратное:
+    перепись личных данных = 0 читалась как «личного нет», а фикстуры держали генотип владельца с подписью
+    «реальные данные» (класса генотипов и латинского имени в словаре не было). ПРИЧИНА В УСТРОЙСТВЕ: утверждение
+    об отсутствии проверялось тем путём, которым было удобно смотреть, а не тем, которым данные доходят
+    до потребителя. ЛЕЧЕНИЕ: утверждение «в данных нет» — только после чтения РОВНО того входа, который
+    видит потребитель (для конституции — собранный промпт), и вторым путём (§17). ИСХОД: правило. ЦЕНА:
+    одна ложная тревога владельцу; фикстуры с генотипом прошли все чистки публичной зоны 23–25.09.'
+  cost: ложная тревога владельцу; генотип в фикстурах прошёл все чистки
+  cause: утверждение об отсутствии проверялось удобным путём, а не входом потребителя
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §17
+  subject:
+  - measurement_path
+  - pii
+  outcome:
+    kind: rule
+    text: «в данных нет» — только после чтения входа потребителя и вторым путём
+  status: observation
+  evidence:
+  - git:02850a4
+  owner: владелец
+- id: C-65
+  date: '2026-09-26'
+  thread: document-intake
+  modules:
+  - project_context/receipt
+  event: 'ПРОБА ≠ НАСТОЯЩЕЕ ДЕЙСТВИЕ, КОГДА ОКРУЖЕНИЕ РАЗНОЕ. thread_finish пробует гейты слияния пробным
+    `merge --no-commit` + `git hook run` и пишет в комментарии «предпроверка честная, а не похожая» —
+    индекс тот же. 25.09 новый зачёт квитанции нити искал её по MERGE_HEAD: проба прошла, настоящий `git
+    merge` — нет, потому что pre-merge-commit зовётся ДО записи MERGE_HEAD (замер на временном репо).
+    ПРИЧИНА В УСТРОЙСТВЕ: равенство пробы и настоящего действия было доказано по одному измерению (индекс),
+    а новый код читал другое (служебные файлы git). ЛЕЧЕНИЕ: состояние, которое читает гейт, передаётся
+    явно (THREAD_MERGE_SOURCE от thread_finish), не выводится из побочного признака git; тест на настоящем
+    git. ИСХОД: проверка (tests/unit/test_preflight_merge_credit.py). ЦЕНА: один сгоревший полный прогон
+    (7 мин) и одно закрытие с ручной переменной.'
+  cost: сгоревший полный прогон (7 мин) и закрытие с ручной переменной
+  cause: равенство пробы и действия доказано по одному измерению, а код читал другое
+  address:
+    kind: runtime
+    ref: project_context/receipt.py
+  subject:
+  - test_stand
+  - git_hooks
+  outcome:
+    kind: check
+    text: состояние передаётся явно (THREAD_MERGE_SOURCE); test_preflight_merge_credit на настоящем git
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tests/unit/test_preflight_merge_credit.py
+  evidence:
+  - git:7578e22
+  owner: владелец
+- id: C-66
+  date: '2026-09-26'
+  thread: document-intake
+  modules:
+  - tests/consistency/test_tg_parse_mode_choke
+  event: 'СТОРОЖ, ЗАВИСЯЩИЙ ОТ .git, КРАСНЕЕТ ТОЛЬКО НА ПОЛНОМ ПРОГОНЕ. Новый сторож чокпоинта Telegram
+    брал список файлов `git ls-files`; локально (дерево нити) зелёный, в полном прогоне на Studio — CalledProcessError:
+    staging-копия едет без .git. ПРИЧИНА В УСТРОЙСТВЕ: среда полного прогона отличается от среды автора
+    ровно отсутствием git, и это нигде не сказано рядом с местом, где пишут новый consistency-тест. ЛЕЧЕНИЕ:
+    обход файловой системы; проверено копией дерева без .git. ИСХОД: правило — тест, который нужен в полном
+    прогоне, не зовёт git (нужен git → skip с причиной, как test_git_facts). ЦЕНА: один красный полный
+    прогон (7 мин).'
+  cost: один красный полный прогон (7 мин)
+  cause: среда полного прогона отличается отсутствием .git, и это не сказано рядом с местом записи теста
+  address:
+    kind: methodology_page
+    ref: docs/how-to/thread_worktree.md
+  subject:
+  - test_stand
+  outcome:
+    kind: rule
+    text: тест полного прогона не зовёт git; нужен git — skip с причиной
+  status: observation
+  evidence:
+  - git:7578e22
+  owner: владелец
+- id: C-67
+  date: '2026-09-26'
+  thread: marker-guard
+  modules:
+  - pii_census
+  event: 'ЛИЧНОЕ ПОМЕЧЕНО СЛОВАМИ, А ПЕРЕПИСЬ ИЩЕТ ЛИТЕРАЛЫ. Дважды за 25.09 личные данные владельца в
+    публичных тестах нашлись не переписью (0 находок), а по пометкам самих авторов: «реальные данные <чьи>»,
+    «<имя>''s actual», «реальные строки из <источника>», «ДОСЛОВНО из conversation_history». ПРИЧИНА В
+    УСТРОЙСТВЕ: словарь переписи знает известные литералы; честная пометка автора «это настоящее» — самый
+    дешёвый признак утечки — никем не читается. ЛЕЧЕНИЕ (2026-09-26, нить marker-guard): класс provenance
+    в private/pii_terms.yaml — пометка + хозяин или источник («реальные … владельца / из аудита / с бланка»,
+    «<кто>''s actual», глагол «взяты/скопированы» + «с живого/боевого источника»); замер по истории с
+    июня: 24 строки в 13 коммитах, почти все — утечки; широкие слова («дословно», «на реальных данных»)
+    не взяты — 85 срабатываний, почти все проза. Сторож нашёл при вводе живую утечку — числа электрофореза
+    владельца в test_electrophoresis_sums. Оракул tests/unit/test_pii_provenance.py, мутации plans/mutate_pii_provenance_2026-09-26.sh
+    4/4. ГРАНИЦА: ловится пометка, не данные; стирание пометки при оставленных данных — худший исход,
+    об этом говорит сообщение блока. ИСХОД: проверка. ЦЕНА: генотип, вкус и онко-история владельца прошли
+    три чистки публичной зоны 23–25.09.'
+  cost: генотип, вкус и онко-история владельца прошли три чистки публичной зоны
+  cause: честная пометка автора «это настоящее» никем не читалась
+  address:
+    kind: data
+    ref: private/pii_terms.yaml
+  subject:
+  - pii
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: класс provenance и оракул tests/unit/test_pii_provenance.py (мутации 4/4)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: tests/unit/test_pii_provenance.py
+  evidence:
+  - git:7578e22
+  owner: владелец
+- id: C-68
+  date: '2026-09-26'
+  thread: document-intake
+  modules:
+  - pii_census
+  event: 'ПЕРЕПИСЬ = 0 ОПИСЫВАЛА СЛОВАРЬ, А НЕ ДЕРЕВО. После четырёх волн чистки 23–26.09 (все — один
+    автор, все — через словарь) перепись показывала 0, а чтение публичной зоны свежими агентами, не знавшими
+    словаря (21 читатель: 750 файлов тестов/данных, 319 .py, 369 доков/PDF), нашло десятки мест с личным
+    без пометок: анализы с датами (одна дата забора — в ~30 фикстурах), фармакопрофиль, генотипы, полное
+    имя, данные партнёра, регион, ряд N=1 в доках. ПРИЧИНА В УСТРОЙСТВЕ: второй источник шёл тем же преобразованием,
+    что и первый (§17) — словарь пишет тот же, кто чистит. ЛЕЧЕНИЕ: чтение не автором до экспорта — ворота;
+    перепись = сторож повтора известного, не доказательство чистоты. ИСХОД: правило (ворота экспорта BL-PUB-9
+    + BL-PUB-16). ЦЕНА: ~250 файлов, 2 фазы, ~40 агентов; без чтения всё это ушло бы на GitHub при «0
+    находок».'
+  cost: ~250 файлов, 2 фазы, ~40 агентов
+  cause: 'второй источник шёл тем же преобразованием, что первый: словарь пишет тот же, кто чистит'
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §17
+  subject:
+  - pii
+  - sensor_perimeter
+  outcome:
+    kind: rule
+    text: чтение не автором до экспорта — ворота; перепись — сторож повтора известного
+  status: observation
+  evidence:
+  - git:8969010
+  owner: владелец
+- id: C-69
+  date: '2026-09-26'
+  thread: document-intake
+  modules:
+  - pii_census
+  event: 'СТОРОЖ СТАЛ ДОСЬЕ. Оракулы словаря (test_pii_chronology, test_pii_provenance, стоп-лист test_prompts_no_hardcode)
+    держали образцы утечек в публичных тестах, склеенные из кусков, чтобы их не видела перепись. Перепись
+    не видела — человек читал целиком: препарат, операция, город, координаты, генотип. ПРИЧИНА В УСТРОЙСТВЕ:
+    склейка прячет от машины, а угроза — читатель. ЛЕЧЕНИЕ: образцы живут в приватном словаре (probes.*,
+    pii_census.probes), тест проверяет их непустоту (test_probes_present). ИСХОД: проверка. ЦЕНА: досье
+    в трёх публичных тестах, одно — внесено автором в день постройки сторожа.'
+  cost: досье в трёх публичных тестах
+  cause: склейка образцов прячет от машины, а угроза — читатель-человек
+  address:
+    kind: data
+    ref: private/pii_terms.yaml
+  subject:
+  - pii
+  outcome:
+    kind: check
+    text: образцы в приватном словаре, тест проверяет их непустоту (test_probes_present)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: private/pii_terms.yaml
+  evidence:
+  - git:8969010
+  owner: владелец
+- id: C-70
+  date: '2026-09-26'
+  thread: owner-tails
+  modules:
+  - intent_registry
+  event: 'КРИТЕРИЙ ВЛАДЕЛЬЦА И ФЛИП В ОДНОЙ НИТИ — ГЕЙТ СЛИЯНИЯ ОТБИВАЕТ. unapproved_promotions сравнивает
+    реестр главной копии (критерия ещё нет) с итогом слияния (критерий и флип) — порядок коммитов нити
+    не виден. ПРИЧИНА В УСТРОЙСТВЕ: судья смотрит на пару состояний, а правило — про последовательность.
+    ЛЕЧЕНИЕ (обход, смысл сохранён): критерий отдельным коммитом прямо в main (cherry-pick), затем закрытие
+    нити; починка — BL-OWNER-CRITERION-MERGE-1. ИСХОД: проверка (запланирована). ЦЕНА: одно отбитое закрытие
+    owner-tails.'
+  cost: одно отбитое закрытие
+  cause: судья сравнивает пару состояний, а правило — про последовательность коммитов
+  address:
+    kind: runtime
+    ref: intent_registry.py
+  subject:
+  - intent_registry
+  - git_hooks
+  outcome:
+    kind: check
+    text: починка запланирована (BL-OWNER-CRITERION-MERGE-1); до неё критерий — отдельным коммитом в main
+  status: in_work
+  evidence:
+  - git:8969010
+  owner: владелец
+- id: C-71
+  date: '2026-09-26'
+  thread: hae-owner
+  modules:
+  - hae_checker
+  - import_apple_health
+  - metrics_db
+  - health_db
+  event: 'ПОМЕТКА «РАЗБИРАЕМ» РЯДОМ С РАЗБОРЩИКОМ — КОПИЯ, КОТОРАЯ ВРЁТ. Реестр hae_metric_registry держал
+    статус handled/tracked руками, а знание «что разбирается» живёт в самом aggregate_metric_by_day. Итог:
+    давление «tracked, покрыто раздельными именами» с апреля (раздельные не пришли ни разу), двойная опора
+    «handled» без ветки, шесть ключей разборщик клал, а база не хранила. ПРИЧИНА В УСТРОЙСТВЕ: два дома
+    одного знания, второй без сверки с первым. ЛЕЧЕНИЕ: статус судится ПОВЕДЕНИЕМ — настоящий разборщик
+    на настоящих записях ∩ ключи, которые база хранит (hae_checker.judge_payload); утверждение «покрыто:
+    <колонка>» проверяется по дням прихода. ПРИЗНАК: рядом с кодом лежит список/статус «что код умеет»
+    — спроси, кто его сверяет с кодом. ИСХОД: проверка (check_hae_arrivals_have_owner, негативный контроль).
+    ЦЕНА: давление 5 мес., 4 показателя выносливости и 6 ключей — с 30.06.'
+  cost: давление 5 мес., 4 показателя выносливости и 6 ключей без хранения
+  cause: два дома одного знания, второй без сверки с первым
+  address:
+    kind: runtime
+    ref: hae_checker.py
+  subject:
+  - existing_home
+  - vendor_data
+  outcome:
+    kind: check
+    text: статус судится поведением разборщика (judge_payload), check_hae_arrivals_have_owner
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: hae_checker.py::judge_payload
+  evidence:
+  - git:f6acf3a
+  owner: владелец
+- id: C-72
+  date: '2026-09-26'
+  thread: hae-owner
+  modules:
+  - services/recommendations
+  - metrics_db
+  event: 'БЕЗУСЛОВНЫЙ ПОРОГ, ЗНАЧЕНИЕ КОТОРОГО УСЛОВНО. Абсолютный потолок давления 140 проверялся «независимо
+    от сигналов» (тест BUG-FLOORS-ORDER зелёный), но значение брал из get_metric_percentiles, а тот пропускает
+    метрику с историей < 14 дней из 90 — для редкого замера порог мёртв при любых данных. ПРИЧИНА В УСТРОЙСТВЕ:
+    оракул стерёг одну ось (пустой signals_def), а отказ жил на другой (источник значения). ЛЕЧЕНИЕ: ключ
+    дня без колонки читается прямо из вчерашнего дня (_raw_only_yesterday); колоночные редкие метрики
+    — названная граница в реестре замысла. ПРИЗНАК: «срабатывает всегда» — спроси, откуда берётся ЧИСЛО,
+    с которым сравнивают. ИСХОД: проверка (test_bp_peak_ceiling_fires_without_percentile_history). ЦЕНА:
+    тревога давления не могла сработать ни разу.'
+  cost: тревога давления не могла сработать ни разу
+  cause: оракул стерёг одну ось, а отказ жил на другой — в источнике числа
+  address:
+    kind: runtime
+    ref: services/recommendations.py
+  subject:
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: test_bp_peak_ceiling_fires_without_percentile_history
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: services/recommendations.py::_raw_only_yesterday
+  evidence:
+  - git:f6acf3a
+  owner: владелец
+- id: C-73
+  date: '2026-09-26'
+  thread: hae-owner
+  modules:
+  - hae_checker
+  - jobs/scheduled
+  - import_apple_health
+  event: 'СМЕНИЛИ КАНАЛ — СТАРЫЕ ПОТРЕБИТЕЛИ ОСТАЛИСЬ НА ПУСТОМ ИСТОЧНИКЕ И ОТВЕЧАЛИ «НИЧЕГО НОВОГО».
+    После перехода Apple Health на REST (06.07) три пути (задача «новые метрики», run_check, ежедневный
+    импорт) 82 дня сканировали пустую iCloud-папку; «0 новых» читалось как «всё хорошо». ПРИЧИНА В УСТРОЙСТВЕ:
+    у потребителя не было датчика «источник вообще жив» — пустота и благополучие неотличимы. ЛЕЧЕНИЕ:
+    старые пути сняты в коде; живость нового — «реестр слеп» (реестр не видел данных, а сырьё свежее).
+    ПРИЗНАК: миграция источника — перечисли ВСЕХ читателей старого, не только писателя. ИСХОД: проверка
+    (blind-judge мутация ПОКРАСНЕЛА). ЦЕНА: 82 дня без сверки новых метрик.'
+  cost: 82 дня без сверки новых метрик
+  cause: у потребителя не было датчика «источник вообще жив» — пустота неотличима от благополучия
+  address:
+    kind: runtime
+    ref: hae_checker.py
+  subject:
+  - contract_change
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: датчик «реестр слеп» (blind-judge мутация краснеет)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: hae_checker.py
+  evidence:
+  - git:f6acf3a
+  owner: владелец
+- id: C-74
+  date: '2026-09-26'
+  thread: hae-owner
+  modules:
+  - templates/launchd
+  - check_contracts
+  - scripts/install
+  event: 'СНЯЛ ЖИВОЙ АГЕНТ — ЕГО ПРОИЗВОДНЫЕ ОСТАЛИСЬ ЖИТЬ. Плист com.larry.health.daily перенесён в _retired/
+    на Studio ПОСЛЕ слияния нити hae-tails, а шаблон templates/launchd/…daily.plist.tmpl и строка в check_contracts.STUDIO_AGENTS
+    остались: следующая нить (intent-hae-owner) получила красный полный прогон «шаблона без живого». ПРИЧИНА
+    В УСТРОЙСТВЕ: у агента launchd четыре дома (живой плист, шаблон, STUDIO_AGENTS, producer_registry)
+    и нет одного места «снять агента»; действие над живой машиной сделано вне нити, где сторож (test_launchd_templates_match_live)
+    судит только на машине владельца в полном прогоне. ЛЕЧЕНИЕ: шаблон удалён, STUDIO_AGENTS поправлен.
+    ПРИЗНАК: снимаешь агент — грепни его label по репо и сними все дома В ТОЙ ЖЕ нити, до thread_finish.
+    ИСХОД: проверка (сторож существовал и покраснел; список STUDIO_AGENTS с шаблонами не сверяет никто
+    — run_checks дал бы ложный FAIL «агент не загружен», долг). ЦЕНА: один красный прогон Studio (~7 мин)
+    и перезапуск слияния.'
+  cost: один красный прогон Studio и перезапуск слияния
+  cause: у агента launchd четыре дома и нет одного места «снять агента»
+  address:
+    kind: runtime
+    ref: check_contracts.py
+  subject:
+  - contract_change
+  - existing_home
+  outcome:
+    kind: rule
+    text: снимаешь агент — грепнуть label и снять все дома в той же нити
+  status: observation
+  evidence:
+  - git:2ce641b
+  owner: владелец
+- id: C-75
+  date: '2026-09-27'
+  thread: tenant-values
+  modules:
+  - health_db
+  - hai_analysis
+  - cpic_reference_db
+  - synthetic_controls
+  event: 'СИД С ЛИЧНЫМ ЗНАЧЕНИЕМ ИДЁТ В БАЗУ ЛЮБОГО ТЕНАНТА. Числа, снятые с ряда одного человека (личный
+    порог амилазы, бэйзлайн индекса восстановления за 2020–2022, кураторские рекомендации CPIC ровно под
+    его фенотип-классы, длины его терапевтических эпох), жили литералами в коде: код одинаков для всех,
+    значит и число применялось ко второму тенанту (у партнёра — чужой порог и проценты от чужого уровня),
+    а в открытом коде набор классов по восьми генам и есть фармакогенетический профиль. ПРИЧИНА В УСТРОЙСТВЕ:
+    сид/константа — удобный первый дом, а персонализация доделывается потом и не всегда вытесняет исходник
+    (пороги вытеснила ещё в июле, бэйзлайн и справочник — нет). ЛЕЧЕНИЕ: значение — из данных тенанта
+    (период, ряд, настройка установки) или из документа с датой (снимок CPIC); кураторский слой установки
+    — приватная зона. ПРИЗНАК: число в коде, у которого источник «анализ/конституция/наблюдение» с датой
+    — спроси, чей это ряд. ИСХОД: проверка (тесты зависимости от данных тенанта; у владельца — побайтовая
+    сверка до/после). ЦЕНА: партнёр месяцами получал индекс восстановления от чужого уровня; профиль генов
+    стоял в коде, готовом к публикации.'
+  cost: партнёр месяцами получал индекс от чужого уровня; профиль генов в коде
+  cause: сид-константа — удобный первый дом, а персонализация не всегда вытесняет исходник
+  address:
+    kind: runtime
+    ref: hai_analysis.py
+  subject:
+  - tenant
+  - pii
+  outcome:
+    kind: check
+    text: тесты зависимости от данных тенанта; у владельца — побайтовая сверка до/после
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: hai_analysis.py
+  evidence:
+  - git:5ae12c6
+  owner: владелец
+- id: C-76
+  date: '2026-09-27'
+  thread: plan-tails
+  modules:
+  - plans
+  - subsystem_intent
+  event: 'ПОСЫЛКА ПЛАНА ПРОЧИТАНА ПО ИМЕНИ, А НЕ ПО ТЕКСТУ И ДАННЫМ. План доделок 27.09 утверждал: «инвариант
+    data_ingestion::no_silent_stale_replica сформулирован уже реальности — таблица consultations тихая
+    копия» (инвариант говорит о HEALTH_DATA_DIR, не о консультациях) и «пороги партнёра сняты с ряда владельца»
+    (с июля выводятся из его ряда — взято из устаревшего комментария «ОСТАТОК» в коде). Оба утверждения
+    пошли владельцу в вопросы. ПРИЧИНА В УСТРОЙСТВЕ: комментарий «остаток/TODO» в коде не гаснет, когда
+    остаток закрыт другой нитью; имя инварианта похоже на предмет. ЛЕЧЕНИЕ: план исправлен, комментарий
+    переписан. ПРИЗНАК: утверждение о состоянии данных в плане — только с замером по базе (§18); инвариант
+    — по полю claim. ИСХОД: тестирование (замер по обеим базам до правки). ЦЕНА: один лишний вопрос владельцу
+    и почти пустая нить 5(а), вместо которой нашёлся настоящий дефект (тексты тревог с чужими числами).'
+  cost: лишний вопрос владельцу и почти пустая нить
+  cause: комментарий «остаток/TODO» не гаснет, когда остаток закрыт другой нитью; имя инварианта похоже
+    на предмет
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §18
+  subject:
+  - hypothesis_before_fact
+  - intent_registry
+  outcome:
+    kind: rule
+    text: утверждение о данных в плане — только с замером; инвариант — по полю claim
+  status: observation
+  evidence:
+  - git:5ae12c6
+  owner: владелец
+- id: C-77
+  date: '2026-09-27'
+  thread: plan-tails
+  modules:
+  - import_all
+  - plans/reocr_encounters_20260927
+  event: 'РЕМОНТ СКОПИРОВАЛ ПОВЕДЕНИЕ ПИСАТЕЛЯ ВМЕСТЕ С ЕГО ДЕФЕКТОМ. Разовый акт волны 2 заменил текст
+    ошибки OCR на «первые 500 знаков документа — длина писателя», и часть приёмов получила заключением шапку
+    документа: клиника, имя, номер удостоверения, дата рождения; такие же давно были у самого писателя. «Врачи» читали шапку, идентификаторы уходили в промпты. ПРИЧИНА В УСТРОЙСТВЕ: «как у писателя»
+    проверялось на совпадение формы, а не на смысл поля; тест акта судил выбор строк, а не содержимое.
+    ЛЕЧЕНИЕ: import_all.consult_conclusion (раздел вывода, без строк с идентификаторами) + акт consult_conclusion_20260927.
+    ПРИЗНАК: поле называется «заключение/вывод», а заполняется срезом [:N] — посмотри на первые строки
+    глазами. ИСХОД: тестирование (сверка Х3 глазами). ЦЕНА: приёмы без вывода, идентификаторы человека
+    в контексте модели.'
+  cost: приёмы без вывода, идентификаторы человека в контексте модели
+  cause: «как у писателя» проверялось на совпадение формы, а не на смысл поля
+  address:
+    kind: runtime
+    ref: import_all.py
+  subject:
+  - writers_readers
+  - pii
+  outcome:
+    kind: check
+    text: import_all.consult_conclusion + сверка глазами
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: import_all.py::consult_conclusion
+  evidence:
+  - git:5ae12c6
+  owner: владелец
+- id: C-78
+  date: '2026-09-28'
+  thread: owner-alerts-2709
+  modules:
+  - scripts/run_probes.sh
+  - gp_context
+  - quarantine_db
+  - plans/probe_context_boundary_2026-09-14
+  - plans/probe_quarantine_exit_2026-07-29
+  event: 'ПОЛНЫЙ ПРОГОН ЗЕЛЁН — ПРОБЫ НЕ ГОНЯЛИСЬ. 27.09 три правки прошли thread_finish (5857+ тестов
+    зелёные), а в понедельник 06:20 еженедельный run_probes.sh покраснел дважды: новый читатель лаб-данных
+    (gp_context.annotate_lab_recency) вне периметра probe_context_boundary и вердикты карантина владельца,
+    после которых probe_quarantine_exit не мог поставить пары в pending. Алерт ушёл владельцу. ПРИЧИНА
+    В УСТРОЙСТВЕ: пробы живут вне pytest и бегут раз в неделю на staging; thread_finish их не исполняет,
+    поэтому поломку ПРОБЫ правкой видно только через до 7 дней и только владельцу. ЛЕЧЕНИЕ: периметр дополнен
+    причиной, проба снимает прежний вердикт на снимке; run_probes.sh прогнан вручную — все держатся. ПРИЗНАК:
+    правка читает лаб-данные / меняет состояние карантина или веры → до закрытия прогнать `launchctl kickstart
+    …com.larry.health.probes` и прочитать итог. ИСХОД: правило (для агента). ЦЕНА: один ложный алерт владельцу
+    и ~40 мин разбора.'
+  cost: ложный алерт владельцу и ~40 мин разбора
+  cause: пробы живут вне pytest и раз в неделю; thread_finish их не исполняет
+  address:
+    kind: ritual
+    ref: the-end
+  subject:
+  - probes
+  - run_version
+  outcome:
+    kind: rule
+    text: правка лаб-данных, карантина или веры — прогнать probes до закрытия
+  status: observation
+  evidence:
+  - git:5ff44ff
+  owner: владелец
+- id: C-79
+  date: '2026-09-28'
+  thread: owner-alerts-2709
+  modules:
+  - correlation_gate
+  - integrity_tests
+  - longitudinal_analysis
+  - methodology/validation_gate/signal_family.yaml
+  event: 'СТРУКТУРНУЮ ПАРУ ОБЪЯВИЛ — ДАТЧИК ЕЁ ВСЁ РАВНО СУДИТ. 28.09 алерт «MC-зазор A: hrv×recovery_high_min»
+    пришёл владельцу. Владелец решил: пара — арифметика прибора (вариант А). Одной записи в algorithmic_derived_pairs
+    не хватало: гейт режет структурные пары ПОСЛЕ BY при рендере (gate_pass), а mc_gap считал по сырым
+    _pass_rows семьи A, то есть по другому слою того же pass-set. Объявленная пара продолжала бы краснеть
+    каждую ночь. ПРИЧИНА В УСТРОЙСТВЕ: у pass-set два слоя (до и после структурного среза), и потребитель
+    выбирал слой сам. Датчик взял ранний. ЛЕЧЕНИЕ: correlation_gate._non_structural применён к строкам
+    A внутри mc_gap. Оракул — test_mcgap_trigger::test_структурная_пара_не_попадает_в_mc_зазор_семьи_A
+    (мутация «вернуть всё» краснеет). ПРИЗНАК: новый датчик или читатель pass-set → спроси, какой слой
+    он читает; судить надо то, что доезжает до веры. ИСХОД: проверка. ЦЕНА: один повторяющийся ночной
+    алерт владельцу, который без фильтра не ушёл бы и после его решения. ВТОРОЙ ЭКЗЕМПЛЯР (найден замером
+    на старте плана остатков 28.09): снимок членства pass-set (_passset_members → мерцание и прибытия
+    в карантин) брал a_lever ДО среза — структурные пары сидели и в семье A, и в карантине, где
+    ждали вердикта владельца. Лечение — _drop_structural с ОБЕИХ сторон diff (иначе первая ночь дала
+    бы ложное «пары ушли»); вердикты через CLI после деплоя. Урок подтвердился: перечень потребителей слоя
+    надо составлять по данным (grep читателей колонки), а не по памяти о датчике.'
+  cost: повторяющийся ночной алерт владельцу; вердикты карантина вручную
+  cause: у pass-set два слоя, и потребитель выбирал слой сам
+  address:
+    kind: runtime
+    ref: correlation_gate.py
+  subject:
+  - sensor_perimeter
+  - writers_readers
+  outcome:
+    kind: check
+    text: test_mcgap_trigger (мутация «вернуть всё» краснеет)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: correlation_gate.py::_non_structural
+  evidence:
+  - git:bd0f608
+  owner: владелец
+- id: C-80
+  date: '2026-09-28'
+  thread: doctor-parity
+  modules:
+  - brief_state
+  - gp_agent
+  - context_cards
+  event: '«SHOWN» В CONTEXT_CARDS — РЕШЕНИЕ ГЕЙТА, НЕ ТЕКСТ БРИФА. 28.09 замер брифов считал «показанные»
+    карточки «вернулось в норму» по status=''shown'' и объяснил их отсутствие в тексте тем, что «модель
+    их игнорирует», — владельцу ушло неверное объяснение. На деле отбой не доходил до модели НИКОГДА:
+    блоки gp_agent собираются из СЕГОДНЯШНИХ находок и фильтруются по _shown, а у разрешившейся находки
+    сегодня строки нет. ПРИЧИНА В УСТРОЙСТВЕ: у брифа два носителя — решение гейта (context_cards) и текст
+    (reports/<дата>.md), и между ними стоит сборка контекста по другому источнику; «отобрано» и «отдано
+    модели» — разные события, а замер смотрел только на первое. ЛЕЧЕНИЕ: канал resolved в gp_agent (нить
+    brief-resolved-shown). ПРИЗНАК: утверждение «X попало/не попало в бриф» → сверь с reports/<дата>.md
+    и с тем, из чего собирается блок, а не только с context_cards (§17). ИСХОД: проверка. ЦЕНА: одно неверное
+    объяснение владельцу, исправленное вслух в той же сессии.'
+  cost: одно неверное объяснение владельцу
+  cause: у брифа два носителя, между ними сборка по другому источнику; замер смотрел только на первый
+  address:
+    kind: runtime
+    ref: gp_agent.py
+  subject:
+  - measurement_path
+  - writers_readers
+  outcome:
+    kind: check
+    text: канал resolved в gp_agent (нить brief-resolved-shown)
+  status: adopted
+  adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
+  change: gp_agent.py
+  evidence:
+  - git:850fb6b
+  owner: владелец
+- id: C-81
+  date: '2026-09-28'
+  thread: icloud-test-guard
+  modules:
+  - tests/conftest.py
+  - infra_config
+  event: 'AUDIT-ХУК PYTHON НЕ ВИДИТ ОТКРЫТИЙ ИЗ C-БИБЛИОТЕК. 28.09 полный прогон повис на чтении документа
+    в iCloud (стек: fread из C-библиотеки PDF). Датчик sys.addaudithook в процессе и в дочерних (sitecustomize)
+    за полный прогон не увидел НИ ОДНОГО открытия настоящего iCloud — и это был не «чисто», а слепота:
+    fopen из C события open не порождает. Два прогона ушли на поиск виновника, которого датчик не мог
+    увидеть по построению. ПРИЧИНА В УСТРОЙСТВЕ: периметр датчика (открытия из Python) уже, чем периметр
+    предмета (любое открытие файла процессом). ЛЕЧЕНИЕ: лечить источник пути (облако тестов → каталог
+    прогона через HEALTH_CLOUD_DIR), хук оставить стражем только Python-открытий и сказать границу вслух.
+    ПРИЗНАК: пустой результат audit-хука о файлах, которые могут читать C-расширения (PDF, изображения,
+    SQLite, архивы) → не вывод «никто не открывает», а «хук не видит»; прямой свидетель — lsof/sample
+    на живом процессе. ИСХОД: правило. ЦЕНА: два полных прогона (~16 мин) и конкретный тест так и не найден.'
+  cost: два полных прогона (~16 мин), виновный тест не найден
+  cause: периметр датчика (открытия из Python) уже периметра предмета (любое открытие файла)
+  address:
+    kind: runtime
+    ref: tests/conftest.py
+  subject:
+  - sensor_perimeter
+  - filesystem_icloud
+  outcome:
+    kind: rule
+    text: лечить источник пути (HEALTH_CLOUD_DIR); пустой ответ хука — «не видит», свидетель — lsof
+  status: observation
+  evidence:
+  - git:850fb6b
+  owner: владелец
+- id: C-82
+  date: '2026-09-28'
+  thread: doctor-parity
+  modules:
+  - plans/mutate_*
+  event: 'МУТАЦИЯ, УРОНИВШАЯ СБОР, — НЕ «ПОКРАСНЕЛ». 28.09 дважды за сессию мутация дала не красный тест,
+    а поломку ВОКРУГ него: (1) подстановка с экранированными кавычками сломала синтаксис модуля — «1 failed,
+    3 errors», засчитывать было нельзя; (2) страж с префиксом «/» блокировал ВСЕ открытия, pytest упал
+    до сбора — строки итога не было, классификатор написал «НЕ покраснел». Обе замечены чтением вывода,
+    не оснасткой. ПРИЧИНА В УСТРОЙСТВЕ: вердикт мутации выводился из наличия слова failed в итоге, а не
+    из «тесты собрались, красный — на утверждении». ЛЕЧЕНИЕ: мутация переписана так, чтобы модуль оставался
+    валидным и pytest собирался; засчитан только чистый «N failed, M passed». ПРИЗНАК: в итоге мутации
+    есть errors, нет строки passed/failed, либо число собранных тестов меньше, чем без мутации → мутация
+    невалидна, переписать. ИСХОД: правило. ЦЕНА: две мутации переделаны; без чтения вывода одна ушла бы
+    в квитанцию ложным вердиктом.'
+  cost: две мутации переделаны
+  cause: вердикт мутации выводился из слова failed, а не из «собралось и красное на утверждении»
+  address:
+    kind: ritual
+    ref: the-end
+  subject:
+  - test_stand
+  outcome:
+    kind: rule
+    text: мутация засчитывается только чистым «N failed, M passed» при том же числе собранных
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:the-end, редакция 2026-09-28 (вечер) — признаки «стенд ≠ бой» и честной мутации в Validation/Сторож; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:850fb6b
+  owner: владелец
+- id: C-83
+  date: '2026-09-28'
+  thread: owner-alerts-2709
+  modules:
+  - task_agent
+  event: 'ПРАВИЛО РЕШЕНИЯ ЗАПИСАНО ДО ЗАМЕРА — ВМЕСТЕ С ЛЕКАРСТВОМ, КОТОРОЕ НЕ ПОДОШЛО. 28.09 для экстрактора
+    задач из отчётов GP владелец принял правило «≥1 сломанный ответ из ~42 → повтор всего вызова». Лекарство
+    было перенесено с судьи адресации, где поломка — порча объекта в середине ответа и повтор её лечит
+    (6/30 → 0/140). Замер экстрактора: 3/42 сломаны, но все — stop_reason=max_tokens, обрезка на 2000;
+    месячный отчёт 30.06 обрезался в ОБОИХ прогонах. Повтор такой поломки не лечит: исполнение правила
+    буквально дало бы зелёный отчёт при прежних потерях задач. ПРИЧИНА В УСТРОЙСТВЕ: правило до замера
+    фиксировало и порог, и лечение, а лечение зависит от механизма поломки, которого до замера не видно.
+    ЛЕЧЕНИЕ: лимит 6000 (самый длинный ответ на тех же отчётах — 2730), отклонение от правила названо
+    владельцу. ПРИЗНАК: пишешь правило решения до замера — фиксируй ПОРОГ и ЧТО МЕРИТЬ (stop_reason, место
+    поломки), а лечение выбирай по измеренному механизму и называй владельцу, если оно отличается от предварительного.
+    ИСХОД: правило (для агента; адрес — шаг «правило решения» в плане letitbe). ЦЕНА: без stop_reason
+    в замере был бы внедрён повтор, не закрывающий потерю задач.'
+  cost: без stop_reason был бы внедрён повтор, не закрывающий потерю задач
+  cause: правило до замера фиксировало и порог, и лечение, а лечение зависит от механизма
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - hypothesis_before_fact
+  - llm_output
+  outcome:
+    kind: rule
+    text: правило до замера фиксирует порог и что мерить; лечение — по измеренному механизму
+  status: adopted
+  adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
+  change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
+  evidence:
+  - git:5fbe19a
+  owner: владелец
+- id: C-84
+  date: '2026-09-28'
+  thread: message-clarity
+  modules:
+  - tests/unit/test_imd_berlin_parser_owner
+  event: 'СТРАЖ ОТКРЫТИЙ ФАЙЛОВ ВИДИТ ТОЛЬКО PYTHON. Аудит-хук conftest (нить icloud-test-guard) ловит
+    open() из Python, а PyMuPDF (fitz) открывает файл из C — мимо хука. Бланк владельца в iCloud оказался
+    не скачан (флаг SF_DATALESS 0x40000000): чтение из C ждёт загрузки без конца. Висли ВСЕ полные прогоны
+    на 50% и вся очередь закрытий, включая чужую нить. ПРИЧИНА В УСТРОЙСТВЕ: граница стража (слой Python)
+    не совпала с границей риска (любое чтение файла, включая C-расширения). ЛЕЧЕНИЕ: не скачанный = отсутствующий
+    → skip (os.stat st_flags). ПРИЗНАК: тест читает настоящий файл через C-библиотеку (fitz, pdfium, PIL)
+    — страж Python его не видит; зависший pytest — kill -ABRT даёт traceback faulthandler. ИСХОД: правило
+    (адрес — «Граница вслух» стража в tests/conftest.py). ЦЕНА: ~1 ч зависших прогонов, три закрытия встали,
+    чужой прогон убит.'
+  cost: ~1 ч зависших прогонов, три закрытия встали
+  cause: граница стража (слой Python) не совпала с границей риска (C-расширения)
+  address:
+    kind: runtime
+    ref: tests/conftest.py
+  subject:
+  - sensor_perimeter
+  - filesystem_icloud
+  outcome:
+    kind: rule
+    text: не скачанный = отсутствующий → skip по st_flags; зависший pytest — kill -ABRT
+  status: observation
+  evidence:
+  - git:7c6687e
+  owner: владелец
+- id: C-85
+  date: '2026-09-28'
+  thread: message-clarity
+  modules:
+  - owner_nag
+  event: 'ПАРТИЯ АГЕНТУ-ИСПОЛНИТЕЛЮ ПЕРЕПИСАЛА ФАЙЛ, КОТОРЫЙ В ТОТ ЖЕ ДЕНЬ ПЕРЕДЕЛЫВАЛА ДРУГАЯ НИТЬ. Codex
+    получил «перепиши все сообщения владельцу» и вернул звонок owner_nag к старому смыслу («на столе N»,
+    в обёртке i18n) — параллельно нить owner-bell переделала его по решению владельца. Слияние дало бы
+    молчаливый откат решения. ПРИЧИНА В УСТРОЙСТВЕ: задание партии перечисляло классы работы, но не файлы,
+    занятые открытыми неслитыми нитями. ЛЕЧЕНИЕ: версия исполнителя откачена на ревью. ПРИЗНАК: широкое
+    задание («все X») при открытых нитях в том же домене. ИСХОД: правило (адрес — постановка задания Codex,
+    docs/how-to/agent_bridge_codex.md: раздел «не трогать» со списком файлов из неслитых нитей). ЦЕНА:
+    раунд ревью; без ревью — откат решения владельца в прод.'
+  cost: раунд ревью; без него — откат решения владельца в прод
+  cause: задание партии перечисляло классы работы, но не файлы открытых нитей
+  address:
+    kind: methodology_page
+    ref: docs/how-to/agent_bridge_codex.md
+  subject:
+  - agent_delegation
+  outcome:
+    kind: rule
+    text: в задании исполнителю — раздел «не трогать» со списком файлов неслитых нитей
+  status: observation
+  evidence:
+  - git:7c6687e
+  owner: владелец
+- id: C-86
+  date: '2026-09-28'
+  thread: message-clarity
+  modules:
+  - survivorship_curator
+  - monthly_consilium
+  - labs_db
+  event: 'ТРИ ПРОИЗВОДИТЕЛЯ ПИСАЛИ В ПУСТОТУ МЕСЯЦАМИ. (1) constitution_conflict — 12 карточек с мая:
+    кнопки описаны, отправителя нет, «секция в утреннем отчёте» из инструкции в коде отсутствует; (2)
+    survivorship_note — ни одного читателя; (3) баллы опросников — фильтр источника в лаб-истории срезал
+    их у ВСЕХ читателей, хотя правило владельца (27.09) исключало их только из конституции. Холодное чтение
+    записало обработчики cb_cc/cb_hyp как «мёртвый код» — удаление похоронило бы канал. ПРИЧИНА В УСТРОЙСТВЕ:
+    у подсистемы survivorship нет записи в реестре замысла — инвариант «детект с доставкой» её не накрывает,
+    производители заводились без названного читателя. ЛЕЧЕНИЕ: решение владельца «разбирает система»,
+    блок «Самоотчёт» в месячном консилиуме. ПРИЗНАК: новая категория памяти/строк — в том же коммите грепни
+    читателя; «кнопок никто не шлёт» сначала проверь как недоставку, не как мёртвый код. ИСХОД: проверка-кандидат
+    (адрес — запись survivorship в subsystem_intent.yaml, домен владельца — парк). ЦЕНА: четыре месяца
+    сигналов самоотчёта без читателя.'
+  cost: четыре месяца сигналов самоотчёта без читателя
+  cause: у подсистемы survivorship нет записи в реестре замысла — производители заводились без названного
+    читателя
+  address:
+    kind: registry_rule
+    ref: subsystem_intent.yaml
+  subject:
+  - dead_code
+  - writers_readers
+  outcome:
+    kind: check
+    text: 'кандидат: запись survivorship в реестре замысла (домен владельца, парк)'
+  status: in_work
+  evidence:
+  - git:7c6687e
+  owner: владелец
+- id: C-87
+  date: '2026-09-28'
+  thread: lessons-home
+  modules: [project_context/lessons, project_context]
+  event: 'УРОК C-66 ПОВТОРЁН ДВИЖКОМ УРОКОВ В ДЕНЬ ЕГО ПЕРЕНОСА. Новая проверка улики git:<sha> звала git в корне проекта; локально зелёная, в полном прогоне на Studio (копия без .git) — 82 красных «улика несуществующая». Запись C-66 лежала в корпусе с модулем tests/consistency/test_tg_parse_mode_choke и до автора движка не доехала: preflight подаёт уроки по модулям, а модули у C-66 — модули её случая, не класса. ЛЕЧЕНИЕ: без git коммитная улика — «не знаю» (None), не «нет»; тест формы в копии без .git. ПРИЗНАК: новая проверка зовёт git или читает .git — она не будет работать в полном прогоне.'
+  cost: 'один красный полный прогон (~8 мин)'
+  cause: 'модули урока записываются по месту случая, а класс ошибки (нужен git в полном прогоне) живёт у любого нового кода, который зовёт git — подача по модулям его не находит'
+  address: {kind: ritual, ref: the-end}
+  subject: [test_stand]
+  outcome: {kind: check, text: 'tests/unit/test_project_context_lessons.py::test_form_check_survives_copy_without_git; для класса — урок уходит в предмет test_stand, подача по предмету на старте работы'}
+  status: failed
+  adopted_on: '2026-09-28'
+  change: project_context/lessons.py::_evidence_ok
+  evidence: [tests/unit/test_project_context_lessons.py]
+  owner: владелец
+- id: C-88
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [scripts/thread_start.sh]
+  event: 'thread_start.sh claude-md-private молча подхватил ЧУЖУЮ открытую нить с тем же именем; Claude принял её за свою новую, удалил дерево и ветку. Восстановлено из 380b92d, дерево было чистым. ПРИЗНАК: в выводе «дерево:» вместо «ветка: … готова» у новой.'
+  cost: 'потерь не было (повезло: дерево чистое); ~15 минут на восстановление и сверку'
+  cause: 'скрипт трактует занятое имя как «продолжить», без проверки владельца нити и без флага намерения; различие «новая/чужая» — одно слово в выводе'
+  address: {kind: runtime, ref: scripts/thread_start.sh}
+  subject: [concurrency, existing_home]
+  outcome: {kind: check, text: 'кандидат: занятое имя без явного --resume — отказ с именем владельца нити из docs/handoff/INDEX.md'}
+  status: observation
+  evidence: ['git:380b92d']
+  owner: владелец
+- id: C-89
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [gen_blueprint.py, gen_key_paths.py, gen_arch_blocks.py]
+  event: 'GEN-блоки ARCH_SNAPSHOT называли 4 несуществующих файла (vps_sync.py, sync_from_studio.sh, static/index.html, knowledge_engine.py). Нашёл посторонний читатель (Codex X8), не датчик. knowledge_engine.py жил в ручном списке ВНУТРИ генератора — пережил снятие MODULES 02.08, где тот же файл был назван причиной снятия; генератор печатал «# файл не найден» в документ, и никто не читал.'
+  cost: 'месяцы устаревшей навигации для постороннего читателя; вскрыто только ревью чтения'
+  cause: 'генераторы блоков не стоят в расписании и не судятся ничем; «файл не найден» выводится в документ вместо отказа'
+  address: {kind: runtime, ref: gen_blueprint.py}
+  subject: [dead_code, sensor_perimeter]
+  outcome: {kind: check, text: 'tests/consistency/test_arch_generated_refs.py — каждый файл, названный в GEN-блоке, существует (нить arch-regen)'}
+  status: in_work
+  evidence: [gen_blueprint.py]
+  owner: владелец
+- id: C-90
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [tests/unit/test_i18n_keys_have_callers.py]
+  event: 'Новый сторож «у каждого ключа i18n есть вызывающий» при ребейзе объявил сиротами два ЖИВЫХ ключа критической тревоги (safety.what_to_do_critical, собирается как "safety.what_to_do" + crit). Удаление поймал тест срочной карточки, не сам сторож.'
+  cost: 'один цикл пересборки коммита; без теста срочной карточки — человек в опасной зоне получил бы сырой ключ вместо совета'
+  cause: 'детектор мёртвого знал только литеральную форму вызова t("ns.key"); сборка ключа конкатенацией — другая форма того же читателя'
+  address: {kind: runtime, ref: tests/unit/test_i18n_keys_have_callers.py}
+  subject: [dead_code]
+  outcome: {kind: check, text: 'детектор распознаёт "ns.key" + суффикс; негативный контроль orphans(["s.w","s.w_critical"], t("s.w" + crit)) == []'}
+  status: in_work
+  evidence: ['git:09a1239']
+  owner: владелец
+- id: C-91
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [scripts/thread_finish.sh]
+  event: 'Очередь закрытий сливала нити по одной; каждая была зелёной на своём main, пробное слияние (git merge-tree) всех пар — чистым. После слияния соседа две нити покраснели на полном прогоне: перевод TEST_ARCHITECTURE (cx-docs-en2) ссылался на CLAUDE.md, который закрывала claude-md-private; перевод README validation_gate (docs-en-root) отстал от переписанного cx-docs-truth оригинала.'
+  cost: 'два красных полных прогона (~8 мин каждый) и два перезапуска очереди'
+  cause: 'проверка перед очередью судила текстовый конфликт, а поломка была смысловой: правило одной нити (закрытая часть, свежесть перевода) применяется к файлу другой — видно только на объединении'
+  address: {kind: runtime, ref: scripts/thread_finish.sh}
+  subject: [run_version]
+  outcome: {kind: rule, text: 'перед постановкой в очередь нити, трогающей документы или правила публичной зоны, прогнать сторожей документов (test_public_doc_refs, test_doc_translations, test_doc_inventory) на объединении с остальными нитями очереди, а не только на её main'}
+  status: observation
+  evidence: ['git:b3e51df', 'git:3586275']
+  owner: владелец
+- id: C-92
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [scripts/public_mirror.py]
+  event: 'Полное чтение экспорта было разрезано на срезы по памяти о составе («~540 непрочитанных»: docs, methodology, tests, корневые файлы). Экспорт — 1656 файлов; целые каталоги (bot/, handlers/, data/, scripts/, specialists/, migrations/, contracts/, templates/) не попали ни в один срез и всплыли только при подсчёте строк для второй волны.'
+  cost: 'вторая волна из 7 читателей и ~1 час; без случайного подсчёта каталоги ушли бы на GitHub непрочитанными'
+  cause: 'план срезов строился из запомненного числа, а не из описи экспорта; ни одна проверка не сверяла объединение срезов с полным списком файлов'
+  address: {kind: runtime, ref: scripts/public_mirror.py}
+  subject: [measurement_path, pii]
+  outcome: {kind: check, text: 'страж pub-read-gate: public_mirror --unread строит список непрочитанного из самого коммита (pii_census.public_files_at), а не из плана чтения; push отказывает, пока список не пуст'}
+  status: in_work
+  evidence: ['docs/handoff/finish-prep/2026-09-29-33163fa.md']
+  owner: владелец
+- id: C-93
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [scripts/public_mirror.py]
+  event: 'Двадцать один читатель экспорта пропустил тестовую фикстуру с личными медицинскими сведениями, записанными выдуманными названиями. Нашёл контрольный поиск по медицинской лексике по итоговому экспорту.'
+  cost: 'фикстура дошла бы до GitHub; исправлено за 10 минут до пуша (нить pub-final-read)'
+  cause: 'задание читателям определяло «реальное» по словам провенанса в тексте («замер», «живые данные», «у тенанта»); выдуманные имена поверх настоящей структуры таких слов не содержат — класс «структурный отпечаток известной истории» в задании не был назван'
+  address: {kind: ritual, ref: docs/how-to/publish_mirror.md}
+  subject: [pii, sensor_perimeter]
+  outcome: {kind: rule, text: 'перед push, кроме дифф-чтения, — контрольный поиск по словарю своей истории (виды лечения, процедуры, места) по всему экспорту; совпадение в фикстуре судится по структуре, а не по наличию слов «реальный/замер»'}
+  status: observation
+  evidence: ['docs/handoff/finish-prep/2026-09-29-33163fa.md']
+  owner: владелец
+- id: C-94
+  date: '2026-09-29'
+  thread: docker-install
+  modules: [plans/PLAN_docker_install_2026-09-29.md]
+  event: 'План переезда в Докер перед выдачей прошёл независимого агента, который повторил замеры на MacBook своими командами: из 9 перепроверенных чисел 4 оказались неверными (модулей, читающих launchd, 11, а не 7; RunAtLoad=true у 9 шаблонов, а не у 23; три из шести iCloud-файлов — ядро, а не машина владельца; tesseract без запасного поиска) и нашлись 2 противоречия. Все четыре числа стояли в плане с пометкой «замер».'
+  cost: 'без перепроверки владелец выбирал бы вариант по плану с объёмом этапа датчиков, заниженным на 4 файла из 11, и с ложным ключевым моментом про запуск при загрузке'
+  cause: 'шаг 1.6 ритуала требует у «замера» команду и число, но не второй путь: посчитано наличие ключа вместо его значения, список модулей собран из двух запросов порознь вместо объединения; автор перепроверяет свои числа тем же способом, каким их получил'
+  address: {kind: ritual, ref: letitbe}
+  subject: [hypothesis_before_fact, measurement_path]
+  outcome: {kind: rule, text: 'план, по числам которого владелец выбирает вариант, до выдачи перепроверяет независимый агент без контекста — повторяет замеры на машине своими командами; расхождения правятся до вопроса владельцу'}
+  status: observation
+  evidence: ['plans/PLAN_docker_install_2026-09-29.md']
+  owner: владелец
+- id: C-95
+  date: '2026-09-29'
+  thread: docker-install
+  modules: [scripts/install.py, docker/Dockerfile, reminders_backend.py]
+  event: 'Этапы 1–5 были зелёными на всех своих тестах (рендер, датчики, адаптер), а первый живой запуск образа и стенда нашёл четыре дефекта, которых не видел ни один: /app принадлежал root — рендер расписания при старте падал, планировщик не стартовал бы вовсе; два прямых вызова часов в обход _time_inject (поймала ночная проверка, исполненная в контейнере); гонка первого старта — lab-intake раньше базы; совет how-to «docker compose logs bot» пуст, потому что логи служб пишутся в файлы тома (поймал свежий агент).'
+  cost: 'пилот владельца стартовал бы с неподнимающимся планировщиком; четыре правки после «зелёного»'
+  cause: 'правило the-end «стенд ≠ бой, реально запусти» сработало — дефекты найдены до слова «сделано»; изъян был в плане: ворота этапа 5 → 7 требовали сборки и pip check, но не запуска самого образа, и тесты судили функции рендера (что сгенерировано), а не артефакт (что исполняется)'
+  address: {kind: ritual, ref: letitbe}
+  subject: [test_stand]
+  outcome: {kind: rule, text: 'в плане нити, выпускающей исполняемый артефакт (образ, службу, установщик), ворота этапа выпуска включают запуск самого артефакта на стенде и ночную проверку внутри него; тесты рендера — промежуточный сигнал'}
+  status: observation
+  evidence: ['git:89e9268', 'git:1802d53']
+  owner: владелец
+- id: C-96
+  date: '2026-09-29'
+  thread: docker-install
+  modules: [reminders_backend.py]
+  event: 'Проба будильника CalDAV-напоминания на iPhone трижды не дала ответа: задача с будильником через 3–8 минут приезжала на телефон ПОЗЖЕ будильника. Лог Radicale: телефон забирал задачи в 16:01 и 16:33, будильник стоял на 16:20. iOS не получает CalDAV push-ом, а забирает по расписанию «Выборка данных» или при открытии Напоминаний.'
+  cost: 'три попытки и ~40 минут внимания владельца с телефоном; одна ложная гипотеза «iOS игнорирует будильник»'
+  cause: 'проба придумана посреди этапа, мимо шага 1.6 letitbe (утверждение — замер или гипотеза): допущение «телефон получает сразу» не помечено гипотезой; ритуал прогоняется на старте плана и до проб, придуманных по ходу, не доходит. Лог сервера — второй путь, обходящий телефон, — прочитан только после третьего отказа'
+  address: {kind: ritual, ref: letitbe}
+  subject: [vendor_data, hypothesis_before_fact]
+  outcome: {kind: rule, text: 'проба доставки на устройство сначала читает лог сервера — когда устройство реально забрало данные, — и только потом ставит время срабатывания; время срабатывания — после подтверждённой выборки'}
+  status: observation
+  evidence: ['git:1802d53']
+  owner: владелец
+- id: C-97
+  date: '2026-09-29'
+  thread: docker-install
+  modules: [scripts/thread_start.sh]
+  event: 'В дереве нити docker-install нашлась незакоммиченная работа этапа 2a (11 файлов, 14:43–14:52), сделанная параллельной сессией той же нити; судя по записи в файл гейта этого же контейнера — ветка того же разговора. Снимок передачи в это время утверждал «писатель у нити один». Работа принята и закоммичена отдельно по слову владельца, записка оставлена в inbox нити.'
+  cost: '~15 минут разбора; риск унести чужие правки своим git add (не случился: мой коммит был до них)'
+  cause: 'отдельное дерево защищает нити друг от друга, но две сессии ОДНОЙ нити пишут в одно дерево и один индекс; признака «в дереве пишет кто-то ещё» у сессии нет, а снимок передачи утверждает единственность без проверки на входе'
+  address: {kind: runtime, ref: scripts/thread_start.sh}
+  subject: [writers_readers, run_version]
+  outcome: {kind: check, text: 'первая команда сессии в дереве нити — git status: непустой при снимке «писатель один» — стоп и выяснение автора до любого git add (внесено в How-to снимка 5943277)'}
+  status: observation
+  evidence: ['git:ef368bf', 'docs/handoff/docker-install/inbox/docker-install-session-stage1.md']
+  owner: владелец
+- id: C-98
+  date: '2026-09-29'
+  thread: docker-install
+  event: 'Репетиция этапа 9: дайджест iterdump базы на хосте (SQLite 3.53.4) и в контейнере (3.46.1) разошёлся при побайтово равных файлах (sha256 одинаков) и равном числе строк дампа — версии SQLite по-разному форматируют дамп.'
+  cost: 'один ложный сигнал «перенос с потерей»; ~5 минут разбора; без побайтовой сверки ушёл бы владельцу как потеря данных'
+  cause: 'сверщик выбран по допущению «дамп — каноническая форма содержимого», а он зависит от версии реализации; второй источник не обходил преобразование, которое мог исказить первый (§17)'
+  address: {kind: methodology_page, ref: plans/PLAN_docker_install_2026-09-29.md}
+  subject: [measurement_path, hypothesis_before_fact]
+  outcome: {kind: rule, text: 'сверка переноса базы — побайтово (sha256 файла) либо одной реализацией на обеих сторонах; дамп разных версий SQLite вторым источником не считается'}
+  status: observation
+  evidence: ['git:1b02ca9']
+  owner: владелец
+- id: C-99
+  date: '2026-09-29'
+  thread: docker-install
+  event: 'Проверка мутацией теста агента Colima: откат мутации через `git checkout -- scripts/install.py` стёр вместе с мутацией и собственные незакоммиченные правки того же файла; восстановлены из контекста сессии.'
+  cost: '~5 минут; при длинной правке или потерянном контексте — тихая потеря работы, тест после отката зелёный на старом коде'
+  cause: 'ритуал мутации требует «сломать и вернуть», но не говорит, чем возвращать; git checkout возвращает к коммиту, а не к состоянию до мутации'
+  address: {kind: ritual, ref: the-end}
+  subject: [test_stand]
+  outcome: {kind: rule, text: 'мутацию делать на копии: cp файл /tmp/keep → sed → прогон → cp обратно; git checkout для отката мутации не использовать'}
+  status: observation
+  evidence: ['git:f5dcc9d']
+  owner: владелец
+- id: C-100
+  date: '2026-09-29'
+  thread: docker-install
+  modules: [pilot_shadow]
+  event: 'Теневой сторож пилота первой версии сравнивал только тревоги safety_net двух сторон на одном снимке. Отрицательный контроль (контейнер без приватного слоя) дал «совпало»: правила читаются из таблиц того же снимка, а данные дня не попадают в спорную полосу — сторож был слеп к классу, ради которого строился.'
+  cost: 'сторож ушёл бы в пилот слепым к расхождению правил тревог до дня, когда анализ попадёт в спорную полосу; поймано на стенде до выпуска'
+  cause: 'выход сравнивался на входе, общем для обеих сторон: снимок несёт и данные, и засеянные правила, поэтому сравнение «вывода на одних данных» пустое по построению для расхождения правил'
+  address: {kind: runtime, ref: pilot_shadow.py}
+  subject: [sensor_perimeter, test_stand]
+  outcome: {kind: check, text: 'натив пересевает копию своим кодом (init_db) и сравниваются ещё и действующие правила тревог; стенд: без слоя — совпало, подменённое правило — 2 расхождения; test_diff_видит_тревогу_и_правило_только_с_одной_стороны'}
+  status: adopted
+  change: 'git:dcc9b87'
+  adopted_on: '2026-09-29'
+  evidence: ['git:dcc9b87', 'contracts/pilot_shadow.json']
+  owner: владелец
+- id: C-101
+  date: '2026-09-29'
+  thread: docker-install
+  event: 'В отчёте владельцу по репетиции написано «без приватного слоя срочные тревоги ушли бы на резерв» — вывод по исчезнувшей строке norm_documents; стенд этапа 10 опроверг: пороги тревог берутся из таблиц базы, от слоя не зависят. Поправлено владельцу явно.'
+  cost: 'одно неверное утверждение о медицинской безопасности в отчёте владельцу; держалось ~40 минут'
+  cause: 'отчёт о находке назвал механизм последствия (какой читатель пострадает) без трассировки читателя: изменённая таблица была замерена, путь от неё до safety_net — нет'
+  address: {kind: ritual, ref: the-end}
+  subject: [hypothesis_before_fact, writers_readers]
+  outcome: {kind: rule, text: 'в отчёте о найденном изменении данных последствие для читателя пишется только после трассировки читателя (кто читает таблицу в рантайме, есть ли резерв); иначе — «читатель не прослежен»'}
+  status: observation
+  evidence: ['git:dcc9b87', 'plans/PLAN_docker_install_2026-09-29.md']
+  owner: владелец
+- id: C-102
+  date: '2026-09-29'
+  thread: finish-prep
+  modules: [scripts/public_mirror.py]
+  event: 'Чистка фикстуры заменила имена и слова, но сохранила порядок событий; публичный урок, называвший этот файл «повторявшим настоящую историю», превратил вычищенную фикстуру в раскрытие — посторонний читатель (Kimi) сложил одно с другим. Там же в общем сиде кода лежали лаборатории и тесты владельца, по которым читались география и вид лечения.'
+  cost: 'вторая выгрузка ушла с фикстурой, опознаваемой через урок; исправлено до открытия репозитория (нить stranger-fixes)'
+  cause: 'чистку судили по словам фикстуры, а не по тому, что посторонний выведет из суммы публичных текстов: урок, how-to и фикстура читались по отдельности'
+  address: {kind: ritual, ref: docs/how-to/publish_mirror.md}
+  subject: [pii, sensor_perimeter]
+  outcome: {kind: rule, text: 'вычищенное место не называть в публичных текстах как «бывшее настоящим»; вычистка структуры — смена порядка и состава событий, не только имён; перед открытием репозитория — чтение постороннего по всей выгрузке, а не по диффу'}
+  status: observation
+  evidence: ['git:3669d5e']
+  owner: владелец
+- id: C-103
+  date: '2026-09-29'
+  thread: docker-install
+  modules: [lessons.yaml, scripts/thread_finish.sh]
+  event: 'Ребейз нити на main дал один конфликт в lessons.yaml, а остальные коммиты с уроками применились «чисто» по строкам: git счёл общей строку `- id: C-92` (в main — урок finish-prep, в нити — свой) и склеил записи; коммит сдвига номеров затем переименовал урок main C-92 в C-94. Поймано сверкой списка id после ребейза, файл пересобран трёхсторонним разбором по записям (база merge-base, ours main, theirs версия нити).'
+  cost: 'один лишний коммит-исправление и ~15 минут; без сверки id в main уехал бы чужой урок под чужим номером, а ссылки нити указывали бы не туда'
+  cause: 'YAML-список записей сливается построчно: одинаковая первая строка записи (`- id: C-NN`) — якорь для diff3, и «чистое» применение не значит «верное»'
+  address: {kind: runtime, ref: scripts/thread_finish.sh}
+  subject: [git_hooks]
+  outcome: {kind: rule, text: 'после ребейза, задевшего lessons.yaml, сверять список id с main (чужие записи целы, свои дописаны); конфликт разбирать по записям id, а не по строкам'}
+  status: observation
+  evidence: ['git:7f1158d']
+  owner: владелец
+- id: C-104
+  date: '2026-09-29'
+  thread: docker-install
+  event: 'Проверяя, в каком виде Radicale хранит пароль пробы, я напечатал в чат первые 4 символа поля пароля, ожидая префикс хеша; конфиг был htpasswd_encryption = plain — это были символы самого пароля.'
+  cost: 'часть значения секрета ушла в чат; учётка CalDAV пробы подлежит замене (при переключении ставится новая)'
+  cause: 'вид хранения выяснялся по значению, а не по объявлению формата: ключ htpasswd_encryption в соседнем файле отвечал на вопрос без касания значения'
+  address: {kind: registry_rule, ref: 'CLAUDE.md §19'}
+  subject: [secrets]
+  outcome: {kind: rule, text: 'формат хранения секрета выяснять по объявлению (ключ конфига, магический префикс через длину/класс символов без вывода), никогда не печатать даже часть значения'}
+  status: observation
+  evidence: ['plans/PLAN_docker_install_2026-09-29.md']
+  owner: владелец
+- id: C-105
+  date: '2026-09-30'
+  thread: docker-install
+  modules: [run_checks.sh, pii_census.py]
+  event: 'Первое утро владельца в контейнере (07:50): pytest упал на сборе (INTERNALERROR — conftest спросил git, которого в образе нет) и не прогнал ни одного теста; run_checks записал «pytest красный, но набор упавших не изменился — молчим». Найдено чтением лога после переезда, не сигналом.'
+  cost: 'утренний набор тестов был бы мёртв каждый день пилота без единого алерта; проверка прошла вслепую один раз'
+  cause: 'сторож новизны сравнивал множества имён FAILED: красный прогон без единой строки FAILED давал пустое множество, равное пустому вчерашнему, и попадал в законное «молчание»'
+  address: {kind: runtime, ref: run_checks.sh}
+  subject: [sensor_perimeter, test_stand]
+  outcome: {kind: check, text: 'красный прогон без имён получает имя «pytest-не-запустился» и проходит ту же хронику (НОВОЕ → алерт); оракул tests/unit/test_pytest_failed_diff.py::test_red_run_without_failed_lines_is_named, мутация краснеет'}
+  status: observation
+  evidence: ['docs/handoff/docker-install/2026-09-30-1a2d544.md']
+  owner: владелец
+- id: C-106
+  date: '2026-09-30'
+  thread: docker-install
+  modules: [scripts/deploy_container.sh, scripts/install.py, jobs/scheduled.py]
+  event: 'Репетиция этапа 9 и переключение проверили службы, данные и срочные тревоги, но не утренний конвейер проверок внутри контейнера. Первый его прогон нашёл сразу пять следствий переезда: нет git (тесты мертвы), нет BSD date (хроника падений), не смонтированы веса PGS, не объявлен секрет CalDAV, lambda-пульс шумит ERROR в журнал бота каждую минуту.'
+  cost: 'первое утро пилота: 0 тестов, 5 FAIL монитора, 244 строки ложных ошибок в журнале бота; четыре исправления в тот же день'
+  cause: 'приёмка переезда судила то, что работает непрерывно (службы, приём, тревоги), а плановое по часам (07:50) впервые запускалось уже в бою; допущения хоста (git, date -j, /opt/homebrew, файлы в ~) живут именно в нём'
+  address: {kind: ritual, ref: docs/how-to/pilot_switch.md}
+  subject: [test_stand, measurement_path]
+  outcome: {kind: rule, text: 'до переключения тенанта (волна В) прогнать внутри его контейнера на копии утренний конвейер целиком — run_checks.sh --scheduled и полный pytest — и разобрать каждый красный: «среда контейнера» или «станок разработчика»'}
+  status: observation
+  evidence: ['docs/handoff/docker-install/2026-09-30-1a2d544.md']
+  owner: владелец
+- id: C-107
+  date: '2026-09-30'
+  thread: docker-install
+  modules: [docs/handoff/docker-install/LATEST.md]
+  event: 'Коммит записок ab565b8 (только документы, без полного прогона) записал в LATEST статус «pilot», которого нет в словаре сторожа записок; main стал красным с 07:42, закрытие соседней нити стояло до 08:20, пока сосед не поправил строку с разрешения владельца.'
+  cost: 'около 40 минут чужой нити и правка чужого файла через владельца'
+  cause: 'статус нити — значение из словаря сторожа (closed|paused|open|active|blocked), а я писал его как слово-описание; коммит документов не гоняет затронутые тесты записок'
+  address: {kind: ritual, ref: docs/how-to/thread_worktree.md}
+  subject: [test_stand, run_version]
+  outcome: {kind: rule, text: 'правка docs/handoff/**/LATEST.md — прогнать tests/consistency/test_handoff_claims_not_stale.py до коммита; статус — только словом словаря, пояснение — в скобках'}
+  status: observation
+  evidence: ['git:efbc73f']
+  owner: владелец
+- id: C-108
+  date: '2026-09-30'
+  thread: docker-install
+  modules: [scripts/install.py, security_sensors.py, watch_and_test.sh]
+  event: 'После перезагрузки Studio (12:47) замороженная нативная база владельца получила около 100 записей сидов (12:52): code-watcher, оставленный на хосте как «служба машины», гоняет smoke и монитор с HEALTH_DATA_DIR=$HOME/health; писать было можно, потому что ремонт прав монитора партнёра вернул файлу 600 вместо 444. Найдено сверкой прав файла с картиной до перезагрузки.'
+  cost: 'копия для отката перестала быть снимком момента переключения (изменения безвредны — те же сиды); без сверки второй писатель жил бы до волны В'
+  cause: 'раскладка служб судила службу по МЕСТУ (хост или контейнер), а не по данным, которые она трогает; а замораживание правами столкнулось с другим сторожем, который считает эти права нарушением и «чинит» их'
+  address: {kind: runtime, ref: scripts/install.py}
+  subject: [writers_readers, sensor_perimeter]
+  outcome: {kind: check, text: 'PILOT_STOP_HOST — службы машины, судящие данные переезжающего тенанта, выгружаются; заморозка — 400 (ремонт прав её не трогает); оракул tests/unit/test_docker_render.py, мутация краснеет'}
+  status: observation
+  evidence: ['docs/how-to/pilot_switch.md']
+  owner: владелец
+- id: C-109
+  date: '2026-09-30'
+  thread: owner-desk-default
+  modules: [finding_identity.py, night_cycle.py]
+  event: 'Звонок владельцу 30.09 нёс две инженерные карточки (launchd без копии в репо; деплой не перезапускает lab-intake партнёра). Замер 13–30.09: через умолчание класса decide на стол легло 12 карточек, 10 сняла сама система без ответа, 1 отвечена и оказалась инженерной, настоящим вопросом была 1. Явных меток decide в карте было 0 — весь поток к владельцу шёл через умолчание.'
+  cost: '12 карточек за 17 дней в самый дефицитный канал; владелец: «не понимаю, зачем они мне»'
+  cause: 'fail-closed направили в самый дорогой канал: «незнание — к человеку» задумывалось против повышения прав автомата, но инженерная очередь сама ничего не исполняет, а структурная проверка необратимого и домена владельца стоит отдельно — умолчание decide ничего не защищало, только кормило стол'
+  address: {kind: registry_rule, ref: finding_identity.py}
+  subject: [classifier_rules, message_delivery]
+  outcome: {kind: rule, text: 'DEFAULT_CLASS = fix; decide только явно и поимённо (условие возврата его решения, MC-триггер, счётчик тенантов, три датчика клинического канона); мутация «вернуть decide» — 4 красных в test_finding_identity/test_triage_delivery'}
+  status: adopted
+  change: 'git:eafcaeb'
+  adopted_on: '2026-09-30'
+  evidence: ['git:eafcaeb', 'git:12f0678', 'docs/handoff/owner-desk-default/LATEST.md']
+  owner: владелец
+- id: C-110
+  date: '2026-09-30'
+  thread: owner-desk-default
+  modules: [owner_nag.py, night_cycle.py, night_investigator.py, methodology/i18n/ru.yaml]
+  event: 'Звонок из двух строк состоял только из рамок («Это про систему, не про твоё здоровье. Срочность средняя…») — ни одного предмета. Карточки несли выдумки: «команда сопровождения», «неизвестно, кто добавил», «вернётся в очередь инженеров» рядом с системной строкой «останется ждать тебя».'
+  cost: 'каждая строка звонка с 28.09 не называла предмет; владелец не мог отличить нужное от шума'
+  cause: 'инструкция генератора и потребитель разъехались по позиции: инструкция требовала рамку ПЕРВОЙ фразой (пожелание читателя 28.09), колокол брал ПЕРВУЮ фразу как предмет; а поля «кто это делает» и «что будет при молчании» требовали от модели фактов, которых нет в уликах, — она их сочиняла'
+  address: {kind: runtime, ref: night_cycle.py}
+  subject: [llm_output, message_delivery]
+  outcome: {kind: check, text: 'поле subject обязательно и стоит первой строкой (без него карточка не готова); инструкция — рамка второй фразой, исполнителей/причин вне улик не писать, строку молчания ставит система; колокол снимает рамки; мутации: снять пропуск рамки — 3 красных, снять требование subject — 1 красный'}
+  status: adopted
+  change: 'git:03c0cce'
+  adopted_on: '2026-09-30'
+  evidence: ['git:03c0cce', 'git:12f0678']
+  owner: владелец
+- id: C-111
+  date: '2026-09-30'
+  thread: docker-install
+  modules: [tests/conftest.py, reminders_backend.py]
+  event: 'Полный прогон тестов в контейнере владельца (пробы 08:08 и 14:53) завёл в его настоящем ящике CalDAV список «Health (demo_alpha)» с задачей «📋 t»: test_writer_puts_tenant_task_into_tenant_list ждал AppleScript, а в каталоге секретов прогона (в контейнере — настоящем) лежал caldav.json, и писатель задач пошёл в CalDAV. Найдено разбором красного «seen == []», не сторожем.'
+  cost: 'чужой список в напоминаниях владельца; без находки — каждую ночь в 00:00 и каждое утро в 07:50 после выбора варианта Б'
+  cause: 'новый канал доставки (CalDAV) включается НАЛИЧИЕМ файла в каталоге секретов, а стражи тестов перехватывали только известные каналы (Telegram, импортёры); у ночного прогона владельца каталог секретов настоящий по замыслу (owner_env)'
+  address: {kind: runtime, ref: tests/conftest.py}
+  subject: [secrets, sensor_perimeter, test_stand]
+  outcome: {kind: check, text: 'conftest._no_real_caldav: caldav.json каталога секретов прогона для тестов не существует, HTTP-сессия CalDAV перехвачена всегда; оракул tests/unit/test_reminders_backend.py::test_настоящий_каталог_секретов_прогона_не_включает_caldav, мутация краснеет. Правило: новый канал, включаемый файлом секрета, приходит вместе со стражем в conftest'}
+  status: observation
+  evidence: ['docs/how-to/pilot_switch.md']
+  owner: владелец
+- id: C-112
+  date: '2026-09-30'
+  thread: docker-install
+  modules: [reminders_sync.py]
+  event: 'Разбор «9 задач без напоминаний» после переезда показал: нативный синк напоминаний владельца с 08.08 по 30.09 не прочитал ящик ни разу — все 422 прогона упали по таймауту osascript, писали ERROR в свой лог и отвечали «No completed reminders with task_id found». Галочки на iPhone восемь недель не закрывали задач; владелец увидел это как «дубли и просроченные».'
+  cost: 'восемь недель задач, закрытых человеком и открытых в системе; 56 задач сняты владельцем разом 30.09'
+  cause: 'сбой чтения и честная пустота давали один и тот же результат ([]), а сбой уходил только в лог службы — ни в журнал сбоев, ни в датчик; тот же класс, что C-105 (пустое множество как «ничего нового»)'
+  address: {kind: runtime, ref: reminders_sync.py}
+  subject: [sensor_perimeter, message_delivery]
+  outcome: {kind: check, text: 'reminders_sync._unread: сбой чтения ящика (CalDAV, AppleScript, таймаут) — notify.fault в журнал сбоев, читаемый ночным монитором; оракул tests/unit/test_tenant_reminders_sync.py::test_непрочитанный_ящик_это_сбой_а_не_пустота. Правило: функция чтения внешнего ящика не возвращает пустоту на сбое'}
+  status: observation
+  evidence: ['docs/how-to/pilot_switch.md']
+  owner: владелец
+- id: C-113
+  date: '2026-09-30'
+  thread: desk-guard
+  modules: [parked_decisions.py, night_cycle.py, owner_nag.py]
+  event: 'Переезд владельца в контейнер перенёс базу, но не logs/: стол решений родился пустым, ночной цикл положил на него решённое 10.08 и 23.08, и в 08:04 владельцу ушёл звонок «Ждут твоего решения: 8» с давно закрытыми вопросами. Нашёл владелец, не сторож.'
+  cost: 'один звонок с 8 пунктами, из них 2 решённых и 2 порождённых их потерей; утро разбора'
+  cause: 'память ops-слоя (стол решений) жила в каталоге, который по имени — журналы; план переезда перенёс «данные» (базу) и завёл для logs/ пустой том как для логов. Свойство «это память» было выражено именем каталога, а не данными'
+  address: {kind: runtime, ref: parked_decisions.py}
+  subject: [state_lifetime, sensor_perimeter, filesystem_icloud]
+  outcome: {kind: check, text: 'число ключей стола (монотонно) запоминается в system_config — база переезжает; ключей меньше отметки → цикл не паркует, колокол одной строкой; оракулы test_owner_nag::test_forgotten_desk_rings_one_line_not_the_list, test_night_cycle_warnings::test_cycle_parks_nothing_when_desk_forgot (краснеют откатом)'}
+  status: adopted
+  change: 'git:4f9e54c'
+  adopted_on: '2026-09-30'
+  evidence: ['git:4f9e54c', 'docs/handoff/desk-guard/2026-09-30-e85f9f3.md']
+  owner: владелец
+- id: C-114
+  date: '2026-09-30'
+  thread: desk-guard
+  modules: [finding_identity.py, integrity_tests.py, night_cycle.py, triage_agent.py]
+  event: 'В контейнере датчики хуков и счётчика тенантов не видят своего предмета (.git, LaunchAgents). Первый честно писал «не судимо в контейнере», второй — «было 1, стало 0»; ночной цикл сделал из обоих вопросы владельцу («ключ от подсобки», «людей стало значительно больше» — неправда).'
+  cost: 'две ложные карточки на столе владельца, одна с неверным утверждением о пользователях'
+  cause: 'класс находки выводился только из МЕТКИ; отказ судить жил в тексте детали, которую маршрутизатор не читал, а счётчик тенантов не отличал «предмета нет» от «тенантов 0»'
+  address: {kind: runtime, ref: finding_identity.py}
+  subject: [classifier_rules, sensor_perimeter, message_delivery]
+  outcome: {kind: check, text: 'finding_identity.NOT_JUDGED_HERE — один дом строки отказа; class_of_warning(label, detail): деталь с ней → standing при любой метке (цикл и утренний триаж); счётчик тенантов в контейнере говорит «не судимо»; оракул test_night_cycle_warnings::test_not_judged_here_is_standing_whatever_the_label'}
+  status: adopted
+  change: 'git:4f9e54c'
+  adopted_on: '2026-09-30'
+  evidence: ['git:4f9e54c']
+  owner: владелец
+- id: C-115
+  date: '2026-09-30'
+  thread: desk-guard
+  modules: [scripts/thread_finish.sh]
+  event: 'Закрытие нити bell-state шло пять раз: main сдвигался чужими закрытиями за 9 минут полного прогона (трижды), один раз — чужая незакоммиченная работа в главной копии, один — конфликт с соседом, который параллельно починил тот же пульс бота (af24633). Мой цикл ожидания сам себя находил в pgrep по подстроке «thread_finish.sh» и ждал вечно.'
+  cost: '~1,5 ч ожидания и пять полных прогонов на Studio ради двух небольших коммитов; дублированная работа с соседом'
+  cause: 'окно между полным прогоном и слиянием (9 мин) длиннее среднего интервала чужих слияний в загруженный день; соседи узнают о занятых файлах только из записок, которые читаются при старте нити, а не перед правкой'
+  address: {kind: runtime, ref: scripts/thread_finish.sh}
+  subject: [concurrency, agent_delegation]
+  outcome: {kind: none, text: 'урока-правила нет: гейт «main сдвинулся — не сливаю» верен (§12), и ослаблять его ради скорости нельзя; наблюдение для хозяина скрипта — повтор после чистого сдвига только записками уже есть, сдвиг ARCH/CHANGELOG тоже мог бы быть «чистым»'}
+  status: observation
+  evidence: ['docs/handoff/desk-guard/2026-09-30-e85f9f3.md']
+  owner: владелец

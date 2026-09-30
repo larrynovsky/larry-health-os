@@ -1,0 +1,42 @@
+#!/bin/bash
+# Studio post-receive: ТОНКАЯ ОБЁРТКА над scripts/install_hooks.sh.
+#
+# ЗАЧЕМ (BL-STUDIO-HOOKS-1, замер 12–13.09). На Studio хуки — симлинки на
+# трекаемые источники, поэтому по СОДЕРЖИМОМУ они не устаревают. Устаревает
+# НАБОР: когда 12.09 появился новый хук `pre-merge-commit`, на Studio его никто
+# не создал — там pre-commit отклоняет коммиты (deploy-only), а слияние шло бы
+# мимо, потому что git зовёт на слияние другой хук. Замок поставили руками.
+# Ручная установка не наследуется: следующий новый хук повторит историю.
+#
+# Тот же приём, что у MacBook и у соседнего проекта: логика живёт в install_hooks.sh и
+# читается ИЗ РЕПОЗИТОРИЯ при каждом срабатывании, то есть всегда свежая. Этот
+# файл больше не меняется, поэтому его собственная устарелость безвредна — он
+# точка входа, а не логика. Бутстрап (создать сам симлинк post-receive) остаётся
+# ручным один раз: его больше некому сделать, и это честная граница.
+#
+# ПОЧЕМУ ЧИСТИМ ОКРУЖЕНИЕ. git зовёт хуки приёма с GIT_DIR и соседями в env.
+# Под ними `git -C <путь> rev-parse` отвечает ПРО ПЕРЕМЕННУЮ, а не про путь,
+# который спросили, — а install_hooks.sh именно так спрашивает каталог хуков.
+# Тот же класс уже стрелял здесь дважды (изоляция прогона тестов 12.09).
+# Список обязан совпадать со списком в scripts/run_affected_tests.sh — за этим
+# следит tests/unit/test_git_env_isolation.py.
+#
+# FAIL-OPEN: установка хуков не должна ломать приём push. Отказ деплоя дороже
+# отсутствия хука, а отсутствие хука видит ночной сторож симлинков.
+#
+# Оракул: tests/unit/test_studio_post_receive.py
+set -uo pipefail
+
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_COMMON_DIR GIT_PREFIX \
+      GIT_OBJECT_DIRECTORY GIT_NAMESPACE GIT_ALTERNATE_OBJECT_DIRECTORIES \
+      GIT_QUARANTINE_PATH \
+      GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE \
+      GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL GIT_COMMITTER_DATE GIT_EDITOR
+
+# Путь берём от САМОГО ФАЙЛА, а не константой: и через симлинк .git/hooks/,
+# и при прямом запуске из scripts/git-hooks/ подъём на два уровня даёт корень.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)" || exit 0
+INSTALLER="$REPO_ROOT/scripts/install_hooks.sh"
+[ -x "$INSTALLER" ] || exit 0
+"$INSTALLER" >/dev/null 2>&1 || true
+exit 0

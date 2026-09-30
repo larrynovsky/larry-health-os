@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Фармакогенетика — Health OS{% endblock %}
+{% set page_name = "фармакогенетика" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Фармакогенетика</h1>
+  <p class="shell-subtitle">CPIC Wave 1 · {{ genes|length }} генов проанализировано · поиск лекарств в реальном времени</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Поиск препаратов ─────────────────────────────────────────────────────── #}
+<section class="genome-section">
+  <h2>Поиск препарата</h2>
+  <p class="hint">Введи действующее вещество или торговое название — увидишь, как твой генотип влияет на этот препарат.</p>
+
+  <div style="margin-bottom: 1.5rem;">
+    <input
+      id="drug-search"
+      type="text"
+      placeholder="Варфарин, симвастатин, абакавир, омепразол…"
+      autocomplete="off"
+      style="width: 100%; max-width: 520px; padding: 0.6rem 1rem; font-size: 1rem;
+             border: 1px solid var(--border, #ddd); border-radius: 6px;
+             background: var(--surface, #fff); color: var(--text, #111);
+             outline: none;"
+      oninput="filterDrugs(this.value)"
+    />
+  </div>
+
+  <div id="drug-results" style="display: none;">
+    <table class="data-table" id="drug-table">
+      <thead>
+        <tr>
+          <th>Препарат</th>
+          <th>Ген</th>
+          <th>Твой фенотип</th>
+          <th>Риск</th>
+          <th>Рекомендация CPIC</th>
+        </tr>
+      </thead>
+      <tbody id="drug-tbody"></tbody>
+    </table>
+    <p id="drug-no-results" class="hint" style="display:none;">
+      Препарат не найден в базе CPIC Wave 1. Это не исключает взаимодействий — проконсультируйся с врачом.
+    </p>
+  </div>
+</section>
+
+{# ── Все гены ─────────────────────────────────────────────────────────────── #}
+<section class="genome-section">
+  <h2>Твои CPIC гены</h2>
+  {% if not genes %}
+    <p class="hint">Данные фармакогеномики недоступны. Запусти <code class="mono">vcf_import_pipeline.py</code> (Phase E).</p>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Ген</th>
+        <th>Аллель 1</th>
+        <th>Аллель 2</th>
+        <th>Фенотип</th>
+        <th>Достоверность</th>
+        <th>SNPs</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in genes %}
+      <tr class="{% if g.phenotype in ('Decreased Function', 'Poor Metabolizer') or 'Carrier' in (g.phenotype or '') %}row--warning{% endif %}">
+        <td><strong>{{ g.gene }}</strong></td>
+        <td class="mono">{{ g.star_allele_1 or '—' }}</td>
+        <td class="mono">{{ g.star_allele_2 or '—' }}</td>
+        <td>{{ g.phenotype or '—' }}</td>
+        <td>
+          {% if g.confidence == 'high' %}
+            <span class="badge badge--ok">high</span>
+          {% elif g.confidence == 'indeterminate' %}
+            <span class="badge">indeterminate</span>
+          {% else %}
+            <span class="badge badge--warning">{{ g.confidence }}</span>
+          {% endif %}
+        </td>
+        <td>{{ g.coverage_snp_count or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{# ── JS: данные + логика поиска ───────────────────────────────────────────── #}
+<script>
+const DRUG_DATA = {{ drug_interactions | tojson }};
+
+function riskBadge(level) {
+  const map = {
+    critical: '<span class="badge badge--critical">⛔ критический</span>',
+    warning:  '<span class="badge badge--warning">⚠️ осторожность</span>',
+    ok:       '<span class="badge badge--ok">✅ норма</span>',
+    unknown:  '<span class="badge">❓ неизвестно</span>',
+  };
+  return map[level] || '<span class="badge">—</span>';
+}
+
+function filterDrugs(query) {
+  const resultsDiv = document.getElementById('drug-results');
+  const tbody      = document.getElementById('drug-tbody');
+  const noResults  = document.getElementById('drug-no-results');
+  const table      = document.getElementById('drug-table');
+
+  if (!query || query.trim().length < 2) {
+    resultsDiv.style.display = 'none';
+    return;
+  }
+
+  resultsDiv.style.display = '';
+  const q = query.toLowerCase().trim();
+
+  const matches = DRUG_DATA.filter(d =>
+    d.drug.toLowerCase().includes(q) ||
+    d.drug_search.toLowerCase().includes(q) ||
+    d.gene.toLowerCase().includes(q)
+  );
+
+  if (matches.length === 0) {
+    tbody.innerHTML = '';
+    table.style.display = 'none';
+    noResults.style.display = '';
+    return;
+  }
+
+  table.style.display = '';
+  noResults.style.display = 'none';
+
+  tbody.innerHTML = matches.map(d => `
+    <tr>
+      <td><strong>${d.drug}</strong></td>
+      <td><strong>${d.gene}</strong></td>
+      <td>${d.phenotype_context}</td>
+      <td>${riskBadge(d.risk_level)}</td>
+      <td class="text-sm">${d.recommendation}</td>
+    </tr>
+  `).join('');
+}
+
+// Показываем критические взаимодействия при загрузке страницы — динамически из DRUG_DATA
+window.addEventListener('DOMContentLoaded', () => {
+  const critical = DRUG_DATA.filter(d => d.risk_level === 'critical');
+  if (critical.length === 0) return;
+
+  const banner = document.createElement('div');
+  banner.style.cssText = [
+    'background: rgba(216,90,62,0.12)',
+    'border-left: 3px solid var(--color-warning)',
+    'padding: 0.85rem 1.1rem',
+    'margin-bottom: 1.25rem',
+    'border-radius: 4px',
+    'color: var(--color-text-display)',
+  ].join(';');
+
+  const items = critical.map(d => {
+    const searchTerm = d.drug.split('/')[0].trim();
+    return `<span style="display:inline-flex;align-items:center;gap:0.4rem;margin:0.2rem 0.35rem 0.2rem 0;">
+      <button onclick="document.getElementById('drug-search').value='${searchTerm}';filterDrugs('${searchTerm}');"
+        style="background:var(--color-warning);color:var(--color-on-warning);border:none;
+               border-radius:3px;padding:0.2rem 0.55rem;font-size:0.82rem;
+               font-family:inherit;cursor:pointer;font-weight:600;">
+        ${d.drug.split('/')[0].trim()}
+      </button>
+      <span style="font-size:0.82rem;color:var(--color-text-muted);">${d.gene}</span>
+    </span>`;
+  }).join('');
+
+  banner.innerHTML = `<span style="font-weight:600;font-size:0.88rem;">⛔ Персональные риски:</span>
+    <span style="font-size:0.83rem;color:var(--color-text-muted);margin-left:0.5rem;">нажми препарат — увидишь детали</span>
+    <div style="margin-top:0.5rem;">${items}</div>`;
+
+  const searchBox = document.getElementById('drug-search').closest('div');
+  searchBox.parentNode.insertBefore(banner, searchBox);
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,17 @@
+{
+  "module": "project_context/indexer",
+  "public": [
+    "scan_data",
+    "disposability_policy",
+    "contract_sidecars",
+    "disposability_causes",
+    "build",
+    "canonical_token",
+    "emit_receipt",
+    "capabilities",
+    "members",
+    "preflight"
+  ],
+  "depends_on": [],
+  "_note": "Контракт заведён 2026-07-26 в Р3 ремонта гейта: dispgate объявлял зависимость на project_context/indexer, а файла не существовало — сайдкар ссылался в пустоту (DG-04), и это нашлось на СОБСТВЕННОМ сайдкаре гейта. Здесь объявлена только ПОВЕРХНОСТЬ: её существование и вызываемость стережёт check_contracts. Блок disposability СОЗНАТЕЛЬНО отсутствует: indexer — легаси, а легаси вне периметра §15, и вердикт по нему выносит аудит владельца, не автор соседнего модуля. Придумать вердикт здесь значило бы подделать суждение ради зелёного гейта — ровно тот класс, от которого §15 защищает."
+}

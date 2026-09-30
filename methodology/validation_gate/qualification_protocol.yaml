@@ -1,0 +1,97 @@
+# Протокол воспроизводимой квалификации FDR-гейта (вердикт §10). СКЕЛЕТ: структура сценариев,
+# метрик и критерия приёмки. Численные значения (α_MC, δ, число прогонов, γ) — ЗАГЛУШКИ (tbd),
+# фиксируются ПОСЛЕ заморозки data manifest (§12.2 STOP-gate) и импорта веса. Пока — НЕ release.
+# Diátaxis: reference. Load-bearing → git.
+
+version: 2            # v2 (2026-07-13): манифест v2 заморожен + Stage B построен+прогнан release → QUALIFIED
+status: qualified         # scaffold → manifest_frozen → qualified. Batch-слой пройден (ACCEPTANCE=True,
+                          # см. release_result). Online-слой (repeated_looks/data_triggered) → Ф4, отдельно.
+frozen_manifest: true     # §12.2: data_manifest.yaml заморожен 2026-07-12 (v2 twin-ядро 2026-07-13)
+manifest_ref: methodology/validation_gate/data_manifest.yaml
+
+# ── Две ступени harness (§10) ──
+stages:
+  oracle_null:
+    purpose: >
+      Истинный oracle: p-value из ИЗВЕСТНОГО нулевого распределения генератора (не оценённый
+      effective-N). Задаёт точные marginal null + репрезентативную joint dependence между тестами.
+      Измеряет чистый штраф контроллера BH/BY без ошибки p-engine.
+    dependence_scenarios: [independent, prds_positive, mixed_sign, common_latent, copula_clayton, copula_gumbel]  # TBD уточнить
+    null_configs: [global_null, partial_null]
+  digital_twin:
+    purpose: >
+      End-to-end: пароспецифичные ACF/спектры, cross-dependence, сезонность, режимы терапии,
+      changepoints, missingness/measurement, ML-selection, preprocessing, p-engine, контроллер.
+      Для lab-path — отдельный estimand + модель процесса наблюдения (MAR/MNAR + sensitivity).
+
+# ── Обязательные сценарии (§10) — каждый со СВОИМ позитивным контролем (RST: check ≠ proof) ──
+mandatory_scenarios:
+  - id: global_null            # все нули; FDR должен быть ≤ q
+    positive_control: planted_all_null_fdr_not_exceed_q
+  - id: partial_null           # часть истинных; super-uniformity истинных нулей
+    positive_control: planted_signals_recovered_and_nulls_controlled
+  - id: mixed_sign_dependence  # смешанные знаки → PRDS не гарантирован (BH под вопросом, BY baseline)
+    positive_control: by_controls_where_bh_may_not
+  - id: local_trends
+    positive_control: trend_does_not_inflate_fdr
+  - id: variance_shifts
+    positive_control: heteroscedasticity_controlled
+  - id: changepoints           # терапевтические эпохи; пример — ступенчатый сдвиг уровня метрики после смены режима
+    positive_control: regime_shift_does_not_break_shift_null
+  - id: common_latent_drivers
+    positive_control: latent_driver_not_counted_as_discovery
+  - id: overlapping_windows
+    positive_control: window_overlap_dependence_controlled
+# repeated_looks/data_triggered ВЫНЕСЕНЫ в online-слой (Ф4): это optional-stopping/selection во
+# ВРЕМЕНИ, не batch-p-движок (§7.1 stage_b_design; вердикт R4/R5 — online-слой отдельный этаж).
+deferred_online_scenarios:
+  - id: repeated_looks
+    positive_control: peeking_does_not_inflate_fdr
+    layer: "Ф4 online-LOND / anytime-valid — не batch-квалификация"
+  - id: data_triggered
+    positive_control: trigger_selection_accounted
+    layer: "Ф4 action-gate selection — не batch-квалификация"
+
+# ── Метрики (§10) ──
+metrics: [fdr, fdx_tail_fdp, fwer, power, time_to_discovery, action_gate_errors]
+monte_carlo_ci: required       # доверительные интервалы для FDR и power обязательны
+
+# ── Пред-регистрация (фиксируется ДО прогонов; сейчас TBD до манифеста §12.2) ──
+preregistration:
+  q: 0.10                      # из signal_family.yaml (governance, §12.1)
+  fdx_gamma: 0.20               # порог tail-FDP P(FDP>γ)
+  alpha_mc: 0.05                # 1−α_MC = односторонний уровень Monte Carlo доверия
+  tolerance_delta: 0.02
+  n_all_null: 50000            # ориентир §10 (итог — от требуемой ширины CI)
+  n_power: 10000               # ориентир §10
+  simultaneous_bounds: holm     # bonferroni | holm | max_stat — одновременное покрытие по сценариям
+  seeds: versioned             # фиксируются и кладутся в raw outputs
+
+# ── Критерий приёмки (§10 stress) ──
+acceptance:
+  stress_criterion: "каждая одновременная верхняя граница выбранной error-метрики ≤ q + δ"
+  gate: >
+    Инвариант гейта → holds ТОЛЬКО когда соответствующая часть ПОСТРОЕНА И этот критерий выполнен
+    на ВСЕХ обязательных сценариях с зафиксированными seeds/manifest/CI. Иначе — оставляем pessimism.
+
+# ── RELEASE-РЕЗУЛЬТАТ (frozen, 2026-07-13). Провенанс: release_run.py, продовый gate_correlations,
+#    13 ядер Studio, ~4.6ч. Сырые числа /tmp/release_results.json. Holm α_MC=0.05. ──
+release_result:
+  run_at: "2026-07-13"
+  engine: "продовый gate_correlations (Stage B digital-twin), 50k all-null / 10k power"
+  acceptance_all_holm_le_q_delta: true
+  scenarios:
+    global_null:         {N: 50000, fdr: 0.0012, holm_ub: 0.0015}
+    partial_power:       {N: 10000, fdr: 0.0161, holm_ub: 0.0178, power: 1.0}
+    family_wide_realamp: {N: 50000, fdr: 0.0046, holm_ub: 0.0053}   # per-metric реальные амплитуды дрейфа
+    combined_nonstat:    {N: 50000, fdr: 0.0036, holm_ub: 0.0041}
+    trend:               {N: 50000, fdr: 0.0026, holm_ub: 0.0031}
+  stage_a_oracle: "global_null/partial_null/mixed_sign/common_latent — построены ранее (fdr_stage_a oracle)"
+  built: [global_null, partial_null, mixed_sign_dependence, common_latent_drivers, local_trends, variance_shifts, changepoints, overlapping_windows]
+  note: "8/8 batch-сценариев построены и прошли stress-критерий. repeated_looks/data_triggered → Ф4."
+
+notes: >
+  Дополняет, НЕ заменяет теоретические условия контроллера. global-null FDR≈q НЕ достаточен
+  (нужны super-uniformity истинных нулей, partial-null, mixed-sign, CI). Существующий fdr_harness.py —
+  mechanism proof: его Stage A использует ОЦЕНЁННЫЙ eff-df (§8) → это НЕ oracle; release-oracle обязан
+  считать p из известного null генератора. Скелет фиксирует СТРУКТУРУ; числа — после манифеста.

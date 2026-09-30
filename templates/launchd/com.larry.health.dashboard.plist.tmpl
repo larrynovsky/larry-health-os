@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.larry.health.dashboard</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{PYTHON}}</string>
+		<string>{{REPO}}/dashboard.py</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HEALTH_DATA_DIR</key>
+		<string>{{DATA}}</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>{{REPO}}/logs/dashboard.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>{{REPO}}/logs/dashboard.err.log</string>
+</dict>
+</plist>

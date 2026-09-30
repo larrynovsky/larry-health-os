@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.night-repair</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/night_repair.py</string>
+        <string>run</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{REPO}}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Ежедневно 08:40: после ночного цикла (08:00, карточки инженерной очереди уже на столе)
+         и утреннего звонка. Хост Мака, не контейнер: автору нужен claude и клон репозитория.
+         Живость сторожит гейт коммита в main (night_repair.py, last_run.json старше 36 ч — строка каждой сессии). -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>40</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/Library/Logs/health-night-repair.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/Library/Logs/health-night-repair.log</string>
+</dict>
+</plist>

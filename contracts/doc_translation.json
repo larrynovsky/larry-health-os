@@ -1,0 +1,29 @@
+{
+  "module": "doc_translation",
+  "public": [
+    "translations",
+    "mark_of",
+    "human_part",
+    "text_hash",
+    "strip_switch",
+    "switch_line",
+    "form_problems",
+    "pair_problems",
+    "stale_translations"
+  ],
+  "depends_on": [],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — формат пары «русский оригинал — английский перевод» документации: метка translation-of с хешем, строка-переключатель, правила формы. Не переводит, не зовёт модель, не пишет файлов.",
+      "D2": "восемь чистых функций над текстом и путями; регулярки MARK/FENCE/HEAD/LINK/SWITCH — данные формата, названные в докстринге.",
+      "D3": "только stdlib (hashlib, re, pathlib).",
+      "D4": "около 80 строк, треть — докстринг с форматом. Разбивать нечего.",
+      "D5": "tests/consistency/test_doc_translations.py (живые переводы: метка, форма, обратная ссылка; негативный контроль — изменённая команда, потерянный раздел, чужая ссылка краснеют) и tests/consistency/test_intent_translation.py (свежесть по text_hash, переключатель). + tests/unit/test_doc_translation_generated.py (блоки и машинная строка не старят перевод, рукописная правка старит, незакрытый маркер не прячет).",
+      "D6": "общий инвариант с doc_agent и тестами: хеш источника — sha256[:12] от РУКОПИСНОЙ части русского файла (human_part: тела GEN/AUTOGEN и машинная строка версии пусты; 29.09, arch-en-gen) вместе с переключателем. Записан один раз в text_hash; doc_agent и тест зовут его, а не считают сами. Для документа без блоков хеш прежний (замер: 134 пары, 0 изменений)."
+    },
+    "rationale": "Переписывается по докстрингу и двум тестам: формат метки и правила формы названы явно, невосстановимого нет.",
+    "date": "2026-09-29",
+    "oracle": "tests/consistency/test_doc_translations.py::test_detector_sees_broken_translation и tests/consistency/test_intent_translation.py::test_english_page_fresh_and_honest"
+  }
+}

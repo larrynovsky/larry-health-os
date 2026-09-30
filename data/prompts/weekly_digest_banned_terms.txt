@@ -1,0 +1,40 @@
+# Технические слова, запрещённые в дайджесте (решение владельца 2026-09-05).
+# Одно слово/основа на строку, без регистра; основа + ≤2 буквы окончания, целым словом. Строки с # — комментарии.
+коммит
+триаж
+нормализац
+нормализу
+таблиц
+модул
+пайплайн
+гейт
+датчик
+тест
+ревью
+лог
+сервер
+парсер
+канон
+конфиг
+скрипт
+pro-балл
+safety
+loinc
+rcv
+handoff
+git
+# English (нить digest-lang, 28.09): без test/log/table/gate/repo — «tested», «logic», «tablet», «report» дали бы ложный блок
+commit
+pipeline
+triage
+refactor
+normaliz
+parser
+config
+script
+regex
+schema
+deploy
+sensor
+server
+module

@@ -1,0 +1,58 @@
+{# Partial: sidebar with grouped navigation (Toscana). #}
+{# Expects `request` and optional `counts`. #}
+{% set path = request.url.path %}
+
+<nav class="sidebar">
+  <div class="sidebar-group">
+    <div class="sidebar-caption">сегодня</div>
+    <a class="sidebar-item {% if path == '/' %}sidebar-item--active{% endif %}" href="/">Главная</a>
+  </div>
+
+  <div class="sidebar-group">
+    <div class="sidebar-caption">управляю</div>
+    <a class="sidebar-item {% if path.startswith('/medical-record') %}sidebar-item--active{% endif %}" href="/medical-record">
+      Медкарта
+      {% if counts %}<span class="sidebar-count">{{ counts.events_total }}</span>{% endif %}
+    </a>
+    <a class="sidebar-item {% if path.startswith('/hypotheses') %}sidebar-item--active{% endif %}" href="/hypotheses">
+      Гипотезы
+      {% if counts %}<span class="sidebar-count">{{ counts.hypotheses_open }}/{{ counts.hypotheses_all }}</span>{% endif %}
+    </a>
+    <a class="sidebar-item {% if path.startswith('/problems') %}sidebar-item--active{% endif %}" href="/problems">
+      Проблемы
+      {% if counts %}<span class="sidebar-count sidebar-count--warning">{{ counts.problems_active }}</span>{% endif %}
+    </a>
+    <a class="sidebar-item {% if path.startswith('/proposals') %}sidebar-item--active{% endif %}" href="/proposals">
+      Предложения
+      {% if counts and counts.proposals_pending %}<span class="sidebar-count sidebar-count--action">{{ counts.proposals_pending }}</span>{% endif %}
+    </a>
+    <a class="sidebar-item {% if path.startswith('/protocols') %}sidebar-item--active{% endif %}" href="/protocols">
+      Протоколы
+      {% if counts %}<span class="sidebar-count sidebar-count--active">{{ counts.protocols_active }}</span>{% endif %}
+    </a>
+    <a class="sidebar-item {% if path.startswith('/tasks') %}sidebar-item--active{% endif %}" href="/tasks">
+      Задачи
+      {% if counts %}<span class="sidebar-count">{{ counts.tasks_open }}</span>{% endif %}
+    </a>
+  </div>
+
+  <div class="sidebar-group">
+    <div class="sidebar-caption">слушаю</div>
+    <a class="sidebar-item {% if path.startswith('/labs') %}sidebar-item--active{% endif %}" href="/labs">
+      Анализы
+      {% if counts %}<span class="sidebar-count">{{ counts.labs_tests }}</span>{% endif %}
+    </a>
+  </div>
+
+  <div class="sidebar-group">
+    <div class="sidebar-caption">справочник</div>
+    <a class="sidebar-item {% if path.startswith('/profile') %}sidebar-item--active{% endif %}" href="/profile">Профиль</a>
+    <a class="sidebar-item {% if path.startswith('/constitutions') %}sidebar-item--active{% endif %}" href="/constitutions">
+      Конституции
+      {% if counts %}<span class="sidebar-count">{{ counts.constitutions }}</span>{% endif %}
+    </a>
+    <a class="sidebar-item {% if path.startswith('/genome') and not path.startswith('/pharmacogenetics') %}sidebar-item--active{% endif %}" href="/genome">Геномика</a>
+    <a class="sidebar-item {% if path.startswith('/pharmacogenetics') %}sidebar-item--active{% endif %}" href="/pharmacogenetics">Фармакогенетика</a>
+    <a class="sidebar-item {% if path.startswith('/audit') %}sidebar-item--active{% endif %}" href="/audit">История правок</a>
+  </div>
+</nav>

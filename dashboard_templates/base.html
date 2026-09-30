@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Health OS{% endblock %}</title>
+  <link rel="stylesheet" href="/static/dashboard.css?v={{ css_version }}">
+  <script src="/static/htmx.min.js?v={{ js_version }}" defer></script>
+</head>
+<body>
+
+<div class="shell">
+
+  <header class="shell-header">
+    {% block header %}
+    <div class="shell-title-block">
+      <h1>{% block page_title %}Health OS{% endblock %}</h1>
+      {% block subtitle %}{% endblock %}
+    </div>
+    <div class="shell-actions">
+      {% block actions %}{% endblock %}
+    </div>
+    {% endblock %}
+  </header>
+
+  <div class="shell-body">
+    <aside class="shell-sidebar">
+      {% include 'sidebar.html' %}
+    </aside>
+    <main class="shell-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <footer class="shell-footer">
+    <span>health-os · {% block footer_left %}{{ page_name or "" }}{% endblock %}</span>
+    <span>la mia stanza · toscana</span>
+  </footer>
+
+</div>
+
+</body>
+</html>

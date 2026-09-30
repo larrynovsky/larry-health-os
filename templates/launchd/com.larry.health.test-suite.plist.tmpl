@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ночной полный набор тестов (TEST_ARCHITECTURE.md §11). Шаблон снят 2026-09-29 с ЖИВОГО
+     плиста Studio, а не с копии в корне репозитория (та отстала: без SoftResourceLimits и
+     HEALTH_DATA_DIR). ExitTimeOut — пауза между SIGTERM и SIGKILL при ОСТАНОВКЕ службы
+     (man launchd.plist), а не предел длительности прогона: прежний комментарий «hard kill через
+     6 часов» обещал защиту, которой нет (замер 2026-09-29). Предела у прогона нет. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.larry.health.test-suite</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{REPO}}/run_full_test_suite.sh</string>
+    </array>
+    <key>WorkingDirectory</key><string>{{REPO}}</string>
+    <key>StandardOutPath</key><string>{{HOME}}/health_test_suite.log</string>
+    <key>StandardErrorPath</key><string>{{HOME}}/health_test_suite.log</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key><integer>0</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key><integer>4096</integer>
+    </dict>
+    <key>ExitTimeOut</key><integer>21600</integer>
+    <key>RunAtLoad</key><false/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HEALTH_DATA_DIR</key><string>{{DATA}}</string>
+    </dict>
+</dict>
+</plist>

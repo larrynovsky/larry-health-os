@@ -1,0 +1,95 @@
+# profile_fields.yaml — поля профиля, которые человек может сообщить о себе сам.
+#
+# ОДИН ДОМ: этот список читают (1) разборщик чата (hai_chat.run_arbiter → profile_db.apply_stated)
+# и (2) знакомство в боте (нить onboarding, следующий этап). Второго списка ключей нет.
+#
+# ПРАВИЛО ВКЛЮЧЕНИЯ (замер 2026-09-23, нить profile-home): поле попадает сюда, только если у него
+# есть ЧИТАТЕЛЬ в коде (`readers` — где именно). Поле без читателя человека не спрашиваем: ответ,
+# который никто не прочтёт, хуже отсутствия вопроса — он выглядит учтённым.
+#
+# `aliases` — ключи, которыми разборщик чата называет то же поле (модель придумывает имена сама:
+# «smoking_status», «weight»). Незнакомый ключ в профиль не пишется и остаётся только в памяти.
+#
+# Типы: text (max_len), date (ГГГГ-ММ-ДД, не в будущем), enum (values + synonyms),
+# number (min/max, единица в `unit`), bool (true/false + synonyms).
+fields:
+  identity.language:
+    type: enum
+    values: [ru, en]
+    synonyms: {русский: ru, russian: ru, английский: en, english: en}
+    aliases: [language, lang, язык]
+    readers: [i18n]
+  identity.name:
+    type: text
+    max_len: 80
+    aliases: [name, full_name, имя]
+    readers: [hai_chat, gp_agent, gp_context, checkin_agent]
+  identity.birth_date:
+    type: date
+    aliases: [birth_date, date_of_birth, dob, дата_рождения]
+    readers: [gp_context, patient_context, consult_prep, consilium_roster, loinc_match, wellally_consult, checkin_agent, _lifestyle_profile]
+  identity.sex:
+    type: enum
+    values: [male, female]
+    synonyms: {мужской: male, муж: male, м: male, man: male, женский: female, жен: female, ж: female, woman: female}
+    aliases: [sex, gender, пол]
+    readers: [consilium_roster]
+  identity.height_cm:
+    type: number
+    min: 100
+    max: 230
+    unit: см
+    aliases: [height, height_cm, рост]
+    readers: [clinical_kb, food_profile, wellally_consult]
+  identity.weight_kg:
+    type: number
+    min: 30
+    max: 250
+    unit: кг
+    aliases: [weight, weight_kg, body_weight, вес]
+    readers: [clinical_kb, morning_report, food_profile, wellally_consult, hai_context, hai_reports, metrics_db]
+  routine.smoking:
+    type: text
+    max_len: 120
+    aliases: [smoking, smoking_status, курение]
+    readers: [gp_agent]
+  routine.diet:
+    type: text
+    max_len: 200
+    aliases: [diet, diet_type, питание]
+    readers: [gp_agent]
+  # Образ жизни для GP (26.09): gp_agent ждал эти факты с пометкой «известно — не спрашивай»,
+  # но искал их под ключами памяти чата (alcohol_consumption…), которых в профиле нет — блок
+  # всегда был пуст. Алиасы = те самые ключи, под которыми их называет разборщик чата.
+  routine.alcohol:
+    type: text
+    max_len: 120
+    aliases: [alcohol, alcohol_consumption, алкоголь]
+    readers: [gp_agent]
+  routine.caffeine:
+    type: text
+    max_len: 160
+    aliases: [caffeine, caffeine_pattern, coffee, кофе, кофеин]
+    readers: [gp_agent]
+  routine.melatonin:
+    type: text
+    max_len: 160
+    aliases: [melatonin, melatonin_user, melatonin_protocol, мелатонин]
+    readers: [gp_agent]
+  routine.bedroom_temp_c:
+    type: number
+    min: 10
+    max: 35
+    unit: °C
+    aliases: [sleep_environment_temperature, bedroom_temperature, температура_в_спальне]
+    readers: [gp_agent]
+  routine.fasting_labs:
+    type: bool
+    synonyms: {да: true, yes: true, натощак: true, нет: false, no: false}
+    aliases: [fasting_labs]
+    readers: [health_db._seed_safety_lab_thresholds, loinc_match]
+  medical.allergies:
+    type: text
+    max_len: 500
+    aliases: [allergies, allergy, drug_allergies, аллергии, непереносимость]
+    readers: [patient_context.medical_frame_lines]

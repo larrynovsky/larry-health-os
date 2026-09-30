@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.logrotate</string>
+
+    <!-- Ротация логов БЕЗ root (2026-09-01). Штатный newsyslog требует /etc/newsyslog.d/ и
+         sudo; агенту он закрыт, а владелец просил поставить без него. Агент ПОЛЬЗОВАТЕЛЯ:
+         launchctl bootstrap gui/$(id -u) — sudo не нужен. Список логов и пороги живут в
+         launchd/health-logs.newsyslog.conf (один дом на оба механизма).
+         ВАЖНО: не включать одновременно с newsyslog-конфигом в /etc/newsyslog.d/. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/log_rotate.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{REPO}}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+    </dict>
+
+    <!-- Раз в 30 мин: порог 5 МБ, самый быстрый лог (health_import_poll) рос ~1 МБ/сутки —
+         запас на два порядка, при этом ротация не отстаёт от всплеска. -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{REPO}}/logs/logrotate.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{REPO}}/logs/logrotate_err.log</string>
+</dict>
+</plist>

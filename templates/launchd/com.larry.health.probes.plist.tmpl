@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  НОСИТЕЛЬ ПРОБ (Ш1, решения владельца Р-1/Р-2, 2026-07-29).
+
+  Своё расписание, а не пассажир чужого: прецедент 2026-07-05 — триаж жил пассажиром
+  morning_report и был мёртв 13 дней, потому что у пассажира нет собственного пульса.
+
+  Понедельник 06:20 — до утреннего брифа (07:00) и до ночного integrity (07:50), чтобы
+  свежий вердикт уже лежал, когда монитор его читает. Раз в неделю: пробы гоняют два
+  полных longitudinal-прогона на снимке, это минуты, а не секунды.
+
+  Ничего не пишет в канон по конструкции: исполняется в ~/health_staging (Р-7), а
+  предохранитель health_db.assert_not_canonical (Р-8) не пустит даже при ошибке в путях —
+  проверено замером У-2, включая подмену жёсткой ссылкой.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.probes</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{REPO}}/scripts/run_probes.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>20</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{{REPO}}/logs/probes.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{REPO}}/logs/probes_err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+    </dict>
+</dict>
+</plist>

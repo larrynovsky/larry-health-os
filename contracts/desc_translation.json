@@ -1,0 +1,41 @@
+{
+  "module": "desc_translation",
+  "public": [
+    "memory_key",
+    "load_memory",
+    "english",
+    "desc_problems",
+    "refresh",
+    "collect_all_descriptions"
+  ],
+  "depends_on": [
+    {
+      "module": "llm_client",
+      "uses": [
+        "guarded_client"
+      ],
+      "why": "перевод идёт моделью только через гард секретов (храповик llm_direct_constructors = 0)"
+    },
+    {
+      "module": "hai_core",
+      "uses": [
+        "get_model"
+      ],
+      "why": "выбор модели — один дом конфигурации моделей; на не-Studio хосте импорт падает, партия уходит в rejected с причиной"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — память перевода коротких пояснений для английских справочников; ключ — хеш русского текста",
+      "D2": "пять функций: memory_key/load_memory/english — чтение, desc_problems — форма перевода, refresh — пополнение и сборка мусора; переводчик передаётся параметром; collect_all_descriptions — сбор ключей со всех шести генераторов (их collect_descriptions)",
+      "D3": "llm_client.guarded_client и hai_core.get_model — публичные; yaml, hashlib, json",
+      "D4": "≈140 строк с докстрингом и самопроверкой",
+      "D5": "tests/unit/test_desc_translation.py — ключ по оригиналу, отказ порченой формы по каждому признаку, сбой партии, сборка мусора",
+      "D6": "инвариант с генераторами: ключ считается от того же текста, что генератор кладёт в блок (после его обрезки); держится тем, что генераторы зовут english() с выводимой строкой"
+    },
+    "rationale": "Память — производное: файл можно стереть и пересобрать refresh(); модуль переписывается по докстрингу и тесту.",
+    "date": "2026-09-29",
+    "oracle": "tests/unit/test_desc_translation.py; python3 desc_translation.py (самопроверка)"
+  }
+}

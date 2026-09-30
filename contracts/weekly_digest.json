@@ -1,0 +1,88 @@
+{
+  "module": "weekly_digest",
+  "public": [
+    "build",
+    "gate_text",
+    "tenant_lexicon",
+    "write_tenant_verdict",
+    "read_digest",
+    "verdicts",
+    "expected_tags",
+    "due",
+    "current_week",
+    "tenant_tag",
+    "main"
+  ],
+  "depends_on": [
+    {
+      "module": "llm_client",
+      "uses": [
+        "guarded_client"
+      ],
+      "why": "единственный путь к API с гардом секретов на исходящем"
+    },
+    {
+      "module": "hai_core",
+      "uses": [
+        "get_model"
+      ],
+      "why": "модель по роли из system_config; вне Studio — код-дефолт, как в doc_agent"
+    },
+    {
+      "module": "diagnosis_guard",
+      "uses": [
+        "SITES"
+      ],
+      "why": "литералы, привязывающие текст к пациенту (фамилии, статусы лечения) — один дом, не копия",
+      "legacy": "страж-модуль без сайдкара (до §15)"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config",
+        "get_doc_patterns"
+      ],
+      "why": "digest.visible_hints — витрины как данные (§9); doc_patterns — имена врачей/лабораторий для per-tenant словаря через существующего читателя",
+      "legacy": "слой конфигурации без сайдкара (до §15)"
+    },
+    {
+      "module": "problems_db",
+      "uses": [
+        "get_problem_list"
+      ],
+      "why": "per-tenant словарь: названия проблем — через существующего читателя, не свой SQL",
+      "legacy": "read-модуль без сайдкара (до §15)"
+    },
+    {
+      "module": "treatment_db",
+      "uses": [
+        "get_medications"
+      ],
+      "why": "per-tenant словарь: названия препаратов — через существующего читателя",
+      "legacy": "read-модуль без сайдкара (до §15)"
+    },
+    {
+      "module": "secrets_paths",
+      "uses": [
+        "tenant_db_paths"
+      ],
+      "why": "множество тенантов — один предикат с датчиком cross-tenant; дом — рядом с DEV_CLONE_MARKERS",
+      "legacy": "модуль границы тенантов без сайдкара (до §15)"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — «коммиты недели → человеческий текст + вердикты гейта + файлы outbox». НЕ шлёт в Telegram (jobs/scheduled.weekly_digest_outbox), НЕ читает чужие БД (per-tenant вердикт пишет процесс тенанта), НЕ решает, что важно, моделью — major_threads решает кодом.",
+      "D2": "имя render_digest, не render: дубль-гейт 05.09 показал занятое имя в gen_testing_contracts.py:75 — переименование честнее allowlist (прецедент affected_claims). Публичная поверхность — две группы: ГЕНЕРАЦИЯ (build, gate_text) и OUTBOX (read_digest, write_tenant_verdict, verdicts, expected_tags, due, current_week, tenant_tag, tenant_lexicon). Вторая группа существует, потому что читатель живёт в другом процессе (бот) и обязан звать те же имена файлов и то же решение due, а не свою копию. Приватны (гейт 05.09 велел объявить или спрятать — спрятано 16 имён): _collect, _group_threads, _major_threads, _render_digest, судьи, лексикон, пути файлов; тесты импортируют их напрямую (D2: тестируемость ≠ публичность).",
+      "D3": "стабильные контракты: llm_client.guarded_client, hai_core.get_model; соседи без сайдкара помечены legacy (config_db, problems_db, treatment_db, diagnosis_guard, secrets_paths). Приватных имён соседей нет. Урок 05.09: import integrity_tests из бота ИСПОЛНЯЕТ монитор (check() на импорте) — предикат тенантов вынесен в secrets_paths.",
+      "D4": "~490 строк — выше ориентира. Треть — outbox-группа и селфтест; кандидат на разбиение (генерация | outbox) при первом же росте. Разбивать заранее не стал: два модуля = два сайдкара ради ещё не случившегося роста.",
+      "D5": "tests/unit/test_weekly_digest.py (24 характеризации): группировка, отбор кодом, гейт позит+негат по четырём классам, claims-check, таблица due, скраб секретов. ИСПОЛНЕННЫЕ негативные контроли 2026-09-05: снятый лексикон → подсадка проходит (test_negative_control_mutation_kills_lexicon_hit); в ходе dry-run гейт краснел на собственном выходе трижды (дата в шапке, «триаж», judge:yes) и один раз ловил дорисованные числа — оракулы стреляют, не декларируют.",
+      "D6": "общие инварианты вынесены явно: (1) «текст без факта о человеке» — политика судьи в _JUDGE и запись реестра multitenancy (кандидат shared_text_gate_fail_closed); (2) «периметр словаря вычисляется из данных, не перечисляется» (C-36) — lexicon/tenant_lexicon читают diagnosis_guard.SITES и таблицы, ручного списка имён нет; (3) «доставка = квитанция» — mark ставит только jobs/scheduled после непустого send_long, модуль сам mark не ставит."
+    },
+    "rationale": "Переписывается с нуля по контракту: вход — окно git log и промпт-файл; выход — <week>.json с текстом|null и вердиктом, <week>.gate.<tag>.json per-tenant; решение due — чистая таблица в тестах. Невосстановимого из контракта нет: промпт и запрещённые слова — файлы данных, витрины — system_config. Границы названы: числа словами claims-check не ловит; судья соответствия ловит неверный механизм, не лишний эпитет; вывод по набору возможностей («система следит за X») гейт не ловит — остаток принят владельцем 2026-09-05.",
+    "date": "2026-09-05",
+    "oracle": "tests/unit/test_weekly_digest.py — поведение чистых частей. Причинный оракул LLM-части — dry-run на реальных коммутах недели (5 прогонов 05.09, квитанция в коммите); тон — tacit-оракул владельца, машинно не выводится.",
+    "cause": null
+  }
+}

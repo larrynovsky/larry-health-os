@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.watcher</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>{{REPO}}/watch_and_import.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+    </dict>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/health_watcher.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/health_watcher_err.log</string>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>

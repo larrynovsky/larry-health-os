@@ -1,0 +1,45 @@
+{
+  "module": "night_cycle",
+  "public": [
+    "run",
+    "standing_count"
+  ],
+  "depends_on": [
+    {
+      "module": "night_investigator",
+      "uses": [
+        "investigate"
+      ],
+      "why": "судит каждое падение → вердикт класса; оркестратор только маршрутизирует его"
+    },
+    {
+      "module": "parked_decisions",
+      "uses": [
+        "park"
+      ],
+      "why": "паркует dev_fix и owner_decision владельцу; идемпотентно по стабильному id падения"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "штамп времени пульса (heartbeat)",
+      "legacy": "у _time_inject нет сайдкара — легаси-seam времени вне периметра §15"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — ОРКЕСТРАЦИЯ прохода: прочитать падения integrity_latest, отдать каждое судье, маршрутизировать вердикт (транзиент→гашение, dev_fix/owner→парк) и оставить пульс. НЕ судит (night_investigator), НЕ хранит (parked_decisions), НЕ звонит (owner_nag), НЕ собирает глубокие улики (Этап-1: текст падения; углубление — следующий слой).",
+      "D2": "один публичный вход run(). Приватны _integrity_path/_heartbeat_path/_slug/_load_failures/_write_heartbeat.",
+      "D3": "три зависимости-контракта: night_investigator.investigate и parked_decisions.park (есть сайдкары), _time_inject.get_now (легаси-seam). К внутренностям не обращается.",
+      "D4": "~94 строки. Разбивать нечего.",
+      "D5": "tests/unit/test_night_cycle.py (4: маршрут транзиент/dev_fix/owner раскладывается по парковке и гашению; идемпотентность — повтор не плодит дублей; пульс пишется; отсутствие integrity → seen=0). investigate замокан — проверяется маршрут, не суждение.",
+      "D6": "инвариант с parked_decisions — идемпотентность по стабильному slug падения (рецидив переоткрывает, правила в park); с night_investigator — оркестратор НЕ переопределяет класс, только раскладывает (owner-домен уже пойман backstop внутри investigate)."
+    },
+    "rationale": "Переписывается по контракту и тестам: вход — integrity_latest, выход — парковки + сводка + пульс. Невосстановимого нет: пути файлов env-override, судья и стор — контракты соседей.",
+    "date": "2026-08-02",
+    "oracle": "tests/unit/test_night_cycle.py — для маршрутизации и идемпотентности; глубина улик Этапа-1 названа минимальной осознанно"
+  }
+}

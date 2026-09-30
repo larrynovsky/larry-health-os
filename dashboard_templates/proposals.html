@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Предложения — Health OS{% endblock %}
+{% set page_name = "предложения" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Предложения в проблемный лист</h1>
+  <p class="shell-subtitle">{{ count }} ждут решения · от gp_weekly и literature_curator</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not proposals %}
+<p class="card-description">Очередь пуста — все предложения разобраны.</p>
+{% endif %}
+
+{% for p in proposals %}
+<article class="card card--action" id="prop-{{ p.id }}">
+  <div class="card-head">
+    <div class="card-meta">#{{ p.id }} · {{ p.source }}
+      {% if p.created_at %} · <time>{{ p.created_at | short(10) }}</time>
+        <span class="age-suffix">({{ p.created_at | age_days }}д назад)</span>
+      {% endif %}
+    </div>
+    <div class="card-chips"><span class="chip chip--action">ждёт решения</span>
+      {% if p.repeats and p.repeats > 1 %}<span class="chip chip--updated">предлагается {{ p.repeats }}-й раз</span>{% endif %}
+    </div>
+  </div>
+  <dl class="card-fields">
+    {% for line in p.lines %}<dt>{{ loop.index }}</dt><dd>{{ line }}</dd>{% endfor %}
+  </dl>
+  <footer class="card-foot card-actions">
+    <button class="action-pill"
+            hx-post="/api/proposals/{{ p.id }}/approve"
+            hx-confirm="Применить предложение #{{ p.id }} в проблемный лист?"
+            hx-target="closest article"
+            hx-swap="delete">принять</button>
+    <button class="action-pill action-pill--ghost"
+            hx-post="/api/proposals/{{ p.id }}/reject"
+            hx-confirm="Отклонить предложение #{{ p.id }}?"
+            hx-target="closest article"
+            hx-swap="delete"
+            style="margin-left: auto">отклонить</button>
+  </footer>
+</article>
+{% endfor %}
+
+{% endblock %}

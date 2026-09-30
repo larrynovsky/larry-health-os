@@ -1,0 +1,552 @@
+#!/bin/bash
+# health_scripts pre-commit hook — Wave 3-DOC v2 P1-4 + P3-4.
+#
+# Запускается на git commit (через symlink из .git/hooks/pre-commit).
+# Проверяет staged .md/.py файлы на:
+#   1. INV-DOC-1: stop-words в LIVE документации
+#   2. INV-DOC-9: drift silent-except baseline
+#   3. ARCHIVE append-only: docs/archive/* нельзя удалять
+#
+# **Без escape-hatch** — design choice 2026-05-11. См.
+#   feedback_health_scripts_design_principles.md §1.
+#
+# Хардкод пути python3.11 — в неинтерактивной ssh-сессии PATH пустой
+# (зафиксировано в ~/.infrastructure.md). См. P1-4 acceptance test.
+#
+# Perf target: <5 секунд для типичного коммита. См. T-P3-В.
+
+set -uo pipefail
+
+# ── Самоопрос: «какой корень ты считаешь своим?» ──────────────────────────────
+# Отвечаем ДО любых политик — это чистый вопрос, не попытка коммита, и запрет
+# коммитов на Studio к нему не относится. Стоял ниже — и оракул
+# tests/unit/test_precommit_repo_root.py падал на Studio, где и бежит ночной
+# набор: проверка механизма не может жить там, где механизм до неё не доходит.
+# Вычисление корня — сразу под этим блоком, дублировать его тут нельзя (вторая
+# копия разошлась бы с первой молча — ровно тот класс, который тест и стережёт).
+_PRINT_ROOT=""
+[[ "${1:-}" == "--print-root" ]] && _PRINT_ROOT=1
+
+# ── Single-writer = MacBook (CLAUDE.md §1, 2026-06-18) ────────────────────────
+# Studio = deploy-only. Коммиты ТОЛЬКО на MacBook → doc_agent/arch_guard бегут на
+# одной машине → недетерминированные доки (CHANGELOG/BLUEPRINT via LLM) не
+# расходятся между узлами. Push доставляет на Studio через updateInstead (это
+# checkout, не commit — данный хук не триггерится), деплой не ломается.
+# Аварийный обход (только осознанно, если MacBook недоступен):
+#   HEALTH_ALLOW_STUDIO_COMMIT=1 git commit ...
+_HN="$(hostname)"
+# Основная машина — данные установки (private/infra.yaml), не литерал имени хоста. Судим
+# `hostname` (подменяем в тесте); infra_config берём из репо, где лежит сам хук (симлинк → источник).
+_HOOK_SRC="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+_HOOK_REPO="$(cd "$(dirname "$_HOOK_SRC")/../.." && pwd)"
+if [[ -z "$_PRINT_ROOT" ]] && /opt/homebrew/bin/python3.11 "$_HOOK_REPO/infra_config.py" is-primary "$_HN" && [[ -z "${HEALTH_ALLOW_STUDIO_COMMIT:-}" ]]; then
+    echo "⛔ Commit на Studio запрещён (single-writer = MacBook, CLAUDE.md §1)."
+    echo "   Studio = deploy-only. Редактируй и коммить на MacBook —"
+    echo "   post-commit hook сам сделает push на Studio."
+    echo "   Аварийный обход: HEALTH_ALLOW_STUDIO_COMMIT=1 git commit ..."
+    exit 1
+fi
+
+# Жёсткий путь — НЕ полагаемся на PATH. См. ~/.infrastructure.md.
+PYTHON="/opt/homebrew/bin/python3.11"
+# Корень — ТОГО дерева, которое коммитят, а не того, где лежит файл хука.
+# §21 завёл деревья нитей, а хуки у них общие: файл хука всегда живёт в главной
+# копии, и путь от ${BASH_SOURCE[0]} давал ГЛАВНУЮ копию при коммите из дерева
+# нити. Последствия были не косметические: гейты читали чужие файлы при МОЁМ
+# индексе (GIT_INDEX_FILE наследуется), поэтому `git diff` в главной копии
+# объявлял мои застейдженные правки «незастейдженными», а pytest гейтов гонял
+# код главной копии — зелёный на не-той версии (§12), только внутри хука.
+# Поймано догфудингом 13.09 на первом же коммите из дерева нити.
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" \
+    || REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+[[ -n "$REPO_ROOT" ]] || REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Оракул на предыдущий абзац. Прецедент в этом же репозитории: watch_and_test.sh
+# девять суток считал свой корень «/» — и тест зеленел, потому что проверял
+# НАПИСАНИЕ строки, а не то, что она вычисляет. Здесь так же: корень спрашивают
+# ИСПОЛНЕНИЕМ (tests/unit/test_precommit_repo_root.py запускает этот файл из
+# дерева нити), а не чтением исходника.
+if [[ "${1:-}" == "--print-root" ]]; then
+    printf '%s\n' "$REPO_ROOT"
+    exit 0
+fi
+
+# ── Замок закрытия нитей (2026-09-23, нить finish-lock) ───────────────────────
+# Коммит в ГЛАВНОЙ копии, пока её меняет закрытие чужой нити, унёс бы чужое
+# слияние или индекс в свой коммит (d15f91d). Суд и путь замка — в одном доме.
+"$(dirname "$_HOOK_SRC")/finish_lock_guard.sh" || exit 1
+
+# ── Ночной ремонт (2026-09-30, нить night-repair; слово владельца 2б) ──────────
+# Пока на Studio лежит неразобранная ночная починка, коммит в main стоит (код 15):
+# сессия сначала сливает её (land → коммит → close), закрывает словами (среда) или
+# отклоняет. Деревья нитей не блокируются. Крах гейта и молчание Studio — пропуск
+# вслух. Репо без удалённого studio (временные репо тестов хука) — гейт не зовётся:
+# иначе тест хука ходил бы по ssh на боевую Studio.
+if git -C "$REPO_ROOT" remote get-url studio >/dev/null 2>&1 && [[ -f "$REPO_ROOT/night_repair.py" ]]; then
+    "$PYTHON" "$REPO_ROOT/night_repair.py" --gate
+    _nr_rc=$?
+    [ "$_nr_rc" -eq 15 ] && exit 15
+fi
+
+INVENTORY="$REPO_ROOT/doc_inventory.yaml"
+
+# Sanity: python3.11 существует.
+if [[ ! -x "$PYTHON" ]]; then
+    echo "❌ pre-commit: $PYTHON не найден или не исполняемый."
+    echo "   Проверь Homebrew Python 3.11: brew install python@3.11"
+    exit 2
+fi
+
+# Sanity: inventory есть.
+if [[ ! -f "$INVENTORY" ]]; then
+    echo "❌ pre-commit: doc_inventory.yaml не найден в $REPO_ROOT"
+    exit 2
+fi
+
+# Список staged файлов (только Added/Modified, не Deleted).
+STAGED=$(git diff --cached --name-only --diff-filter=AM)
+
+if [[ -z "$STAGED" ]]; then
+    exit 0
+fi
+
+# Запускаем Python-проверки. Скрипт сам решает что и как проверить.
+"$PYTHON" "$REPO_ROOT/scripts/git-hooks/pre_commit_check.py" $STAGED
+rc=$?
+
+if [[ $rc -ne 0 ]]; then
+    echo ""
+    echo "Коммит заблокирован. См. сообщения выше."
+    echo "Что сделать:"
+    echo "  • Stop-words в LIVE: либо переписать упоминание, либо перенести файл в docs/archive/"
+    echo "    (см. docs/how-to/move_to_archive.md)"
+    echo "  • Silent-except превышен: вернуть к baseline или добавить log.warning/# silent-ok"
+    echo "  • Удаление из docs/archive/: запрещено — архив append-only"
+    exit $rc
+fi
+
+# ── Личные данные в публичной зоне (pii_census, нить pii-scrub, 2026-09-23) ──────────
+# Решение владельца 2026-09-23: проект когда-нибудь откроется на GitHub новым чистым
+# репозиторием, и утечку ловим ДО коммита, а не ночью. Судит застейдженное из ИНДЕКСА
+# против долга private/pii_baseline.json: рост — блок, убыль — долг опускается и
+# до-стейджится сам. Обход (--no-verify, коммит без хуков) ловит ночью
+# tests/consistency/test_pii_census_ratchet.py. Нет словаря — блок, не пропуск.
+# Хук общий для всех деревьев (§21): дерево нити, заведённое ДО появления гейта, файла
+# не имеет — там не отказ, а громкий пропуск; слитое в main догонит ночной ратчет.
+if [[ ! -f "$REPO_ROOT/pii_census.py" ]]; then
+    echo "⚠️  pre-commit: в этом дереве нет pii_census.py (ветка старше гейта) — суд личных данных пропущен, ночной ратчет догонит"
+    pii_rc=0
+else
+    (cd "$REPO_ROOT" && "$PYTHON" "$REPO_ROOT/pii_census.py" --staged)
+    pii_rc=$?
+fi
+if [[ $pii_rc -ne 0 ]]; then
+    echo ""
+    echo "Коммит заблокирован: pii_census (личные данные в публичной зоне, см. выше)."
+    exit 10
+fi
+
+# Q-5 fix (2026-05-22, roadmap): ruff F601 (dict-duplicate-keys) + F811
+# (redefined-while-unused). Ловят баги типа F-094 (DATA_FRESHNESS дубли)
+# и F-106 (двойное get_active_protocols). Применяется к staged .py.
+STAGED_PY=$(echo "$STAGED" | grep -E '\.py$' || true)
+if [[ -n "$STAGED_PY" ]]; then
+    "$PYTHON" -m ruff check --select F601,F811 $STAGED_PY 2>&1
+    ruff_rc=$?
+    if [[ $ruff_rc -ne 0 ]]; then
+        echo ""
+        echo "Коммит заблокирован: ruff F601/F811 нашёл проблемы."
+        echo "  • F601: дубликаты ключей в dict literal"
+        echo "  • F811: повторное определение функции/имени"
+        echo "Fix: '$PYTHON -m ruff check --select F601,F811 --fix <files>'"
+        exit $ruff_rc
+    fi
+fi
+
+# ── Сторож подъёма статуса (CLAUDE.md §13, клауза условия закрытия; 2026-09-21) ──────────
+# Судит ПЕРЕХОД HEAD → индекс: по одному снимку нарушение не видно (у holds поля
+# closes_when уже нет). Норма прожила текстом полдня и была нарушена дважды — обе поимки
+# чтением ПОСЛЕ коммита. Судья — intent_registry.unapproved_promotions; обход --no-verify
+# и смерть этой проводки ловит tests/consistency/test_promotion_by_own_criterion.py,
+# который проходит ту же историю ночью. Стоит ДО гейта провенанса намеренно: тот при
+# подъёме статуса требует перегенерировать страницу (вызов LLM), и тратить его на
+# подъём, который всё равно будет отбит, незачем.
+if echo "$STAGED" | grep -qxE 'subsystem_intent\.yaml'; then
+    PROMO=$(cd "$REPO_ROOT" && "$PYTHON" -c '
+import intent_registry as ir
+for v in ir.unapproved_promotions(ir.registry_at("HEAD"), ir.registry_at(":")):
+    print("     " + v)
+' 2>&1)
+    promo_rc=$?
+    if [[ $promo_rc -ne 0 || -n "$PROMO" ]]; then
+        echo ""
+        echo "⛔ pre-commit (intent): обещание поднято до holds НЕ по критерию владельца."
+        echo "$PROMO"
+        [[ $promo_rc -ne 0 ]] && echo "     (судья упал — fail-closed: молчание сторожа не считается разрешением)"
+        exit 9
+    fi
+fi
+
+# ── INTENT: реестр замысла ↔ код ↔ тёплая страница (commit-time gate, 2026-07-12) ──
+# Раньше сторож бежал ТОЛЬКО ночью (pytest tests/ --scheduled) → окно рассогласования ≤24ч.
+# Ловим на коммите: провенанс страницы разошёлся с реестром / якорь умер / статус отмыт.
+# Scope: staged содержит .py ИЛИ subsystem_intent.yaml ИЛИ docs/explanation/*.md.
+# Escape/Studio-коммиты минуют хук → остаются на совести ночного прогона (defense-in-depth).
+STAGED_INTENT=$(echo "$STAGED" | grep -E '\.py$|^subsystem_intent\.yaml$|^docs/explanation/.*\.md$|^BLUEPRINT\.md$|^BACKLOG\.md$|^SECURITY\.md$' || true)
+if [[ -n "$STAGED_INTENT" ]]; then
+    # S2: частичный стейджинг пары реестр↔страница = false-green. Гейт читает working-tree,
+    # поэтому «застейджил реестр, регенерённую страницу забыл» ушло бы в коммит рассогласованным,
+    # а сторож (working-tree свежий) промолчал бы. Реестр/страницы — коммить одним набором.
+    if echo "$STAGED" | grep -qE '^subsystem_intent\.yaml$|^docs/explanation/.*\.md$'; then
+        UNSTAGED_SET=$(git -C "$REPO_ROOT" diff --name-only -- subsystem_intent.yaml docs/explanation/ 2>/dev/null || true)
+        if [[ -n "$UNSTAGED_SET" ]]; then
+            echo "⛔ pre-commit (intent): частичный стейджинг реестра/страниц. Незастейджено:"
+            echo "$UNSTAGED_SET" | sed 's/^/     /'
+            echo "   Коммить реестр и тёплые страницы одним набором (иначе снапшот рассогласован,"
+            echo "   а сторож читает working-tree и это пропустит)."
+            echo "   Fix: git add subsystem_intent.yaml docs/explanation/"
+            exit 3
+        fi
+    fi
+    "$PYTHON" -m pytest \
+        "$REPO_ROOT/tests/consistency/test_intent_validation_gate.py" \
+        "$REPO_ROOT/tests/consistency/test_intent_regen_controls.py" \
+        "$REPO_ROOT/tests/consistency/test_intent_doc_home_refs.py" \
+        "$REPO_ROOT/tests/consistency/test_intent_ref_exists.py" \
+        -q -p no:cacheprovider >/tmp/intent_precommit.log 2>&1
+    intent_rc=$?
+    if [[ $intent_rc -ne 0 ]]; then
+        echo ""
+        echo "⛔ pre-commit (intent): реестр замысла разошёлся с кодом/страницами."
+        tail -15 /tmp/intent_precommit.log
+        echo ""
+        echo "  • провенанс устарел → python3.11 doc_agent.py --regen-intent <id>, застейджь страницу"
+        echo "  • якорь умер (символ переименован) → обнови code_anchors в subsystem_intent.yaml"
+        echo "  • статус отмыт / маркер пропал → сверь claim с кодом (4-я колонка)"
+        exit $intent_rc
+    fi
+fi
+
+# ── INSTALL: видимые факты ↔ установочные страницы ─────────────────────────
+# Как intent-гейт, читает working tree. Частично застейдженная пара код↔страница
+# запрещена: иначе свежая страница на диске прикрыла бы старую страницу в индексе.
+STAGED_INSTALL=$(echo "$STAGED" | grep -E '^scripts/install\.py$|^docker/Dockerfile$|^templates/launchd/|^bot/filters\.py$|^docs/tutorials/first_install[^/]*\.md$|^docs/how-to/install_docker[^/]*\.md$' || true)
+if [[ -n "$STAGED_INSTALL" ]]; then
+    UNSTAGED_INSTALL=$(git -C "$REPO_ROOT" diff --name-only -- scripts/install.py docker/Dockerfile \
+        templates/launchd/ bot/filters.py 'docs/tutorials/first_install*.md' 'docs/how-to/install_docker*.md')
+    install_diff_rc=$?
+    if [[ $install_diff_rc -ne 0 || -n "$UNSTAGED_INSTALL" ]]; then
+        echo "⛔ pre-commit (install): код и установочные страницы нужно стейджить целиком вместе."
+        echo "$UNSTAGED_INSTALL"
+        echo "   python3.11 doc_agent.py --regen-install <page>, застейджь страницу"
+        exit 3
+    fi
+    install_log=$(mktemp "${TMPDIR:-/tmp}/install_precommit.XXXXXX") || exit 1
+    "$PYTHON" -m pytest "$REPO_ROOT/tests/consistency/test_install_docs_fresh.py" \
+        -q -p no:cacheprovider >"$install_log" 2>&1
+    install_rc=$?
+    if [[ $install_rc -ne 0 ]]; then
+        echo "⛔ pre-commit (install): документация разошлась с установщиком."
+        tail -15 "$install_log"
+        rm -f "$install_log"
+        echo "   python3.11 doc_agent.py --regen-install <page>, застейджь страницу"
+        exit $install_rc
+    fi
+    rm -f "$install_log"
+fi
+
+# ── TESTING_CONTRACTS.md auto-regen (2026-07-17) ─────────────────────────────
+# AUTOGEN из integrity_tests.py (детерминирован, AST source-order). Раньше дрейф
+# ловился ТОЛЬКО ночью (test_generated_section_is_current) → каждое утро алерт +
+# ручная регенерация (3× за июль). Регенерация механическая, ревью не требует →
+# авто: integrity_tests.py в коммите → регенерим и до-стейджим doc в ТОТ ЖЕ коммит.
+# gen читает integrity_tests.py как AST-текст (health_db не импортит → env не нужен).
+if echo "$STAGED" | grep -qxE 'integrity_tests\.py'; then
+    # ── forward-ref страж (2026-07-17) ──────────────────────────────────────
+    # check() зарегистрирован ДО определения хелпера (напр. _iter_tenant_ro) → check()
+    # исполняет fn сразу → NameError в мониторе. Это класс reschedule-инцидента: прошёл
+    # test_on_studio (монитор там не гоняется, check() глотает исключение) и всплыл лишь
+    # ночью алертом. AST-статически, без БД → MacBook-safe в pre-commit. Закрывает
+    # Studio-only ограничение runtime code-guard (test_on_studio шаг 5) для этого класса.
+    if ! "$PYTHON" "$REPO_ROOT/scripts/check_integrity_registration_order.py"; then
+        echo ""
+        echo "⛔ pre-commit: forward-ref в integrity_tests.py (см. выше). Перенеси check()-"
+        echo "   регистрацию ниже определения хелпера (в блок per-tenant чеков под _iter_tenant_ro)."
+        exit 5
+    fi
+    if ! "$PYTHON" "$REPO_ROOT/gen_testing_contracts.py" >/tmp/gen_tc.log 2>&1; then
+        echo "❌ pre-commit: gen_testing_contracts.py упал — TESTING_CONTRACTS.md не регенерирован:"
+        cat /tmp/gen_tc.log
+        exit 4
+    fi
+    git -C "$REPO_ROOT" add TESTING_CONTRACTS.md
+    # Английская версия — тем же генератором (arch-en-gen, 29.09). Пояснение нового датчика,
+    # которого нет в памяти перевода, выходит русским с меткой ⟨untranslated⟩; память
+    # пополняет scripts/arch_regen.sh на Studio при закрытии нити.
+    if [ -f "$REPO_ROOT/TESTING_CONTRACTS.en.md" ]; then
+        if ! "$PYTHON" "$REPO_ROOT/gen_testing_contracts.py" --lang en >/tmp/gen_tc_en.log 2>&1; then
+            echo "❌ pre-commit: gen_testing_contracts.py --lang en упал:"
+            cat /tmp/gen_tc_en.log
+            exit 4
+        fi
+        git -C "$REPO_ROOT" add TESTING_CONTRACTS.en.md
+    fi
+    echo "✓ pre-commit: TESTING_CONTRACTS.md регенерирован и застейджен (integrity_tests.py в коммите)"
+fi
+
+# ── L2 preflight-квитанция (BLOCK-режим, глобально, 2026-07-22) ──────────────
+# Коммит трогает подсистему без ЧЕСТНОЙ свежей (<6ч, на текущем HEAD) квитанции
+# preflight → блок с точной командой. Квитанция неподделываема (canonical_token =
+# hash(HEAD|sid|члены); не touch, гаснет при смене HEAD). Обход — git commit
+# --no-verify (пропускает ВСЕ хуки). Fail-open: только exit-код 3 = настоящий блок
+# «пропущен ритуал»; любой другой код (крах инструмента, import-fail) НЕ блокирует —
+# сломанный индексатор не имеет права рушить все коммиты.
+(cd "$REPO_ROOT" && "$PYTHON" -m project_context check-precommit --block)
+_l2_rc=$?
+if [[ $_l2_rc -eq 3 ]]; then
+    echo ""
+    echo "Коммит заблокирован: нет честной свежей preflight-квитанции на задетую подсистему (см. выше)."
+    echo "  Прогони preflight по названным подсистемам, затем повтори коммит."
+    echo "  Осознанный обход: git commit --no-verify"
+    exit 3
+fi
+
+# ── Дубль-гейт (discovery-до-постройки, Слой 3, 2026-07-23) ──────────────────
+# BLOCK: staged вводит модульную функцию с именем, уже определённым в другом
+# prod-модуле (F-106-класс). WARN: новая функция трогает чужую для модуля таблицу
+# (кандидат дубля по данным) — не блокирует. Только НОВЫЕ имена — легаси не
+# красится (RN-E). Включён после зелёных позит+негат контролей
+# (tests/unit/test_dupgate.py, RN-B). Fail-open: только exit 4 = блок; любой
+# другой код (крах инструмента) коммит не рушит.
+# ADR: docs/explanation/discovery_before_build.md
+if [[ -n "$STAGED_PY" ]]; then
+    (cd "$REPO_ROOT" && "$PYTHON" -m project_context dupgate --block)
+    _dg_rc=$?
+    if [[ $_dg_rc -eq 4 ]]; then
+        echo ""
+        echo "Коммит заблокирован: точный кросс-файл дубль имени (см. выше)."
+        echo "  Переиспользуй существующее: $PYTHON -m project_context capabilities <имя|таблица>"
+        echo "  Осознанный дубль: dup_allowlist в project_context.json (+строка в catch-log)."
+        echo "  См. docs/how-to/discovery_before_build.md"
+        exit 4
+    fi
+fi
+
+# ── Гейт одноразовости (CLAUDE.md §15, 2026-07-26) ───────────────────────────
+# BLOCK только на НОВЫХ .py (--diff-filter=A): нет сайдкар-контракта / заявленная
+# поверхность не совпадает с фактической / блок вердикта не заполнен / нет теста,
+# который импортирует модуль и зовёт публичное имя / модуль лезет в чужие _private.
+# Размер (поверхность, строки) — только WARN: блок по размеру воспроизводил бы
+# ловушку «больше модулей = больше стыков». Отрицательный вердикт ПРОХОДИТ —
+# блокирует отсутствие суждения, а не его знак. Легаси вне периметра осознанно,
+# поэтому baseline-механизм не нужен. Включён после зелёных позит+негат контролей
+# (tests/unit/test_dispgate.py), проверенных мутациями: обезвреженная проверка
+# краснит именно свой тест. Fail-open: только exit 6 = настоящий блок.
+# КОД 6, не 5: 3=preflight-квитанция, 4=dupgate и gen_testing_contracts, 5=forward-ref-страж
+# integrity_tests. Коллизия найдена при включении (2026-07-26) — заодно вскрыла, что мой
+# сторож «блок-код проброшен» был ПУСТО-ЗЕЛЁНЫМ: подстрока «exit 5» и так есть в файле.
+# ГРАНИЦА: проверки ловят отсутствие НОСИТЕЛЯ, не его качество — зелёный гейт
+# доказывает, что суждение вынесено и записано, а не что модуль одноразов.
+# Замысел: docs/explanation/disposable_modules_refactor.md
+if [[ -n "$STAGED_PY" ]]; then
+    (cd "$REPO_ROOT" && "$PYTHON" -m project_context dispgate --block)
+    _disp_rc=$?
+    if [[ $_disp_rc -eq 6 ]]; then
+        echo ""
+        echo "Коммит заблокирован: новый модуль не прошёл гейт одноразовости (см. выше)."
+        echo "  Чек-лист и скелет вердикта: $PYTHON -m project_context disposability <модуль>"
+        echo "  Осознанный «не одноразовый»: verdict=not_disposable + cause в сайдкаре."
+        echo "  См. docs/how-to/disposability_gate.md"
+        exit 6
+    fi
+fi
+
+# ── Гейт квитанции замысла (нить intent-receipts, 2026-08-07) ────────────────
+# BLOCK только на НОВЫХ артефактах закрытия (--diff-filter=A): plans/PLAN_*.md и
+# docs/handoff/**.md без секции «## Замысел» с живой квитанцией (ids затронутых
+# записей + статусы инвариантов + read_at); статусы пересчитываются против реестра
+# ИЗ ИНДЕКСА — расхождение красное (квитанция — кэш чтения, пересчёт — инвалидация).
+# *.review.md — ids без обязательных статусов (авторские статусы = Explanation-утечка
+# ревьюеру); INDEX/LATEST — указатели, вне периметра; изменённые легаси не красятся
+# (прецедент dupgate). Внутренняя ошибка гейта БЛОКИРУЕТ (exit 7); отказ окружения
+# выражается структурно (snapshot ok=False → WARN и пропуск). Guard ниже — только
+# экономия времени хука по УЖЕ прочитанному $STAGED (AM): сам суд A-only внутри гейта.
+# КОД 7: 3=preflight, 4=dupgate/gen_tc, 5=forward-ref, 6=dispgate.
+# ГРАНИЦА: гейт доказывает, что квитанция собрана с живого реестра, не что замысел
+# понят. Старт нити (план до коммита) не стережётся в принципе — названо в реестре.
+# Замысел: subsystem_intent.yaml → intent_receipts; план: plans/PLAN_intent_receipt_gate_2026-08-07.md
+_STAGED_CLOSE=$(echo "$STAGED" | grep -E '^(plans/PLAN_.*\.md|docs/handoff/.*\.md)$' || true)
+if [[ -n "$_STAGED_CLOSE" ]]; then
+    (cd "$REPO_ROOT" && "$PYTHON" -m project_context intentgate --block)
+    _int_rc=$?
+    if [[ $_int_rc -eq 7 ]]; then
+        echo ""
+        echo "Коммит заблокирован: артефакт закрытия без живой квитанции замысла (см. выше)."
+        echo "  Формат и образцы: docs/reference/intent_receipt_format.md; живые статусы — subsystem_intent.yaml."
+        exit 7
+    fi
+fi
+
+# ── Затронутые тесты (2026-08-03, решение владельца) ─────────────────────────
+# Класс, который закрываем: прогнал не то. 03.08 дважды за день список тестов
+# выбирался по памяти о связях — и красный test_blueprint_points_to_git_canon
+# уехал в прод, потому что правка .md «вроде не про тесты». Память о связях —
+# утверждение о соседях без гасителя (§18); теперь связи ВЫЧИСЛЯЮТСЯ.
+# Не блокирует: отбор неполон по построению (см. affected_tests docstring),
+# и делать блок из неполного признака значило бы обещать больше, чем он даёт.
+# Полное доказательство остаётся за ночным прогоном; здесь — окно обнаружения.
+_AFF=$("$PYTHON" "$REPO_ROOT/affected_tests.py" 2>/dev/null)
+if [[ -n "$_AFF" && "$_AFF" != affected_tests:* ]]; then
+    _N=$(echo "$_AFF" | wc -l | tr -d ' ')
+    echo "▶ pre-commit: затронуто тестов — $_N, гоню"
+    # shellcheck disable=SC2086
+    # Прогон и снятие git-окружения переехали в scripts/run_affected_tests.sh
+    # (12.09, после третьего раунда ревью). Там же объяснено зачем; коротко:
+    # код возврата pytest не различает «красное» и «непроверенное», и хук
+    # печатал одну строку на оба случая — выглядел сработавшим датчиком, не
+    # проверив ничего. Скрипт отдаёт три разных ответа, и ниже они РАЗБИРАЮТСЯ.
+    # Оракул на оба: tests/unit/test_run_affected_tests.py.
+    _VERDICT=$(PYTHON="$PYTHON" "$REPO_ROOT/scripts/run_affected_tests.sh" $_AFF)
+    _ARC=$?
+    case $_ARC in
+      0)
+        echo "✓ pre-commit: затронутые тесты зелёные ($_N)"
+        ;;
+      1)
+        echo ""
+        echo "⚠️  ЗАТРОНУТЫЕ ТЕСТЫ КРАСНЫЕ — коммит НЕ блокируется, но ты предупреждён:"
+        echo "   $_VERDICT"
+        tail -12 /tmp/affected_precommit.log
+        echo ""
+        echo "   Полный список: $PYTHON affected_tests.py"
+        echo "   Отбор неполон по построению — зелёный здесь не заменяет ночной прогон."
+        echo ""
+        ;;
+      2)
+        # Худшая новость из трёх: часть набора НЕ ПРОВЕРЕНА. Красное видно,
+        # непроверенное невидимо — поэтому у него своя строка, а не общая с
+        # красным. Известная причина на MacBook — BL-AFFECTED-COLLECT-1.
+        echo ""
+        echo "⚠️  ЧАСТЬ ЗАТРОНУТЫХ ТЕСТОВ НЕ ПРОВЕРЕНА (файлы не собрались):"
+        echo "   $_VERDICT"
+        tail -12 /tmp/affected_precommit.log
+        echo ""
+        echo "   Это НЕ «тесты красные» — это «про них ничего не известно»."
+        echo "   Причины на MacBook: BACKLOG → BL-AFFECTED-COLLECT-1."
+        echo ""
+        ;;
+      *)
+        echo ""
+        echo "⚠️  ПРОГОН ЗАТРОНУТЫХ ТЕСТОВ НЕ СОСТОЯЛСЯ — вердикта нет вообще:"
+        echo "   $_VERDICT"
+        tail -5 /tmp/affected_precommit.log
+        echo ""
+        ;;
+    esac
+elif [[ "$_AFF" == affected_tests:* ]]; then
+    echo "▶ pre-commit: $_AFF"
+fi
+
+# ── Затронутые §-утверждения свода (нить claims-carriers, 2026-08-20) ────────
+# Класс, который закрываем: утверждение свода о поведении соседнего файла может
+# стать ложным в момент правки этого файла, а узнаётся через дни. Замер 20.08 по
+# четырём признанным дрейфам: лаг 3–9 дней, и все четыре нашёл человек, затеявший
+# сверку, — ни одного не нашёл датчик. Показательнее прочих: живой ЗЕЛЁНЫЙ маркер
+# стерёг СОСЕДНЕЕ утверждение, пока проверяемое было ложным пять дней
+# (validation_gate, BH-vs-BY, 21→26.07). Поэтому связь причинная, а не по таймеру.
+# НЕ БЛОКИРУЕТ, осознанно: признак неполон по построению (не ловит утверждение,
+# ставшее ложным без правки носителя — смена конфига, поведение внешнего сервиса),
+# а блок из неполного признака обещает больше, чем даёт. Тот же довод, что у
+# affected_tests. Красное для битой метки и протухшего адреса даёт ратчет
+# tests/consistency/test_claims_carriers_ratchet.py — его affected_tests выбирает
+# сам при правке CLAUDE.md по признаку «имя файла упомянуто в исходнике».
+# ГРАНИЦА: механизм говорит «носитель тронут, перечитай §», а НЕ «утверждение
+# ложно». Истинность — суждение человека; обещать больше значило бы повторить
+# ошибку heartbeat-вместо-корректности (§14, оговорка).
+_CLAIMS=$("$PYTHON" "$REPO_ROOT/affected_claims.py" 2>/tmp/affected_claims.err)
+if grep -q "⛔" /tmp/affected_claims.err 2>/dev/null; then
+    echo "⛔ affected_claims: метки свода битые — механизм слеп (коммит не блокирован):"
+    grep "⛔" /tmp/affected_claims.err | sed 's/^/     /'
+fi
+# Новая строка «Enforcement: LIVE» без метки носителя. Решение владельца 2026-08-20:
+# WARN, не блок. Довод: свод — проза, и блок заставил бы автора выбирать между
+# «не написать норму» и «написать метку наугад». Ложная метка ХУЖЕ отсутствующей —
+# она даёт тихо-зелёного сторожа, то есть ровно то, от чего механизм и защищает
+# (ср. §15: `legacy` требует непустую строку, но не осмысленность). Цена выбора
+# названа вслух: покрытие не растёт само, поэтому WARN печатает его ЧИСЛОМ.
+# Только ДОБАВЛЕННЫЕ строки — легаси не красится (прецедент дубль-гейта), иначе
+# восемь старых строк на каждом коммите в свод выучили бы пропускать датчик (§13).
+if grep -q "unmarked-live:" /tmp/affected_claims.err 2>/dev/null; then
+    echo ""
+    echo "⚠️  НОВАЯ НОРМА ОБЕЩАЕТ LIVE, НО НЕ НАЗЫВАЕТ НОСИТЕЛЯ:"
+    grep "unmarked-live:" /tmp/affected_claims.err | sed 's/^unmarked-live:/    /'
+    echo "     Метка: ⟨carriers: путь, путь⟩ в конце строки. Не обязательна —"
+    echo "     но без неё утверждение остаётся без гасителя (§18)."
+fi
+if [[ -n "$_CLAIMS" ]]; then
+    echo ""
+    echo "⚠️  ЗАТРОНУТЫ УТВЕРЖДЕНИЯ СВОДА — перечитай, всё ещё ли они верны:"
+    echo "$_CLAIMS" | sed 's/^/     /'
+    echo "     Механизм называет связь, не судит истинность (§18)."
+    echo ""
+fi
+
+# ── Права каталога секретов НА ЭТОЙ МАШИНЕ (2026-09-02) ──────────────────────
+# Находка: аудит прав (security_sensors._secrets_perms) живёт в integrity, а integrity
+# гоняется на Studio. Секрет с правами 644 на ВТОРОЙ машине не видел никто — так и
+# было: google_calendar_client.json лежал 644 на MacBook пять месяцев (замер 02.09).
+# Здесь — единственное место, которое исполняется на машине-писателе кода при каждом
+# коммите. WARN, не блок: права машины владельца — не вина коммита; и датчик, который
+# блокирует работу из-за состояния чужой ФС, выучат обходить (§13).
+_PERMS=$("$PYTHON" - <<'PYEOF' 2>/dev/null
+from pathlib import Path
+try:
+    from security_sensors import _secrets_perms
+    for f in _secrets_perms(Path.home()):
+        print(f)
+except Exception as e:
+    print(f"датчик прав не отработал: {e}")
+PYEOF
+)
+if [[ -n "$_PERMS" ]]; then
+    echo ""
+    echo "⚠️  ПРАВА В КАТАЛОГЕ СЕКРЕТОВ ЭТОЙ МАШИНЫ (канон 700/600):"
+    echo "$_PERMS" | sed 's/^/     /'
+    echo "     chmod 600 <файл> / chmod 700 <каталог>. Integrity видит только Studio."
+fi
+
+# ── Ротация ЭТОЙ машины жива? (2026-09-02) ───────────────────────────────────
+# Находка: check_logrotate_liveness читает ЛОКАЛЬНУЮ квитанцию, а integrity гоняется
+# на Studio — смерть агента на MacBook оттуда не видна. Здесь единственное место,
+# исполняемое на машине-писателе кода. WARN, не блок: состояние launchd — не вина
+# коммита, а датчик, блокирующий работу из-за чужого агента, выучат обходить (§13).
+_ROT=$("$PYTHON" - <<'PYEOF' 2>/dev/null
+try:
+    import log_rotate
+    r = log_rotate.receipt_status()
+    if not r["exists"]:
+        print("квитанции ротации нет — агент com.larry.health.logrotate не запускался")
+    elif r["age_h"] >= 24:
+        print(f"ротация молчит {r['age_h']:.0f}ч при интервале 30 мин — агент не бежит")
+    elif not r["selftest_ok"]:
+        print("последний прогон не дошёл до `selftest ok` — смотри logs/logrotate_err.log")
+except Exception as e:
+    print(f"датчик живости ротации не отработал: {e}")
+PYEOF
+)
+if [[ -n "$_ROT" ]]; then
+    echo ""
+    echo "⚠️  РОТАЦИЯ ЛОГОВ НА ЭТОЙ МАШИНЕ:"
+    echo "$_ROT" | sed 's/^/     /'
+    echo "     launchctl print gui/\$(id -u)/com.larry.health.logrotate"
+fi
+
+# ── ЗАПИСКИ НИТЕЙ: доставка УШЛА ОТСЮДА В post-commit (15.09) ────────────────
+# Здесь она стояла с 13.09 и была неправа: pre-commit срабатывает на ПОПЫТКЕ
+# коммита, а отметка «прочитано» осмысленна только для СОСТОЯВШЕГОСЯ. Отменённый
+# коммит гасил записку соседа навсегда. Дом доставки прежний
+# (scripts/git-hooks/handoff_notes_notice.sh), зовёт её теперь post-commit —
+# единственное событие git, которое означает «коммит случился».
+# Оракул на вызов: tests/unit/test_handoff_note_delivery.py.
+
+exit 0

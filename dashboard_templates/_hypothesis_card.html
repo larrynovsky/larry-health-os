@@ -1,0 +1,86 @@
+{# Пока идёт фоновой консилиум (status=testing, eval_started_at свежий — фильтр
+   eval_running) карточка опрашивает себя каждые 5 с; финальная карточка приходит
+   без триггера — опрос гаснет сам. #}
+{% set eval_running = h.payload | eval_running %}
+<article class="card card--warning" id="hyp-{{ h.id }}"
+  {% if eval_running %}hx-get="/api/hypotheses/{{ h.id }}/card" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+  <div class="card-head">
+    <div class="card-meta">№ {{ h.id }}
+      {% if h.payload.trigger %} · {{ h.payload.trigger }}{% endif %}
+      · <time>{{ h.created_at | iso_date }}</time>
+      <span class="age-suffix">({{ h.created_at | age_days }}д)</span>
+    </div>
+    <div class="card-chips">
+      {% set st = h.payload.status or 'open' %}
+      {% if st in ['active', 'open'] %}<span class="chip chip--active">{{ st }}</span>
+      {% elif st in ['testing', 'pending', 'specialist_review'] %}<span class="chip chip--action">{{ st }}</span>
+      {% else %}<span class="chip chip--outline">{{ st }}</span>
+      {% endif %}
+      {% if h.payload.trigger_subtype %}<span class="chip chip--outline">{{ h.payload.trigger_subtype }}</span>{% endif %}
+      {% if h.payload.history %}<span class="chip chip--updated">v{{ h.payload.version or 1 }}</span>{% endif %}
+    </div>
+  </div>
+  <h3 class="card-title">{{ h.payload.observation or h.key }}</h3>
+  <dl class="card-fields">
+    {% if h.payload.mechanism %}<dt>механизм</dt><dd>{{ h.payload.mechanism }}</dd>{% endif %}
+    {% if h.payload.prediction %}<dt>предсказание</dt><dd>{{ h.payload.prediction }}</dd>{% endif %}
+    {% if h.payload.test %}<dt>тест</dt><dd>{{ h.payload.test }}</dd>{% endif %}
+    {% if h.payload.last_verdict %}<dt>последний вердикт</dt>
+      <dd>{{ h.payload.last_verdict }} ({{ ((h.payload.last_confidence or 0) * 100) | int }}%)</dd>
+    {% endif %}
+  </dl>
+  {% if h.payload.history %}
+  <details class="hyp-history">
+    <summary>история ({{ h.payload.history | length }} версий)</summary>
+    {% for entry in h.payload.history %}
+    <div class="hyp-history-entry">
+      <span class="hyp-history-meta">
+        v{{ entry.version | default(0) }} · {{ entry.date | default('') }}
+        · {{ entry.verdict | default('') }}
+        {% if entry.confidence %}({{ (entry.confidence * 100) | int }}%){% endif %}
+      </span>
+      {% if entry.observation %}<p class="hyp-history-obs">{{ (entry.observation or '')[:80] }}{% if (entry.observation or '') | length > 80 %}…{% endif %}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+  <footer class="card-foot card-actions">
+    {% if h.payload.status == 'confirmed' %}
+    <button class="action-pill action-pill--doctor"
+            hx-post="/api/hypotheses/{{ h.id }}/doctor-brief"
+            hx-target="#doctor-brief-{{ h.id }}"
+            hx-swap="innerHTML"
+            hx-indicator="#doctor-spin-{{ h.id }}">версия для врача</button>
+    <span id="doctor-spin-{{ h.id }}" class="htmx-indicator eval-spinner">⏳</span>
+    <button class="action-pill action-pill--eval"
+            hx-post="/api/hypotheses/{{ h.id }}/eval"
+            hx-target="#hyp-{{ h.id }}"
+            hx-swap="outerHTML"
+            hx-indicator="#eval-spin-{{ h.id }}">консилиум</button>
+    <span id="eval-spin-{{ h.id }}" class="htmx-indicator eval-spinner">⏳</span>
+    {% else %}
+    <button class="action-pill action-pill--active"
+            hx-post="/api/hypotheses/{{ h.id }}/confirm"
+            hx-confirm="Принять гипотезу № {{ h.id }}?"
+            hx-target="closest article"
+            hx-swap="outerHTML">принять</button>
+    <button class="action-pill action-pill--ghost"
+            hx-post="/api/hypotheses/{{ h.id }}/reject"
+            hx-confirm="Отвергнуть гипотезу № {{ h.id }}?"
+            hx-target="closest article"
+            hx-swap="delete">отвергнуть</button>
+    <button class="action-pill action-pill--eval"
+            hx-post="/api/hypotheses/{{ h.id }}/eval"
+            hx-target="#hyp-{{ h.id }}"
+            hx-swap="outerHTML"
+            hx-indicator="#eval-spin-{{ h.id }}">консилиум</button>
+    <span id="eval-spin-{{ h.id }}" class="htmx-indicator eval-spinner">⏳</span>
+    {% endif %}
+  </footer>
+  <div id="eval-{{ h.id }}" class="eval-result-wrap">
+    {% if eval_result_html %}{{ eval_result_html | safe }}
+    {% elif eval_running %}<div class="eval-result eval-result--info">⏳ Идёт консилиум (начат {{ h.payload.eval_started_at[11:16] }}) — карточка обновится сама; заключение придёт и в Telegram.</div>
+    {% endif %}
+  </div>
+  <div id="doctor-brief-{{ h.id }}" class="doctor-brief-result"></div>
+</article>

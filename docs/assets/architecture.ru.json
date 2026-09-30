@@ -1,0 +1,779 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Larry Health OS — что умеет система",
+    "quality_profile": "standard",
+    "viewBox": [
+      1250,
+      680
+    ],
+    "views": [
+      {
+        "id": "labs",
+        "label": "Анализы",
+        "focus": [
+          "scans",
+          "recog",
+          "staging",
+          "db",
+          "band",
+          "brief"
+        ],
+        "note": "Скан → две модели → ваше «да» → база → отчёт о сдвиге."
+      },
+      {
+        "id": "genome",
+        "label": "Геном",
+        "focus": [
+          "dna",
+          "genome",
+          "db",
+          "pgx",
+          "dash"
+        ],
+        "note": "Сырой геном → сверка цепей → фармакогенетика и риски."
+      },
+      {
+        "id": "insight",
+        "label": "Выводы",
+        "focus": [
+          "db",
+          "gate",
+          "hyp",
+          "team",
+          "tasks",
+          "const",
+          "problems"
+        ],
+        "note": "Связь проходит гейт; консилиум спорит; меняете только вы."
+      },
+      {
+        "id": "watch",
+        "label": "Самоконтроль",
+        "focus": [
+          "db",
+          "monitor",
+          "alarm",
+          "normdocs",
+          "norms"
+        ],
+        "note": "Пороги — из документов; несвежие данные — тревога, а не отчёт."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "scans",
+      "type": "external",
+      "label": "Анализы: PDF, фото",
+      "sublabel": "любой язык",
+      "pos": [
+        20,
+        92
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "recog",
+      "type": "backend",
+      "label": "Распознавание",
+      "sublabel": "две модели сверяются",
+      "pos": [
+        216,
+        92
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "staging",
+      "type": "security",
+      "label": "Отстойник",
+      "sublabel": "ждёт вашего «да»",
+      "pos": [
+        422,
+        92
+      ],
+      "size": [
+        150,
+        54
+      ]
+    },
+    {
+      "id": "letters",
+      "type": "external",
+      "label": "Выписки врачей",
+      "sublabel": "файл, ссылка на облако",
+      "pos": [
+        20,
+        170
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "docs",
+      "type": "backend",
+      "label": "Разбор заключений",
+      "sublabel": "диагнозы, лекарства",
+      "pos": [
+        216,
+        170
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "cards",
+      "type": "security",
+      "label": "Карточки",
+      "sublabel": "в медкарту — по одобрению",
+      "pos": [
+        422,
+        170
+      ],
+      "size": [
+        150,
+        54
+      ]
+    },
+    {
+      "id": "dna",
+      "type": "external",
+      "label": "Сырой геном",
+      "sublabel": "23andMe, tellmeGen · VCF",
+      "pos": [
+        20,
+        248
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "genome",
+      "type": "backend",
+      "label": "Геном-конвейер",
+      "sublabel": "сверка цепей ДНК",
+      "pos": [
+        216,
+        248
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "devices",
+      "type": "external",
+      "label": "Oura · «Здоровье»",
+      "sublabel": "сон, ВСР, пульс, давление",
+      "pos": [
+        20,
+        326
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "hae",
+      "type": "backend",
+      "label": "Импорт метрик",
+      "sublabel": "судья каждого поля",
+      "pos": [
+        216,
+        326
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "normdocs",
+      "type": "external",
+      "label": "Документы норм",
+      "sublabel": "CTCAE · EFLM · CPIC",
+      "pos": [
+        20,
+        404
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "norms",
+      "type": "backend",
+      "label": "Нормы из документов",
+      "sublabel": "версия, контрольная сумма",
+      "pos": [
+        216,
+        404
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "chat",
+      "type": "external",
+      "label": "Вы в Telegram",
+      "sublabel": "ответы, чекины, опросники",
+      "pos": [
+        20,
+        482
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "backend",
+      "label": "Память",
+      "sublabel": "вечное · до смены · разовое",
+      "pos": [
+        216,
+        482
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "context",
+      "type": "external",
+      "label": "Календарь, погода",
+      "sublabel": "и место, где вы сейчас",
+      "pos": [
+        20,
+        560
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "envctx",
+      "type": "backend",
+      "label": "Контекст дня",
+      "sublabel": "что вокруг вас сегодня",
+      "pos": [
+        216,
+        560
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "health.db",
+      "sublabel": "одна база · один писатель",
+      "pos": [
+        608,
+        92
+      ],
+      "size": [
+        150,
+        522
+      ],
+      "tag": "ваш Mac"
+    },
+    {
+      "id": "band",
+      "type": "backend",
+      "label": "Личная полоса",
+      "sublabel": "тренд — серией, не одной ночью",
+      "pos": [
+        794,
+        92
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "brief",
+      "type": "frontend",
+      "label": "Утренний отчёт",
+      "sublabel": "что сдвинулось",
+      "pos": [
+        1020,
+        92
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Гейт связей",
+      "sublabel": "случайность · плацебо во времени",
+      "pos": [
+        794,
+        170
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "hyp",
+      "type": "frontend",
+      "label": "Гипотезы → протоколы",
+      "sublabel": "статус и история",
+      "pos": [
+        1020,
+        170
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "pgx",
+      "type": "backend",
+      "label": "Фармакогенетика, риски",
+      "sublabel": "CPIC · полигенные баллы",
+      "pos": [
+        794,
+        248
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "dash",
+      "type": "frontend",
+      "label": "Дашборд",
+      "sublabel": "127.0.0.1:8001",
+      "pos": [
+        1020,
+        248
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "team",
+      "type": "backend",
+      "label": "Терапевт и консилиум",
+      "sublabel": "день · неделя · месяц, спор",
+      "pos": [
+        794,
+        326
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "tasks",
+      "type": "frontend",
+      "label": "Задачи",
+      "sublabel": "бот + Напоминания macOS",
+      "pos": [
+        1020,
+        326
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "const",
+      "type": "backend",
+      "label": "Конституции, питание",
+      "sublabel": "по доменам, из генома и данных",
+      "pos": [
+        794,
+        404
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "problems",
+      "type": "frontend",
+      "label": "Список проблем",
+      "sublabel": "меняете только вы",
+      "pos": [
+        1020,
+        404
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "lit",
+      "type": "backend",
+      "label": "Литература, наблюдение",
+      "sublabel": "PubMed, графики наблюдения",
+      "pos": [
+        794,
+        482
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "visit",
+      "type": "frontend",
+      "label": "К врачу",
+      "sublabel": "сводка, ответ врача — входом",
+      "pos": [
+        1020,
+        482
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "monitor",
+      "type": "security",
+      "label": "Ночной монитор",
+      "sublabel": "свежесть · целостность · вред",
+      "pos": [
+        794,
+        560
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "alarm",
+      "type": "frontend",
+      "label": "Тревога в Telegram",
+      "sublabel": "пока не закрыта",
+      "pos": [
+        1020,
+        560
+      ],
+      "size": [
+        180,
+        54
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Ваш Mac — основная машина",
+      "wraps": [
+        "recog",
+        "staging",
+        "docs",
+        "cards",
+        "genome",
+        "hae",
+        "norms",
+        "memory",
+        "envctx",
+        "db",
+        "band",
+        "brief",
+        "gate",
+        "hyp",
+        "pgx",
+        "dash",
+        "team",
+        "tasks",
+        "const",
+        "problems",
+        "lit",
+        "visit",
+        "monitor",
+        "alarm"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "scans-recog",
+      "from": "scans",
+      "to": "recog",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "recog-staging",
+      "from": "recog",
+      "to": "staging",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "staging-db",
+      "from": "staging",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "letters-docs",
+      "from": "letters",
+      "to": "docs",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "docs-cards",
+      "from": "docs",
+      "to": "cards",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "cards-db",
+      "from": "cards",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dna-genome",
+      "from": "dna",
+      "to": "genome",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "genome-db",
+      "from": "genome",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "devices-hae",
+      "from": "devices",
+      "to": "hae",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "hae-db",
+      "from": "hae",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "normdocs-norms",
+      "from": "normdocs",
+      "to": "norms",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "norms-db",
+      "from": "norms",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "chat-memory",
+      "from": "chat",
+      "to": "memory",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "memory-db",
+      "from": "memory",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "context-envctx",
+      "from": "context",
+      "to": "envctx",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "envctx-db",
+      "from": "envctx",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-band",
+      "from": "db",
+      "to": "band",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "band-brief",
+      "from": "band",
+      "to": "brief",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-gate",
+      "from": "db",
+      "to": "gate",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate-hyp",
+      "from": "gate",
+      "to": "hyp",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-pgx",
+      "from": "db",
+      "to": "pgx",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "pgx-dash",
+      "from": "pgx",
+      "to": "dash",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-team",
+      "from": "db",
+      "to": "team",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "team-tasks",
+      "from": "team",
+      "to": "tasks",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-const",
+      "from": "db",
+      "to": "const",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "const-problems",
+      "from": "const",
+      "to": "problems",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-lit",
+      "from": "db",
+      "to": "lit",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "lit-visit",
+      "from": "lit",
+      "to": "visit",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-monitor",
+      "from": "db",
+      "to": "monitor",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "dashed"
+    },
+    {
+      "id": "monitor-alarm",
+      "from": "monitor",
+      "to": "alarm",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Уходит наружу",
+      "items": [
+        "Медицинский контекст и сканы — в Anthropic API",
+        "Сообщения — через Telegram",
+        "Позиции вариантов генома — в сервисы аннотации"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Не верит себе",
+      "items": [
+        "В базу — только подтверждённое",
+        "Связи — только прошедшие гейт",
+        "Порог есть в документе — или громкий отказ"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Вокруг",
+      "items": [
+        "31 фоновая служба macOS",
+        "Бэкап каждую ночь, снимок перед рискованным",
+        "Несколько человек — у каждого своя база"
+      ]
+    }
+  ]
+}

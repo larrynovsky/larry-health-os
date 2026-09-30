@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Гипотезы — Health OS{% endblock %}
+{% set page_name = "гипотезы" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Гипотезы</h1>
+  <p class="shell-subtitle">{{ count_active }} активных · {{ count_total }} всего</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% set ns = namespace(has_open=false, has_confirmed=false) %}
+{% for h in hypotheses %}
+  {% if h.active %}
+    {% if h.payload.status == 'confirmed' %}{% set ns.has_confirmed = true %}
+    {% else %}{% set ns.has_open = true %}{% endif %}
+  {% endif %}
+{% endfor %}
+
+{% if ns.has_open %}
+<div class="caption">открытые</div>
+{% endif %}
+{% for h in hypotheses %}
+  {% if h.active and h.payload.status != 'confirmed' %}
+    {% include "_hypothesis_card.html" %}
+  {% endif %}
+{% endfor %}
+
+{% if ns.has_confirmed %}
+<div class="caption">принятые</div>
+{% endif %}
+{% for h in hypotheses %}
+  {% if h.active and h.payload.status == 'confirmed' %}
+    {% include "_hypothesis_card.html" %}
+  {% endif %}
+{% endfor %}
+
+{% set inactive = hypotheses | rejectattr('active') | list %}
+{% if inactive %}
+<div class="caption">архив ({{ inactive | length }})</div>
+{% for h in inactive %}
+  <article class="card">
+    <div class="card-head">
+      <div class="card-meta">№ {{ h.id }} ·
+        <time>{{ h.created_at | iso_date }}</time>
+        <span class="age-suffix">({{ h.created_at | age_days }}д)</span>
+      </div>
+      <div class="card-chips"><span class="chip chip--outline">inactive</span></div>
+    </div>
+    <h3 class="card-title">{{ h.payload.observation or h.key }}</h3>
+    {% if h.payload.rejection_reason %}
+      <p class="card-description">причина: {{ h.payload.rejection_reason[:120] }}</p>
+    {% elif h.payload.resolution_type %}
+      <p class="card-description">закрытие: {{ h.payload.resolution_type }}</p>
+    {% endif %}
+    {% if h.payload.history %}
+      <p class="card-description card-description--muted">
+        {{ h.payload.history | length }} версий в истории
+      </p>
+    {% endif %}
+  </article>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

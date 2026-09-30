@@ -1,0 +1,22 @@
+# Позиции фармакогенетической панели в GRCh37 (плюс-цепь) — для вывода «позиции нет в VCF
+# полного генома = гомозигота по референсу» (вариант Б, решение владельца 28.09).
+# Источник: myvariant.info (dbSNP, hg19), запрос 2026-09-28 по rsid панели pharmaco_pipeline.
+# ref — аллель референсного генома в этой позиции; чужие данные здесь не хранятся.
+# CYP2D6 и HLA-B сюда НЕ входят и не войдут: CYP2D6 — делеции/дупликации и псевдоген
+# CYP2D7, HLA — сверхполиморфный локус; отсутствие строки в VCF там не значит «норма».
+build: GRCh37
+source: "myvariant.info dbsnp.hg19, 2026-09-28"
+positions:
+  rs1799853:  {gene: CYP2C9,  chrom: "10", pos: 96702047,  ref: C}
+  rs1057910:  {gene: CYP2C9,  chrom: "10", pos: 96741053,  ref: A}
+  rs12248560: {gene: CYP2C19, chrom: "10", pos: 96521657,  ref: C}
+  rs4244285:  {gene: CYP2C19, chrom: "10", pos: 96541616,  ref: G}
+  rs4986893:  {gene: CYP2C19, chrom: "10", pos: 96540410,  ref: G}
+  rs3918290:  {gene: DPYD,    chrom: "1",  pos: 97915614,  ref: C}
+  rs55886062: {gene: DPYD,    chrom: "1",  pos: 97981343,  ref: A}
+  rs67376798: {gene: DPYD,    chrom: "1",  pos: 97547947,  ref: T}
+  rs1142345:  {gene: TPMT,    chrom: "6",  pos: 18130918,  ref: T}
+  rs1800460:  {gene: TPMT,    chrom: "6",  pos: 18139228,  ref: C}
+  rs1800462:  {gene: TPMT,    chrom: "6",  pos: 18143955,  ref: C}
+  rs887829:   {gene: UGT1A1,  chrom: "2",  pos: 234668570, ref: C}
+  rs4149056:  {gene: SLCO1B1, chrom: "12", pos: 21331549,  ref: T}

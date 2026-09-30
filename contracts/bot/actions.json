@@ -1,0 +1,54 @@
+{
+  "module": "bot/actions",
+  "public": [
+    "action",
+    "on_reply",
+    "callback_data",
+    "button",
+    "keyboard",
+    "remove_target",
+    "handle_callback",
+    "ask",
+    "handle_reply",
+    "reply_verb",
+    "register"
+  ],
+  "depends_on": [
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn"
+      ],
+      "why": "квитанция ask() → bot_prompts в базе тенанта: вопрос переживает перезапуск бота"
+    },
+    {
+      "module": "bot/filters",
+      "uses": [
+        "owner_chat_id"
+      ],
+      "why": "UC-I-02 fail-closed: кнопку нажимает только свой человек",
+      "legacy": "модуль фильтров бота старше гейта одноразовости; контракт — вместе с его ближайшей правкой"
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "текст «кнопка устарела» на языке человека"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен: кнопка под сообщением → действие; кнопка просит текст → реплай тому же действию. Сами действия живут у своих команд",
+      "D2": "декораторы action/on_reply, button/keyboard, ask, remove_target, reply_verb для ConversationHandler, два входа от Telegram и register",
+      "D3": "зависит от get_conn, owner_chat_id, i18n.t — стабильные контракты",
+      "D4": "180 строк (28.09.2026)",
+      "D5": "tests/unit/test_bot_actions.py и test_buttons_instead_of_commands.py: нажатия, чужой чат, реплай через базу, предел 64 байт, оставшиеся строки клавиатуры, ConversationHandler",
+      "D6": "формат callback_data act:<verb>:<target> и таблица bot_prompts — только внутри модуля"
+    },
+    "rationale": "переписывается с нуля по докстрингу и тесту; соседние префиксы callback (docrev_, cb_*) не тронуты",
+    "date": "2026-09-28",
+    "oracle": "tests/unit/test_bot_actions.py"
+  }
+}

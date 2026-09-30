@@ -1,0 +1,4 @@
+# private/pii_terms.yaml — словарь личных слов для переписи публичной зоны (pii_census).
+# Впиши свои имена, адреса, врачей — pre-commit не пустит их в код. Пусто — стеречь нечего.
+literals: {identity: [], surname: [], partner: [], geo: [], clinical: [], chat_id: [], infra: [], doctor: [], genotype: [], treatment: [], birth_date: []}
+patterns: {}

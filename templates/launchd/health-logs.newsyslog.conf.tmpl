@@ -1,0 +1,74 @@
+# health-logs.newsyslog.conf — ротация логов Health OS штатным ротатором macOS (newsyslog).
+#
+# ЗАМЕР 2026-09-01: ротации не было НИ У ОДНОГО лога, ни на одной машине.
+#   Studio:  health_import_poll.log 204 МБ · health_bot.log 71 · logs/code_watcher.log 46 ·
+#   MacBook: logs/code_watcher.log 31 · health_bot_error.log 25 · health_import_poll.log 25
+#   Итого ~470 МБ, растут с мая. Повод — не мой logs/consilium_eval.log (он в этом списке
+#   даже не виден), класс шире: пишем логи, не убираем.
+#
+# ПОЧЕМУ newsyslog, а не RotatingFileHandler (лестница, ступень 3 — платформа умеет):
+# логи пишутся ДВУМЯ способами — logging.FileHandler в модулях (bot/main, import_oura,
+# import_apple_health, reminders_sync, vcf_import_pipeline) И редиректом launchd
+# (StandardOutPath/StandardErrorPath). Для второго дескриптор держит launchd, ротация из
+# процесса невозможна. newsyslog ротирует ФАЙЛ, а не писателя — покрывает оба.
+#
+# ПОЧЕМУ ПУТИ ПЕРЕЧИСЛЕНЫ ЯВНО, а не '*.log': glob в logfilename у BSD newsyslog (база macOS)
+# не документирован, и ни один из 6 системных конфигов /etc/newsyslog.d/ его не использует —
+# положить '*' значило бы отдать владельцу конфиг, который молча ничего не ротирует.
+# Несуществующий на этой машине путь newsyslog пропускает, поэтому список — ОБЪЕДИНЕНИЕ
+# Studio и MacBook. НОВЫЙ крупный лог сюда придётся добавить руками: docs/how-to/rotate_logs.md.
+#
+# УСТАНОВКА — шаг владельца (нужен sudo; агент системный каталог не трогает, как и с launchctl
+# в нити night-cycle). Команды и оракул проверки — docs/how-to/rotate_logs.md.
+#
+# Поля: путь | owner:group | права | архивов | размер КБ | когда | флаги.
+# owner:group ОБЯЗАТЕЛЕН: newsyslog работает от root и без него пересоздаст файл как root:wheel —
+# процессы пользователя потеряют право писать. J = сжимать bzip2. 5000 КБ = 5 МБ, порог по размеру.
+{{HOME}}/health_import_poll.log                     {{USER}}:staff 644 4 5000 * J
+{{HOME}}/health_import_poll_error.log               {{USER}}:staff 644 4 5000 * J
+{{HOME}}/health_bot.log                             {{USER}}:staff 644 4 5000 * J
+{{HOME}}/health_bot_error.log                       {{USER}}:staff 644 4 5000 * J
+{{HOME}}/health_watcher.log                         {{USER}}:staff 644 4 5000 * J
+{{HOME}}/health_daily.log                           {{USER}}:staff 644 2 5000 * J
+{{HOME}}/health_apple_import.log                    {{USER}}:staff 644 2 5000 * J
+{{HOME}}/health_oura_import.log                     {{USER}}:staff 644 2 5000 * J
+{{HOME}}/health_reminders_sync.log                  {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/code_watcher.log       {{USER}}:staff 644 4 5000 * J
+{{REPO}}/logs/code_watcher_err.log   {{USER}}:staff 644 4 5000 * J
+{{REPO}}/logs/bot_err.log            {{USER}}:staff 644 4 5000 * J
+{{REPO}}/logs/run_checks.log         {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/test_suite.log         {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/dashboard.err.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/dashboard.out.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/consilium_eval.log     {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/logrotate.log          {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/logrotate_err.log      {{USER}}:staff 644 2 5000 * J
+
+# ── Добавлено 2026-09-02: логи, ОБЪЯВЛЕННЫЕ плистами, но не покрытые ротацией.
+# Замер: 26 из 30 StandardOut/ErrorPath были вне конфига. Датчик их не видел —
+# они мелкие СЕГОДНЯ, а растут без ограничений. Плист объявляет лог; конфиг обязан
+# его знать, и это теперь стережёт test_every_declared_log_is_rotated.
+{{REPO}}/logs/calendar_sync.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/calendar_sync_err.log  {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/lab_intake.log         {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/lab_intake_err.log     {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/night_cycle.log        {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/night_cycle_err.log    {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/weekly_digest.log      {{USER}}:staff 644 2 5000 * J
+# backup.log — MacBook: суточный снимок 03:00 + wip каждые 3 часа (2026-09-07).
+# Раньше в конфиге его не было: плист суточного бэкапа не версионируется в launchd/,
+# и датчик слепого пятна его не видел. Версионированный backup-wip плист это вскрыл.
+{{REPO}}/logs/backup.log             {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/weekly_digest_err.log  {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/owner_nag.log          {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/owner_nag_err.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/pgs_discovery.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/pgs_discovery_err.log  {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/pip_audit.err.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/pip_audit.out.log      {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/probes.log             {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/probes_err.log         {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/profile_reconciler.log {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/profile_reconciler_error.log {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/owner_weekly.log        {{USER}}:staff 644 2 5000 * J
+{{REPO}}/logs/owner_weekly_err.log    {{USER}}:staff 644 2 5000 * J

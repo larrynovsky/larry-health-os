@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Медкарта — Health OS{% endblock %}
+{% set page_name = "медкарта" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Медкарта</h1>
+  <p class="shell-subtitle">{{ total_events }} событий{% if episodes %} · {{ episodes | length }} эпизодов{% endif %}</p>
+</div>
+<div class="shell-actions">
+  {% for val, label in event_types %}
+    <a href="{% if val %}/medical-record?event_type={{ val }}{% else %}/medical-record{% endif %}"
+       class="action-pill {% if current_type == val %}action-pill--active{% endif %}">{{ label }}</a>
+  {% endfor %}
+  <button class="action-pill action-pill--ghost" onclick="document.getElementById('event-dialog').showModal()">+ событие</button>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% macro chip_type(etype) %}
+  {% if etype == "encounter" %}<span class="chip chip--action">приём</span>
+  {% elif etype in ["lab_result", "lab"] %}<span class="chip chip--active">анализ</span>
+  {% elif etype == "imaging" %}<span class="chip chip--outline">визуализация</span>
+  {% elif etype == "procedure" %}<span class="chip chip--warning">процедура</span>
+  {% elif etype == "self_observation" %}<span class="chip chip--outline">опросник</span>
+  {% else %}<span class="chip chip--outline">{{ etype }}</span>{% endif %}
+{% endmacro %}
+
+{% macro event_card(ev) %}
+{% set etype = ev.event_type or "event" %}
+{% set is_planned = ev.status == "planned" %}
+<article class="card {% if is_planned %}card--action{% endif %}">
+  <div class="card-head">
+    <div class="card-meta">
+      {% if ev.effective_date %}
+        <time>{{ ev.effective_date }}</time>
+        <span class="age-suffix">({{ ev.effective_date | age_days }}д назад)</span>
+      {% else %}—{% endif %}
+      {% if ev.performer == "self" %} · самоотчёт{% elif ev.performer %} · {{ ev.performer }}{% if ev.performer_role %}, {{ ev.performer_role }}{% endif %}{% endif %}
+      {% if ev.location %} · {{ ev.location }}{% endif %}
+    </div>
+    <div class="card-chips">
+      {{ chip_type(etype) }}
+      {% if ev.specialty %}<span class="chip chip--outline">{{ ev.specialty }}</span>{% endif %}
+      {% if is_planned %}<span class="chip chip--action">запланировано</span>{% endif %}
+    </div>
+  </div>
+  {% if ev.pro_text %}
+    <h3 class="card-title">{{ ev.pro_text }}</h3>
+  {% elif ev.assessment %}
+    <h3 class="card-title">{{ ev.assessment | short(200) }}</h3>
+  {% elif ev.interpreted_report %}
+    <h3 class="card-title">{{ ev.interpreted_report | short(200) }}</h3>
+  {% elif ev.reason_text %}
+    <h3 class="card-title">{{ ev.reason_text | short(200) }}</h3>
+  {% elif ev.notes %}
+    <h3 class="card-title">{{ ev.notes | short(200) }}</h3>
+  {% endif %}
+  {% if ev.lab_summary %}{% set ls = ev.lab_summary %}
+  <p class="card-line">{{ ls.n }} показателей{% if ls.flags %} · вне нормы {{ ls.flags | length }}: {{ ls.flags[:8] | join(", ") }}{% if ls.flags | length > 8 %} и ещё {{ ls.flags | length - 8 }}{% endif %}{% else %} · без пометок об отклонении{% endif %} · <a href="/labs">все значения</a></p>
+  {% endif %}
+  {% if ev.subjective or ev.objective or ev.enc_plan or (ev.abnormal_flags and ev.abnormal_flags not in ('[]', '', 'null')) %}
+  <dl class="card-fields">
+    {% if ev.subjective %}<dt>S</dt><dd>{{ ev.subjective | short(300) }}</dd>{% endif %}
+    {% if ev.objective %}<dt>O</dt><dd>{{ ev.objective | short(300) }}</dd>{% endif %}
+    {% if ev.enc_plan %}<dt>план</dt><dd>{{ ev.enc_plan | short(300) }}</dd>{% endif %}
+    {% if ev.abnormal_flags and ev.abnormal_flags not in ('[]', '', 'null') %}<dt>⚠</dt><dd>{{ ev.abnormal_flags }}</dd>{% endif %}
+  </dl>
+  {% endif %}
+</article>
+{% endmacro %}
+
+{% if not episodes and not ungrouped %}
+  <p class="hint">Событий пока нет. Нажмите <strong>+ событие</strong> чтобы добавить вручную, или импортируйте документы.</p>
+{% endif %}
+
+{% macro episodes_block() %}
+{% for ep in episodes %}
+  {% if ep.events or not current_type %}
+  <div class="caption">
+    {{ ep.title or "без названия" }}
+    {% if ep.status == "active" %} · активный{% elif ep.status == "resolved" %} · завершён{% endif %}
+    {% if ep.start_date %} · с {{ ep.start_date }}{% if ep.end_date %} по {{ ep.end_date }}{% endif %}{% endif %}
+    {% if ep.problem_name %} · {{ ep.problem_name }}{% endif %}
+  </div>
+  {% if ep.events %}
+    {% for ev in ep.events %}{{ event_card(ev) }}{% endfor %}
+  {% else %}
+    <p class="hint">Нет событий в этом эпизоде.</p>
+  {% endif %}
+  {% endif %}
+{% endfor %}
+{% endmacro %}
+{% macro ungrouped_block() %}
+{% if ungrouped %}
+  {% if episodes %}<div class="caption">вне эпизодов лечения</div>{% endif %}
+  <div id="events-top"></div>
+  {% for ev in ungrouped %}{{ event_card(ev) }}{% endfor %}
+{% else %}
+  <div id="events-top"></div>
+{% endif %}
+{% endmacro %}
+{# Свежее — сверху: блок «вне эпизодов» первым, если в нём событие новее эпизодов #}
+{% if ungrouped_first %}{{ ungrouped_block() }}{{ episodes_block() }}{% else %}{{ episodes_block() }}{{ ungrouped_block() }}{% endif %}
+
+{# ── Модаль добавления события ────────────────────────────────────────────── #}
+<dialog id="event-dialog" class="event-dialog">
+  <div class="dialog-head">
+    <h2>Новое событие</h2>
+    <button class="dialog-close" onclick="document.getElementById('event-dialog').close()" type="button">×</button>
+  </div>
+
+  <form method="post" action="/api/events/new"
+        hx-post="/api/events/new"
+        hx-target="#events-top"
+        hx-swap="afterbegin"
+        hx-on::after-request="if(event.detail.successful){document.getElementById('event-dialog').close();}">
+
+    <div class="dialog-body">
+
+      {# Тип + Дата #}
+      <div class="dialog-row">
+        <div class="dialog-field">
+          <label for="ef-type">Тип</label>
+          <select id="ef-type" name="event_type" onchange="onTypeChange(this.value)" required>
+            <option value="encounter">Приём / консультация</option>
+            <option value="lab_result">Анализы</option>
+            <option value="imaging">Визуализация / КТ / МРТ</option>
+            <option value="procedure">Процедура</option>
+          </select>
+        </div>
+        <div class="dialog-field">
+          <label for="ef-date">Дата</label>
+          <input type="date" id="ef-date" name="effective_date" required>
+        </div>
+      </div>
+
+      {# Исполнитель #}
+      <div class="dialog-row">
+        <div class="dialog-field">
+          <label for="ef-performer">Врач / лаборатория</label>
+          <input type="text" id="ef-performer" name="performer" placeholder="Иванов И.И.">
+        </div>
+        <div class="dialog-field">
+          <label for="ef-role">Специальность / роль</label>
+          <input type="text" id="ef-role" name="performer_role" placeholder="онколог">
+        </div>
+      </div>
+
+      {# Место + Эпизод #}
+      <div class="dialog-row">
+        <div class="dialog-field">
+          <label for="ef-location">Место</label>
+          <input type="text" id="ef-location" name="location" placeholder="Клиника">
+        </div>
+        <div class="dialog-field">
+          <label for="ef-episode">Эпизод</label>
+          <select id="ef-episode" name="episode_id">
+            <option value="">— без эпизода —</option>
+            {% for ep in episodes %}
+              <option value="{{ ep.id }}">{{ ep.title | short(50) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {# Секция: приём #}
+      <div class="dialog-section visible" id="sec-encounter">
+        <div class="dialog-row">
+          <div class="dialog-field">
+            <label for="ef-specialty">Специализация приёма</label>
+            <input type="text" id="ef-specialty" name="specialty" placeholder="онкология">
+          </div>
+          <div class="dialog-field">
+            <label for="ef-reason">Причина обращения</label>
+            <input type="text" id="ef-reason" name="reason_text" placeholder="плановый осмотр">
+          </div>
+        </div>
+        <div class="dialog-field">
+          <label for="ef-assessment">Заключение / Assessment</label>
+          <textarea id="ef-assessment" name="assessment" placeholder="Что выявлено, какой вывод врача…"></textarea>
+        </div>
+        <div class="dialog-field">
+          <label for="ef-plan">План / назначения</label>
+          <textarea id="ef-plan" name="enc_plan" placeholder="Назначения, следующие шаги…"></textarea>
+        </div>
+      </div>
+
+      {# Секция: анализы / визуализация #}
+      <div class="dialog-section" id="sec-diagnostic">
+        <div class="dialog-row">
+          <div class="dialog-field">
+            <label for="ef-modality">Модальность / метод</label>
+            <input type="text" id="ef-modality" name="modality" placeholder="МРТ, КТ, УЗИ, CBC…">
+          </div>
+          <div class="dialog-field">
+            <label for="ef-flags">Отклонения</label>
+            <input type="text" id="ef-flags" name="abnormal_flags" placeholder="CEA↑, Hb↓…">
+          </div>
+        </div>
+        <div class="dialog-field">
+          <label for="ef-report">Интерпретация / результат</label>
+          <textarea id="ef-report" name="interpreted_report" placeholder="Описание результата…"></textarea>
+        </div>
+      </div>
+
+      {# Заметки — всегда #}
+      <div class="dialog-field">
+        <label for="ef-notes">Заметки</label>
+        <textarea id="ef-notes" name="notes" placeholder="Дополнительный контекст…"></textarea>
+      </div>
+
+    </div>{# end dialog-body #}
+
+    <div class="dialog-foot">
+      <button type="button" class="action-pill action-pill--ghost"
+              onclick="document.getElementById('event-dialog').close()">Отмена</button>
+      <button type="submit" class="action-pill action-pill--active">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+  const ENCOUNTER_TYPES = ['encounter'];
+  const DIAGNOSTIC_TYPES = ['lab_result', 'imaging', 'procedure'];
+
+  window.onTypeChange = function(val) {
+    const secEnc  = document.getElementById('sec-encounter');
+    const secDiag = document.getElementById('sec-diagnostic');
+    secEnc.classList.toggle('visible',  ENCOUNTER_TYPES.includes(val));
+    secDiag.classList.toggle('visible', DIAGNOSTIC_TYPES.includes(val));
+  };
+
+  // Закрыть по клику на backdrop
+  document.getElementById('event-dialog').addEventListener('click', function(e){
+    if (e.target === this) this.close();
+  });
+
+  // Prefill сегодняшняя дата
+  const dateInput = document.getElementById('ef-date');
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+})();
+</script>
+{% endblock %}

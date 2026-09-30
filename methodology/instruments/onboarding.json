@@ -1,0 +1,277 @@
+{
+ "id": "onboarding",
+ "name": {
+  "ru": "Знакомство",
+  "en": "Onboarding"
+ },
+ "sink": "profile",
+ "wording_version_hash": "onboarding_v2_2026-09-28",
+ "_note": "Опросник проекта (не лицензионный, не данные человека). У каждого пункта есть читатель в коде: поле профиля (methodology/profile_fields.yaml) или target — куда assessment_dialog._apply_sink кладёт ответ. Решения владельца 23.09: всё сразу при первом входе; вопрос о здоровье — его формулировка; диабет/группу крови не спрашиваем — «сами расскажут или дадут результаты обследования»; аллергии спрашиваем (решение 27.09: пересмотр прежнего). 28.09 (нить i18n): первый вопрос — язык (двуязычный по построению: язык ещё не известен); тексты — по языкам {ru, en}; вступление — ключ onboarding.intro в methodology/i18n, число вопросов считается из items.",
+ "items": [
+  {
+   "id": "language",
+   "kind": "choice",
+   "field": "identity.language",
+   "text": "Язык / Language?",
+   "options": [
+    {
+     "label": "Русский",
+     "value": "ru"
+    },
+    {
+     "label": "English",
+     "value": "en"
+    }
+   ]
+  },
+  {
+   "id": "name",
+   "kind": "text",
+   "field": "identity.name",
+   "max_len": 80,
+   "text": {
+    "ru": "Как к тебе обращаться?",
+    "en": "What should I call you?"
+   }
+  },
+  {
+   "id": "birth_date",
+   "kind": "date",
+   "field": "identity.birth_date",
+   "text": {
+    "ru": "Дата рождения? Например: 01.02.1990",
+    "en": "Date of birth? For example: 01.02.1990"
+   },
+   "hint": {
+    "ru": "дата вида 01.02.1990 или 1990-02-01, не в будущем",
+    "en": "a date like 01.02.1990 or 1990-02-01, not in the future"
+   }
+  },
+  {
+   "id": "sex",
+   "kind": "choice",
+   "field": "identity.sex",
+   "text": {
+    "ru": "Пол? От него зависят нормы части анализов.",
+    "en": "Sex? Reference ranges for some lab tests depend on it."
+   },
+   "options": [
+    {
+     "label": {
+      "ru": "Мужской",
+      "en": "Male"
+     },
+     "value": "male"
+    },
+    {
+     "label": {
+      "ru": "Женский",
+      "en": "Female"
+     },
+     "value": "female"
+    }
+   ]
+  },
+  {
+   "id": "height",
+   "kind": "number",
+   "field": "identity.height_cm",
+   "text": {
+    "ru": "Рост в сантиметрах?",
+    "en": "Height in centimeters?"
+   },
+   "hint": {
+    "ru": "число от 100 до 230",
+    "en": "a number from 100 to 230"
+   }
+  },
+  {
+   "id": "weight",
+   "kind": "number",
+   "field": "identity.weight_kg",
+   "optional": true,
+   "text": {
+    "ru": "Вес в килограммах? Если взвешиваешься на умных весах, пропусти: возьму оттуда.",
+    "en": "Weight in kilograms? If you use a smart scale, skip this: I'll take it from there."
+   },
+   "hint": {
+    "ru": "число от 30 до 250",
+    "en": "a number from 30 to 250"
+   }
+  },
+  {
+   "id": "home",
+   "kind": "location",
+   "target": "home",
+   "optional": true,
+   "text": {
+    "ru": "Где твой дом? Нажми «Отправить место», когда будешь дома. По этой точке я отличаю дом от поездок и узнаю часовой пояс. Точка хранится только в твоей базе.",
+    "en": "Where is your home? Tap “Send location” when you are at home. I use this point to tell home from travel and to learn your time zone. The point is stored only in your database."
+   }
+  },
+  {
+   "id": "brief_time",
+   "kind": "choice",
+   "target": "brief_time",
+   "text": {
+    "ru": "Во сколько присылать утренний отчёт?",
+    "en": "What time should I send the morning brief?"
+   },
+   "options": [
+    {
+     "label": "06:30",
+     "value": "06:30"
+    },
+    {
+     "label": "07:00",
+     "value": "07:00"
+    },
+    {
+     "label": "07:30",
+     "value": "07:30"
+    },
+    {
+     "label": "08:00",
+     "value": "08:00"
+    },
+    {
+     "label": "08:30",
+     "value": "08:30"
+    },
+    {
+     "label": "09:00",
+     "value": "09:00"
+    }
+   ]
+  },
+  {
+   "id": "health",
+   "kind": "text",
+   "target": "problems",
+   "optional": true,
+   "max_len": 3000,
+   "text": {
+    "ru": "Есть ли текущие проблемы со здоровьем? Расскажи или пришли медицинские документы и анализы. Каждую проблему — с новой строки. Документы можно прислать прямо сейчас файлами; когда закончишь, напиши текст или «нет».",
+    "en": "Do you have any current health problems? Tell me, or send medical documents and lab results. One problem per line. You can send documents as files right now; when you're done, write your text or “no”."
+   }
+  },
+  {
+   "id": "allergies",
+   "kind": "text",
+   "field": "medical.allergies",
+   "optional": true,
+   "max_len": 500,
+   "text": {
+    "ru": "Есть ли аллергии или непереносимость — на лекарства, продукты, что-то ещё? Если нет — «нет».",
+    "en": "Any allergies or intolerances — to medications, food, anything else? If none — “no”."
+   }
+  },
+  {
+   "id": "meds",
+   "kind": "text",
+   "target": "medications",
+   "optional": true,
+   "max_len": 2000,
+   "text": {
+    "ru": "Что принимаешь регулярно: лекарства, добавки? Каждое с новой строки, можно с дозой. Если ничего — «нет».",
+    "en": "What do you take regularly: medications, supplements? One per line, dose is welcome. If nothing — “no”."
+   }
+  },
+  {
+   "id": "smoking",
+   "kind": "choice",
+   "field": "routine.smoking",
+   "text": {
+    "ru": "Куришь?",
+    "en": "Do you smoke?"
+   },
+   "options": [
+    {
+     "label": {
+      "ru": "Не курю",
+      "en": "I don't smoke"
+     },
+     "value": "не курит"
+    },
+    {
+     "label": {
+      "ru": "Курю",
+      "en": "I smoke"
+     },
+     "value": "курит"
+    },
+    {
+     "label": {
+      "ru": "Бросил(а)",
+      "en": "I quit"
+     },
+     "value": "бросил"
+    }
+   ]
+  },
+  {
+   "id": "fasting",
+   "kind": "choice",
+   "field": "routine.fasting_labs",
+   "text": {
+    "ru": "Анализы крови обычно сдаёшь натощак? От этого зависит, как я читаю глюкозу и жиры.",
+    "en": "Do you usually take blood tests fasting? It changes how I read glucose and lipids."
+   },
+   "options": [
+    {
+     "label": {
+      "ru": "Да, натощак",
+      "en": "Yes, fasting"
+     },
+     "value": "true"
+    },
+    {
+     "label": {
+      "ru": "Нет / по-разному",
+      "en": "No / it varies"
+     },
+     "value": "false"
+    }
+   ]
+  },
+  {
+   "id": "sources",
+   "kind": "choice",
+   "target": "connections",
+   "text": {
+    "ru": "Что из этого у тебя есть?",
+    "en": "Which of these do you have?"
+   },
+   "options": [
+    {
+     "label": {
+      "ru": "Кольцо Oura",
+      "en": "Oura ring"
+     },
+     "value": "oura"
+    },
+    {
+     "label": {
+      "ru": "Apple Watch / «Здоровье» на iPhone",
+      "en": "Apple Watch / Apple Health on iPhone"
+     },
+     "value": "apple"
+    },
+    {
+     "label": {
+      "ru": "И то и другое",
+      "en": "Both"
+     },
+     "value": "both"
+    },
+    {
+     "label": {
+      "ru": "Ничего",
+      "en": "Neither"
+     },
+     "value": "none"
+    }
+   ]
+  }
+ ]
+}

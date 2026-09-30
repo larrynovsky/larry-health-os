@@ -1,0 +1,68 @@
+# Урок установки исполняется на чистой машине (решение владельца 30.09): помеченные блоки
+# docs/tutorials/first_install.md идут как их прочтёт человек (scripts/tutorial_run.py), образ и
+# файлы запуска собраны из ЭТОГО коммита — урок проверяется до выпуска, а не после.
+# Краснеет, если урок разошёлся с системой: команда упала, служба не поднялась, дашборд не
+# ответил, бот не дошёл до чтения токена.
+name: tutorial
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    if: github.repository == 'larrynovsky/larry-health-os'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      IMAGE: ghcr.io/larrynovsky/larry-health-os:ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.11"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - name: образ и файлы запуска из этого коммита (то же, что делает выпуск)
+        run: |
+          pip install pyyaml
+          python3 scripts/install.py --docker --tz UTC --image "$IMAGE"   # и .dockerignore
+          grep -qx '.git' .dockerignore
+          docker buildx build --load -f docker/Dockerfile -t "$IMAGE" .
+          mkdir -p dist
+          cp build/docker/compose.yaml dist/compose.yaml
+          cp build/docker/.env dist/health.env
+      - name: урок, помеченные блоки
+        run: python3 scripts/tutorial_run.py docs/tutorials/first_install.md --dist "$PWD/dist"
+      - name: система жива так, как обещает урок
+        working-directory: /home/runner/health-docker
+        run: |
+          grep -qx 'TZ=Europe/Berlin' .env                      # шаг 3 сработал
+          for i in $(seq 60); do                                 # дашборд: до 5 минут
+            curl -fsS -o /dev/null http://127.0.0.1:8001/ && break
+            sleep 5
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:8001/
+          for i in $(seq 36); do                                 # пульс служб: до 3 минут
+            down=$(docker compose exec -T cron python3 -c \
+              "import daemon_liveness as d; print(' '.join(x for x in map(str, d.find_down_daemons())))")
+            echo "$down" | grep -Eq 'dashboard|lab-intake|lab_intake' || break
+            sleep 5
+          done
+          echo "не отмечаются: $down"
+          ! echo "$down" | grep -Eq 'dashboard|lab-intake|lab_intake'
+          # Поддельный токен: бот обязан дойти до Telegram и получить отказ — значит, он
+          # стартовал и прочёл секрет из каталога урока.
+          for i in $(seq 36); do
+            docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log' && break
+            sleep 5
+          done
+          docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log'
+      - name: журналы при провале
+        if: failure()
+        working-directory: /home/runner/health-docker
+        run: docker compose ps; docker compose logs --tail 80

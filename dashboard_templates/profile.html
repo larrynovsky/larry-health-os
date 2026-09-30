@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Профиль — Health OS{% endblock %}
+{% set page_name = "профиль" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Профиль</h1>
+  <p class="shell-subtitle">{{ total }} записей · {{ by_category | length }} категорий</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% for category, items in by_category.items() %}
+  <div class="caption">{{ category }}</div>
+  <table class="kv">
+    <tbody>
+      {% for r in items %}
+        <tr class="kv-row">
+          <td class="kv-key" title="{{ r.key }}">{{ r.label }}{% if r.auto %} <span class="caption">авто</span>{% endif %}</td>
+          <td class="kv-value {% if r.value_json %}kv-value--json{% elif r.value_text and r.value_text|length > 60 %}kv-value--narrative{% else %}kv-value--text{% endif %}"
+              {% if r.auto %}title="обновляется системой из документов · {{ r.updated_at }}"
+              {% else %}hx-get="/api/profile/{{ r.key }}/edit"
+              hx-trigger="click"
+              hx-swap="outerHTML"
+              title="клик чтобы изменить · {{ r.updated_at }} · {{ r.updated_by or '—' }}"{% endif %}>
+            {% if r.value_text %}{{ r.value_text }}{% endif %}
+            {% if r.value_json %}<pre class="mono">{{ r.value_json | pretty_json }}</pre>{% endif %}
+          </td>
+          <td class="kv-age" title="{{ r.updated_at }} · {{ r.updated_by or '—' }}">
+            {% set _age = r.updated_at | age_days %}{% if _age is not none %}{{ _age }}д{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endfor %}
+
+{% endblock %}

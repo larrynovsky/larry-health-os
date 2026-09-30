@@ -1,0 +1,17 @@
+{
+  "module": "health_ai",
+  "public": [
+    "chat",
+    "compute_recovery_index",
+    "detect_metric_drift",
+    "generate_morning_report",
+    "generate_weekly_report",
+    "get_active_protocols",
+    "get_open_hypotheses",
+    "run_arbiter",
+    "save_hypothesis"
+  ],
+  "depends_on": [],
+  "disposability": null,
+  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился."
+}

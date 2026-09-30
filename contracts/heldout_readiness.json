@@ -1,0 +1,29 @@
+{
+  "module": "heldout_readiness",
+  "public": [
+    "parks_due"
+  ],
+  "depends_on": [
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "тексты карточек ru/en; язык передаёт вызывающий, профиль здесь не читается"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "Одна ответственность: РЕШЕНИЕ «что поднять владельцу при данной готовности данных». Ни БД, ни времени, ни веры — их читает тонкий check_heldout_ready в integrity_tests.",
+      "D2": "Один entry point — parks_due(weeks_since_freeze, q_lag_passed, floor_weeks). Приватных нет.",
+      "D3": "Решение на числах/None; i18n.t читает словарь с явно заданным языком, без БД и часов.",
+      "D4": "57 строк на 2026-09-28.",
+      "D5": "Характеризационный тест — __main__ selftest: каждая ветка (рано / дозрело на пол / с запасом / лаг-выживший / оба / нет данных).",
+      "D6": "Общий инвариант — СТАБИЛЬНЫЕ gate_id 'vg:heldout_ready' и 'vg:signal_generative_promotion': объявлены здесь, потребляются check_heldout_ready и parked_decisions. Явный контракт (строки), не неписаное допущение."
+    },
+    "rationale": "Чистая функция за узким объявленным контрактом: переписывается с нуля из этого сайдкара + __main__-теста, без открытия integrity_tests. Порог floor_weeks инжектится извне (provisional, SPEC §4), состояние — снаружи.",
+    "date": "2026-09-28",
+    "oracle": "heldout_readiness.py::__main__ (assert по каждой ветке parks_due)"
+  }
+}

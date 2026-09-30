@@ -1,0 +1,47 @@
+{
+  "module": "scripts/install",
+  "public": [
+    "plan_install",
+    "apply_install",
+    "exclude_from_git",
+    "secure_db",
+    "docker_plan",
+    "render_docker",
+    "docker_summary",
+    "install_facts",
+    "install_facts_hash",
+    "install_doc_problem",
+    "main"
+  ],
+  "depends_on": [
+    {
+      "module": "health_db",
+      "uses": [
+        "init_db"
+      ],
+      "why": "пустая база — в дочернем процессе с каталогом установки"
+    },
+    {
+      "module": "norm_documents",
+      "uses": [
+        "fetch_eflm",
+        "fetch_ctcae"
+      ],
+      "why": "по флагу --fetch-eflm: снимок из API EFLM на машине установщика; по флагу --fetch-ctcae: документ CTCAE с сайта NCI (в репо не едет)"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — развернуть установку из templates/, включая контейнерный рендер и видимые факты для документации. Не грузит launchd, не пишет секреты, не решает, что такое основная машина (это infra_config).",
+      "D2": "plan_install/apply_install — план и запись; main — CLI. docker_plan/render_docker — общий контейнерный рендер, image только keyword (дефолт health-os:local). docker_summary — печатаемый итог без пути машины; install_facts — только services/volumes/summary/secrets/env_keys/ocr_langs/cli_flags, без значений окружения машины; install_facts_hash — sha256:<12 hex> sorted-keys JSON. install_doc_problem — None для свежей единственной метки, иначе диагноз с командой --regen-install. exclude_from_git прячет данные ЭТОЙ установки от git.",
+      "D3": "stdlib и существующий PyYAML; init_db/fetch_eflm/fetch_ctcae в дочернем процессе. Стартовые имена секретов читаются из AST bot/filters.py без импорта и чтения значений; OCR — из ARG Dockerfile.",
+      "D4": "Контейнерный рендер расширяет прежний установщик: второй модуль с копией плана не заводится. install_facts проецирует существующий рендер, не держит свою конфигурацию служб.",
+      "D5": "tests/unit/test_install.py — свежая машина, существующее не затирается, повтор пуст, секреты 700; tests/unit/test_docker_render.py — расписание, образ каждой службы, CLI, независимый счёт итога и мутации источников facts. tests/consistency/test_install_docs_fresh.py — stamp и исполненный отрицательный контроль.",
+      "D6": "primary_host пишется один раз; существующие данные не затираются. INSTALL_DOC_PAGES/INSTALL_PROVENANCE — общий периметр doc_agent и датчика. Факты берутся из render_docker/docker_plan; docker_summary используется и CLI, и facts. Дефолт образа сохраняет путь deploy_container без изменения."
+    },
+    "rationale": "Исходные шаблоны, placement и тесты фиксируют рендер; контракт называет границы записи, дефолт образа и формат facts. Второго дома расписания и настроек служб нет.",
+    "date": "2026-09-30",
+    "oracle": "tests/unit/test_install.py; tests/unit/test_docker_render.py; tests/consistency/test_install_docs_fresh.py::test_sensor_is_red_on_missing_stale_malformed_and_changed_facts; проба чистого клона (scripts/clean_clone_probe.py)."
+  }
+}

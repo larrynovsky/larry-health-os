@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Сегодня — Health OS{% endblock %}
+{% set page_name = "главная" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Сегодня, <em>{{ weekday_name }}</em></h1>
+  <p class="shell-subtitle">{{ today_meta }}</p>
+  <p class="epigraph">«{{ epigraph or 'тише, чем кажется' }}»</p>
+</div>
+<div class="shell-actions">
+  <span class="hint">⌘K</span>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="caption">сводка</div>
+
+<ul class="counts">
+  <li><a href="/profile">Профиль</a><b>{{ counts.profile }} записей</b></li>
+  <li><a href="/hypotheses">Гипотезы</a><b>{{ counts.hypotheses_open }}/{{ counts.hypotheses_all }} активных</b></li>
+  <li><a href="/protocols">Протоколы</a><b>{{ counts.protocols_active }}/{{ counts.protocols_total }} активных</b></li>
+  <li><a href="/tasks">Задачи</a><b>{{ counts.tasks_open }} открытых</b></li>
+  <li><a href="/problems">Проблемы</a><b>{{ counts.problems_active }} активных</b></li>
+  <li><a href="/medical-record">Медкарта</a><b>{{ counts.events_total }} событий · {{ counts.episodes_total }} эпизодов</b></li>
+  <li><a href="/labs">Анализы</a><b>{{ counts.labs_tests }} тестов</b></li>
+  <li><a href="/constitutions">Конституции</a><b>{{ counts.constitutions }} доменов</b></li>
+</ul>
+
+{% endblock %}

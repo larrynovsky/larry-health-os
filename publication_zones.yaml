@@ -1,0 +1,167 @@
+# Зоны публикации — ЕДИНСТВЕННЫЙ дом списка «что не едет в открытый репозиторий».
+#
+# Решение владельца 2026-09-23: проект когда-нибудь откроется на GitHub новым чистым
+# репозиторием — экспортом публичной зоны одним первым коммитом. История git и всё,
+# что перечислено ниже, остаются у владельца.
+#
+# Читатели: pii_census.py (перепись и pre-commit-гейт: приватное не судится) и будущий
+# скрипт экспорта (приватное не копируется). Второй копии этого списка быть не должно.
+#
+# Всё, что не перечислено, — ПУБЛИЧНОЕ и судится гейтом. Добавить путь сюда — значит
+# сказать «это личное по сути и не будет опубликовано», а не «не хочу чистить»:
+# причина обязательна, и она читается глазами при ревью экспорта.
+# Синтаксис glob — fnmatch: «*» захватывает и «/».
+private:
+  - glob: "CLAUDE.md"
+    why: свод правил работы агентов в этом репозитории — внутренняя кухня владельца, не документация продукта (решение владельца 28.09)
+  - glob: "docs/how-to/recover_studio_filevault*"
+    why: восстановление доступа к машине владельца (его инфраструктура, не продукт; решение владельца 29.09)
+  - glob: "docs/how-to/agent_bridge_codex*"
+    why: переписка агентов владельца (Cowork ↔ Codex) — его рабочая кухня (решение владельца 29.09)
+  - glob: "docs/how-to/multi_session_protocol*"
+    why: протокол нескольких чатов Claude на машине владельца — его рабочая кухня (решение владельца 29.09)
+  - glob: "private/*"
+    why: словарь и долг самого гейта — сам словарь состоит из личных данных
+  - glob: "docs/handoff/*"
+    why: журнал сессий — записки между сессиями, датированные снимки
+  - glob: "plans/*"
+    why: рабочие планы — история, не документация продукта
+  - glob: "contracts/plans/*"
+    why: сайдкары проб из plans/ — едут вместе со своими файлами
+  - glob: "plan_*.md"
+    why: датированные разовые планы в корне — история, как plans/
+  - glob: "CHANGELOG.md"
+    why: журнал изменений, append-only
+  - glob: "BACKLOG.md"
+    why: живой долг владельца, пишется в рабочем порядке
+  - glob: "BACKLOG_ARCHIVE.md"
+    why: закрытый долг, журнал
+  - glob: "ROADMAP.md"
+    why: планы владельца
+  - glob: "SECURITY_AUDIT_LOG.md"
+    why: журнал аудитов безопасности
+  - glob: "launchd/*"
+    why: конфиги развёртывания машин владельца (пути, таймзона, окружения тенантов); публичный проект получит шаблоны
+  - glob: "*.plist"
+    why: то же — плисты launchd владельца в корне репозитория
+  - glob: "tests/reports/*"
+    why: артефакты прогонов (хосты, пути машины)
+  - glob: "methodology/repertoire.json"
+    why: личный кулинарный репертуар владельца — данные тенанта, не код
+  - glob: "methodology/taste_profile.json"
+    why: "личный вкусовой профиль владельца (извлечён из его PDF, user_id и имя внутри) — тот же класс, что repertoire.json; найдено 2026-09-25 (нить genotype-scrub). Без файла вкусовой слой нейтрален (taste.load_taste)"
+  - glob: "methodology/taste_bridge.json"
+    why: "мост keyword→вердикт, выведенный из его вкусового профиля (его запреты и любимое) — тот же класс"
+  - glob: "methodology/taste_profile_calibrations.md"
+    why: "ответы владельца о его вкусе (калибровка сессии 2026-07-15) — тот же класс"
+  - glob: "data/norm_docs/physician_*"
+    why: решения лечащего врача владельцу — дословные документы, данные тенанта
+  - glob: "data/norm_docs/stratified_targets.json"
+    why: машинная форма решения врача (парная к physician_*), данные тенанта
+  - glob: "data/norm_docs/eflm_*"
+    why: "ЛИЦЕНЗИЯ ЗАПРЕЩАЕТ: условия EFLM BV Database (biologicalvariation.eu/disclaimer, прочитано 2026-09-23) — «You may not, except with our express written permission, distribute… You cannot… store it in any other website». Публичная установка тянет данные из API сама или получает письменное разрешение EFLM"
+  - glob: "data/norm_docs/ctcae_v*.xlsx"
+    why: "документ NCI с кодами MedDRA — установка скачивает сам (norm_documents.fetch_ctcae, решение владельца 2026-09-25)"
+  - glob: "data/norm_docs/ctcae_lab_v*.json"
+    why: "ЛИЦЕНЗИЯ НЕ ПРОВЕРЕНА ДО КОНЦА: текст NCI свободен от копирайта (cancer.gov/policies/copyright-reuse), но файлы несут коды MedDRA (v5: колонка MedDRA Code), а MedDRA лицензирует ICH/MSSO. До проверки публичная установка скачивает CTCAE у NCI сама (URL — в norm_documents)"
+  - glob: "methodology/clinical_kb/*"
+    why: "онко-контур тенанта (классы состояний его диагноза, генотипы) — решение владельца 2026-09-23: публичный код не выдаёт диагноз публикатора; публичная установка приносит свой свод"
+  - glob: "data/norm_docs/schedules.json"
+    why: "кадансы и утверждения гайдлайнов по эпизодам лечения тенанта (id его эпизодов) — онко-контур, решение владельца 2026-09-23"
+  - glob: "data/norm_docs/documents_tenant.json"
+    why: "реестр документов тенанта (гайдлайны его диагноза, решения его врача) — то же решение"
+  - glob: "methodology/validation_gate/data_manifest.yaml"
+    why: "пререгистрация N=1-исследования владельца: даты его лечения как эпохи — личная медицинская хронология"
+  - glob: "methodology/validation_gate/synthetic_spec.yaml"
+    why: "длины его терапевтических эпох в спецификации синтетики — та же хронология, числом дней"
+  - glob: "methodology/food_rules.yaml"
+    why: "пол безопасности питания — правила, выписанные под состояния владельца (оракул — владелец); публичная установка приносит свой"
+  - glob: "methodology/regimens.yaml"
+    why: "синонимы схем лечения тенанта — набор схем выдаёт диагноз; решение владельца 2026-09-23"
+  - glob: "docs/explanation/survivorship_extension_plan.md"
+    why: "план расширения, написанный по истории лечения владельца — история, не документация продукта"
+  - glob: "docs/explanation/survivorship_preflight.md"
+    why: "разведка перед постройкой по данным владельца — история"
+  - glob: "docs/DIATAXIS_WORKPLAN_V2.md"
+    why: "рабочий план перестройки документации (14 ссылок на plans/ и журналы) — история, не документация продукта; 2026-09-27, нить export-refs"
+  - glob: "docs/explanation/periods_model.md"
+    why: "разбор на личной хронологии лечения владельца"
+  - glob: "tests/.diagnosis_cache/*"
+    why: "кэш диагнозов упавших тестов — артефакт прогонов (пути машины), переписывается самим прогоном; тот же класс, что tests/reports/*"
+  # ── Тесты, которые не едут в выгрузку (решение владельца 2026-09-24 «разделить», по репетиции
+  #    экспорта docs/handoff/publication/2026-09-24-2aba98b.md). Тесты правил владельца, у которых
+  #    в самих файлах нет его данных, остаются публичными с меткой owner_data (пропуск в выгрузке).
+  - glob: "tests/unit/test_lab_canon_snapshot.py"
+    why: "regression corpus built from real tenants' lab-name strings"
+  - glob: "tests/snapshots/lab_canon_normalize.json"
+    why: "regression corpus built from real tenants' lab-name strings"
+  - glob: "tests/unit/test_stratified_target.py"
+    why: "тест правил владельца: цели по классу его состояния (id класса из его свода) — 6 из 7 требуют его данных"
+  - glob: "tests/unit/test_food_profile.py"
+    why: "тест правил владельца: пол питания под его операцию — 8 из 11 требуют его данных, фикстуры называют операцию"
+  - glob: "tests/unit/test_food_floor.py"
+    why: "тест правил владельца: то же, пол питания — 4 из 7 требуют его данных"
+  - glob: "tests/unit/test_food_apply_generated.py"
+    why: "тест правил владельца: применение сгенерированных правил питания к его профилю"
+  - glob: "tests/unit/test_norm_documents_fresh.py"
+    why: "тест правил владельца: свежесть гайдлайнов его диагноза — 9 из 11 требуют его документов"
+  - glob: "tests/unit/test_clinical_kb_phase2.py"
+    why: "тест правил владельца: его свод состояний (классы, импликации резекции) — 13 из 21 требуют его свода"
+  # Тесты оснасток мастерской plans/ — едут вместе со своей зоной (без plans/ не собираются вовсе).
+  - glob: "tests/unit/test_close_constitution_conflicts.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_drop_harness_parse_bucket.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_episode3_relapse_title.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_fill_closing_conditions.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_lab_flag_absence.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_mutation_stand_guard.py"
+    why: "тест оснастки plans/mutation_stand.py"
+  - glob: "tests/unit/test_premechanism_retire_selection.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_probe_quarantine_exit_helpers.py"
+    why: "тест пробы plans/probe_quarantine_exit_2026-07-29.py"
+  - glob: "tests/unit/test_ungrounded_corr_journal.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_waiting_room_cleanup.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_waiting_room_urine.py"
+    why: "тест оснастки plans/ — импортирует plans/"
+  # С 27.09 тесты разовых актов plans/ называются test_plan_*.py и приватны по имени; публичный
+  # файл, импортирующий приватную зону, блокирует коммит (pii_census.private_imports).
+  - glob: "tests/unit/test_plan_*.py"
+    why: "тесты разовых актов plans/ — импортируют plans/, в выгрузке упали бы на сборке"
+  # Тесты правил владельца, выделенные из публичных файлов: они ловят ЕГО слова его же правилами
+  # (регулярка пола питания, синонимы схем лечения), и нейтральное слово их ломает.
+  - glob: "tests/unit/*_owner.py"
+    why: "тесты правил владельца, выделенные из одноимённого публичного файла (решение 2026-09-24 «разделить»)"
+  - glob: "tests/unit/test_taste.py"
+    why: "тест вкусового профиля владельца: литералами держит его любимое, нелюбимое и запреты (2026-09-25, genotype-scrub)"
+  - glob: "tests/unit/test_brief_retell_sensor.py"
+    why: "датчик пересказа характеризуется на ДОСЛОВНЫХ репликах владельца и брифах инцидента 02–04.08 — его онко-наблюдение; синтетика убила бы смысл характеризации (2026-09-25, onco-scrub)"
+  # 2026-09-26 (нить pub-read-scrub, чтение публичной зоны НЕ автором): характеризация на данных владельца
+  - glob: "tests/integration/test_gate_stratified_canon.py"
+    why: "сверяет p-значения и доли гейта с живым каноном сна и ВСР владельца (читает его БД) — синтетика убила бы смысл характеризации"
+  - glob: "tests/charters/CH-ONCO-01.md"
+    why: "чартер ручной приёмки онко-отчётов по клиническому профилю владельца (стадия, лечение, маркеры) — правило его данных, не продукта"
+  # 2026-09-26 (pub-read-scrub, фаза 2 — чтение кода и документации НЕ автором): документы, которые
+  # целиком описывают ряд данных ОДНОГО человека (N=1, его эпохи лечения, корреляции, медианы, даты)
+  - glob: "docs/explanation/statistik/*"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "docs/explanation/null_gate_spec.md"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "docs/explanation/null_gate_impl_plan.md"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "docs/explanation/null_gate_appendix_code.md"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "docs/explanation/null_gate_fig3_weights.png"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "docs/explanation/studio_db_schema_2026-05.md"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "methodology/validation_gate/stage_b_design.md"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"
+  - glob: "methodology/validation_gate/validation_gate_FDR_verdict.md"
+    why: "документ на ряде данных владельца (N=1): его периоды, агрегаты и находки — не документация продукта"

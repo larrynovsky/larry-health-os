@@ -1,0 +1,138 @@
+# icloud_contacts.yaml — реестр всех точек контакта кода с iCloud-планом.
+# Создан 2026-07-02 (Поток 3, обзор трёх линз).
+#
+# Зачем: iCloud — ленивая репликация без датчиков. Каждый контакт кода с ней —
+# потенциальный stale-read или пропущенный-при-миграции читатель (прецеденты:
+# monthly_consilium месяц читал заархивированные промпты; backup.sh 35/36 ночей
+# падал на TCC). Новый контакт без записи здесь — падение census-теста
+# tests/integration/test_icloud_contact_registry.py.
+#
+# kind:
+#   source_inbox    — iCloud = источник входящих (человек/приложение кладёт, код читает)
+#   staging         — tentative-зона пайплайна (код пишет и читает, канон дальше в БД)
+#   derived_export  — производный экспорт из канона-БД (код пишет, человек читает)
+#   guard           — код упоминает путь только чтобы ЗАПРЕТИТЬ его использование
+#   journal         — разовые артефакты для чтения человеком (не читаются кодом обратно)
+#   legacy_oneshot  — исторический одноразовый импорт, путь заморожен в коде
+#   home            — единственный дом облачного пути (значение — в настройке установки)
+#
+# Правила (лестница из feedback_stale_intermediate_layer):
+#   derived_export — писать в точке генерации + anti-drift маркер в файле;
+#   source_inbox   — код никогда не пишет туда;
+#   staging        — вычищается после промоута, канон только БД;
+#   новый derived_export без автозаписи в точке генерации — запрещён.
+
+# 2026-09-24 (BL-PUB-12, нить publication-tails): облачный путь больше не литерал в 27 файлах —
+# у него один дом, infra_config (CLOUD_HEALTH_DIR / cloud_dir() / HAE_APP_DIR / CONSTITUTIONS_MIRROR;
+# значение — private/infra.yaml: cloud_health_dir). Census ищет контакт по литералу ИЛИ по обращению
+# к этому дому, поэтому контакт через настройку он видит. Литерал вне дома и стражей — красный
+# (test_cloud_literal_only_in_home). Сняты записи, где контакт был мёртвой константой
+# (gp_agent, hai_core, wellally_consult, smoke_tests) или строкой в docstring (lab_review_sheet).
+contacts:
+  - file: health_db.py
+    kind: guard
+    note: >-
+      _ICLOUD_DEFAULT (легаси-дефолт MacBook) + список cloud-папок для
+      _validate_db_path — импорт падает, если DB_PATH в облачной папке.
+      iCloud-копия health.db — НЕ бэкап (решение 2026-07-02): бэкапы =
+      sqlite3 .backup на Studio + Time Machine.
+
+
+  - file: hae_checker.py
+    kind: source_inbox
+    path: iCloud~com~ifunography~HealthExport + health/data/hae_archive/
+    note: инбокс Health Auto Export; архив после обработки — staging-архив.
+
+  - file: lab_backfill.py
+    kind: source_inbox
+    path: health/ (CR/, сканы анализов)
+    note: исходные документы анализов; код только читает.
+
+  - file: lab_intake_watcher.py
+    kind: source_inbox
+    path: health/CR/ (только у владельца) + HEALTH_DATA_DIR/incoming
+    note: >
+      Поллит папку владельца и инбокс тенанта, отдаёт лабораторные бланки
+      распознавателю. Код ТОЛЬКО читает; состояние (водяной знак, вердикты
+      «не лаб») живёт в data/lab_intake_state.json тенанта, а не сайдкарами
+      в iCloud — там они были бы мусором в личной папке. Исключение: сайдкары
+      .failed/.norows пишутся рядом с файлом, они несут сигнал человеку.
+      CR/ читается только процессом владельца; у партнёра — лишь его incoming.
+
+  - file: lab_extractor.py
+    kind: staging
+    path: health/data/pending_labs/
+    note: tentative-зона лаб-пайплайна до Telegram-approve; канон — lab_results (БД).
+
+  # ── Дополнено census-датчиком 2026-07-02 (первый прогон нашёл 20 незарегистрированных) ──
+
+  - file: import_all.py
+    kind: source_inbox
+    path: health/ (корень — входящие документы)
+    note: оркестратор импорта; iCloud = инбокс документов.
+
+  - file: import_apple_health.py
+    kind: source_inbox
+    path: HealthExport inbox + health/
+    note: HAE-экспорты; читает, не пишет.
+
+  - file: import_oura.py
+    kind: source_inbox
+    note: пути входящих; данные уезжают в daily_metrics (БД).
+
+  - file: import_fitdays.py
+    kind: source_inbox
+    path: health/data/Fitdays*.csv
+    note: сырой CSV-экспорт Fitdays smart-scale (вес) → daily_metrics.weight; код только читает.
+
+  - file: import_medical_events.py
+    kind: source_inbox
+    path: health/ (медицинские документы)
+    note: encounters из документов; канон — БД.
+
+  - file: hai_reports.py
+    kind: source_inbox
+    path: health/data/vital_metrics_config.json
+    note: человек-редактируемый конфиг = канон в iCloud, код читает. Кандидат на переезд в system_config (БД) — тот же класс, что cbcr_manifest.
+
+  - file: jobs/scheduled.py
+    kind: derived_export
+    path: health/data/reports/
+    note: чтение/отправка сгенерированных отчётов (канон — БД + reports-экспорт morning_report).
+
+  - file: consult_prep.py
+    kind: source_inbox
+    note: ICLOUD-константа путей; подготовка к разбору читает документы.
+
+  - file: check_contracts.py
+    kind: guard
+    note: проверяет существование критических путей, в т.ч. iCloud.
+
+  - file: integrity_tests.py
+    kind: guard
+    note: список облачных папок для проверок + путь iCloud для датчиков.
+
+  - file: gen_key_paths.py
+    kind: guard
+    note: генератор таблицы ключевых путей; помечает iCloud как «read-only реплика, НЕ canonical».
+
+  - file: lab_drytest.py
+    kind: journal
+    path: health/dry_test/
+    note: артефакты dry-прогонов лаб-пайплайна для человека.
+
+  - file: scripts/create_test_synevo_pdf.py
+    kind: journal
+    path: health/CR/TEST_synevo_*.PDF
+    note: генератор тестового PDF в инбокс (ручной тест пайплайна).
+
+  - file: infra_config.py
+    kind: home
+    note: >-
+      CLOUD_HEALTH_DIR (private/infra.yaml: cloud_health_dir), cloud_dir() — нет облака → каталог
+      данных процесса, HAE_APP_DIR — контейнер приложения Health Auto Export, CONSTITUTIONS_MIRROR.
+
+  - file: generate_constitutions.py
+    kind: derived_export
+    path: health/constitutions/
+    note: зеркало производных .md конституций (канон — БД); путь — infra_config.CONSTITUTIONS_MIRROR.

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HEALTH_DATA_DIR</key>
+		<string>{{DATA}}</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>ExitTimeOut</key>
+	<integer>60</integer>
+	<key>Label</key>
+	<string>com.larry.health.uncommitted-watchdog</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{PYTHON}}</string>
+		<string>{{REPO}}/scripts/uncommitted_watchdog.py</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>{{REPO}}/logs/uncommitted_watchdog.err.log</string>
+	<key>StandardOutPath</key>
+	<string>{{REPO}}/logs/uncommitted_watchdog.out.log</string>
+	<key>StartInterval</key>
+	<integer>3600</integer>
+	<key>WorkingDirectory</key>
+	<string>{{REPO}}</string>
+</dict>
+</plist>

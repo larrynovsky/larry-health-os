@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Протоколы — Health OS{% endblock %}
+{% set page_name = "протоколы" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Протоколы</h1>
+  <p class="shell-subtitle">{{ protocols | length }} всего</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% set active = protocols | selectattr('status', 'equalto', 'active') | list %}
+{% set other = protocols | rejectattr('status', 'equalto', 'active') | list %}
+
+{% if active %}
+<div class="caption">действующие</div>
+{% for p in active %}
+  <article class="card card--active" id="prot-{{ p.id }}">
+    <div class="card-head">
+      <div class="card-meta">№ {{ p.id }}
+        {% if p.domain %} · {{ p.domain }}{% endif %}
+        {% if p.frequency %} · {{ p.frequency }}{% endif %}
+        · <time>{{ p.created_at | short(10) }}</time>
+        <span class="age-suffix">({{ p.created_at | age_days }}д)</span>
+      </div>
+      <div class="card-chips">
+        <span class="chip chip--active">{{ p.status }}</span>
+        {% if p.review_date %}<span class="chip chip--outline">review {{ p.review_date }}</span>{% endif %}
+      </div>
+    </div>
+    <h3 class="card-title">{{ p.title }}</h3>
+    <dl class="card-fields">
+      {% if p.behavior %}<dt>поведение</dt><dd>{{ p.behavior }}</dd>{% endif %}
+      {% if p.rationale %}<dt>обоснование</dt><dd>{{ p.rationale }}</dd>{% endif %}
+      {% if p.notes %}<dt>заметки</dt><dd>{{ p.notes }}</dd>{% endif %}
+    </dl>
+    <footer class="card-foot card-actions">
+      {% if p.linked_hypothesis_id %}<span class="card-link">гипотеза № {{ p.linked_hypothesis_id }}</span>{% endif %}
+      {% if p.linked_experiment_id %}<span class="card-link">эксперимент № {{ p.linked_experiment_id }}</span>{% endif %}
+      <button class="action-pill action-pill--ghost"
+              hx-post="/api/protocols/{{ p.id }}/retire"
+              hx-confirm="Прекратить протокол № {{ p.id }}?"
+              hx-target="closest article"
+              hx-swap="delete"
+              style="margin-left: auto">retire</button>
+    </footer>
+  </article>
+{% endfor %}
+{% endif %}
+
+{% if other %}
+<div class="caption">архив ({{ other | length }})</div>
+{% for p in other %}
+  <article class="card">
+    <div class="card-head">
+      <div class="card-meta">№ {{ p.id }} ·
+        <time>{{ p.created_at | short(10) }}</time>
+        <span class="age-suffix">({{ p.created_at | age_days }}д)</span>
+      </div>
+      <div class="card-chips">
+        <span class="chip chip--outline">{{ p.status }}</span>
+        {% if p.retired_at %}<span class="chip chip--outline">retired {{ p.retired_at }}</span>{% endif %}
+      </div>
+    </div>
+    <h3 class="card-title">{{ p.title }}</h3>
+    {% if p.behavior %}<p class="card-description">{{ p.behavior | short(220) }}</p>{% endif %}
+  </article>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

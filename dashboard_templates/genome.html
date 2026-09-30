@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Геномика — Health OS{% endblock %}
+{% set page_name = "геномика" %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Геномика</h1>
+  <p class="shell-subtitle">
+    {{ total_variants }} вариантов ClinVar · {{ pharmaco|length }} CPIC генов ·
+    {{ traits|length }} черт · {{ wellness|length }} wellness · {{ prs|length }} PRS
+  </p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── 1. Клинические варианты (ClinVar P/LP) ─────────────────────────────── #}
+<section class="genome-section">
+  <h2>Клинически значимые варианты <span class="count-badge" id="variants-count">{{ variants|length }} / {{ total_variants }}</span></h2>
+  {% if not variants %}
+    <p class="hint">Нет вариантов с клинической значимостью Pathogenic / Likely pathogenic.</p>
+  {% else %}
+
+  {# Поиск #}
+  <div style="margin-bottom:1rem;">
+    <input id="variants-search" type="text" placeholder="Ищи по гену, заболеванию или описанию…"
+      style="width:100%;max-width:520px;padding:0.5rem 0.8rem;
+             background:var(--color-surface);border:1px solid var(--color-border);
+             border-radius:4px;color:var(--color-text);font-family:inherit;font-size:0.9rem;"
+      oninput="filterVariants(this.value)">
+  </div>
+
+  <table class="data-table" id="variants-table">
+    <thead>
+      <tr>
+        <th style="width:22%">Название</th>
+        <th style="width:14%">Значимость</th>
+        <th>Описание</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in variants %}
+      {% set desc = v.description_ru or v.conditions or '' %}
+      <tr class="{% if 'Pathogenic' in v.significance and 'Likely' not in v.significance %}row--critical{% elif 'Likely' in v.significance %}row--warning{% endif %}"
+          data-search="{{ (v.gene or '') | lower }} {{ (v.conditions or '') | lower }} {{ (v.description_ru or '') | lower }}">
+        <td>
+          <strong>{{ v.gene or '—' }}</strong>
+          {% if v.conditions %}
+          <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:0.15rem;line-height:1.35;">{{ v.conditions[:80] }}{% if v.conditions|length > 80 %}…{% endif %}</div>
+          {% endif %}
+        </td>
+        <td>
+          {% if 'Pathogenic' in v.significance and 'Likely' not in v.significance %}
+            <span class="badge badge--critical">Pathogenic</span>
+          {% else %}
+            <span class="badge badge--warning">Likely pathogenic</span>
+          {% endif %}
+          {% if v.zygosity == 'homozygous' %}
+            <div style="margin-top:0.3rem;"><span class="badge badge--critical" style="font-size:0.68rem;padding:0.1rem 0.4rem;">обе копии</span></div>
+          {% elif v.zygosity == 'heterozygous' %}
+            <div style="margin-top:0.3rem;"><span class="badge badge--warning" style="font-size:0.68rem;padding:0.1rem 0.4rem;">носитель</span></div>
+          {% endif %}
+        </td>
+        <td class="text-sm" style="line-height:1.5;">
+          {{ desc[:250] }}{% if desc|length > 250 %}…{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p id="variants-empty" style="display:none;color:var(--color-text-muted);font-size:0.9rem;margin-top:0.75rem;">
+    Ничего не найдено. Попробуй другой запрос.
+  </p>
+  {% endif %}
+</section>
+
+<script>
+(function() {
+  let _timer;
+  window.filterVariants = function(q) {
+    clearTimeout(_timer);
+    _timer = setTimeout(function() {
+      const term = q.trim().toLowerCase();
+      const rows = document.querySelectorAll('#variants-table tbody tr');
+      let visible = 0;
+      rows.forEach(function(r) {
+        const match = !term || r.dataset.search.includes(term);
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      const total = {{ variants|length }};
+      document.getElementById('variants-count').textContent =
+        term ? (visible + ' / ' + total) : (total + ' / {{ total_variants }}');
+      document.getElementById('variants-empty').style.display =
+        (visible === 0 && term) ? '' : 'none';
+    }, 150);
+  };
+})();
+</script>
+
+{# ── 2. Фармакогеномика (Wave 1, CPIC) ──────────────────────────────────── #}
+<section class="genome-section">
+  <h2>Фармакогеномика <span class="meta">Wave 1 · CPIC</span></h2>
+  {% if not pharmaco %}
+    <p class="hint">Данные фармакогеномики недоступны. Запусти <code class="mono">vcf_import_pipeline.py --phase E</code>.</p>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Ген</th>
+        <th>Аллель 1</th>
+        <th>Аллель 2</th>
+        <th>Фенотип</th>
+        <th>Достоверность</th>
+        <th>SNP</th>
+        <th>Вычислено</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pharmaco %}
+      <tr>
+        <td><strong>{{ p.gene }}</strong></td>
+        <td class="mono">{{ p.star_allele_1 or '—' }}</td>
+        <td class="mono">{{ p.star_allele_2 or '—' }}</td>
+        <td>{{ p.phenotype or '—' }}</td>
+        <td>
+          {% if p.confidence == 'definitive' or p.confidence == 'strong' %}
+            <span class="badge badge--ok">{{ p.confidence }}</span>
+          {% elif p.confidence == 'moderate' %}
+            <span class="badge badge--warning">{{ p.confidence }}</span>
+          {% else %}
+            <span class="badge">{{ p.confidence or '—' }}</span>
+          {% endif %}
+        </td>
+        <td>{{ p.coverage_snp_count or '—' }}</td>
+        <td class="text-sm mono">{{ (p.computed_at or '')[:10] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{# ── 3. Генетические черты (Wave 2) ─────────────────────────────────────── #}
+<section class="genome-section">
+  <h2>Генетические черты <span class="meta">Wave 2 · детерминированные</span></h2>
+  {% if not traits %}
+    <p class="hint">Данные черт недоступны. Запусти <code class="mono">vcf_import_pipeline.py --phase F</code>.</p>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Черта</th>
+        <th>Категория</th>
+        <th>Фенотип</th>
+        <th>Достоверность</th>
+        <th>Примечание</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in traits %}
+      <tr>
+        <td><strong>{{ t.trait }}</strong></td>
+        <td>{{ t.category or '—' }}</td>
+        <td>{{ t.phenotype or '—' }}</td>
+        <td>
+          {% if t.confidence in ('high','definitive') %}
+            <span class="badge badge--ok">{{ t.confidence }}</span>
+          {% else %}
+            <span class="badge">{{ t.confidence or '—' }}</span>
+          {% endif %}
+        </td>
+        <td class="text-sm">{{ (t.notes or '')[:100] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{# ── 4. Wellness-маркеры (Wave 3) ────────────────────────────────────────── #}
+<section class="genome-section">
+  <h2>Wellness-маркеры <span class="meta">Wave 3</span></h2>
+  {% if not wellness %}
+    <p class="hint">Данные wellness недоступны. Запусти <code class="mono">vcf_import_pipeline.py --phase G</code>.</p>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Ген</th>
+        <th>Признак</th>
+        <th>Фенотип</th>
+        <th>Достоверность</th>
+        <th>Примечание</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for w in wellness %}
+      <tr>
+        <td><strong>{{ w.gene or '—' }}</strong></td>
+        <td>{{ w.trait }}</td>
+        <td>{{ w.phenotype or '—' }}</td>
+        <td>
+          {% if w.confidence in ('high','definitive') %}
+            <span class="badge badge--ok">{{ w.confidence }}</span>
+          {% else %}
+            <span class="badge">{{ w.confidence or '—' }}</span>
+          {% endif %}
+        </td>
+        <td class="text-sm">{{ (w.notes or '')[:100] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{# ── 5. Полигенные индексы риска (Wave 4, PRS) ──────────────────────────── #}
+<section class="genome-section">
+  <h2>Полигенные индексы риска <span class="meta">Wave 4 · Phase H</span></h2>
+  <p class="hint">⚠️ Модели обучены преимущественно на европейской популяции. Для не-европейского или смешанного происхождения возможно отклонение 15–30%. Показатели — ориентировочные.</p>
+  {% if not prs %}
+    <p class="hint">PRS недоступны. Скачай веса: <code class="mono">genome_weights.py --pgs-id &lt;ID&gt;</code>, затем запусти <code class="mono">vcf_import_pipeline.py --phase H</code>.</p>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Признак</th>
+        <th>PGS ID</th>
+        <th>Сырой балл</th>
+        <th>Покрытие</th>
+        <th>SNP</th>
+        <th>Вычислено</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in prs %}
+      <tr>
+        <td><strong>{{ p.trait_label }}</strong></td>
+        <td class="mono text-sm">{{ p.pgs_id }}</td>
+        <td class="mono">{{ "%.4f"|format(p.raw_score) }}</td>
+        <td>
+          {% if p.coverage_tier == 'ok' %}
+            <span class="badge badge--ok">{{ p.coverage_pct }}% ✅</span>
+          {% elif p.coverage_tier == 'warn' %}
+            <span class="badge badge--warning">{{ p.coverage_pct }}% ⚠️</span>
+          {% else %}
+            <span class="badge badge--critical">{{ p.coverage_pct }}% ⛔</span>
+          {% endif %}
+        </td>
+        <td class="text-sm">{{ "{:,}".format(p.snps_matched) }} / {{ "{:,}".format(p.snps_total) }}</td>
+        <td class="text-sm mono">{{ (p.computed_at or '')[:10] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% endblock %}

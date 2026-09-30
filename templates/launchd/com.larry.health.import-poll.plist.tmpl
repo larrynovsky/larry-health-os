@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HEALTH_DATA_DIR</key>
+		<string>{{DATA}}</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>Label</key>
+	<string>com.larry.health.import-poll</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{PYTHON}}</string>
+		<string>{{REPO}}/import_all.py</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>{{HOME}}/health_import_poll_error.log</string>
+	<key>StandardOutPath</key>
+	<string>{{HOME}}/health_import_poll.log</string>
+	<key>StartInterval</key>
+	<integer>300</integer>
+</dict>
+</plist>

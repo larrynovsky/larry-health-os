@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HEALTH_DATA_DIR</key>
+		<string>{{DATA}}</string>
+	</dict>
+	<key>Label</key>
+	<string>com.larry.health.assessment-scheduler</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{PYTHON}}</string>
+		<string>{{REPO}}/assessment_scheduler.py</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>{{DATA}}/logs/assessment-scheduler.err.log</string>
+	<key>StandardOutPath</key>
+	<string>{{DATA}}/logs/assessment-scheduler.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>{{REPO}}</string>
+</dict>
+</plist>

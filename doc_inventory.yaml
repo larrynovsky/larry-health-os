@@ -1,0 +1,122 @@
+# doc_inventory.yaml — SSOT классификации .md документации.
+# Создан 2026-05-11 как часть Wave 3-DOC v2 P2-1.
+#
+# Используется:
+# - tests/integration/test_doc_inventory.py (P3-1): coverage — каждый .md в проекте
+#   должен быть в `live` или `archive` (или явно в `ignored_paths`).
+# - tests/integration/test_doc_invariants.py (P3-2): INV-DOC-* проверки stop-words
+#   и других инвариантов в LIVE-файлах.
+# - scripts/git-hooks/pre-commit (P3-4): блок commit'ов с stop-words в LIVE.
+#
+# Изменения этого файла = архитектурное решение, не routine. Перед правкой —
+# обсудить с пользователем.
+
+# LIVE: drift-тесты проверяют эти файлы на актуальность и stop-words.
+# Перечень включает explicit-список root .md и glob-паттерны для подкаталогов.
+live:
+  - "*.en.md"   # английские версии документов корня: класс перевода = класс оригинала (29.09, finish-prep)
+  # Root-level reference + правила
+  - ARCH_SNAPSHOT.md
+  - CLAUDE.md
+  - CONSTITUTION_RULES.md
+  - EXTERNAL_DEPENDENCIES.md
+  - README.md
+  - README.ru.md   # русская версия README; основной — английский (решение владельца 27.09)
+  - CONTRIBUTING.md   # как присылать правки (нить cx-community, 28.09)
+  - CODE_OF_CONDUCT.md
+  - .github/PULL_REQUEST_TEMPLATE.md   # шаблоны GitHub: запрет реальных медданных (28.09)
+  - ".github/ISSUE_TEMPLATE/*.md"
+  - ROADMAP.md
+  - SECURITY.md
+  - NOTICE.md
+  - TESTING_CONTRACTS.md
+  - TEST_ARCHITECTURE.md
+  - USE_CASES.md
+  - recommendation_engine.md
+  - tests/README.md
+  - tests/README.en.md   # перевод (29.09)
+  - tests/PINS.md
+  - docs/DIATAXIS_WORKPLAN_V2.md
+  - docs/BACKUP_POLICY.md
+  - docs/patient_context_single_source.md   # единый контекст пациента (C, 2026-07-05)
+  - docs/BACKUP_POLICY.en.md                 # перевод (28.09)
+  - docs/patient_context_single_source.en.md # перевод (28.09)
+  # Подкаталоги — все .md
+  - "docs/explanation/*.md"
+  - "docs/how-to/*.md"
+  - "docs/tutorials/*.md"   # урок первой установки (онбординг, 2026-09-23)
+  - "docs/reference/*.md"   # Diátaxis reference (2026-06-28)
+  - "docs/genome/*.md"   # genome reference/how-to/explanation (2026-06-28, BL-DOC-1)
+  - "tests/charters/*.md"
+  - "tests/plans/*.md"
+  - "constitutions/*.md"
+  - "specialists/*.md"   # промпты специалистов в git (2026-06-18); чистота — test_prompts_no_hardcode
+  - "data/prompts/*.md"  # промпт еженедельного дайджеста (2026-09-05): данные, не код; тон правится здесь
+  - "data/norm_docs/*.md"  # документы нормы в человеческой форме (2026-09-21): данные, не код
+  # methodology — активные спеки (владелец ведёт; читаются кодом/людьми). Явные пути,
+  # не glob: пусть каждая новая методич-дока осознанно классифицируется (2026-07-13).
+  - methodology/cbcr/cbcr_manifest.md
+  - methodology/signal_validation_lifecycle_SPEC.md
+  - methodology/validation_gate/README.md
+  - methodology/validation_gate/README.en.md   # перевод (29.09)
+  - methodology/validation_gate/validation_gate_FDR_verdict.md
+  - methodology/validation_gate/stage_b_design.md   # Diátaxis reference+explanation дизайна Stage B (2026-07-13)
+  - methodology/validation_gate/HOWTO_qual_drift_and_lab_reactivation.md   # how-to: реакция на датчики M1/M2/M3 (2026-07-13)
+  - methodology/validation_gate/HOWTO_mc_gap.md   # how-to: реакция на датчик MC-зазора (триггер Фаз 1/3-а, 2026-07-24)
+  - methodology/validation_gate/HOWTO_passset_flicker.md   # how-to: реакция на мерцание pass-set (триггер онлайн-контроллера Ф4, 2026-07-24)
+  - methodology/taste_profile_calibrations.md   # калибровки вкус-профиля (оверлей к taste_profile.json, владелец ведёт) (2026-07-15, data-in-code-9)
+
+# ARCHIVE: drift-тесты пропускают целиком (это история, не текущее состояние).
+archive:
+  - BACKLOG.md
+  - BACKLOG_ARCHIVE.md   # заморожен 2026-07-10 при расчистке BACKLOG (E.6)
+  - CHANGELOG.md
+  - SECURITY_AUDIT_LOG.md
+  - "plans/*.md"        # разовые рабочие документы/планы — история, не live
+  - plan_fdr_stage_b_and_debts_2026-07-12.md   # датированный one-shot план (FDR Stage B) — история
+
+# Заголовки секций внутри LIVE-файлов, которые drift игнорирует (как archive).
+# Используются для встроенных подсекций «История изменений» в живых документах.
+history_section_headers:
+  - "История изменений"
+  - "История версий"
+  - "ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ"
+  - "VPS-архив"
+  - "VPS УЗЕЛ"
+
+# Stop-words в LIVE-файлах — упоминание = drift-нарушение.
+# Ограниченный список высокоспецифичных маркеров. nginx/fail2ban сознательно
+# убраны — могут вернуться в новом контексте.
+stop_words_in_live:
+  # адрес старого VPS (снят 2026-04-09) стережёт pii_census: класс infra приватного словаря
+  - "nip.io"        # VPS HTTPS поддомен
+
+# Пути, которые drift полностью игнорирует (даже если там .md).
+ignored_paths:
+  - "tests/reports/"
+  - "tests/.diagnosis_cache/"
+  - ".pytest_cache/"
+  - "_Archive/"
+  - ".git/"
+  - "__pycache__/"
+  - "methodology/cbcr/wiki/"   # cbcr-методичка: внешний reference, читается кодом (cbcr_lookup) как данные, не проектная дока (2026-07-13)
+  - "docs/handoff/"   # the-end continuation-снимки: датированные immutable-артефакты сессий (INDEX/LATEST/снимки), история не live-дока (2026-07-14)
+
+# Бейслайн для INV-DOC-9 (правило #7 в CLAUDE.md):
+# Число silent-except'ов в LIVE *.py на момент введения правила.
+# Превышение → drift-warning в утренний брифинг.
+silent_except_baseline: 35
+
+# ПУТЬ ЧИТАТЕЛЯ (2026-08-04). Страница обязана быть достижима от входа: код
+# называет её ПУТЁМ (текст алерта, докстринг, сообщение исключения) либо её
+# называет read-first документ. Достижимость транзитивна через страницу-проводник;
+# листинг каталога и голое имя без пути входом НЕ считаются, архив docs/handoff/
+# проводником НЕ работает. Сторож — tests/consistency/test_doc_reader_path.py.
+# frozen — хвост на момент замера, ратчет только вниз: страница, получившая вход,
+# уходит отсюда тем же коммитом (за этим следит test_frozen_list_does_not_rot).
+# Путь, уехавший в историю (plans/) или удалённый, тоже обязан уйти отсюда:
+# сторож судит только docs/**, поэтому строка, указывающая в пустоту, не
+# краснела бы НИКОГДА. За этим следит test_frozen_paths_are_alive (2026-08-04).
+reader_path:
+  measured: "2026-08-04"
+  frozen: []   # пусто с 2026-08-04: все 23 страницы получили вход

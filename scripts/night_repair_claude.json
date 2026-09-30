@@ -1,0 +1,24 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": ["~/.health_secrets/**", "~/health/**", "~/health_partner/**",
+                   "~/Library/Mobile Documents/**", "~/.ssh/**", "~/.config/gh/**", "~/.codex/**", "~/.claude/**",
+                   "~/health_scripts/logs/**", "~/health-canary-deny/**"]
+    },
+    "network": {
+      "allowedDomains": []
+    }
+  },
+  "permissions": {
+    "deny": [
+      "Read(~/.health_secrets/**)", "Read(~/health/**)", "Read(~/health_partner/**)",
+      "Read(~/Library/Mobile Documents/**)", "Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.codex/**)",
+      "Read(~/health_scripts/logs/**)", "Read(~/health-canary-deny/**)",
+      "Bash(git push *)", "Bash(git commit *)", "Bash(ssh *)", "Bash(scp *)", "Bash(curl *)", "Bash(docker *)",
+      "Bash(launchctl *)", "Bash(sudo *)", "WebFetch", "WebSearch"
+    ]
+  }
+}

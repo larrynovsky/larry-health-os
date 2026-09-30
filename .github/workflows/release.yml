@@ -1,0 +1,105 @@
+# Выпуск готового образа (решение владельца 30.09): тег v* в ОТКРЫТОМ репозитории →
+# образ amd64+arm64 в GHCR (родные раннеры, без эмуляции) → выпуск GitHub с compose.yaml и
+# health.env, в которых уже стоит имя этого образа. Человеку не нужен клон и сборка.
+# Выпуск делается только по команде владельца: scripts/public_mirror.py --release vX
+# (docs/how-to/release.md). Действия закреплены по SHA — тег чужого репозитория можно передвинуть.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write     # выпуск GitHub
+  packages: write     # GHCR
+
+env:
+  IMAGE: ghcr.io/larrynovsky/larry-health-os
+
+jobs:
+  build:
+    # Рабочий репозиторий владельца несёт тот же файл; выпускает только открытый.
+    if: github.repository == 'larrynovsky/larry-health-os'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.11"
+      # .dockerignore генерирует установщик (в git его нет): без него в образ уехал бы .git.
+      - name: .dockerignore
+        run: |
+          pip install pyyaml
+          python3 scripts/install.py --docker --tz UTC
+          grep -qx '.git' .dockerignore
+      # Языки OCR — умолчание Dockerfile (eng rus, решение 30.09); свои языки — своя сборка.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          provenance: false
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}
+
+  manifest:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: один тег на две архитектуры
+        run: |
+          v="${{ github.ref_name }}"
+          docker buildx imagetools create -t "$IMAGE:$v" -t "$IMAGE:latest" \
+            "$IMAGE:$v-amd64" "$IMAGE:$v-arm64"
+          docker buildx imagetools inspect "$IMAGE:$v"
+
+  release:
+    needs: manifest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: файлы запуска с именем этого образа
+        run: |
+          pip install pyyaml
+          v="${{ github.ref_name }}"
+          # Пояс UTC — заглушка: человек ставит свой в health.env (урок first_install).
+          python3 scripts/install.py --docker --tz UTC --image "$IMAGE:$v"
+          grep -q "image: $IMAGE:$v" build/docker/compose.yaml   # оракул: имя образа доехало
+          mkdir -p dist
+          cp build/docker/compose.yaml dist/compose.yaml
+          # Имя с точкой в начале GitHub переименовывает у файлов выпуска — отдаём health.env.
+          cp build/docker/.env dist/health.env
+          # Агент автозапуска Colima для Мака; дом подставляет урок (sed __HOME__ → $HOME).
+          python3 -c "import sys; sys.path.insert(0, 'scripts'); import install; print(install.render_colima_agent('__HOME__'), end='')" \
+            > dist/com.larry.health.colima.plist
+          grep -q '__HOME__/Library/Logs' dist/com.larry.health.colima.plist
+      - name: выпуск
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${{ github.ref_name }}"
+          gh release create "$v" dist/* --title "$v" \
+            --notes "Образ: \`$IMAGE:$v\` (amd64, arm64). Установка: docs/tutorials/first_install.md · Install: docs/tutorials/first_install.en.md"

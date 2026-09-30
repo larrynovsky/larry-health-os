@@ -1,0 +1,780 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Larry Health OS — what the system does",
+    "quality_profile": "standard",
+    "viewBox": [
+      1250,
+      680
+    ],
+    "views": [
+      {
+        "id": "labs",
+        "label": "Lab results",
+        "focus": [
+          "scans",
+          "recog",
+          "staging",
+          "db",
+          "band",
+          "brief"
+        ],
+        "note": "Scan → two models → your “yes” → database → a brief about the shift."
+      },
+      {
+        "id": "genome",
+        "label": "Genome",
+        "focus": [
+          "dna",
+          "genome",
+          "db",
+          "pgx",
+          "dash"
+        ],
+        "note": "Raw genome → strand reconciliation → pharmacogenomics and risks."
+      },
+      {
+        "id": "insight",
+        "label": "Insights",
+        "focus": [
+          "db",
+          "gate",
+          "hyp",
+          "team",
+          "tasks",
+          "const",
+          "problems"
+        ],
+        "note": "A link must pass the gate; the consilium debates; only you change the record."
+      },
+      {
+        "id": "watch",
+        "label": "Self-monitoring",
+        "focus": [
+          "db",
+          "monitor",
+          "alarm",
+          "normdocs",
+          "norms"
+        ],
+        "note": "Thresholds come from documents; stale data raises an alert, not a brief."
+      }
+    ],
+    "locale": "en"
+  },
+  "components": [
+    {
+      "id": "scans",
+      "type": "external",
+      "label": "Lab results: PDF, photo",
+      "sublabel": "any language",
+      "pos": [
+        20,
+        92
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "recog",
+      "type": "backend",
+      "label": "Recognition",
+      "sublabel": "two models cross-check",
+      "pos": [
+        216,
+        92
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "staging",
+      "type": "security",
+      "label": "Staging",
+      "sublabel": "waits for your “yes”",
+      "pos": [
+        422,
+        92
+      ],
+      "size": [
+        150,
+        54
+      ]
+    },
+    {
+      "id": "letters",
+      "type": "external",
+      "label": "Doctors' letters",
+      "sublabel": "file or cloud link",
+      "pos": [
+        20,
+        170
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "docs",
+      "type": "backend",
+      "label": "Letter parsing",
+      "sublabel": "diagnoses, medications",
+      "pos": [
+        216,
+        170
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "cards",
+      "type": "security",
+      "label": "Cards",
+      "sublabel": "recorded only if approved",
+      "pos": [
+        422,
+        170
+      ],
+      "size": [
+        150,
+        54
+      ]
+    },
+    {
+      "id": "dna",
+      "type": "external",
+      "label": "Raw genome",
+      "sublabel": "23andMe, tellmeGen · VCF",
+      "pos": [
+        20,
+        248
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "genome",
+      "type": "backend",
+      "label": "Genome pipeline",
+      "sublabel": "DNA strand reconciliation",
+      "pos": [
+        216,
+        248
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "devices",
+      "type": "external",
+      "label": "Oura · Apple Health",
+      "sublabel": "sleep, HRV, pulse, BP",
+      "pos": [
+        20,
+        326
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "hae",
+      "type": "backend",
+      "label": "Metric import",
+      "sublabel": "every field checked",
+      "pos": [
+        216,
+        326
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "normdocs",
+      "type": "external",
+      "label": "Reference documents",
+      "sublabel": "CTCAE · EFLM · CPIC",
+      "pos": [
+        20,
+        404
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "norms",
+      "type": "backend",
+      "label": "Norms from documents",
+      "sublabel": "version + checksum",
+      "pos": [
+        216,
+        404
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "chat",
+      "type": "external",
+      "label": "You in Telegram",
+      "sublabel": "answers, check-ins, surveys",
+      "pos": [
+        20,
+        482
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "backend",
+      "label": "Memory",
+      "sublabel": "durable · standing · transient",
+      "pos": [
+        216,
+        482
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "context",
+      "type": "external",
+      "label": "Calendar, weather",
+      "sublabel": "and where you are now",
+      "pos": [
+        20,
+        560
+      ],
+      "size": [
+        160,
+        54
+      ]
+    },
+    {
+      "id": "envctx",
+      "type": "backend",
+      "label": "Day context",
+      "sublabel": "what surrounds you today",
+      "pos": [
+        216,
+        560
+      ],
+      "size": [
+        170,
+        54
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "health.db",
+      "sublabel": "one database · one writer",
+      "pos": [
+        608,
+        92
+      ],
+      "size": [
+        150,
+        522
+      ],
+      "tag": "your Mac"
+    },
+    {
+      "id": "band",
+      "type": "backend",
+      "label": "Personal band",
+      "sublabel": "trend = a run, not one night",
+      "pos": [
+        794,
+        92
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "brief",
+      "type": "frontend",
+      "label": "Morning brief",
+      "sublabel": "what has shifted",
+      "pos": [
+        1020,
+        92
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Correlation gate",
+      "sublabel": "chance · time placebo",
+      "pos": [
+        794,
+        170
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "hyp",
+      "type": "frontend",
+      "label": "Hypotheses → protocols",
+      "sublabel": "status and history",
+      "pos": [
+        1020,
+        170
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "pgx",
+      "type": "backend",
+      "label": "Pharmacogenomics, risks",
+      "sublabel": "CPIC · polygenic scores",
+      "pos": [
+        794,
+        248
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "dash",
+      "type": "frontend",
+      "label": "Dashboard",
+      "sublabel": "127.0.0.1:8001",
+      "pos": [
+        1020,
+        248
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "team",
+      "type": "backend",
+      "label": "GP and consilium",
+      "sublabel": "daily · weekly · monthly debate",
+      "pos": [
+        794,
+        326
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "tasks",
+      "type": "frontend",
+      "label": "Tasks",
+      "sublabel": "bot + macOS Reminders",
+      "pos": [
+        1020,
+        326
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "const",
+      "type": "backend",
+      "label": "Constitutions, nutrition",
+      "sublabel": "per domain, from genome + data",
+      "pos": [
+        794,
+        404
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "problems",
+      "type": "frontend",
+      "label": "Problem list",
+      "sublabel": "only you change it",
+      "pos": [
+        1020,
+        404
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "lit",
+      "type": "backend",
+      "label": "Literature, surveillance",
+      "sublabel": "PubMed, follow-up schedules",
+      "pos": [
+        794,
+        482
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "visit",
+      "type": "frontend",
+      "label": "For your doctor",
+      "sublabel": "summary; reply comes back as input",
+      "pos": [
+        1020,
+        482
+      ],
+      "size": [
+        180,
+        54
+      ]
+    },
+    {
+      "id": "monitor",
+      "type": "security",
+      "label": "Night monitor",
+      "sublabel": "freshness · integrity · harm",
+      "pos": [
+        794,
+        560
+      ],
+      "size": [
+        190,
+        54
+      ]
+    },
+    {
+      "id": "alarm",
+      "type": "frontend",
+      "label": "Alert in Telegram",
+      "sublabel": "until it is closed",
+      "pos": [
+        1020,
+        560
+      ],
+      "size": [
+        180,
+        54
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Your Mac — the primary machine",
+      "wraps": [
+        "recog",
+        "staging",
+        "docs",
+        "cards",
+        "genome",
+        "hae",
+        "norms",
+        "memory",
+        "envctx",
+        "db",
+        "band",
+        "brief",
+        "gate",
+        "hyp",
+        "pgx",
+        "dash",
+        "team",
+        "tasks",
+        "const",
+        "problems",
+        "lit",
+        "visit",
+        "monitor",
+        "alarm"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "scans-recog",
+      "from": "scans",
+      "to": "recog",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "recog-staging",
+      "from": "recog",
+      "to": "staging",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "staging-db",
+      "from": "staging",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "letters-docs",
+      "from": "letters",
+      "to": "docs",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "docs-cards",
+      "from": "docs",
+      "to": "cards",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "cards-db",
+      "from": "cards",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dna-genome",
+      "from": "dna",
+      "to": "genome",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "genome-db",
+      "from": "genome",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "devices-hae",
+      "from": "devices",
+      "to": "hae",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "hae-db",
+      "from": "hae",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "normdocs-norms",
+      "from": "normdocs",
+      "to": "norms",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "norms-db",
+      "from": "norms",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "chat-memory",
+      "from": "chat",
+      "to": "memory",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "memory-db",
+      "from": "memory",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "context-envctx",
+      "from": "context",
+      "to": "envctx",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "envctx-db",
+      "from": "envctx",
+      "to": "db",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-band",
+      "from": "db",
+      "to": "band",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "band-brief",
+      "from": "band",
+      "to": "brief",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-gate",
+      "from": "db",
+      "to": "gate",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate-hyp",
+      "from": "gate",
+      "to": "hyp",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-pgx",
+      "from": "db",
+      "to": "pgx",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "pgx-dash",
+      "from": "pgx",
+      "to": "dash",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-team",
+      "from": "db",
+      "to": "team",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "team-tasks",
+      "from": "team",
+      "to": "tasks",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-const",
+      "from": "db",
+      "to": "const",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "const-problems",
+      "from": "const",
+      "to": "problems",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-lit",
+      "from": "db",
+      "to": "lit",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "lit-visit",
+      "from": "lit",
+      "to": "visit",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "db-monitor",
+      "from": "db",
+      "to": "monitor",
+      "fromSide": "right",
+      "toSide": "left",
+      "variant": "dashed"
+    },
+    {
+      "id": "monitor-alarm",
+      "from": "monitor",
+      "to": "alarm",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "What leaves your machine",
+      "items": [
+        "Medical context, scans → Anthropic API",
+        "Messages — via Telegram",
+        "Variant positions → annotation APIs"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Distrusts itself",
+      "items": [
+        "Only confirmed data is stored",
+        "Only gate-passed correlations",
+        "Thresholds from documents, or a loud refusal"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Around it",
+      "items": [
+        "31 macOS background services",
+        "Nightly backup; snapshot before risky ops",
+        "Several people, one database each"
+      ]
+    }
+  ]
+}

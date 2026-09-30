@@ -1,0 +1,272 @@
+# uc_index.yaml — машиночитаемый индекс UC из USE_CASES.md.
+# Каждый confirmed UC связан с modules / data / tests / oracle / risk.
+# См. USE_CASES.md §3 (каталог) и §J (UC-J-03).
+#
+# Формат: один документ — корневой dict {UC-X-NN: {...}}.
+# Источник правды: USE_CASES.md §3 (каталог). Этот файл — derived.
+# Генерируется/валидируется через `validate_uc_index.py` (TODO).
+
+version: "0.1"
+updated: "2026-05-08"
+note: |
+  Стартовый индекс — только для UC из первого пакета и тех, для которых
+  написаны тесты. По мере подтверждения остальных UC — расширять.
+
+ucs:
+  UC-I-01:
+    title: "Наружный язык всегда русский"
+    alias: UC-LANG-001
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, E]
+    modules:
+      - hai_core.py
+      - wellally_consult.py
+      - telegram_bot.py
+    data:
+      - ".claude/specialists/*.md"
+    tests:
+      - tests/unit/test_uc_i_01_lang.py
+    plan: tests/plans/UC-I-01.md
+    risk: high
+    notes: "FORMAT_RULES имплицитно русифицирован, явного 'only Russian' нет"
+
+  UC-I-02:
+    title: "Telegram fail-closed (OWNER_CHAT_ID)"
+    alias: UC-SEC-001
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, E]
+    modules: [telegram_bot.py]
+    data: ["~/.health_secrets/telegram_chat_id"]
+    tests: [tests/unit/test_uc_i_02_sec.py]
+    plan: tests/plans/UC-I-02.md
+    risk: high
+
+  UC-I-03:
+    title: "NULL ≠ 0 в нарративе"
+    alias: UC-NULL-001
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, E]
+    modules: [gp_agent.py, hai_reports.py]
+    tests: [tests/integration/test_uc_i_03_null_not_zero.py]
+    plan: tests/plans/UC-I-03.md
+    risk: high
+    known_bugs:
+      - "gp_agent.py:478 — int((stats.get('avg_deep') or 0)*60) → 'Deep: 0 мин' при NULL"
+
+  UC-I-07:
+    title: "Single-primary: только Studio пишет в health.db"
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: manual_charter + check
+    oracle: [B, H]
+    modules: [health_db.py]
+    tests:
+      - tests/consistency/test_single_primary_db_writes.py
+    plan: tests/charters/CH-PRIMARY-01.md
+    risk: high
+
+  UC-A-01:
+    title: "Лаб PDF/JPEG → распознавание → подтверждение → запись в БД"
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: e2e_mock
+    oracle: [B, E, C, D]
+    modules:
+      - import_all.py
+      - lab_extractor.py
+      - health_db.py
+      - telegram_bot.py
+    tests: [tests/integration/test_uc_a_01_lab_pipeline.py]
+    plan: USE_CASES.md §4.A
+    risk: high
+    notes: "Council автозапуск отложен в BACKLOG"
+
+  UC-A-02:
+    title: "Не-лаб PDF классифицируется в правильный домен"
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, E]
+    modules: [import_all.py]
+    tests: [tests/unit/test_uc_a_02_classify.py]
+    risk: medium
+
+  UC-A-03:
+    title: "HAE merge без затирания Oura"
+    alias: UC-APPLE-001
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: integration
+    oracle: [B, E]
+    modules: [import_apple_health.py]
+    tests: [tests/integration/test_uc_a_03_hae_merge.py]
+    plan: tests/plans/UC-A-03.md
+    risk: medium
+    known_bugs:
+      - "import_apple_health.py:248 — existing.update() shallow merge перезаписывает Oura при HAE null"
+
+  UC-A-04:
+    title: "Oura: сон по дате пробуждения, активность/HRV — yesterday"
+    alias: UC-OURA-001
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, E]
+    modules: [import_oura.py]
+    tests: [tests/unit/test_uc_a_04_oura_dates.py]
+    plan: tests/plans/UC-A-04.md
+    risk: medium
+
+  UC-B-02:
+    title: "GP daily: 7д контекст + 4 горизонта"
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: integration
+    oracle: [B, E, C, D]
+    modules: [gp_agent.py, health_db.py]
+    tests: [tests/integration/test_uc_b_02_gp_context.py]
+    risk: high
+
+  UC-B-03:
+    title: "_triage_metric: 3 режима — снят 28.09 (тренды в разбор, не в задачи)"
+    status: intended
+    confirmation: rejected
+    priority: P2
+    testability: check
+    oracle: [B, E]
+    modules: [gp_agent.py]
+    tests: []
+    risk: low
+
+  UC-B-04:
+    title: "Работа системы не кладётся в список задач человека (решение владельца 28.09)"
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B]
+    modules: [gp_agent.py, jobs/scheduled.py]
+    tests: [tests/unit/test_uc_b_04_no_system_work_in_person_list.py]
+    risk: medium
+
+  UC-D-04:
+    title: "triage_agent: WARN автофиксы, идемпотентен по дню"
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: e2e_mock
+    oracle: [B, E]
+    modules: [triage_agent.py, integrity_tests.py]
+    tests: [tests/integration/test_uc_d_04_triage.py]
+    plan: tests/plans/UC-D-04.md
+    risk: high
+
+  UC-H-01:
+    title: "Council полный цикл: Round A/B + coordinator"
+    alias: UC-MDT-001
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: e2e_mock
+    oracle: [B, E, C, D]
+    modules: [wellally_consult.py, lifestyle_agents.py]
+    tests: [tests/e2e_mock/test_uc_h_01_council_full.py]
+    risk: high
+
+  UC-H-02:
+    title: "user_qa.append() ДО _build_data_package() и раундов"
+    status: implemented
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, E]
+    modules: [wellally_consult.py]
+    tests: [tests/unit/test_uc_h_02_user_qa_order.py]
+    plan: tests/plans/UC-H-02.md
+    risk: high
+
+  UC-J-01:
+    title: "Diff кода → proposal UC, без автозаписи"
+    status: intended
+    confirmation: confirmed
+    priority: P0
+    testability: meta
+    oracle: [B, E]
+    modules: [propose_uc.py]
+    tests: [tests/unit/test_uc_j_01_propose.py]
+    risk: medium
+
+  UC-J-02:
+    title: "Подтверждение перед генерацией теста"
+    status: intended
+    confirmation: confirmed
+    priority: P0
+    testability: meta
+    oracle: [B]
+    modules: [generate_test.py]
+    tests: [tests/unit/test_uc_j_02_generate.py]
+    risk: medium
+
+  UC-J-03:
+    title: "Каждый confirmed UC связан в uc_index.yaml"
+    status: intended
+    confirmation: proposed
+    priority: P0
+    testability: meta
+    oracle: [B, E]
+    modules: [validate_uc_index.py]
+    tests: []
+    risk: low
+
+  UC-J-04:
+    title: "Конфликт USE_CASES vs TESTING_CONTRACTS → needs_review"
+    status: intended
+    confirmation: proposed
+    priority: P0
+    testability: meta
+    oracle: [B]
+    modules: []
+    tests: []
+    risk: medium
+
+  UC-D-05:
+    title: "Устаревшие labs/genome помечаются датой и сниженной уверенностью"
+    alias: UC-LABS-AGE-001
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: check
+    oracle: [B, D]
+    modules: [hai_core.py]
+    tests: [tests/unit/test_uc_d_05_stale_sources.py]
+    risk: high
+    notes: "Prompt-инструкция в FORMAT_RULES (W2A-4); LLM-actual compliance — W3B"
+
+  UC-K-01:
+    title: "Specialist prompts upstream tracking (huifer/WellAlly-health)"
+    alias: UC-UPSTREAM-PROMPT-001
+    status: partial
+    confirmation: confirmed
+    priority: P0
+    testability: e2e_mock
+    oracle: [B, E]
+    modules: [check_wellally_updates.py]
+    tests: [tests/unit/test_uc_k_01_upstream.py]
+    plan: tests/plans/UC-K-01.md
+    risk: high
+    notes: "apply ещё не реализован — manual rsync"

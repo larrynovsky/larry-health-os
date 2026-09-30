@@ -1,0 +1,187 @@
+# external_dependencies.yaml — реестр внешних артефактов Health OS.
+# См. EXTERNAL_DEPENDENCIES.md (формат + lifecycle).
+# UC-X-01 (USE_CASES.md): этот файл должен существовать и проходить валидацию.
+
+version: "0.1"
+updated: "2026-07-11"
+
+dependencies:
+
+  # ── Specialist prompts (китайские) ────────────────────────────────────────
+
+  specialist_prompts_repo:
+    category: prompt
+    source: https://github.com/huifer/WellAlly-health
+    local_path: specialists/                # git (Ф0b), не iCloud — синхронно с wellally_consult.py
+    language: zh
+    approved_sha256: 27c2603b4973980ee46a435ff3f242966d9f205e  # одобренный baseline upstream-коммита
+    current_sha256: TBD                      # живой SHA ведёт скрипт: .wellally_upstream_state.json
+    last_checked: null                       # живая отметка там же (script-managed, не дублируем)
+    last_applied: null
+    last_check_ok: null
+    local_override: false
+    impact: medical
+    owner: wellally_consult.py
+    impacted_uc: [UC-H-01, UC-I-01, UC-I-08, UC-K-01]
+    notes: |
+      9 врачебных промптов на китайском. Обновление меняет медицинское
+      поведение Council Round A/B. Apply только через ручной /upstream_apply.
+
+  # ── Lifestyle prompts (русские) ───────────────────────────────────────────
+
+  lifestyle_prompts:
+    category: prompt
+    source: TBD                             # вероятно local-only, не из upstream
+    local_path: .claude/specialists/lifestyle_*.md
+    language: ru
+    approved_sha256: TBD
+    impact: behavior
+    owner: lifestyle_agents.py
+    impacted_uc: [UC-B-05, UC-B-06, UC-K-02]
+    local_override: true                    # пока local-only
+    notes: "Промпты sleep/movement/stress/energy"
+
+  # ── ClinVar / MyVariant API ──────────────────────────────────────────────
+
+  clinvar_via_myvariant:
+    category: api_schema
+    source: https://myvariant.info/v1/
+    expected_fields:
+      - clinvar.rcv.clinical_significance
+      - dbsnp.alleles
+      - dbsnp.chrom
+      - dbsnp.gene
+    last_checked: null
+    impact: medical
+    owner: genome_annotator.py
+    impacted_uc: [UC-C-02, UC-C-03, UC-K-04]
+    notes: "Изменение схемы → upstream_drift (замысел: subsystem_intent.yaml::genome_effect_allele)"
+
+  # ── PubMed E-utilities ───────────────────────────────────────────────────
+
+  pubmed_eutils:
+    category: api_schema
+    source: https://www.ncbi.nlm.nih.gov/books/NBK25500/
+    expected_fields:
+      - PubmedArticleSet.PubmedArticle.MedlineCitation.PMID
+      - PubmedArticleSet.PubmedArticle.MedlineCitation.Article.ArticleTitle
+    impact: behavior
+    owner: pubmed_client.py
+    impacted_uc: [UC-B-07, UC-K-05]
+
+  # ── Anthropic models ─────────────────────────────────────────────────────
+
+  anthropic_models:
+    category: model
+    source: https://docs.claude.com/en/docs/about-claude/models
+    models_in_use:
+      - claude-sonnet-4-6                   # chat, MDT coordinator, GP daily/weekly/monthly
+      - claude-haiku-4-5                    # arbiter, task extraction, hypothesis, diagnosis
+      - claude-opus-4-7                     # constitutions
+    impact: behavior
+    owner: hai_core.py
+    impacted_uc: [UC-K-03]
+    notes: "Deprecation watcher T-5.6 (TODO)"
+
+  # ── Oura API ─────────────────────────────────────────────────────────────
+
+  oura_api:
+    category: api_schema
+    source: https://cloud.ouraring.com/v2/docs
+    expected_fields:
+      - sleep.day                           # дата пробуждения
+      - sleep.total_sleep_duration
+      - sleep.deep_sleep_duration
+      - daily_activity.steps
+      - daily_readiness.score
+      - daily_stress.stress_high
+    impact: medical
+    owner: import_oura.py
+    impacted_uc: [UC-A-04, UC-D-02]
+    notes: "Изменение field name в Oura API = upstream_drift"
+
+  # ── Apple Health Export (HAE) ────────────────────────────────────────────
+
+  apple_health_hae:
+    category: api_schema
+    source: https://www.healthautoexport.app/
+    local_path: ~/Library/Mobile Documents/iCloud~com~ifunography~HealthExport/Documents/Health/
+    expected_fields:
+      - HKQuantityTypeIdentifierStepCount
+      - HKQuantityTypeIdentifierHeartRateVariabilitySDNN
+      - HKQuantityTypeIdentifierBloodPressureSystolic
+    impact: medical
+    owner: import_apple_health.py
+    impacted_uc: [UC-A-03, UC-A-05]
+
+  # ── Telegram Bot API ─────────────────────────────────────────────────────
+
+  telegram_bot_api:
+    category: api_schema
+    source: https://core.telegram.org/bots/api
+    impact: infra
+    owner: telegram_bot.py
+    impacted_uc: [UC-A-01, UC-G-01, UC-I-02, UC-I-06]
+
+  # ── macOS Reminders / Calendar / launchd ─────────────────────────────────
+
+  macos_integration:
+    category: os_integration
+    source: macOS system frameworks
+    components: [osascript, icalbuddy, launchd]
+    impact: infra
+    owner: task_agent.py, calendar_client.py, calendar_sync.py
+    impacted_uc: [UC-G-01, UC-G-02, UC-A-06]
+
+  # ── Medical guideline windows ────────────────────────────────────────────
+
+  guideline_freshness:
+    category: guideline
+    source: TESTING_CONTRACTS.md §1
+    windows:
+      lab_results_reminder_days: 180
+      lab_results_alert_days: 270
+      genome_update_alert_days: 30
+      gp_weekly_max_age_days: 8
+      gp_monthly_max_age_days: 35
+    last_reviewed: 2026-04-24
+    impact: medical
+    owner: integrity_tests.py, TESTING_CONTRACTS.md
+    impacted_uc: [UC-D-05, UC-A-05, UC-B-08]
+
+  # ── CBCR методология (case-based clinical reasoning) ──────────────────────
+
+  cbcr_methodology:
+    category: methodology
+    source: local            # авторская методология; была в iCloud, перенесена в git 2026-07-11 (СК-1)
+    local_path: methodology/cbcr/            # git: cbcr_manifest.md + wiki/ (95 концептов)
+    impact: medical          # load-bearing: manifest = system-prompt генерации гипотез; wiki = concept-tool
+    auto_update: never       # медицинская методология — правит только человек
+    owner: cbcr_hypothesis.py, cbcr_lookup.py
+    sentinel: integrity_tests.py::check_cbcr_methodology_present
+    impacted_uc: []
+    notes: |
+      cbcr_manifest.md (system prompt CBCR-генерации гипотез) + wiki/*.md (95 концептов,
+      Anthropic-tool read_cbcr_concept). Перенесено из iCloud в git 2026-07-11 (СК-1:
+      load-bearing не в iCloud — эвикт iCloud давал тихую деградацию качества гипотез).
+      Датчик наличия/непустоты — check_cbcr_methodology_present.
+
+  # ── Валидационный гейт: методология FDR (спека + harness статистиков) ──────
+
+  validation_gate_methodology:
+    category: methodology
+    source: local            # авторская спека + вердикт/harness статистиков; iCloud → git 2026-07-12 (СК-1)
+    local_path: methodology/validation_gate/   # fdr_harness.py + fdr_sweep.py; спека — methodology/signal_validation_lifecycle_SPEC.md
+    impact: medical          # load-bearing: спека = замысел гейта; harness воспроизводит числа вердикта (BH/BY)
+    auto_update: never       # методология выверена статистиками — правит только человек
+    owner: correlation_gate.py
+    sentinel: integrity_tests.py::check_validation_gate_methodology_present
+    impacted_uc: []
+    notes: |
+      signal_validation_lifecycle_SPEC.md (замысел подсистемы; реестр validation_gate.spec
+      ссылается на него) + validation_gate/fdr_harness.py, fdr_sweep.py (mechanism-proof
+      harness: BH/BY, циркулярный shift, discreteness-wall — числа §2–§4 вердикта).
+      Перенесено из iCloud в git 2026-07-12 (СК-1: эвикт делал вердикт невоспроизводимым,
+      spec-указатель реестра повисал). NB: harness = mechanism proof, НЕ release-grade
+      (single-φ oracle, modest trials, без partial-null/CI — §8); исполнение требует
+      numpy/scipy (на MacBook нет). Датчик — check_validation_gate_methodology_present.

@@ -1,0 +1,3 @@
+# time_contract baseline — унаследованные прямые вызовы часов.
+# Формат: <relpath>	<sha1_12>. Есть тут -> WARN; нет -> FAIL (новое).
+# Пусто = worklist закрыт: любой прямой вызов теперь FAIL (исключение = # time-inject: ok).

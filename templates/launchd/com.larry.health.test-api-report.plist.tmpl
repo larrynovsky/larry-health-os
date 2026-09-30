@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Месячный отчёт API-трат на тестовые вызовы (ROADMAP T-0.17). Шаблон снят 2026-09-29
+     с живого плиста Studio. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.larry.health.test-api-report</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{PYTHON}}</string>
+        <string>{{REPO}}/monthly_api_report.py</string>
+    </array>
+    <key>WorkingDirectory</key><string>{{REPO}}</string>
+    <key>StandardOutPath</key><string>{{REPO}}/logs/test_api_report.log</string>
+    <key>StandardErrorPath</key><string>{{REPO}}/logs/test_api_report.log</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key><integer>1</integer>
+        <key>Hour</key><integer>9</integer>
+        <key>Minute</key><integer>30</integer>
+    </dict>
+    <key>RunAtLoad</key><false/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HEALTH_DATA_DIR</key><string>{{DATA}}</string>
+    </dict>
+</dict>
+</plist>

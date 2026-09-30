@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:df76fd6d6503 -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:810b7d379c76 -->
 **English** · [Русский](first_install.md)
 
 # First install of Larry Health OS
@@ -135,6 +135,19 @@ chmod 600 telegram_token telegram_chat_id anthropic_key
 Replace only the text inside the quotes and keep the quotes. The id is digits only, for example
 `printf '%s' '12345678' > telegram_chat_id`. The containers see this directory read-only. The
 bot answers only your id: anyone can write to it, but it listens only to you.
+
+Inside the containers the system runs as the user with number 1000. On a Mac this does not
+matter; on Linux, if your number is different (`id -u` prints something other than `1000`), the
+container cannot read the keys. Hand the directory over — the command does nothing when it is
+not needed:
+
+<!-- tutorial:run -->
+```bash
+if [ "$(uname)" = Linux ] && [ "$(id -u)" != 1000 ]; then sudo chown -R 1000:1000 ~/health-docker/secrets; fi
+```
+
+After that, keys on such a machine are changed with `sudo`, for example
+`printf '%s' '12345678' | sudo tee ~/health-docker/secrets/telegram_chat_id >/dev/null`.
 
 ## 5. Start it
 

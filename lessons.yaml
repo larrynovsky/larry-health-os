@@ -2739,3 +2739,46 @@ lessons:
   status: observation
   evidence: ['docs/handoff/desk-guard/2026-09-30-e85f9f3.md']
   owner: владелец
+- id: C-116
+  date: '2026-09-30'
+  thread: night-repair
+  modules: [night_repair.py]
+  event: 'Первый носитель ночного ремонта взяли две сессии одновременно: я делал land (патч в индексе главной копии, маркер слияния), соседняя нить nr-anon тем временем исправила по ревью и сделала reject того же id — reject сбросил индекс главной копии и удалил мой маркер. Потерь нет (отклонённое и не должно сливаться), но стёрто молча.'
+  cost: 'одно слияние потеряно без сообщения; при другом исходе — работа сессии'
+  cause: 'у носителя нет отметки «взят такой-то сессией»: решать один id могут несколько сессий, и отмена одной действует на состояние другой'
+  address: {kind: runtime, ref: night_repair.py}
+  subject: [concurrency, agent_delegation]
+  outcome: {kind: none, text: 'правила пока нет: одна коллизия за первый день, исход безвреден; если повторится — метка взятия на Studio (pending/<id>/taken_by) и отказ land/reject чужой'}
+  status: observation
+  evidence: ['docs/handoff/night-repair/2026-09-30-1eb74c1.md']
+  owner: владелец
+- id: C-117
+  date: '2026-09-30'
+  thread: night-repair
+  modules: [doc_agent.py]
+  event: 'doc_agent --regen-install трижды отказал «Expecting value: line 1 column 1»: модель, несмотря на просьбу «JSON без внешнего fence», обернула ответ в ```json. После снятия ограды перегенератор отказал уже по делу — модель переписала защищённый блок урока. Коммит нити стоял на устаревшей метке установочных страниц.'
+  cost: 'три платных вызова и ~15 мин; строка итога правлена руками'
+  cause: 'разбор ответа модели доверял просьбе формата вместо того, чтобы терпеть самую частую обёртку; а изменение одного числа в фактах требовало переписать страницу целиком моделью'
+  address: {kind: runtime, ref: doc_agent.py}
+  subject: [llm_output]
+  outcome: {kind: check, text: 'одна внешняя ограда ```json снимается; оракул tests/consistency/test_install_docs_fresh.py::test_regen_accepts_json_in_one_outer_fence краснеет без правки'}
+  status: adopted
+  change: 'git:1eb74c1'
+  adopted_on: '2026-09-30'
+  evidence: ['git:1eb74c1']
+  owner: владелец
+- id: C-118
+  date: '2026-09-30'
+  thread: night-repair
+  modules: [night_repair.py, scripts/night_repair_claude.json]
+  event: 'claude на Studio по ssh ответил «Not logged in»: под ssh и launchd нет входа в keychain. Ключ API владельца пришлось отдать автору окружением — песочница закрывает файл секрета, но переменная окружения автору видна, и улики (недоверенный текст) могут попросить её напечатать.'
+  cost: 'первая проба песочницы впустую; риск утечки ключа в носитель'
+  cause: 'ночной агент — первый исполнитель модели на Studio без интерактивного входа; секрет попадает туда, куда песочница по построению не смотрит'
+  address: {kind: runtime, ref: night_repair.py}
+  subject: [secrets, sensor_perimeter]
+  outcome: {kind: check, text: 'значение ключа в выходе автора/ревьюера → носитель не пишется (_leaks); проба песочницы приманкой 30.09: Read и cat запрещённых каталогов — отказ, сеть — только с одобрения; оракул tests/unit/test_night_repair.py::test_secret_in_author_output_is_never_carried'}
+  status: adopted
+  change: 'git:1eb74c1'
+  adopted_on: '2026-09-30'
+  evidence: ['git:1eb74c1']
+  owner: владелец

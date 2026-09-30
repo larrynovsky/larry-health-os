@@ -65,4 +65,7 @@ jobs:
       - name: журналы при провале
         if: failure()
         working-directory: /home/runner/health-docker
-        run: docker compose ps; docker compose logs --tail 80
+        run: |
+          docker compose ps; docker compose logs --tail 80
+          ls -ln ~/health-docker/secrets || true
+          docker compose exec -T cron sh -c 'id; tail -n 40 /app/logs/bot_err.log /app/logs/bot.log' || true

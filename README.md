@@ -259,7 +259,7 @@ billed to it — for one person, about €5–15 a month in the author's experie
 
 ## Installation
 
-Docker (Colima from Homebrew on a Mac, Docker Engine on Linux), a Telegram account, an Anthropic API
+Docker (any: Docker Desktop, OrbStack or Colima on a Mac; Docker Engine on Linux; Windows via WSL2, not yet verified), a Telegram account, an Anthropic API
 key (about €5–15 a month per person). About 20 minutes:
 [docs/tutorials/first_install.en.md](docs/tutorials/first_install.en.md) — from downloading two
 files to meeting the bot. The image is prebuilt for amd64 and arm64; nothing to clone or build.

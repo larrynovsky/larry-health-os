@@ -257,7 +257,7 @@ Anthropic API и оплачиваются им — на одного челов�
 
 ## Установка
 
-Докер (на Маке — Colima из Homebrew, на Linux — Docker Engine), аккаунт Telegram, ключ Anthropic
+Докер (любой: на Маке — Docker Desktop, OrbStack или Colima; на Linux — Docker Engine; Windows — через WSL2, этот путь пока не проверен), аккаунт Telegram, ключ Anthropic
 API (около 5–15 € в месяц на человека). Около 20 минут:
 [docs/tutorials/first_install.md](docs/tutorials/first_install.md) — от скачивания двух файлов до
 знакомства с ботом. Образ собран заранее для amd64 и arm64; клонировать и собирать ничего не нужно.

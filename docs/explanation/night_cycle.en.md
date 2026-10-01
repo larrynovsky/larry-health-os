@@ -1,78 +1,69 @@
-<!-- translation-of: docs/explanation/night_cycle.md sha256:866bfface5f1 -->
+<!-- translation-of: docs/explanation/night_cycle.md sha256:3586754a5657 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](night_cycle.md)
 
-# Night Decision Pipeline: a Finding Gets a Name, a Class, and a Deadline
+# Night Decision Pipeline: a finding gets a name, a class, and a deadline
 
-## What Changed
+## What changed
 
-- **The decision desk now remembers what was decided.** The invariant `desk_remembers_what_was_decided` (status=holds) has been added: the total number of cards on the desk (which only ever grows) is stored in a database that travels with the system; every nightly pass is checked against it — if the number of cards has decreased, the desk has lost its memory: the cycle puts nothing new on it, and the bell sends a single line about this instead of a list.
+- **Night repair: the night prepares the fix, the session lands it.** The invariant `night_repair_prepares_session_lands` (status=holds) has been added: each night the author works through up to two engineering-queue cards in a sandbox and the reviewer attempts to refute them; the fix lands as a patch on Studio, and the commit to main waits until the session either lands it (patch test on the stand is red without the fix and green with it), closes it (environment breakage), or rejects it. The owner takes no part in the chain.
 
-- **"Cannot verify here" is not a question for the owner.** The invariant `cannot_judge_is_not_a_question` (status=holds) has been added: if a sensor cannot see its subject in the current environment, the finding goes into the weekly engineering digest, not to the owner's desk and not into the morning bell. Inapplicability of a check does not produce a card with a question.
+- **The claim about the absence of automatic application has been lifted.** The invariant `auto_fix_applier_absent` has been removed: the former declaration "the carrier of the mechanism is not built and is not being built right now" is no longer a recorded fact in the registry.
 
 **Updated:** 2026-09-30
 
 
-## Why It Exists
+## Why it exists
 
-Imagine that every night the system notices something: a test failed, a sensor fired, a project has been silent for a week. But if every such observation lives for only one moment — just a line in a log — then tomorrow the same thing looks new again. The day after, new again. It becomes impossible to tell whether this is an old problem nobody solved or a fresh one. It becomes impossible to say what to do with it. It becomes impossible to ask the owner once and wait for an answer — every day the system will ask again, because it does not remember that it already asked.
+Imagine that every night the system looks at your health and notices something. Say, one indicator has gone slightly outside its usual range. The next night — again. And once more. If each of those observations has no name and no address, they never accumulate into a history — they look like fresh news every time. You don't know whether it is the same issue or a different one. You don't know whether anyone has already dealt with it or not.
 
-The pipeline exists precisely to stop that. It gives each finding a stable identity: one name, one home, one deadline. From that point on, a finding is not a line in a log but a card on a desk. It can be tracked, deferred, closed — and you can know who did that and when.
+That is exactly the problem the night pipeline solves: it gives a finding a stable identity. One name per subject. One home where it lives. A clear category: this the system will fix on its own, this goes into a digest, and this is a question that needs your answer. And a deadline: if no one has answered within two weeks, the card closes in silence — but only when a whole set of conditions is met, and not a single one can be skipped.
 
-## What It Does, in Plain Words
+Without the pipeline, a stream of messages is noise. With the pipeline, they are managed questions with names, owners, and deadlines.
 
-At night, while you sleep, the pipeline passes through three kinds of events: something broke and went down, something is quietly warning, and — separately — a project that has had no movement for too long. For each such finding the pipeline does several things in sequence.
+## What it does, in plain terms
 
-**Gives it a name.** A finding has one name and it lives in one place. Not two, not one and a half — one. This matters, because if one thing lives under two names in two places, sooner or later one will be closed while the other keeps ringing as though nothing happened.
+Every night the pipeline passes through three sources. The first — crashes and errors the system caught during the day. The second — sensor warnings. The third — silence: if there has been no movement whatsoever in some area of work for more than six days, that is also a finding, and it also needs to be named.
 
-**Assigns a class.** The finding receives one of three labels: "mine to fix" — the system will handle it; "into the digest" — this is a technical matter, engineers see it but you do not; "your decision" — you need to choose. The distinction here is structural, not based on how confident the model is. A language model's confidence is not calibrated, and an error in the direction of "I'll handle it myself" on an irreversible action is too costly. Therefore the autonomous cycle never takes on more, only less: if there is any doubt, the card is parked with the owner rather than resolved without them.
+Every finding gets a **name** — one, permanent, by which it can be recognised tomorrow and a month from now. It gets a **class**: the system will handle it on its own, or it goes into a specialist digest, or it is a question specifically for you. It gets a **card** — a place where the entire history is stored: what happened, what the options are, what each of them means, and who ultimately made the decision.
 
-**Opens a card.** A card is not merely a note. It reaches the desk only when it has three things: a question in your words, a closed list of options, and a clear cost for each. If any of the three fields is missing, it is an incomplete diagnosis — it goes to the engineering queue with a note and is not placed on your desk.
+By the time the card reaches your desk it is already prepared: the question is phrased in your terms, the options are listed, and each has its own cost. If even one of the three is missing — the card does not come to you; it goes to the engineering queue with a note about what is incomplete.
 
-**Rings once a day.** The bell arrives no more than once per day and names each decision that is waiting in a single plain-language line. Not "14 items on the desk" — but what exactly is there. Technical findings that do not require your choice are not part of this ring: they travel in a separate line once a week.
+Once a day the pipeline calls you — no more often. That call lists every decision that is waiting specifically for you, one line each, and the nearest deadline after which the card may close in silence. Technical findings that the system is to resolve on its own are not included in this call.
 
-**Tracks memory.** The decision desk never deletes closed cards. The number of cards only grows, and that number is stored separately. If after the system moves the number of cards is suddenly less than what was stored, the desk has lost its memory. In that case the cycle puts nothing new on the desk, and the bell sends you a single line about this, and only that. This happened once in practice: a migration into a container moved the database, the desk was born empty, and the system returned questions that had already been resolved a month and a half earlier.
+Silence as a card outcome is a special matter. For a card to close without your answer, all of the following must hold simultaneously: it must have a ready option, a way to undo, a date, and a specific assignee who has already carried out that option. And the action must not be irreversible. And it must not touch your personal data space. If even one condition is not met — the card stays on the desk and waits for you indefinitely. The system is designed so that the right to close silently must be earned explicitly, card by card. By default, silence does not mean closed.
 
-**Records authorship.** Every closed card has the author of the decision recorded — you, silence, thread closure, or something else from a short closed list. The system does not accept an author outside this list. This is not bureaucracy: a month later, "resolved" without an author reads as your word — and that is a substitution where it is most costly.
+Every closed decision has a recorded author: you answered yourself, the card closed in silence according to the rules, or the thread was closed entirely in the registry. There is no fourth option. A month from now it will be visible who made each decision — and that is not words, that is a record in the system.
 
-**Sets a deadline.** After two weeks of silence a card may close by default — but only if its full triple is filled in (option, rollback, date), the action is reversible, it does not write to your domain, and there is a specific executor who has already carried out the action before the decision was recorded. Without all of that the card waits for you indefinitely. The right to close silently is granted explicitly, to each card individually. By default, the mechanism named "default" defaults to not closing.
+The decision desk remembers everything that has ever been on it — cards are not deleted. If after a system migration there are fewer cards on the desk than there should be, the system does not stay silent: it reports this to you instead of the usual list.
 
-**Knows when it does not know.** If a sensor cannot see its subject in this environment — for example, a container cannot see host tasks — it says so explicitly. Such a finding goes into the weekly digest, not to your desk and not into the morning review. "Cannot verify here" is not a question for you.
+There is one more thing worth saying separately: a sensor cannot be silent out of blindness. If it cannot see what it is supposed to watch — it says so out loud. "Cannot check here" is not a question to you; it is a separate record that goes into the weekly digest. A sensor's silence and its admission of blindness are different things, and the system tells them apart.
 
-**Notices sensor silence.** A sensor cannot go silent undetected: if it is blind, stale, or is tracking less than it declared, that is a warning. And that warning is checked before error collection begins, not after — because after, collection would have overwritten the state and any measurement would look fresh.
+During the night, while you sleep, the system works through up to two engineering cards on its own: it looks for the cause, prepares a fix with a test, and checks it through an independent review. You are not part of that chain. The fix lands on the working machine and waits until the test confirms: red without the fix, green with it. Only then can things move forward.
 
-## What Is Honest to Say About Its Limits
+## What is honest to say about its limits
 
-Several things need to be said here without softening.
+All of the pipeline's promises hold — but "holds" and "verified everywhere" are different claims. Here is where the line between them falls.
 
----
+**Silence is currently effectively disabled as an outcome.** The promise about closing in silence is correct, but the assignee registry is empty right now. While no one is in it — silence resolves nothing. The rule "silence equals delegation" is suspended until the first assignee with a test appears.
 
-**Automatic application of fixes is not built.**
+**"Finding disappeared" can mean two different things.** When a card is taken off the desk because the sensor no longer sees it — that may mean the problem is gone. Or it may mean the sensor itself broke and stopped looking. Against the second case stand separate liveness sensors and the requirement of a fresh artifact date, but not a hundred-percent guarantee. A check that does not run every day introduces additional complexity: if it missed its day, the card is removed and reopened on the next run, and the age resets.
 
-There is a decision that under three conditions — the action is reversible, there is an independent verifier, there is a downstream oracle — the system could theoretically apply fixes on its own. But the carrier of this mechanism is not built and is not being built now. The reason is not that it was forgotten: over a month and a half of operation there have been almost no red nights, and there is simply no entry point for such a mechanism. Until one appears, the cycle investigates and parks, and a human applies. If the stream of red nights returns, the system will raise a card with a question about revisiting this. Until then the decision remains declarative.
+**A fresh installation starts from zero.** The protection against desk-memory loss works from the second pass of the cycle — on the very first installation there is nothing to lose, and that is expected. But if both the desk and the database are lost simultaneously, the protection is silent.
 
----
+**A sensor that wrote its refusal in its own words becomes a question again.** The phrase "cannot check here" is recognised by exact text. If the sensor phrases it differently, the refusal will not be recognised as such.
 
-**Silence currently resolves nothing in practice.**
+**An unknown finding class stays as a question for you.** The class is determined by the finding's name from a closed list. If the name is unknown to the system, the finding goes to your desk — until it is given the correct name.
 
-The promise that "silence can close a card" holds structurally, but the registry of executors who actually carry out the action is currently empty. This means silence technically works, but there is nothing to apply it to. The decision "silence = delegation" is effectively suspended until the first executor with a test exists.
+**Night repair: the key lives in an environment variable.** The sandbox closes the file containing the secret, but not the variable itself. If the value ends up in the session output — other paths to exfiltrate it are not blocked. This is named, not closed.
 
----
+**A thread can be recorded as closed without the owner's decision.** The system sees the status `closed` in the registry but does not verify that you were the one who set it. The norm "a thread closes by the owner's decision" is upheld by the closing ritual, not by code.
 
-**Four silent failures that look like silence.**
+**The engineering queue has no voice about its own age.** Once a week — a line in the digest. If a card has been sitting there a long time — the system will not remind about it any more loudly on its own.
 
-The system is structurally protected against them, but they are worth acknowledging honestly:
+**The call waits for the cycle only at its scheduled minute.** If the cycle did not start on time — late calls do not compensate for that.
 
-- An autonomous actor takes a decision that the owner should have made. From the outside — silence, card closed.
-- A card closes by silence where silence should not have applied. From the outside — silence, question "resolved."
-- One finding lives under two names, one was closed, the other is ringing. From the outside — a puzzling ring.
-- A sensor went blind, and "no errors" became indistinguishable from "I was not looking at anything." From the outside — silence.
+## Where this lives in the system
 
-All four look the same. The pipeline is designed so that each of them leaves a trace — but a trace, not a guarantee.
-
----
-
-**Limits that are verified, but not everywhere.**
-
-A card is removed from the desk when its cause has disappeared from today's check.
+The pipeline lives in `night_cycle.py` — a script that runs at night on

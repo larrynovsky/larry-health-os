@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.282 | **Дата:** 2026-09-30
+**Версия:** 15.283 | **Дата:** 2026-09-30
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -342,7 +342,7 @@ checkins_fts       -- виртуальная FTS5 таблица для полн
 <!-- GEN:MODULE_REGISTRY:START -->
 
 ## МОДУЛЬНЫЙ РЕЕСТР
-<!-- Авто-генерировано gen_blueprint.py 2026-09-30 -->
+<!-- Авто-генерировано gen_blueprint.py 2026-10-01 -->
 
 ### СЛОЙ ДАННЫХ
 ```

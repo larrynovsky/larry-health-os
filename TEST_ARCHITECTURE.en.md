@@ -1,4 +1,4 @@
-<!-- translation-of: TEST_ARCHITECTURE.md sha256:4567a2e9db3f -->
+<!-- translation-of: TEST_ARCHITECTURE.md sha256:b92d98ae20b6 -->
 **English** · [Русский](TEST_ARCHITECTURE.md)
 
 # TEST_ARCHITECTURE.md — Larry Health OS automated test architecture and work plan
@@ -509,9 +509,9 @@ pointed here. A restatement of a rule ages independently of the rule — §18; a
 copy of a verdict adds no knowledge, only another way to diverge.
 
 In practice, today: level C is not implemented in `test_failure_handler.py`,
-and the project has no mechanism for automatic application (`fix_applier`). The mechanism's status is in
-`subsystem_intent.yaml` (`auto_fix_applier_absent`), so it does not acquire
-another home here either.
+and the project has no mechanism for automatic application (`fix_applier`): since 30.09 the night repair
+prepares a fix and a session applies it. The mechanism's status is in `subsystem_intent.yaml`
+(`night_repair_prepares_session_lands`), so it does not acquire another home here either.
 
 ---
 

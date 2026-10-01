@@ -1477,7 +1477,7 @@ lessons:
   outcome:
     kind: rule
     text: список для стража — только pc.literals([класс]) из private/pii_terms.yaml
-  status: adopted
+  status: failed
   adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
   change: private/pii_terms.yaml
   evidence:
@@ -1505,7 +1505,7 @@ lessons:
   outcome:
     kind: check
     text: класс шаблонов хронологии и оракул tests/unit/test_pii_chronology.py
-  status: adopted
+  status: failed
   adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
   change: tests/unit/test_pii_chronology.py
   evidence:
@@ -1746,7 +1746,7 @@ lessons:
   outcome:
     kind: check
     text: класс provenance и оракул tests/unit/test_pii_provenance.py (мутации 4/4)
-  status: adopted
+  status: failed
   adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
   change: tests/unit/test_pii_provenance.py
   evidence:
@@ -1802,7 +1802,7 @@ lessons:
   outcome:
     kind: check
     text: образцы в приватном словаре, тест проверяет их непустоту (test_probes_present)
-  status: adopted
+  status: failed
   adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
   change: private/pii_terms.yaml
   evidence:
@@ -2781,4 +2781,45 @@ lessons:
   change: 'git:1eb74c1'
   adopted_on: '2026-09-30'
   evidence: ['git:1eb74c1']
+  owner: владелец
+- id: C-119
+  date: '2026-09-30'
+  thread: finish-prep
+  modules: [docs/tutorials/first_install.md, .github/workflows/tutorial.yml]
+  event: 'Урок установки прошёл репетицию на MacBook (Colima) целиком, а на чистой Ubuntu GitHub бот перезапускался по кругу: каталог ключей 700 принадлежал пользователю 1001, контейнер работает от 1000 и ключей не читал.'
+  cost: 'один красный прогон CI и ~40 мин на нить исправления; у человека на Linux с uid не 1000 урок молча не работал бы'
+  cause: 'репетиция шла на Маке: Colima отображает владельца файлов при монтировании, Docker Engine на Linux — нет; стенд репетиции отличался от машины читателя урока как раз в правах'
+  address: {kind: ritual, ref: .github/workflows/tutorial.yml}
+  subject: [test_stand, filesystem_icloud]
+  outcome: {kind: check, text: 'урок исполняется на GitHub на чистой Ubuntu под пользователем 1001 (tutorial.yml): блок chown для Linux с uid ≠ 1000 в уроке, при провале шаг журналов печатает id в контейнере, права каталога ключей и журнал бота'}
+  status: adopted
+  change: 'git:3574465'
+  adopted_on: '2026-09-30'
+  evidence: ['git:3574465']
+  owner: владелец
+- id: C-120
+  date: '2026-09-30'
+  thread: finish-prep
+  modules: [contracts/, docs/handoff/]
+  event: 'Исполнитель Codex по заданию принёс, кроме кода, сайдкар контракта для тестового файла с пустой поверхностью и свой каталог docs/handoff/<нить>/ — первое покрасило полный прогон Studio (test_contract_sidecars_shape), второе отбил гейт квитанции замысла при коммите.'
+  cost: 'один красный полный прогон (~10 мин) и один отбитый коммит'
+  cause: 'задание исполнителю описывало что построить, но не конвенции артефактов проекта: кому положены сайдкары (модулям, не тестам), кто пишет снимки нитей (автор нити, не исполнитель)'
+  address: {kind: methodology_page, ref: docs/how-to/agent_bridge_codex.md}
+  subject: [agent_delegation]
+  outcome: {kind: rule, text: 'в задании исполнителю — строка «не создавай docs/handoff/ и сайдкары для тестов; сайдкар — только новому модулю»'}
+  status: observation
+  evidence: ['git:354ecf2']
+  owner: владелец
+- id: C-121
+  date: '2026-09-30'
+  thread: finish-prep
+  modules: [night_repair.py, scripts/night_repair_claude.json, pii_census.py]
+  event: 'Через полчаса после того, как нить neighbor-anon убрала имена соседних проектов из публичной зоны, параллельная нить night-repair принесла их обратно (каталог секретов и путь Кодекса соседа). Поймал страж чтения перед пушем (--unread) и чтение глазами; перепись показывала 0.'
+  cost: 'одна дополнительная нить (nr-anon, ~25 мин) до выгрузки'
+  cause: 'класс «соседние проекты» решён владельцем, но в словарь переписи не внесён: страж коммита не знает имён, которые уже решено прятать, и параллельная работа возвращает их молча'
+  address: {kind: data, ref: private/pii_terms.yaml}
+  subject: [pii, sensor_perimeter]
+  outcome: {kind: check, text: 'имена соседних проектов и их служб — в словарь переписи (класс infra или identity): коммит, возвращающий их в публичную зону, блокируется'}
+  status: observation
+  evidence: ['git:a64752c']
   owner: владелец

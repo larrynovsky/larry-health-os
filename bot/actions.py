@@ -82,17 +82,35 @@ def _parse(data: str):
     return parts[1], parts[2]
 
 
+import contextvars as _cv
+_removed = _cv.ContextVar("actions_removed", default=None)
+
+
 async def remove_target(query, target):
     """Снять кнопки выбранного предмета, сохранив остальные строки списка.
 
     Меняем только markup: одинаково для текста и caption документа/фото.
     """
+    if _removed.get() == (id(query), str(target)):
+        return                                   # уже сняты диспетчером в этом же нажатии
     markup = getattr(query.message, "reply_markup", None)
     rows = [[b for b in row if not ((parsed := _parse(b.callback_data))
                                    and parsed[1] == str(target))]
             for row in markup.inline_keyboard] if markup else []
     remaining = keyboard(*rows)
-    await query.edit_message_reply_markup(reply_markup=remaining if remaining.inline_keyboard else None)
+    await clear_markup(query, remaining if remaining.inline_keyboard else None)
+
+
+async def clear_markup(query, markup=None):
+    """Заменить клавиатуру; «message is not modified» — не ошибка: кнопки уже сняты
+    диспетчером (handle_callback), и обработчик, снимающий их по старинке в конце, не должен
+    падать после сделанной работы."""
+    from telegram.error import BadRequest
+    try:
+        await query.edit_message_reply_markup(reply_markup=markup)
+    except BadRequest as e:
+        if "not modified" not in str(e).lower():
+            raise
 
 
 async def handle_callback(update, context) -> int | None:
@@ -108,7 +126,16 @@ async def handle_callback(update, context) -> int | None:
         log.warning(f"actions: неизвестное действие {query.data!r}")
         await query.message.reply_text(i18n.t("common.error.button_outdated"))
         return
+    # Кнопки предмета снимаются ДО работы обработчика (01.10, слово владельца «кнопка должна
+    # исчезать после нажатия»). До этого 15 из 20 обработчиков снимали их в конце, после
+    # генерации моделью; кнопка жила ~7 с — повторное «Подтвердить» завело второй протокол (#1118).
+    try:
+        await remove_target(query, parsed[1])
+        _removed.set((id(query), str(parsed[1])))
+    except Exception as e:  # noqa: BLE001 — не снялись кнопки: работа всё равно идёт, но громко
+        log.warning(f"actions: кнопки {query.data!r} не сняты до обработчика: {e}")
     return await fn(query, context, parsed[1])
+
 
 
 def _conn():

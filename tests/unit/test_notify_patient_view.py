@@ -111,3 +111,18 @@ def test_notify_internal_trigger_is_not_in_message(monkeypatch):
     hh._notify_patient_view(memory_id=7, cbcr_dict=cbcr,
                             trigger_label="specialist_review:cardiology")
     assert "specialist_review:cardiology" not in captured["text"]
+
+
+def test_confirming_twice_does_not_make_a_second_protocol(monkeypatch):
+    """01.10: двойное «Подтвердить» по #1118 завело два одинаковых протокола."""
+    import json
+    saved = []
+    row = {"id": 5, "key": "k", "source": "s", "value": json.dumps({"status": "open"})}
+    monkeypatch.setattr(hh.db, "get_memory", lambda **k: [row])
+    def _save(**k):
+        saved.append(k); row["value"] = k["value"]
+    monkeypatch.setattr(hh.db, "save_memory", _save)
+    first = hh.confirm_hypothesis(5)
+    second = hh.confirm_hypothesis(5)
+    assert not first.get("_already_confirmed") and second.get("_already_confirmed")
+    assert len(saved) == 1

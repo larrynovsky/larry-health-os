@@ -35,6 +35,8 @@ case "$1 $2" in
   "log -1")             echo "${FAKE_MSG:-test commit}"; exit 0;;
   "rev-parse --short")  echo "deadbee"; exit 0;;
   "rev-parse --abbrev-ref") echo "$FAKE_BRANCH"; exit 0;;
+  "rev-parse -q")       echo "$FAKE_DEPLOYED"; exit 0;;
+  "diff --name-only")   printf "%b" "$FAKE_CHANGED"; exit 0;;
   "remote get-url")     if [[ -n "$FAKE_NO_REMOTE" ]]; then exit 2; fi
                         echo "user@studio.example:/repo"; exit 0;;
   "push studio")        sleep "${SLOW_DEPLOY:-0}"
@@ -72,7 +74,8 @@ HookRun = collections.namedtuple("HookRun", "marker stdout log cmds", defaults=(
 
 
 def _run_hook(branch, timeout=30.0, slow=0, msg=None, push_rc=0,
-              dirty="", ssh_dead=False, norepo=False, no_remote=False, owner_rt=""):
+              dirty="", ssh_dead=False, norepo=False, no_remote=False, owner_rt="",
+              deployed="", changed=""):
     """Исполняет хук в изолированном дереве. Возвращает (маркер, stdout хука).
 
     Маркер читается СРАЗУ после возврата хука, без ожидания. Так и задумано:
@@ -110,6 +113,7 @@ def _run_hook(branch, timeout=30.0, slow=0, msg=None, push_rc=0,
                    FAKE_SSH_DEAD="1" if ssh_dead else "",
                    FAKE_NO_REMOTE="1" if no_remote else "",
                    FAKE_OWNER_RUNTIME=owner_rt,
+                   FAKE_DEPLOYED=deployed, FAKE_CHANGED=changed,
                    # Пауза ретрая — 0: тест судит КЛАССИФИКАЦИЮ, а не то, что
                    # bash умеет спать. 25 с × 3 теста = 75 с в каждом pre-commit
                    # за факт, который не проверяется.
@@ -383,3 +387,29 @@ def test_владелец_нативно_бот_перезапускается_�
     r = _run_hook("main")                      # метки нет — нативная установка
     assert _LOAD_OWNER_BOT in r.cmds, r.cmds
     assert "deploy_container.sh" not in r.cmds
+
+
+# ── Рестарт нативных служб по делу (01.10, нить finish-tails) ────────────────
+# Диапазон «что уже на Studio..HEAD» берётся из remote-tracking ref ДО пуша. Только
+# документы/тесты/журналы → бот партнёра не перезапускается; что-то ещё → перезапускается;
+# прежний деплой неизвестен → перезапускается (безопасная сторона).
+
+def test_только_документы_не_перезапускают_бота_партнёра():
+    r = _run_hook("main", deployed="abc1234", changed="docs/how-to/x.md\\nCHANGELOG.md\\ntests/unit/t.py\\n")
+    assert "bot.partner" not in r.cmds, r.cmds
+    assert "рестарт нативных служб не нужен" in r.stdout, r.stdout[-800:]
+
+
+def test_код_в_диапазоне_перезапускает_бота_партнёра():
+    r = _run_hook("main", deployed="abc1234", changed="docs/x.md\\njobs/scheduled.py\\n")
+    assert "bot.partner" in r.cmds, r.cmds
+
+
+def test_тексты_бота_не_считаются_документами():
+    r = _run_hook("main", deployed="abc1234", changed="methodology/i18n/ru.yaml\\n")
+    assert "bot.partner" in r.cmds, r.cmds
+
+
+def test_неизвестный_прежний_деплой_перезапускает():
+    r = _run_hook("main", deployed="", changed="docs/x.md\\n")
+    assert "bot.partner" in r.cmds, r.cmds

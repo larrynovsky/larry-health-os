@@ -89,6 +89,9 @@ async def _confirm_hypothesis(message, hyp_id):
     if not confirmed:
         await message.reply_text(i18n.t("hypotheses.error.not_found", hypothesis_id=hyp_id))
         return
+    if confirmed.get("_already_confirmed"):
+        await message.reply_text(i18n.t("hypotheses.reply.already_confirmed", hypothesis_id=hyp_id))
+        return
 
     await message.reply_text(i18n.t("hypotheses.reply.confirmed_creating_protocol", hypothesis_id=hyp_id))
     await message.chat.send_action("typing")

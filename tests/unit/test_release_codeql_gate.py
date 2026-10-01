@@ -28,3 +28,11 @@ def test_open_high_or_critical_blocks():
 
 def test_clean_scan_passes():
     assert pm.codeql_verdict(HEAD, SCANNED, [_alert(3, "medium"), _alert(9, None)]) is None
+
+
+# Решение владельца 01.10: гейт расширен на уязвимые зависимости (Dependabot).
+def test_dependabot_high_blocks_medium_does_not():
+    why = pm.dependabot_verdict([{"number": 4, "severity": "high", "package": "urllib3"},
+                                 {"number": 1, "severity": "medium", "package": "oauthlib"}])
+    assert "#4 urllib3" in why and "oauthlib" not in why, why
+    assert pm.dependabot_verdict([{"number": 1, "severity": "medium", "package": "x"}]) is None

@@ -67,6 +67,7 @@ hypotheses.help.evaluate_usage: "Выбери «Проверить гипоте�
 hypotheses.help.reject_usage: "Выбери «Отклонить» под нужной гипотезой. Без выбора она останется без изменений."
 hypotheses.reply.active_heading: "На проверке: {hypotheses}.\n"
 hypotheses.reply.confirmed_creating_protocol: "Ты подтвердил гипотезу #{hypothesis_id}. Составляю план действий…"
+hypotheses.reply.already_confirmed: "Гипотеза #{hypothesis_id} уже подтверждена, план действий по ней есть — второй не завожу."
 hypotheses.reply.consilium_report: "📋 Проверка гипотезы — результат:\n\n{coord_text}"
 hypotheses.reply.consilium_status: " | проверка гипотезы: {verdict_ru}, уверенность {conf:.0%} ({ev_date})"
 hypotheses.reply.entry_heading: "#{hypothesis_id} [{status_label}{consilium_str}]"

@@ -109,6 +109,10 @@ fi
   # ретрай через паузу лечит это БЕЗ тревоги человеку. Эскалируем (ступень 3) только
   # если и ретрай упал И авто-ремонта не существует (см. классификацию ниже).
   push_ok=false
+  # Что УЖЕ стоит на Studio — снимаем ДО пуша: remote-tracking ref двигает только успешный
+  # push, поэтому диапазон «задеплоено..HEAD» включает и код из пуша, который упал раньше
+  # (урок C-42: смысл берём из события git, без своего файла состояния).
+  DEPLOYED=$(git rev-parse -q --verify refs/remotes/studio/main 2>/dev/null || true)
   if git push studio main 2>&1; then
     push_ok=true
   else
@@ -144,6 +148,20 @@ fi
     ssh "$STUDIO" "launchctl unload ~/Library/LaunchAgents/com.larry.health.bot.plist && launchctl load ~/Library/LaunchAgents/com.larry.health.bot.plist" && \
     echo "$(date): push + bot restart OK"
     fi
+    # Рестарт нативных служб — только если в диапазоне есть что-то кроме файлов, которые
+    # рантайм не держит в памяти (01.10: из 37 коммитов 24 меняли только документы и
+    # журналы, и каждый перезапускал бота партнёра — 7 раз за 45 минут вокруг брифа).
+    # Список узкий намеренно: тексты (i18n) и методика грузятся при импорте — их тут нет.
+    # Неизвестен прежний деплой → перезапуск (по умолчанию — безопасная сторона).
+    # Контейнер владельца выше не затронут: образ строится всегда.
+    NATIVE_RESTART=true
+    if [ -n "$DEPLOYED" ] && ! git diff --name-only "$DEPLOYED" HEAD 2>/dev/null \
+         | grep -v -E '^(tests/|docs/|plans/|CHANGELOG\.md$|BACKLOG(_ARCHIVE)?\.md$|ARCH_SNAPSHOT(\.en)?\.md$|\.arch_graph(\.en)?\.json$|lessons\.yaml$|CLAUDE\.md$)' \
+         | grep -q .; then
+      NATIVE_RESTART=false
+      echo "$(date): рестарт нативных служб не нужен: с ${DEPLOYED:0:7} менялись только документы, тесты и журналы"
+    fi
+    if $NATIVE_RESTART; then
     # Partner-бот (партнёр) — тоже несёт код брифа; хук раньше его НЕ рестартил → каждый
     # деплой ехал у партнёра на СТАРОМ коде в памяти (2026-07-15). Отдельным best-effort
     # statement (не в owner-цепи, чтобы падение не пряталось), kickstart -k (проверен живьём),
@@ -168,6 +186,7 @@ fi
     ssh "$STUDIO" 'for s in com.larry.health.lab-intake com.larry.health.watcher.partner; do launchctl kickstart -k gui/$(id -u)/$s 2>/dev/null || true; done' \
       && echo "$(date): intake watcher restart triggered (owner+partner)" \
       || echo "$(date): WARN watcher restart не удался (вход может ехать на старом коде)"
+    fi
   else
     echo "$(date): push FAILED дважды — классифицирую причину (§13: эскалация — последнее средство)"
     # §13: человека тревожим ТОЛЬКО когда эффективного авто-действия НЕ существует.

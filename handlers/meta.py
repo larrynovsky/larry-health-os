@@ -70,13 +70,13 @@ async def _stop_onboarding(message):
 @actions.action("ob_stop")
 async def stop_onboarding(query, context, target):
     await _stop_onboarding(query.message)
-    await query.edit_message_reply_markup(reply_markup=None)
+    await actions.clear_markup(query)
 
 
 @actions.action("ob_redo")
 async def redo_onboarding(query, context, target):
     await _begin_onboarding(query.message.chat)
-    await query.edit_message_reply_markup(reply_markup=None)
+    await actions.clear_markup(query)
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -141,7 +141,7 @@ async def stop_checkin(query, context, target):
     state = ck.checkin_state
     if not state.active or state.started_at is None or target != state.started_at.isoformat():
         await query.message.reply_text(i18n.t("checkin.reply.already_ended"))
-        await query.edit_message_reply_markup(reply_markup=None)
+        await actions.clear_markup(query)
         return
     snapshot = list(state.conversation)
     state.reset()
@@ -149,7 +149,7 @@ async def stop_checkin(query, context, target):
     if any(item["role"] == "user" for item in snapshot):
         asyncio.create_task(_finalize_checkin_background(snapshot))
     await query.message.reply_text(i18n.t("checkin.reply.stopped"))
-    await query.edit_message_reply_markup(reply_markup=None)
+    await actions.clear_markup(query)
 
 
 async def cmd_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):

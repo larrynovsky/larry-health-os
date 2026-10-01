@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:e785e14d36c1 -->
+<!-- translation-of: docs/how-to/README.md sha256:99b67bea1203 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -71,4 +71,15 @@ remaining guides are here: [Git](git_workflow.md), [tests](run_tests.md),
 [worktree for a thread](thread_worktree.md), [dashboard](extend_dashboard.md),
 [domains](add_domain.md), [questionnaires](add_instrument.md), [dependencies](dependency_updates.md),
 [documentation](update_docs.md), [image release](release.md),
-[public mirror](publish_mirror.md), and others in this folder.
+[public mirror](publish_mirror.md).
+
+Extending the system: [a channel in the morning brief](add_brief_channel.md) ·
+[a clinical threshold](add_clinical_threshold.md) · [a literature agent topic](add_survivorship_topic.md) ·
+[an image-intake domain](add_visual_domain.md) · [a scenario and its test](add_new_uc.md) ·
+[a recipient of owner messages](add_bot_consumer.md).
+Project rules and gates: [find what exists before building](discovery_before_build.md) ·
+[the disposability gate](disposability_gate.md) · [the lexicons-in-code sensor](move_lexicon_to_db.md) ·
+[a date in a memory channel](date_memory_channel.md) · [a document to history](move_to_archive.md).
+
+A new public guide in this folder must appear in one of the three lists — the test
+`tests/unit/test_howto_landing_lists_all.py` checks this.

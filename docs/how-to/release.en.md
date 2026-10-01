@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/release.md sha256:dccf6c2b715c -->
+<!-- translation-of: docs/how-to/release.md sha256:9a503ae0d0f3 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](release.md)
@@ -32,8 +32,9 @@ python3.11 scripts/public_mirror.py --release v0.1.0
 
 The command will refuse if the mirror clone does not match GitHub, if such a tag already exists, if the tutorial
 on this commit is not green, if CodeQL has not yet analyzed this commit, or if there are open findings
-of critical/high severity on it (owner decision 01.10). A false finding is dismissed on the Security tab
-with a reason — it will then not block the release. Then it waits for `release.yml` (about half an hour, arm64 takes the longest) and
+of critical/high severity on it, or if Dependabot has an open dependency vulnerability of the same severity
+(owner decisions 01.10). A false finding is dismissed on the Security tab with a reason — it will then not
+block the release; a vulnerable package is updated per `dependency_updates.en.md`. Then it waits for `release.yml` (about half an hour, arm64 takes the longest) and
 verifies the release files. The version number cannot be overwritten: made a mistake — release the next one.
 
 ## 3. First release: make the repository public, then the package

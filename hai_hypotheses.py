@@ -253,6 +253,11 @@ def confirm_hypothesis(memory_id: int) -> dict | None:
             continue
         try:
             payload          = _json.loads(row["value"])
+            if payload.get("status") == "confirmed":
+                # Повторное подтверждение — не новое событие: второй протокол не заводим (01.10, #1118).
+                payload["memory_id"] = memory_id
+                payload["_already_confirmed"] = True
+                return payload
             payload["status"]    = "confirmed"
             payload["memory_id"] = memory_id
             db.save_memory(

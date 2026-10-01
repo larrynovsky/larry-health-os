@@ -99,3 +99,38 @@ def test_fault_splits_detail_from_person(monkeypatch, fault_journal):
     assert "529" in records[0]["text"]
     assert "529" not in person and person
     assert notify.fault("тихо", person_key=None) is None
+
+
+@pytest.mark.unit
+def test_buttons_vanish_before_the_handler_runs(monkeypatch):
+    """01.10: кнопка жила, пока обработчик генерировал протокол (~7 с) — второе «Подтвердить»
+    завело второй протокол. Кнопки предмета снимаются ДО работы; поздний remove_target
+    обработчика («message is not modified») не роняет его после сделанной работы."""
+    from telegram.error import BadRequest
+    import bot.filters as filters
+    monkeypatch.setattr(filters, "owner_chat_id", lambda: 7)
+    edits, order = [], []
+    kb = actions.keyboard([actions.button("ok", "t_slow", 5), actions.button("no", "t_slow2", 5)],
+                          [actions.button("other", "t_slow", 6)])
+
+    async def answer():
+        return None
+
+    async def edit(reply_markup=None):
+        if edits:
+            raise BadRequest("Message is not modified")   # второй вызов в живом Telegram
+        edits.append(reply_markup); order.append("removed")
+
+    query = SimpleNamespace(data="act:t_slow:5", answer=answer, edit_message_reply_markup=edit,
+                            message=SimpleNamespace(reply_markup=kb))
+
+    @actions.action("t_slow")
+    async def _slow(q, context, target):
+        order.append("handler")
+        await actions.remove_target(q, target)          # старый обычай — снимать в конце
+
+    asyncio.run(actions.handle_callback(
+        SimpleNamespace(effective_chat=SimpleNamespace(id=7), callback_query=query), None))
+    assert order == ["removed", "handler"] and len(edits) == 1, (order, edits)
+    left = [[b.callback_data for b in row] for row in edits[0].inline_keyboard]
+    assert left == [["act:t_slow:6"]], left              # чужой предмет остался

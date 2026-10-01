@@ -65,6 +65,7 @@ hypotheses.help.evaluate_usage: "Tap “Check hypothesis” under the hypothesis
 hypotheses.help.reject_usage: "Tap “Reject” under the hypothesis. You can decide later — it will stay unchanged."
 hypotheses.reply.active_heading: "Under review: {hypotheses}.\n"
 hypotheses.reply.confirmed_creating_protocol: "You confirmed hypothesis #{hypothesis_id}. Preparing an action plan…"
+hypotheses.reply.already_confirmed: "Hypothesis #{hypothesis_id} is already confirmed and has an action plan — I will not create a second one."
 hypotheses.reply.consilium_report: "📋 Hypothesis check result:\n\n{coord_text}"
 hypotheses.reply.consilium_status: " | hypothesis check: {verdict_ru}, confidence {conf:.0%} ({ev_date})"
 hypotheses.reply.entry_heading: "#{hypothesis_id} [{status_label}{consilium_str}]"

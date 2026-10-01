@@ -138,6 +138,30 @@ def _codeql_state() -> tuple[list[dict], list[dict]]:
     return analyses, [json.loads(l) for l in lines if l.strip()]
 
 
+def dependabot_verdict(alerts: list[dict]) -> str | None:
+    """Причина отказать выпуску по уязвимым зависимостям или None (решение владельца 01.10:
+    гейт G7 расширен с CodeQL на Dependabot — в тот день 5 алертов, 2 high, заметил глаз на
+    выводе пуша, а не конвейер). Держат выпуск открытые critical/high; закрытые на GitHub
+    с причиной — не держат. Граница: алерты Dependabot пересчитываются после пуша не мгновенно —
+    свежесть к коммиту не сверяется (урок на том же коммите идёт ~10 минут, граф успевает)."""
+    serious = sorted((a["number"], a.get("package", "?")) for a in alerts
+                     if (a.get("severity") or "") in ("critical", "high"))
+    if serious:
+        return (f"открыты уязвимости зависимостей critical/high: "
+                f"{', '.join(f'#{n} {p}' for n, p in serious)}"
+                f" — обновить пакет (docs/how-to/dependency_updates.md) или закрыть с причиной"
+                f" (github.com/{REPO}/security/dependabot)")
+    return None
+
+
+def _dependabot_state() -> list[dict]:
+    import json
+    lines = _gh("api", "--paginate", "--jq",
+                ".[] | {number, severity: .security_advisory.severity, package: .dependency.package.name}",
+                f"repos/{REPO}/dependabot/alerts?state=open&per_page=100").splitlines()
+    return [json.loads(l) for l in lines if l.strip()]
+
+
 def release(tag: str, dest: Path) -> int:
     """Выпуск (решение владельца 30.09: только по его команде). Тег ставится на то, что УЖЕ
     лежит на GitHub, и только если урок на этом коммите прошёл (tutorial.yml) — выпуск не
@@ -164,6 +188,11 @@ def release(tag: str, dest: Path) -> int:
         why = codeql_verdict(head, *_codeql_state())
     except (subprocess.CalledProcessError, ValueError) as e:
         why = f"не удалось прочитать CodeQL ({type(e).__name__}) — выпуск без проверки не делается"
+    if not why:
+        try:
+            why = dependabot_verdict(_dependabot_state())
+        except (subprocess.CalledProcessError, ValueError) as e:
+            why = f"не удалось прочитать Dependabot ({type(e).__name__}) — выпуск без проверки не делается"
     if why:
         print(f"⛔ {why}", file=sys.stderr)
         return 1

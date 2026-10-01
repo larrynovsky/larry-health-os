@@ -160,7 +160,7 @@ lessons:
   outcome:
     kind: rule
     text: гипотеза о причине отказа джобы проверяется фактом процесса (родитель, время жизни) до правки
-  status: adopted
+  status: failed
   adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
   change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
   evidence:
@@ -624,7 +624,7 @@ lessons:
   outcome:
     kind: rule
     text: ветвление по значениям поставщика — только после GROUP BY по базе
-  status: adopted
+  status: failed
   adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
   change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
   evidence:
@@ -1533,7 +1533,7 @@ lessons:
   outcome:
     kind: rule
     text: слова о смещении — только с числом прогона; оракул — инвариант новой оценки
-  status: adopted
+  status: failed
   adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
   change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
   evidence:
@@ -2258,7 +2258,7 @@ lessons:
   outcome:
     kind: rule
     text: правило до замера фиксирует порог и что мерить; лечение — по измеренному механизму
-  status: adopted
+  status: failed
   adopted_on: '2026-09-29'   # редакция ритуала сохранена владельцем
   change: 'ritual:letitbe, редакция 2026-09-28 (вечер) — шаг 1.6 «Утверждения под решениями: замер или гипотеза»; сохранена владельцем 2026-09-29'
   evidence:
@@ -2824,4 +2824,150 @@ lessons:
   change: private/pii_terms.yaml
   adopted_on: '2026-10-01'
   evidence: ['git:a64752c', 'git:51a7a80']
+  owner: владелец
+- id: C-122
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [tests/conftest.py, food_quarterly.py]
+  event: 'Ночной pytest в контейнере владельца (run_checks --scheduled 07:50) прислал ему один и тот же пищевой профиль ≥5 раз: каждый тест утреннего брифа в первые 7 дней квартала звал food_quarterly.deliver, а тот шлёт curl на api.telegram.org настоящим токеном.'
+  cost: '≥5 одинаковых документов владельцу 01.10; без правки повторялось бы ежедневно до 07.10'
+  cause: 'conftest подменял секреты на фиктивные, только если HEALTH_SECRETS_DIR пуст; в контейнере он задан настоящим. Глушитель Telegram стоял на одном отправителе (notify), а отправителей мимо него в коде шесть (curl/urlopen) — сток не стерёгся'
+  address: {kind: runtime, ref: tests/conftest.py}
+  subject: [test_stand, message_delivery, secrets]
+  outcome: {kind: check, text: 'conftest._no_real_importers: хост api.telegram.org в argv subprocess.run или в URL urlopen — блок + красный teardown, токен в журнал не пишется. Мутация: без нейтрализатора квартальной доставки 7 тестов брифа красные с «telegram: sendDocument». Не покрыто: httpx/requests'}
+  status: adopted
+  change: 'git:b7bbdc4'
+  adopted_on: '2026-10-01'
+  evidence: ['git:b7bbdc4']
+  owner: владелец
+- id: C-123
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [integrity_tests.py, plist_env_liveness.py]
+  event: 'Колокол позвал владельца «включить партнёрский канал литературы?» через 4 дня после его «включить» (27.09): с 30.09 ночной прогон владельца идёт в контейнере, плисты партнёра живут на хосте и в контейнер не смонтированы — датчик прочёл «крана нет».'
+  cost: 'ложная карточка на столе владельца; повторный вопрос по решённому'
+  cause: 'датчик судил наличие службы по каталогу плистов той машины, где сам бежит; переезд прогона в контейнер сменил эту машину, а признак in_container() у датчика не читался — утверждение о соседнем носителе без гасителя (класс §18)'
+  address: {kind: runtime, ref: 'integrity_tests.py::check_literature_partner_gate'}
+  subject: [sensor_perimeter, tenant, filesystem_icloud]
+  outcome: {kind: check, text: 'partner_tap_present: в контейнере судит копия плиста в launchd/ репо; test_container_sees_the_tap_through_the_repo_copy красный без правки. Прочие датчики, читающие agents_dir() о хостовых службах, не пересмотрены'}
+  status: adopted
+  change: 'git:7443917'
+  adopted_on: '2026-10-01'
+  evidence: ['git:7443917']
+  owner: владелец
+- id: C-124
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [integrity_tests.py, correlation_gate.py]
+  event: 'Датчик «чисел ниоткуда» (UC-B-09) спросил владельца «r=0.38 — цитата или выдумка?»; это медиана r по периодам (r_epoch_median) из той же принятой веры, которую гейт сам кладёт консилиуму.'
+  cost: 'ложная карточка владельцу с вопросом, ответ на который лежал в базе'
+  cause: 'определение «посчитанное число» жило в двух домах: производитель (correlation_gate) публикует r и r_* по периодам, датчик собирал «известные» только из поля r — список полей у читателя отстал от писателя'
+  address: {kind: runtime, ref: 'integrity_tests.py::collect_ungrounded'}
+  subject: [sensor_perimeter, writers_readers]
+  outcome: {kind: check, text: 'collect_ungrounded берёт все числовые r_* записи веры (по данным, не по списку имён); test_epoch_r_from_accepted_belief_is_grounded красный без правки'}
+  status: adopted
+  change: 'git:7f028fa'
+  adopted_on: '2026-10-01'
+  evidence: ['git:7f028fa']
+  owner: владелец
+- id: C-125
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [proposals_db.py, literature_curator.py]
+  event: 'Каждое предложение куратора литературы (31 у владельца, включая принятое #54) бот показывал пустым: «Этой проблемы уже нет в списке — предложение ничего не изменит»; суть, обоснование и статья не печатались никогда. Найдено проверкой перед первой прямой доставкой партнёру.'
+  cost: '31 пустая карточка владельцу с июля; нить proposal-delivery (23.09) наладила доставку, не заметив, что доставляет пустое'
+  cause: 'контракт производитель→карточка не общий: куратор пишет action=literature_review_required и поле rationale, рендер знал только update/add/resolve и читал reason; тесты карточки шли на руками собранных правках GP, ни один — на выходе куратора'
+  address: {kind: runtime, ref: proposals_db.py}
+  subject: [contract_change, writers_readers, message_delivery]
+  outcome: {kind: check, text: 'ветка literature_review_required в format_proposal_card + test_карточка_статьи_несёт_суть_причину_и_источник (на старой карточке красный). Других производителей предложений (survivorship и т.п.) этим тестом не покрыто'}
+  status: adopted
+  change: 'git:460ded3'
+  adopted_on: '2026-10-01'
+  evidence: ['git:460ded3']
+  owner: владелец
+- id: C-126
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [literature_curator.py]
+  event: 'Модель куратора вписала в поле «номер проблемы» номер гипотезы (203069) — карточка не нашла проблему.'
+  cost: 'часть предложений куратора адресована несуществующей проблеме'
+  cause: 'в контексте промпта проблемы, протоколы и гипотезы перечислены одной формой «#id», поле объявлено int при строковых problem_id (P007); выход модели не сверялся с данными на границе'
+  address: {kind: runtime, ref: literature_curator.py}
+  subject: [llm_output]
+  outcome: {kind: check, text: 'problem_id=<id> только у проблем, поле str; несуществующий id → заметка (test_proposal_with_unknown_problem_id_becomes_note)'}
+  status: adopted
+  change: 'git:460ded3'
+  adopted_on: '2026-10-01'
+  evidence: ['git:460ded3']
+  owner: владелец
+- id: C-127
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [bot/actions.py, hai_hypotheses.py, handlers/hypotheses.py]
+  event: 'Кнопка «Подтвердить» гипотезу жила ~7 с, пока модель писала протокол; второе нажатие завело второй одинаковый протокол (#1118: 254309 и 254310).'
+  cost: 'дубль протокола у владельца (снят вручную, 254309 retired)'
+  cause: 'правило «кнопка исчезает после нажатия» жило в каждом из 20 обработчиков отдельно и исполнялось в конце, после работы (4 не снимали вовсе); confirm_hypothesis не был идемпотентным'
+  address: {kind: runtime, ref: bot/actions.py}
+  subject: [message_delivery, concurrency]
+  outcome: {kind: check, text: 'handle_callback снимает кнопки предмета ДО обработчика (один дом для всех 20); повторное подтверждение не заводит протокол. test_buttons_vanish_before_the_handler_runs красный без правки'}
+  status: adopted
+  change: 'git:a989e30'
+  adopted_on: '2026-10-01'
+  evidence: ['git:a989e30']
+  owner: владелец
+- id: C-128
+  date: '2026-10-01'
+  thread: bot-repairs-1001
+  modules: [hai_hypotheses.py, monthly_consilium.py]
+  event: 'Гипотезы консилиума (3 владельцу, 5 партнёру) пришли без «Подтвердить / Отклонить» — решить можно было только из списка /hypotheses; пришлось переслать заново.'
+  cost: '8 повторных сообщений; решения откладывались до ручного /hypotheses'
+  cause: 'партия «кнопки вместо команд» (28.09) заменила команду 1:1 на то, что было в сообщении (/hyp → «Запрос для врача»), а не на действия, которых ждёт человек; кнопки уведомления жили в двух местах кода'
+  address: {kind: runtime, ref: hai_hypotheses.py}
+  subject: [message_delivery]
+  outcome: {kind: check, text: 'hai_hypotheses.notice_keyboard — один дом кнопок для генератора и консилиума; раскладка закреплена test_notify_uses_patient_view_when_complete'}
+  status: adopted
+  change: 'git:5a4f228'
+  adopted_on: '2026-10-01'
+  evidence: ['git:5a4f228']
+  owner: владелец
+- id: C-129
+  date: '2026-10-01'
+  thread: finish-prep
+  modules: [scripts/deploy_container.sh]
+  event: 'Диск виртуальной машины Докера владельца (20 ГБ) заполнился на 100% около 13:26: деплой строил образ на каждый коммит в main и не удалял старые — 109 образов, 19,5 ГБ. На том же диске база владельца: «disk I/O error» в боте и при разборе документа, две сборки упали. Нашёл не датчик, а полный прогон закрытия чужой задачи («database or disk is full» на снимке базы).'
+  cost: '~1 ч ошибок записи базы владельца, 2 упавших деплоя, 1 сорванный разбор документа (сайдкар снят руками)'
+  cause: 'у накопителя «образ на каждое событие» не было ни уборщика, ни датчика места; диск общий с базой, поэтому заполнение било по данным, а не только по сборке'
+  address: {kind: runtime, ref: scripts/deploy_container.sh}
+  subject: [sensor_perimeter, filesystem_icloud]
+  outcome: {kind: check, text: 'после сверки нового образа остаётся только образ этого коммита (+:local); при ≥85% занятого — notify.fault; форма стережётся test_deploy_container_ocr::test_old_images_are_removed_and_disk_is_watched; живьём после деплоя 14:42 осталось 2 тега. Граница: место меряется только на деплое'}
+  status: adopted
+  change: 'git:11ec69e'
+  adopted_on: '2026-10-01'
+  evidence: ['git:11ec69e']
+  owner: владелец
+- id: C-130
+  date: '2026-10-01'
+  thread: finish-prep
+  modules: [jobs/scheduled.py]
+  event: 'Пункт M3 (бриф после рестарта бота) утром назван владельцу «покрытым» по наличию функции досылки. Перепроверка днём: досылка смотрела на reports/<день>.md, который пишется ДО отправки, а единственный тест её подменял заглушкой.'
+  cost: 'один ложный статус в отчёте владельцу; окно потери брифа при рестарте между записью и отправкой'
+  cause: 'признак «покрыто» в отчёте не требовал теста, который исполняет проверяемое, а не подменяет его; маркер «собран» принят за квитанцию «доставлен»'
+  address: {kind: ritual, ref: letitbe}
+  subject: [hypothesis_before_fact, message_delivery]
+  outcome: {kind: rule, text: 'слово «покрыто» о поведении — только со ссылкой на тест, который это поведение исполняет (не monkeypatch проверяемой функции); маркер досылки ставится после отправки (исправлено git:5cff604)'}
+  status: observation
+  evidence: ['git:5cff604']
+  owner: владелец
+- id: C-131
+  date: '2026-10-01'
+  thread: finish-prep
+  modules: [plans/research_llm_providers_2026-10-01.md]
+  event: 'Кодекс запущен на исследование провайдеров с -c sandbox_permissions=["disk-full-read-access"] при чтении открытого зеркала; через ~45 с объявил «проверю родительские каталоги» и был остановлен, журнал затёрт перезапуском — что прочитано вне зеркала, неизвестно.'
+  cost: 'неизвестный объём чтения вне зеркала за ~45 с'
+  cause: 'команда запуска в задании не ограничивала чтение каталогом зеркала, а песочница read-only чтение диска не ограничивает — граница держалась только на тексте задания, которого не было'
+  address: {kind: methodology_page, ref: docs/how-to/agent_bridge_codex.md}
+  subject: [agent_delegation, pii]
+  outcome: {kind: rule, text: 'внешний исполнитель по открытому коду — запуск из каталога зеркала, без disk-full-read, с запретом читать родительские каталоги в тексте задания; журнал запуска не перезаписывать'}
+  status: observation
+  evidence: ['docs/handoff/finish-prep/2026-10-01-7a8e324.md']
   owner: владелец

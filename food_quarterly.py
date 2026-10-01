@@ -71,10 +71,29 @@ def deliver(today: datetime.date | None = None) -> str:
     return doc
 
 
+def has_personal_basis(conn=None, profile: dict | None = None) -> bool:
+    """Есть ли у человека хоть одно личное основание профиля: проблема в медкарте, геном или
+    рост с весом. 01.10: человек, поставивший систему из выпуска, в первый же запуск получил
+    документ «Выгодные продукты по геному и медкарте» — общий список без единого его факта,
+    который владелец узнал как свой (тот же каркас продуктов). Без основания документ
+    обещает персональность, которой нет; он придёт в квартале, когда основание появится."""
+    import food_profile as _fp
+    if _fp._bmi(profile if profile is not None else db.get_profile_context()) is not None:
+        return True
+    c = conn or db.get_conn()
+    for table in ("problem_list", "genetic_variants"):
+        try:
+            if c.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone():
+                return True
+        except Exception:  # silent-ok: таблицы нет — основания из неё тоже нет
+            continue
+    return False
+
+
 def maybe_deliver(today: datetime.date | None = None) -> bool:
-    """Гвард: доставить, если пора и ещё не слали. Не роняет вызывающего (daily job)."""
+    """Гвард: доставить, если пора, ещё не слали и есть личное основание. Не роняет вызывающего."""
     try:
-        if should_deliver(today):
+        if should_deliver(today) and has_personal_basis():
             deliver(today)
             return True
     except Exception as e:

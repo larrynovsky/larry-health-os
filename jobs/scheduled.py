@@ -368,9 +368,7 @@ async def send_morning_report(context: ContextTypes.DEFAULT_TYPE):
     # Сохраняем markdown-версию
     # tenant-aware (2026-07-03): раньше захардкожено в iCloud владельца — отчёт
     # партнёра писался в каталог владельца. Теперь в data-каталог тенанта.
-    import os
-    reports_dir = Path(os.environ.get("HEALTH_DATA_DIR")
-                       or infra_config.cloud_dir()) / "data" / "reports"
+    reports_dir = _reports_dir()
     reports_dir.mkdir(parents=True, exist_ok=True)
     # Метка едет и в ФАЙЛ: его читают дашборд и GP-циклы позже, когда сообщение в
     # Telegram уже пролистано. Документ, которому нельзя верить, обязан нести это
@@ -380,6 +378,12 @@ async def send_morning_report(context: ContextTypes.DEFAULT_TYPE):
         f"{_file_header}\n\n---\n\n{report}" if _file_header else report)
 
     await send_long(context.bot, chat_id, report)
+    # Квитанция «бриф ДОСТАВЛЕН» — её читает досылка после рестарта. Файл .md выше пишется
+    # ДО отправки и значит «собран»: рестарт между ним и отправкой терял бриф молча (M3, 01.10).
+    try:
+        _sent_marker(target).touch()
+    except OSError as e:
+        log.warning(f"квитанция доставки брифа не записана: {e}")
     # Квитанция доставки: FSM гейта коммитим ТОЛЬКО после успешной отправки (риск #1)
     if _gate_sink.get("specs"):
         try:
@@ -1029,25 +1033,33 @@ async def discover_pgs_monthly(context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-def _schedule_morning_catchup(app):
-    """Если бот стартует ПОСЛЕ 08:30, а отчёт за сегодня ещё не сформирован —
-    запланировать одноразовую досылку через 60с. Идемпотентно: маркер —
-    наличие файла reports/<today>.md (send_morning_report пишет его при успехе),
-    поэтому повторный рестарт в тот же день не пошлёт дубль."""
+def _reports_dir() -> Path:
     import os
+    return Path(os.environ.get("HEALTH_DATA_DIR") or infra_config.cloud_dir()) / "data" / "reports"
+
+
+def _sent_marker(day) -> Path:
+    """reports/<день>.sent — бриф за день ушёл в Telegram (пишется ПОСЛЕ send_long)."""
+    return _reports_dir() / f"{day}.sent"
+
+
+def _schedule_morning_catchup(app):
+    """Если бот стартует ПОСЛЕ времени брифа, а бриф за сегодня не ДОСТАВЛЕН —
+    одноразовая досылка через 60с. Маркер — квитанция reports/<today>.sent, которую
+    send_morning_report пишет после отправки; повторный рестарт дубля не шлёт.
+    До 01.10 маркером был reports/<today>.md, а он пишется ДО отправки (M3).
+    Граница: в день перехода на квитанцию рестарт после брифа пошлёт его второй раз."""
     tz, _tzn, _ok = _resolve_brief_tz()
     bt = _brief_time()
     now = _dt.now(tz)
     slot = now.replace(hour=bt.hour, minute=bt.minute, second=0, microsecond=0)
     if now <= slot:
         return  # обычное расписание сработает сегодня — досылка не нужна
-    reports_dir = Path(os.environ.get("HEALTH_DATA_DIR")
-                       or infra_config.cloud_dir()) / "data" / "reports"
-    today_md = reports_dir / f"{get_today()}.md"
-    if today_md.exists():
-        return  # отчёт за сегодня уже сформирован
-    log.info("morning_report catch-up: рестарт после 08:30, нет %s — досылаю через 60с",
-             today_md.name)
+    sent = _sent_marker(get_today())
+    if sent.exists():
+        return  # бриф за сегодня уже доставлен
+    log.info("morning_report catch-up: рестарт после брифа, нет %s — досылаю через 60с",
+             sent.name)
     app.job_queue.run_once(send_morning_report, when=60, name="morning_report_catchup")
 
 

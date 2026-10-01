@@ -2146,6 +2146,19 @@ def literature_partner_gate(approved: int, partner_plist_exists: bool) -> str | 
             f"Карточка: BACKLOG::BL-LIT-PARTNER-CRON-1")
 
 
+def partner_tap_present(agents_dir, repo_launchd, in_container: bool,
+                        name: str = "com.larry.health.literature-search.partner.plist") -> bool:
+    """Заведён ли партнёрский кран. Установленный плист — где служба исполняется. В контейнере
+    владельца партнёра нет (он живёт на хосте), его плисты не смонтированы: замер 01.10 —
+    гаситель позвал владельца «включить?» через 4 дня после «включить» (27.09). Там судит копия
+    в репо (launchd/, её кладёт тот же коммит, что заводит кран); живость крана — забота
+    хостового прогона партнёра (check_literature_freshness_partner), не этого гасителя."""
+    from pathlib import Path as _P
+    if (_P(agents_dir) / name).exists():
+        return True
+    return bool(in_container) and (_P(repo_launchd) / name).exists()
+
+
 def check_literature_partner_gate():
     """Отложенное решение владельца возвращается по СОБЫТИЮ, а не по сроку.
 
@@ -2171,8 +2184,9 @@ def check_literature_partner_gate():
             "SELECT count(*) FROM problem_list_proposals "
             "WHERE source='literature_curator' AND status='approved'").fetchone()[0]
     import plist_env_liveness as _pl
-    plist = str(_pl.agents_dir() / "com.larry.health.literature-search.partner.plist")
-    reason = literature_partner_gate(approved, _os.path.exists(plist))
+    present = partner_tap_present(_pl.agents_dir(), Path(__file__).parent / "launchd",
+                                  _pl.in_container())
+    reason = literature_partner_gate(approved, present)
     if reason:
         warn("партнёрский кран литературы: условие возврата наступило", reason)
     return {"approved": approved}

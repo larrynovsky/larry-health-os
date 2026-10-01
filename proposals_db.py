@@ -84,13 +84,31 @@ def format_proposal_card(prop: dict) -> str:
     from _fmt_helpers import fmt_label
     rep = prop.get("repeats") or 1
     rep_s = i18n.t("proposals.repeat", count=rep) if rep > 1 else ""
-    lines = [i18n.t("proposals.heading", source=prop['source'], repeat=rep_s), ""]
+    changes = _j.loads(prop["proposed"])
+    if isinstance(changes, dict):
+        changes = [changes]
+    # Предложение куратора литературы — не правка списка, а статья к обсуждению: своя шапка
+    # и свой текст (01.10: карточка такого типа выходила пустой — «предложение ничего не изменит»,
+    # суть/обоснование/статья не печатались вовсе, а «Применить» список не меняет).
+    lit = bool(changes) and all(c.get("action") == "literature_review_required" for c in changes)
+    head = "proposals.lit.heading" if lit else "proposals.heading"
+    lines = [i18n.t(head, source=prop['source'], repeat=rep_s), ""]
     with _hdb.get_conn() as conn:
-        for ch in _j.loads(prop["proposed"]):
+        for ch in changes:
             action = ch.get("action", "")
             pid = ch.get("problem_id", "?")
             row = conn.execute("SELECT * FROM problem_list WHERE problem_id=?", (pid,)).fetchone()
             row = dict(row) if row else None
+            if action == "literature_review_required":
+                if row:
+                    lines.append(i18n.t("proposals.lit.about", title=_clip(row.get("title"), 90)))
+                lines.append(i18n.t("proposals.lit.summary", summary=_clip(ch.get("summary"), 400)))
+                if ch.get("rationale"):
+                    lines.append(i18n.t("proposals.reason", reason=_clip(ch["rationale"], 300)))
+                if ch.get("source_title") or ch.get("source_pmid"):
+                    lines.append(i18n.t("proposals.lit.source", title=_clip(ch.get("source_title"), 150),
+                                        pmid=ch.get("source_pmid") or "—"))
+                continue
             if action == "add":
                 nv = ch.get("new_value") if isinstance(ch.get("new_value"), dict) else {}
                 lines.append(i18n.t("proposals.new", title=ch.get('title') or nv.get('title', '')))
@@ -116,6 +134,8 @@ def format_proposal_card(prop: dict) -> str:
                     lines.append(i18n.t("proposals.proposed", whole=whole, value=proposed))
             if ch.get("reason"):
                 lines.append(i18n.t("proposals.reason", reason=_clip(ch['reason'], 300)))
+    if lit:
+        lines += ["", i18n.t("proposals.lit.buttons")]
     return "\n".join(lines)
 
 

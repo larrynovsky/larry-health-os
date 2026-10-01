@@ -133,7 +133,8 @@ def test_k8_monthly_notice_uses_tenant_language_in_body_and_button(monkeypatch):
     profile = {}
     translator = _k8_translator(monkeypatch, profile)
     delivery = Mock()
-    monkeypatch.setitem(sys.modules, "hai_hypotheses", SimpleNamespace(_notify_specialist=delivery))
+    monkeypatch.setitem(sys.modules, "hai_hypotheses", SimpleNamespace(
+        _notify_specialist=delivery, notice_keyboard=lambda mid, lang=None: ("kb", mid, lang)))
     actions = SimpleNamespace(button=lambda *args: args, keyboard=lambda buttons: buttons)
     monkeypatch.setitem(sys.modules, "bot", SimpleNamespace(actions=actions))
     ns = _k8_function_namespace("monthly_consilium.py", {"_notify_consilium_hypothesis"})
@@ -160,8 +161,8 @@ def test_k8_monthly_notice_uses_tenant_language_in_body_and_button(monkeypatch):
                           supporters=", ".join(consensus.get("specialists_supporting", [])[:5]),
                           noticed=pv.get("noticed", "—"), causes=expected_causes,
                           do_now=pv.get("do_now", "—"), consult_when=pv.get("consult_when", "—"))
-            delivery.assert_called_with(expected, reply_markup=[
-                (translator.t("actions.hypothesis.query", lang), "hq", 7)])
+            expected += translator.t("hypotheses.notice.silence", lang)
+            delivery.assert_called_with(expected, reply_markup=("kb", 7, lang))
             if lang == "en":
                 assert not re.search("[А-Яа-яЁё]", expected)
     assert json.dumps(hypothesis, sort_keys=True) == before

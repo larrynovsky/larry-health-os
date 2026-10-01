@@ -572,6 +572,11 @@ def render_tenant(values: dict[str, str], tenant: str, dashboard_port: int) -> d
                    HEALTH_TZ=values["TZ"])
         if svc == "dashboard":
             env["DASHBOARD_PORT"] = str(dashboard_port)
+        if svc == "bot":
+            # Бриф человека судится ЕГО вердиктом ночной проверки: run_checks.sh кладёт его в
+            # <данные>/logs (HEALTH_TRIAGE_LOGS), бот без этой переменной читал артефакт
+            # владельца и слал BRIEF_NOT_GATED каждое утро (замер 01.10, M2).
+            env["HEALTH_TRIAGE_LOGS"] = f"{values['DATA']}/logs"
         out[pl["Label"] + ".plist"] = plistlib.dumps(_retag(pl, tenant))
     return out
 

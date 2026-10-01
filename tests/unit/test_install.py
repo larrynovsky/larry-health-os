@@ -201,3 +201,10 @@ def test_логи_собранных_плистов_попадают_под_ро
     assert set(map(pathlib.Path, added)) == declared
     assert declared <= {r["path"] for r in log_rotate._parse_conf(conf)}
     assert log_rotate.cover(texts, conf, "zz") == []
+
+
+def test_бот_человека_судит_бриф_своим_вердиктом():
+    """M2 (01.10): бот тенанта читает вердикт ночной проверки из ЕГО <данные>/logs — туда его
+    пишет run_checks.sh. Падение = бриф человека снова уходит с BRIEF_NOT_GATED."""
+    env = _tenant_plists()["com.larry.health.bot.t2.plist"]["EnvironmentVariables"]
+    assert env["HEALTH_TRIAGE_LOGS"] == f"{_T['DATA']}/logs"

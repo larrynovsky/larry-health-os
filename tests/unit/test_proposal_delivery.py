@@ -122,3 +122,18 @@ def test_outbox_зарегистрирован_в_расписании_бота(
         err = e
     assert "deliver_pending_proposals" in names, (sorted(names), repr(err))
     assert names["deliver_pending_proposals"]["interval"] == proposals_db.DELIVERY_EVERY_S
+
+
+def test_карточка_статьи_несёт_суть_причину_и_источник(db):
+    """01.10: предложение куратора литературы выходило пустым — «предложение ничего не изменит»."""
+    import json as _j
+    import health_db as hdb
+    prop = {"id": 1, "source": "literature_curator", "repeats": 1, "proposed": _j.dumps([{
+        "action": "literature_review_required", "problem_id": "нет-такой",
+        "summary": "Спроси врача про вечерние прогулки", "rationale": "Это влияет на сон",
+        "source_pmid": "12345678", "source_title": "Sleep and evening walks"}])}
+    card = hdb.format_proposal_card(prop)
+    for must in ("Спроси врача про вечерние прогулки", "Это влияет на сон", "12345678",
+                 "Список проблем от этого не меняется"):
+        assert must in card, card
+    assert "ничего не изменит" not in card, card

@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.287 | **Дата:** 2026-10-01
+**Версия:** 15.291 | **Дата:** 2026-10-01
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -651,6 +651,7 @@ hai_hypotheses.py  # hai_hypotheses — гипотезы, протоколы, ф
   generate_hypothesis_from_drift(drifts, linked_experiment_id) — W5H-B (2026-05-14): defunct.
   confirm_hypothesis(memory_id) — Подтверждает гипотезу (status → confirmed), возвращает payload.
   reject_hypothesis(memory_id, reason) — Отклоняет гипотезу (status → rejected).
+  notice_keyboard(memory_id, lang) — Кнопки уведомления о новой гипотезе — один дом для обоих путей (г
   get_specialist_hypotheses(n) — Открытые гипотезы с resolution_type=needs_specialist.
   generate_protocol_from_hypothesis(hypothesis) — LLM генерирует поведенческий протокол из подтверждённой гипотезы.
   save_protocol(protocol) — Сохраняет протокол в таблицу protocols.
@@ -940,6 +941,7 @@ integrity_tests.py  # integrity_tests.py — проверка целостнос
   check_canon_naming_debt() — Назывной долг канона не растёт: строка из документа живёт под сво
   check_unrepeated_draw_not_swamping() — Исторический блок не перерастает текущую лабораторную картину.
   literature_partner_gate(approved, partner_plist_exists) — Чистая логика гасителя: пора ли возвращаться к партнёрскому крану
+  partner_tap_present(agents_dir, repo_launchd, in_container, name) — Заведён ли партнёрский кран. Установленный плист — где служба исп
   check_literature_partner_gate() — Отложенное решение владельца возвращается по СОБЫТИЮ, а не по сро
   electrophoresis_offenders(rows, tol) — Чистая логика: электрофорез белка обязан сходиться сам с собой.
   check_electrophoresis_sums() — Электрофорез сходится сам с собой (см. `electrophoresis_offenders

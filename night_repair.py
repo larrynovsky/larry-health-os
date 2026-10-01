@@ -456,10 +456,13 @@ def close_fix(repo: Path, rid: str, note: str = "") -> tuple[int, str]:
     _git(repo, "fetch", "-q", "studio")
     if _git(repo, "merge-base", "--is-ancestor", "HEAD", "studio/main").returncode != 0:
         return 1, "коммит слияния ещё не на Studio — дождись деплоя"
-    if not _move_remote(rid, "done", f"слито {head[:7]}"):
+    # Квитанция называет коммит ПОЧИНКИ, а не HEAD на момент close: после него post-commit
+    # успевает положить свой коммит doc_agent, и 01.10 квитанция 82a5cb30 указала на CHANGELOG.
+    fix = _git(repo, "log", "-1", "--format=%H", "--grep", rid, f"{base}..HEAD").stdout.strip() or head
+    if not _move_remote(rid, "done", f"слито {fix[:7]}"):
         return 1, "Studio не ответила"
     mk.unlink()
-    return 0, f"{rid} слит ({head[:7]}) и снят со Studio"
+    return 0, f"{rid} слит ({fix[:7]}) и снят со Studio"
 
 
 def reject_fix(repo: Path, rid: str, why: str) -> tuple[int, str]:

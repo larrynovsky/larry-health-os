@@ -788,9 +788,8 @@ def _notify_consilium_hypothesis(memory_id: int, hyp: dict):
                   supporters=", ".join(supporters[:5]), noticed=pv.get("noticed", "—"),
                   causes=causes_text, do_now=pv.get("do_now", "—"),
                   consult_when=pv.get("consult_when", "—"))
-    from bot import actions
-    hh._notify_specialist(text, reply_markup=actions.keyboard([
-        actions.button(i18n.t("actions.hypothesis.query", lang), "hq", memory_id)]))
+    hh._notify_specialist(text + i18n.t("hypotheses.notice.silence", lang),
+                          reply_markup=hh.notice_keyboard(memory_id, lang))
 
 
 def _alert_food_generation_gap(reason: str) -> None:

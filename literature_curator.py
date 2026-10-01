@@ -63,12 +63,18 @@ FINDING:
   Applicability to me: {applicability_to_me}
   Relevance assessment: {relevance_assessment}
 
+summary и rationale ЧИТАЕТ САМ ЧЕЛОВЕК в Telegram, а не врач и не агент. Поэтому:
+- обращайся к нему на «ты», не «пациент»;
+- простыми словами, как объяснил бы знакомый врач; медицинский термин — только с пояснением в скобках;
+- без английских слов и сокращений (HRV, readiness, CBT-I и т.п.) — пиши по-русски, что это;
+- без внутренних номеров (#…, id проблем, гипотез, протоколов) — называй тему словами.
+
 Ответь СТРОГО валидным JSON:
 {{
   "action": "hypothesis" | "problem_proposal" | "task" | "note",
   "rationale": "1-2 предложения почему именно эта эскалация",
   "summary": "что эскалируем (1-2 предложения, конкретно)",
-  "linked_problem_id": int|null,        // для problem_proposal — id проблемы которую затрагивает
+  "linked_problem_id": str|null,        // для problem_proposal — problem_id ИЗ СПИСКА «Активные проблемы» (не номер гипотезы/протокола), иначе null
   "task_type": "lab_test"|"action"|"consult"|null,  // для task
   "task_deadline_days": int|null        // для task — через сколько дней дедлайн
 }}
@@ -91,7 +97,7 @@ def _build_short_context() -> str:
         if probs:
             lines.append("Активные проблемы:")
             for p in probs[:8]:
-                lines.append(f"  #{p.get('problem_id', p.get('id'))}: {p.get('title', '')[:80]}")
+                lines.append(f"  problem_id={p.get('problem_id', p.get('id'))}: {p.get('title', '')[:80]}")
     except Exception:  # silent-ok: broken row/JSON или нет данных — пропуск
         pass
 
@@ -100,7 +106,7 @@ def _build_short_context() -> str:
         if protos:
             lines.append("Активные протоколы:")
             for pr in protos[:5]:
-                lines.append(f"  #{pr.get('id')}: {pr.get('title', '')[:80]}")
+                lines.append(f"  - {pr.get('title', '')[:80]}")
     except Exception:  # silent-ok: broken row/JSON или нет данных — пропуск
         pass
 
@@ -128,7 +134,7 @@ def _build_short_context() -> str:
         if hyps:
             lines.append("Открытые гипотезы:")
             for h in hyps[:5]:
-                lines.append(f"  #{h.get('memory_id')}: {(h.get('observation') or '')[:80]}")
+                lines.append(f"  - {(h.get('observation') or '')[:80]}")
     except Exception:  # silent-ok: broken row/JSON или нет данных — пропуск
         pass
 
@@ -295,7 +301,14 @@ def _execute_proposal(finding: dict, decision: dict) -> int | None:
         return None
     # Предложение без problem_id некому применить (apply_proposal его не знает) — это мысль,
     # а не правка; ей место в заметках, а не в очереди на approve.
-    if decision.get("linked_problem_id") in (None, "", "null"):
+    # Граница доверия: id пишет модель. 01.10 замер — номер гипотезы (203069) вместо
+    # problem_id → карточка «этой проблемы нет». Несуществующий id = мысль без адресата.
+    _pid = decision.get("linked_problem_id")
+    if _pid not in (None, "", "null") and not any(
+            str(p.get("problem_id")) == str(_pid) for p in (db.get_problem_list() or [])):
+        log.info(f"  linked_problem_id={_pid!r} нет в списке проблем → заметка")
+        _pid = None
+    if _pid in (None, "", "null"):
         decision["_routed"] = "note"
         return _execute_note(finding, decision)
     proposed = [{

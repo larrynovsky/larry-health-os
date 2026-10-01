@@ -2,7 +2,7 @@
 **English** · [Русский](ARCH_SNAPSHOT.md)
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Version:** 15.287 | **Date:** 2026-10-01
+**Version:** 15.291 | **Date:** 2026-10-01
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. The line above is written by doc_agent on post-commit
      (moved from BLUEPRINT.md on 2026-08-03; that file was deleted) — do not edit manually. -->
@@ -654,6 +654,7 @@ hai_hypotheses.py  # hai_hypotheses — hypotheses, protocols, formatting.
   generate_hypothesis_from_drift(drifts, linked_experiment_id) — W5H-B (2026-05-14): defunct.
   confirm_hypothesis(memory_id) — Confirms the hypothesis (status → confirmed), returns payload.
   reject_hypothesis(memory_id, reason) — Rejects the hypothesis (status → rejected).
+  notice_keyboard(memory_id, lang) — New hypothesis notification buttons — one domain for both paths (
   get_specialist_hypotheses(n) — Open hypotheses with resolution_type=needs_specialist.
   generate_protocol_from_hypothesis(hypothesis) — LLM generates a behavioural protocol from a confirmed hypothesis.
   save_protocol(protocol) — Saves a protocol to the protocols table.
@@ -943,6 +944,7 @@ integrity_tests.py  # integrity_tests.py — integrity checks for Larry Health O
   check_canon_naming_debt() — Canon's nominal debt does not grow: a row from a document lives u
   check_unrepeated_draw_not_swamping() — The historical block does not outgrow the current laboratory pict
   literature_partner_gate(approved, partner_plist_exists) — Pure suppressor logic: whether it is time to return to the partne
+  partner_tap_present(agents_dir, repo_launchd, in_container, name) — Whether the partner tap is set up. The configured plist — where t
   check_literature_partner_gate() — The deferred owner decision is returned on EVENT, not on schedule
   electrophoresis_offenders(rows, tol) — Pure logic: protein electrophoresis must converge with itself.
   check_electrophoresis_sums() — Electrophoresis converges with itself (see `electrophoresis_offen

@@ -61,3 +61,17 @@ def test_curator_escalates_to_task(db, anthropic_mock):
     assert result["actions"].get("task", 0) == 1
     rows = db.fetchall("SELECT * FROM tasks WHERE source='literature_curator'")
     assert len(rows) >= 1
+
+
+def test_proposal_with_unknown_problem_id_becomes_note(monkeypatch):
+    """01.10: модель вписала номер ГИПОТЕЗЫ (203069) как problem_id → карточка «этой проблемы
+    нет». Несуществующий id — мысль без адресата: заметка, не предложение."""
+    import literature_curator as lc
+    monkeypatch.setattr(lc, "_duplicate_of_prior", lambda d: (False, ""))
+    monkeypatch.setattr(lc.db, "get_problem_list", lambda *a, **k: [{"problem_id": "P007"}])
+    notes, props = [], []
+    monkeypatch.setattr(lc, "_execute_note", lambda f, d: notes.append(d) or 1)
+    monkeypatch.setattr(lc.db, "save_problem_proposal", lambda **k: props.append(k) or 2)
+    lc._execute_proposal({"pmid": "1"}, {"linked_problem_id": 203069, "summary": "s"})
+    lc._execute_proposal({"pmid": "2"}, {"linked_problem_id": "P007", "summary": "s"})
+    assert len(notes) == 1 and len(props) == 1, (notes, props)

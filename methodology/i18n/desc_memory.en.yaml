@@ -664,6 +664,9 @@
 4e37bed59296:
   ru: Ждущие решения человека и ещё не доставленные ему (delivered_at IS NULL), старые первыми.
   en: Pending decisions for the person that have not yet been delivered (delivered_at IS NULL), oldest first.
+4e491e1521da:
+  ru: Заведён ли партнёрский кран. Установленный плист — где служба исполняется. В контейнере
+  en: Whether the partner tap is set up. The configured plist — where the service is executed. In a container.
 4e875ed12f0e:
   ru: 'W5K-A2 (2026-05-14): follow next_token пагинацию до конца.'
   en: 'W5K-A2 (2026-05-14): follow next_token pagination to the end.'
@@ -2128,6 +2131,9 @@ e84c92dc17db:
 e875731a6a62:
   ru: Дом класса по вердикту человека. None = вердикта нет, решать не машине.
   en: Domain of a class by human verdict. None = no verdict, not for the machine to decide.
+e89fe8e06601:
+  ru: Кнопки уведомления о новой гипотезе — один дом для обоих путей (генератор и консилиум).
+  en: New hypothesis notification buttons — one domain for both paths (generator and consilium).
 e9242ab06b3a:
   ru: 'WARN: active state с temporal_class IS NULL — путь записи обошёл деривацию'
   en: 'WARN: active state with temporal_class IS NULL — write path bypassed derivation'

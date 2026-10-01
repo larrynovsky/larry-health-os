@@ -37,7 +37,9 @@ def test_notify_uses_patient_view_when_complete(monkeypatch):
     assert "ЧТО ДЕЛАТЬ СЕЙЧАС" in t
     assert "КОГДА К ВРАЧУ" in t
     assert "/hyp" not in t
-    assert captured["reply_markup"].inline_keyboard[0][0].callback_data == "act:hq:42"
+    # 01.10: решить по гипотезе можно прямо в уведомлении — Подтвердить/Отклонить + Запрос
+    kb = [[b.callback_data for b in row] for row in captured["reply_markup"].inline_keyboard]
+    assert kb == [["act:hc:42", "act:hr:42"], ["act:hq:42"]], kb
     assert "drift" not in t
     assert "Без нажатия" in t
 
@@ -51,7 +53,7 @@ def test_notify_fallback_when_no_patient_view(monkeypatch):
     t = captured["text"]
     assert "Some long technical sentence" in t
     assert "/hyp" not in t
-    assert captured["reply_markup"].inline_keyboard[0][0].callback_data == "act:hq:99"
+    assert captured["reply_markup"].inline_keyboard[1][0].callback_data == "act:hq:99"
 
 
 def test_notify_fallback_when_partial_patient_view(monkeypatch):

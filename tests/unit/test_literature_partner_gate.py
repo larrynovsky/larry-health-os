@@ -22,3 +22,14 @@ def test_speaks_once_the_first_proposal_is_approved():
 def test_silent_once_the_partner_tap_already_exists():
     """Второе гашение: кран заведён — поводу больше неоткуда взяться."""
     assert gate(5, True) is None
+
+
+def test_container_sees_the_tap_through_the_repo_copy(tmp_path):
+    """01.10: в контейнере владельца плистов партнёра нет — кран, включённый 27.09, читался
+    как не заведённый, и владельцу снова пришло «включить?»."""
+    from integrity_tests import partner_tap_present as present
+    agents, repo = tmp_path / "agents", tmp_path / "launchd"
+    agents.mkdir(); repo.mkdir()
+    (repo / "com.larry.health.literature-search.partner.plist").write_text("x")
+    assert present(agents, repo, in_container=True) is True
+    assert present(agents, repo, in_container=False) is False   # на хосте судит установленный

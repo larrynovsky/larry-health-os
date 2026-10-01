@@ -109,3 +109,22 @@ def test_settings_deny_neighbor_secrets_from_config(monkeypatch):
     monkeypatch.setattr(infra_config, "NEIGHBORS", {})
     s = _json.loads(_P(night_repair._settings()).read_text(encoding="utf-8"))
     assert not any("crm" in x for x in s["sandbox"]["filesystem"]["denyRead"])
+
+
+def test_close_receipt_names_fix_commit_not_later_head(repo, monkeypatch, tmp_path):
+    """01.10: после коммита починки post-commit положил коммит doc_agent, и квитанция
+    «слито <HEAD>» назвала CHANGELOG вместо починки."""
+    d = _carrier(tmp_path, "code")
+    monkeypatch.setattr(nr, "_fetch", lambda rid: d)
+    notes = []
+    monkeypatch.setattr(nr, "_move_remote", lambda rid, where, note: notes.append(note) or True)
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / ".git" / nr.LANDING).write_text(f"rid {base}")
+    (repo / "code.py").write_text("X = 2\n")
+    _git(repo, "commit", "-qam", "починка (ночная починка rid)")
+    fix = _git(repo, "rev-parse", "HEAD")
+    (repo / "CHANGELOG.md").write_text("x\n")
+    _git(repo, "add", "."); _git(repo, "commit", "-qm", "docs: артефакты doc_agent")
+    _git(repo, "push", "-q", "studio", "main"); _git(repo, "fetch", "-q", "studio")
+    code, text = nr.close_fix(repo, "rid")
+    assert code == 0 and notes == [f"слито {fix[:7]}"], (text, notes)

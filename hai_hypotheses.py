@@ -453,9 +453,19 @@ def _notify_patient_view(memory_id: int, cbcr_dict: dict, trigger_label: str = "
             + f"{one_line}\n\n"
         )
 
+    _notify_specialist(text + i18n.t("hypotheses.notice.silence"), reply_markup=notice_keyboard(memory_id))
+
+
+def notice_keyboard(memory_id: int, lang=None):
+    """Кнопки уведомления о новой гипотезе — один дом для обоих путей (генератор и консилиум).
+    01.10 (слово владельца): решить по гипотезе можно прямо в уведомлении; до этого
+    «Подтвердить/Отклонить» были только в списке /hypotheses, в уведомлении — один «Запрос»."""
+    import i18n
     from bot import actions
-    _notify_specialist(text + i18n.t("hypotheses.notice.silence"), reply_markup=actions.keyboard([
-        actions.button(i18n.t("actions.hypothesis.query"), "hq", memory_id)]))
+    return actions.keyboard(
+        [actions.button(i18n.t("actions.confirm", lang), "hc", memory_id),
+         actions.button(i18n.t("actions.reject", lang), "hr", memory_id)],
+        [actions.button(i18n.t("actions.hypothesis.query", lang), "hq", memory_id)])
 
 
 def get_specialist_hypotheses(n: int = 20) -> list[dict]:

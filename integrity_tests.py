@@ -7608,6 +7608,12 @@ def collect_ungrounded(window_days=None):
                  (b["data"].get("lab_metric_correlations") or []):
             try:
                 known.add(round(abs(float(c.get("r"))), 2))
+                # Гейт кладёт в веру и консилиуму не только r, но и r по периодам
+                # (r_epoch_median/r_epoch_weakest) — это тоже посчитанное число, не выдумка.
+                # Замер 01.10: «медиана r=-0.38» из sleep_core↔sleep_start стала гейтом владельцу.
+                for k, v in c.items():
+                    if k.startswith("r_") and isinstance(v, (int, float)):
+                        known.add(round(abs(float(v)), 2))
             except (TypeError, ValueError):
                 # Не глотаем: пустое `known` иначе молча объявило бы ВСЕ
                 # корреляции в отчётах необоснованными — ложная тревога вместо
@@ -7833,9 +7839,15 @@ def check_ungrounded_corr_ratchet():
              f"коэффициент, которого никто не считал. База (обратное заполнение "
              f"08.08): {len(base)} значений")
         for v, n, d1, d2, who in novel:
-            _park_owner_gate(f"ungrounded_corr_{v}",
-                             f"UC-B-09: новое необоснованное r={v} ×{n} ({who}) — "
-                             f"цитата из литературы или выдумка? База: {len(base)}")
+            _park_owner_gate(
+                f"ungrounded_corr_{v}",
+                f"В отчёте агента «{who}» за {d2} напечатан коэффициент связи r={v}, которого "
+                f"система не считала: среди принятых расчётов такого числа нет. Значит, это "
+                f"либо цитата из статьи, либо модель число придумала.\n\n"
+                f"• Цитата — число запомнят как известное, больше вопрос не вернётся.\n"
+                f"• Выдумка — чиним промпт агента, чтобы он не печатал непосчитанных цифр; "
+                f"на долгой дистанции это выгоднее: выдуманное число в медотчёте читается как факт.\n"
+                f"Если промолчишь — вопрос будет ждать, отчёты не меняются.")
     return {"baseline": len(base), "novel": len(novel), "repeats": len(repeats),
             "adjudicated": len(adjudicated)}
 

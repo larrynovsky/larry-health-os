@@ -295,7 +295,7 @@ API (около 5–15 € в месяц на человека). Около 20 �
 | Что | Где |
 |---|---|
 | Урок установки | [`docs/tutorials/`](docs/tutorials/) |
-| Как сделать конкретную операцию | [`docs/how-to/`](docs/how-to/) |
+| Как сделать конкретную операцию | [`docs/how-to/` — с чего начать](docs/how-to/README.md) |
 | Почему устроено так | [`docs/explanation/`](docs/explanation/) |
 | Модули, схема БД, пути, расписание | [`ARCH_SNAPSHOT.md`](ARCH_SNAPSHOT.md), [`docs/reference/`](docs/reference/) |
 | Безопасность | [`SECURITY.md`](SECURITY.md) |

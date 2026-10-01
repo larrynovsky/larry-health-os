@@ -51,3 +51,19 @@ def test_no_tf_uses_env_then_utc(monkeypatch):
     assert ls.tenant_timezone() == "Europe/Berlin"
     monkeypatch.delenv("HEALTH_TZ", raising=False)
     assert ls.tenant_timezone() == "UTC"
+
+
+def test_home_not_set_is_quiet_env(monkeypatch, caplog):
+    """Новая установка до знакомства: GPS нет, дом не задан → env, БЕЗ «упал» в журнале.
+    Падение = журнал нового человека снова получает TypeError на штатном состоянии
+    (анонимный прогон урока 01.10: 33 строки за две минуты)."""
+    import logging
+    import location_signal as ls
+    monkeypatch.setattr(ls, "_tf_instance", lambda: _FakeTF())
+    monkeypatch.setattr(ls, "resolve_place",
+                        lambda *a, **k: {"known": False, "fresh": False, "lat": None, "lon": None})
+    monkeypatch.setattr(ls, "home_anchor", lambda: (None, None, 15.0))
+    monkeypatch.setenv("HEALTH_TZ", "Europe/Berlin")
+    with caplog.at_level(logging.WARNING, logger=ls.log.name):
+        assert ls.tenant_timezone() == "Europe/Berlin"
+    assert "упал" not in caplog.text

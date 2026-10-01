@@ -298,7 +298,7 @@ written-down boundaries, and a public-zone guard that keeps personal data out of
 | What | Where |
 |---|---|
 | Installation tutorial | [`docs/tutorials/`](docs/tutorials/) |
-| How to do a specific task | [`docs/how-to/`](docs/how-to/) |
+| How to do a specific task | [`docs/how-to/` — start here](docs/how-to/README.en.md) |
 | Why it works this way | [`docs/explanation/`](docs/explanation/) |
 | Modules, DB schema, paths, schedule | [`ARCH_SNAPSHOT.md`](ARCH_SNAPSHOT.md), [`docs/reference/`](docs/reference/) |
 | Security | [`SECURITY.md`](SECURITY.md) |

@@ -9,8 +9,8 @@
 FROM python:3.11.15-slim AS wheels
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements.lock /tmp/requirements.lock
-RUN pip wheel --no-cache-dir -w /wheels -r /tmp/requirements.lock
+COPY requirements.txt /tmp/requirements.txt
+RUN pip wheel --no-cache-dir -w /wheels -r /tmp/requirements.txt
 
 # ── Рабочий образ ─────────────────────────────────────────────────────────────────────────
 FROM python:3.11.15-slim
@@ -42,8 +42,8 @@ RUN set -eu; \
     chmod +x /usr/local/bin/supercronic
 
 COPY --from=wheels /wheels /wheels
-COPY requirements.lock /tmp/requirements.lock
-RUN pip install --no-cache-dir --no-index -f /wheels -r /tmp/requirements.lock \
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --no-index -f /wheels -r /tmp/requirements.txt \
     && pip check \
     && rm -rf /wheels
 

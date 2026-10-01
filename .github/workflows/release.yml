@@ -96,6 +96,9 @@ jobs:
           python3 -c "import sys; sys.path.insert(0, 'scripts'); import install; print(install.render_colima_agent('__HOME__'), end='')" \
             > dist/com.larry.health.colima.plist
           grep -q '__HOME__/Library/Logs' dist/com.larry.health.colima.plist
+          # Установка одной командой (урок, «Короткий путь»): тот же скрипт, что прошёл tutorial.yml.
+          cp scripts/install.sh dist/install.sh
+          bash -n dist/install.sh
       - name: выпуск
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

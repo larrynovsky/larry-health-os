@@ -91,7 +91,10 @@ def test_live_code_covers_the_three_schedule_judged_jobs():
     """На живом integrity_tests.py: те три задачи, что ушли из MONITORED 23.09."""
     got = pr.schedule_judged_labels()
     for label in ("com.larry.health.longitudinal", "com.larry.health.night-cycle",
-                  "com.larry.health.owner-nag"):
+                  "com.larry.health.owner-nag",
+                  # 01.10 (ночная починка 156e0db4): triage ушёл из MONITORED — держит его
+                  # только вычисленное покрытие; без этой строки потерю датчика никто не видит.
+                  "com.larry.health.triage"):
         assert got.get(label), f"{label}: вычисленного покрытия нет — задача снова без датчика"
 
 
@@ -104,3 +107,10 @@ def test_manual_duplicate_of_computed_coverage_is_flagged():
     key = next(iter(pr.MONITORED))
     found = pr.audit_producers(list(pr.MONITORED) + list(pr.EXEMPT), {key: ["check_x"]})
     assert len(found) == 1 and "записано и руками" in found[0] and key in found[0]
+
+
+def test_live_registry_has_no_manual_duplicate_of_computed_coverage():
+    """На живом integrity_tests.py: ни одна строка MONITORED не дублирует вычисленное
+    покрытие (карточка 24.09: com.larry.health.triage стояла в обоих домах)."""
+    judged = pr.schedule_judged_labels()
+    assert not set(pr.MONITORED) & set(judged), sorted(set(pr.MONITORED) & set(judged))

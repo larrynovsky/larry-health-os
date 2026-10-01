@@ -1,4 +1,4 @@
-<!-- translation-of: SECURITY.md sha256:14eecab3fb81 -->
+<!-- translation-of: SECURITY.md sha256:a79feef72437 -->
 **English** · [Русский](SECURITY.md)
 
 # SECURITY POLICY: Larry Health OS
@@ -255,6 +255,10 @@ Until 23.09, `/hae/ingest` read the token from the hard-coded path `~/.health_se
 ---
 
 ### SEC-50: port 8003 was added to EXPECTED_SERVE_BACKEND_PORTS — the neighbour project's web page (stdlib http.server); reachable only via tailnet-only Serve :8443/cost; loopback-only, not exposed outside; owner's decision 2026-09-26, see a decision in the neighbour project.
+
+---
+
+### SEC-51: Telegram bot token in process argv — conftest._no_real_importers trims the URL to its last segment (rsplit) before writing it to the attempts log (§19); deliver food_quarterly is silenced by a separate fixture so the secret does not reach the teardown assert
 
 ---
 

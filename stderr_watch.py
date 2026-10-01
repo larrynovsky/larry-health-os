@@ -94,11 +94,24 @@ def new_errors(save: bool = True) -> list[dict]:
     for label, path in _err_logs():
         try:
             size = path.stat().st_size
-        except OSError:
+        except FileNotFoundError:
+            # Лога ещё нет (джоба ни разу не писала в stderr) — это не слепота, а
+            # позиция 0: запоминаем, иначе blind_spots считал бы его неотслеживаемым
+            # (карточка 28.09: «объявляют 28, отслеживает 12»), а первая ошибка в
+            # появившемся файле пропускалась бы как «новый лейбл».
+            # Только если каталог лога есть: нет каталога — писать джобе некуда, это слепота.
+            if path.parent.is_dir():
+                new_state[label] = {"offset": 0, "path": str(path)}
             continue
+        except OSError:
+            # Отказ доступа и прочее — наблюдать нельзя: лейбл выпадает из состояния и
+            # остаётся видимым для blind_spots; после восстановления — калибровка заново
+            # (старые строки не выдаются повторно). Ревью ночной починки 01.10, пп.1–2.
+            continue
+        known = label in state
         prev = int(state.get(label, {}).get("offset", 0) or 0)
         new_state[label] = {"offset": size, "path": str(path)}
-        if first_run or prev == 0 or size < prev or size == prev:
+        if first_run or not known or size < prev or size == prev:
             continue
         try:
             with path.open("r", encoding="utf-8", errors="replace") as f:

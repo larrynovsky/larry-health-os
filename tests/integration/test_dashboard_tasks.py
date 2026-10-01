@@ -86,3 +86,16 @@ def test_task_done_idempotent_on_completed(dashboard_client):
     r = client.post(f"/api/tasks/{tid}/done")
     assert r.status_code == 200
     assert r.text == ""
+
+
+def test_task_text_is_escaped_both_ways(dashboard_client):
+    """CodeQL #1/#2 (reflective XSS, api_tasks): текст задачи из запроса и из БД уходит в HTML только
+    экранированным — и в теле, и в атрибуте value. Падение = вернулась вставка сырого HTML."""
+    client, db = dashboard_client
+    tid = db.add_task("x")
+    evil = '"><script>alert(1)</script>'
+    saved = client.post(f"/api/tasks/{tid}", data={"value": evil}).text
+    edit = client.get(f"/api/tasks/{tid}/edit").text
+    for body in (saved, edit):
+        assert "<script>" not in body and "&lt;script&gt;" in body
+    assert 'value="&quot;&gt;&lt;script' in edit          # кавычка не закрыла атрибут

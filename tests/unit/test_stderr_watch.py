@@ -133,6 +133,23 @@ def test_tracking_fewer_logs_than_declared_is_blindness(env):
     assert any("объявляют 2" in x and "отслеживает 1" in x for x in blind), blind
 
 
+def test_not_yet_created_log_is_tracked_not_blind(env):
+    """Карточка 28.09 «объявляют 28, отслеживает 12»: лог, которого ещё нет на диске
+    (джоба не писала в stderr), выпадал из состояния и считался слепотой. Его отсутствие —
+    позиция 0, а не слепое пятно; и первая ошибка в появившемся файле — находка."""
+    agents, logs = env
+    a = logs / "a.err.log"; a.write_text("x\n")
+    _agent(agents, "com.larry.health.a", a)
+    b = logs / "b.err.log"                              # файла нет
+    _agent(agents, "com.larry.health.b", b)
+    sw.new_errors()
+    assert sw.blind_spots() == []
+    sw.new_errors()
+    b.write_text("Traceback (most recent call last):\n", encoding="utf-8")
+    found = sw.new_errors()
+    assert [f["label"] for f in found] == ["com.larry.health.b"], found
+
+
 def test_fresh_full_state_is_silent(env):
     """Негативный контроль: здоровый датчик молчит — иначе находка обесценится."""
     agents, logs = env
@@ -155,3 +172,39 @@ def test_liveness_check_runs_before_error_check():
     i_blind = src.index('check("слепота stderr-датчика"')
     i_err = src.index('check("новые ошибки в stderr джоб"')
     assert i_blind < i_err, "проверка слепоты обязана быть зарегистрирована РАНЬШЕ сбора"
+
+
+def test_unreadable_or_parentless_log_stays_blind(env):
+    """Ревью починки 01.10, п.1: «файла ещё нет» — только FileNotFoundError при живом
+    каталоге. Отказ доступа и отсутствие каталога — слепота, а не здоровье."""
+    import os
+    agents, logs = env
+    locked = logs / "locked"; locked.mkdir()
+    a = locked / "a.err.log"; a.write_text("x\n")
+    _agent(agents, "com.larry.health.a", a)
+    _agent(agents, "com.larry.health.b", logs / "нет-каталога" / "b.err.log")
+    os.chmod(locked, 0)
+    try:
+        sw.new_errors(); sw.new_errors()
+        assert sw.blind_spots() != []
+    finally:
+        os.chmod(locked, 0o755)
+
+
+def test_temporary_access_loss_does_not_replay_history(env):
+    """Ревью п.2: учтённый Traceback → временный отказ доступа → доступ вернулся, файл
+    тот же — старая ошибка не выдаётся повторно."""
+    import os
+    agents, logs = env
+    d = logs / "d"; d.mkdir()
+    a = d / "a.err.log"; a.write_text("x\n")
+    _agent(agents, "com.larry.health.a", a)
+    sw.new_errors()
+    a.write_text("x\nTraceback (most recent call last):\n")
+    assert sw.new_errors()                      # новая ошибка — находка
+    os.chmod(d, 0)
+    try:
+        sw.new_errors()
+    finally:
+        os.chmod(d, 0o755)
+    assert sw.new_errors() == []

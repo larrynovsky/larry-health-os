@@ -1,4 +1,4 @@
-# requirements.lock — канон окружения health-os (системный python3.11, Studio)
+# requirements.txt — канон (до 01.10 назывался requirements.lock; Dependabot читает только *.txt) окружения health-os (системный python3.11, Studio)
 # Сгенерировано: 2026-07-17 (+pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
 # Обновление ТОЛЬКО через docs/how-to/dependency_updates.md (cooldown, по одному пакету)
 aiohappyeyeballs==2.6.1

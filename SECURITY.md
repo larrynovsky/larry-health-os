@@ -257,6 +257,10 @@ EXIF-strip через paste в чистый `Image` (метаданные тел
 
 ---
 
+### SEC-51: токен бота Telegram в argv процесса — conftest._no_real_importers обрезает URL до последнего сегмента (rsplit) перед записью в журнал попыток (§19); deliver food_quarterly заглушён отдельной фикстурой, чтобы секрет не попадал в teardown-assert
+
+---
+
 ## ЧТО УЖЕ ХОРОШО ✅ (актуальное состояние)
 
 - `anthropic_key`, `oura_token`, `telegram_token` — права 600, только владелец.

@@ -73,7 +73,8 @@ MONITORED: dict[str, str] = {
     # покрыты. Класс — census-асимметрия в сторону реестра: MONITORED пополняли
     # руками, а датчики заводили отдельными нитями, и сверки не было ни одной.
     "com.larry.health.probes": "check_probe_liveness",
-    "com.larry.health.triage": "check_triage_delivery_liveness (маркер triage_done + квитанция канала)",
+    # ⚰️ 2026-10-01: com.larry.health.triage отсюда ушёл — check_triage_delivery_liveness
+    # судит его через `_schedule_covers(TRIAGE_LABEL)`, покрытие вычисляется из кода.
     # ── Покрытие задач каждого тенанта ────────────────────────────────────────
     # Освобождение «тенант пуст до активации» нельзя считать бессрочным:
     # поступление данных требует контроля свежести независимо от ручного статуса.

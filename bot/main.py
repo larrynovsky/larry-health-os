@@ -138,5 +138,30 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 
+def run(entry=None) -> None:
+    """main() с трассировкой падения без значения токена.
+
+    PTB кладёт токен в текст InvalidToken/ссылки запроса, а трассировка падения идёт в stderr —
+    то есть в bot_err.log человека (прогон урока 30.09; журнал прикладывают к вопросам на GitHub).
+    Слово InvalidToken остаётся: по нему урок и install.sh узнают неверный токен.
+    """
+    import sys
+    import traceback
+    try:
+        (entry or main)()
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException:  # noqa: BLE001 — любой крах печатается, но очищенным
+        text = traceback.format_exc()
+        try:
+            tok = get_token()
+        except Exception:  # silent-ok: токена нет — вычищать нечего
+            tok = ""
+        if tok:
+            text = text.replace(tok, "<telegram_token>")
+        sys.stderr.write(text)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    main()
+    run()

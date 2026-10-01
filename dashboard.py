@@ -89,6 +89,55 @@ async def _lifespan(app):
 
 
 app = FastAPI(title="Health Dashboard", lifespan=_lifespan)
+
+
+# ── Периметр против браузера внутри периметра (ghas-triage, 2026-10-01) ──────────
+# «Периметр вместо пароля» не спасает от браузера, который стоит ВНУТРИ периметра и открывает
+# чужие сайты. Два класса: (1) подделка запроса — страница evil.example отправляет форму на
+# http://127.0.0.1:8001/…/promote, браузер сам несёт её внутрь (WSTG-SESS-05); (2) подмена
+# имени — evil.example начинает резолвиться в 127.0.0.1, и её страница читает медкарту как
+# «свою» (DNS rebinding). Против (2): имя хоста — только локальное (IP, localhost, однословное
+# имя tailnet, *.ts.net); публичного имени с точкой у дашборда нет. Против (1): запрос на запись
+# из браузера принимается, только если пришёл со страницы того же адреса. Запросы без Origin
+# (телефон шлёт HAE/место, curl) — не браузер, их это не касается.
+import ipaddress as _ipaddress
+from urllib.parse import urlsplit as _urlsplit
+from fastapi.responses import PlainTextResponse as _PlainText
+
+_UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _local_host(host: str) -> bool:
+    name = (host or "").strip().lower()
+    if name.startswith("["):                     # [::1]:8001
+        name = name[1:].split("]", 1)[0]
+    elif name.count(":") == 1:                   # 127.0.0.1:8001, studio:8001
+        name = name.split(":", 1)[0]
+    if not name:
+        return False
+    try:
+        _ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        pass
+    return name == "localhost" or "." not in name or name.endswith(".ts.net")
+
+
+@app.middleware("http")
+async def _perimeter_guard(request, call_next):
+    host = request.headers.get("host", "")
+    if not _local_host(host):
+        return _PlainText("unknown host", status_code=421)
+    if request.method in _UNSAFE:
+        origin = request.headers.get("origin")
+        # Сравниваем не с Host (tailscale serve может переписать его на 127.0.0.1), а с тем же
+        # правилом «адрес локальный»: страница чужого сайта локальной не бывает.
+        if request.headers.get("sec-fetch-site") == "cross-site" or (
+                origin is not None and not _local_host(_urlsplit(origin).netloc)):
+            return _PlainText("cross-origin write refused", status_code=403)
+    return await call_next(request)
+
+
 STATIC_DIR.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

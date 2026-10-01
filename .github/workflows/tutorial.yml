@@ -62,6 +62,24 @@ jobs:
             sleep 5
           done
           docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log'
+      - name: install.sh — тот же путь одной командой (проверка, установка, повтор = обновление)
+        run: |
+          (cd ~/health-docker && docker compose down -v)            # порт 8001 — второй установке
+          bash scripts/install.sh --check
+          export HEALTH_TZ=Europe/Berlin TELEGRAM_TOKEN='123456:ci-fake-token' TELEGRAM_CHAT_ID=1 ANTHROPIC_KEY=sk-ant-ci-fake
+          bash scripts/install.sh --dir ~/health-sh --dist "$PWD/dist" --non-interactive --ci-fake-keys
+          grep -qx 'TZ=Europe/Berlin' ~/health-sh/.env
+          curl -fsS -o /dev/null http://127.0.0.1:8001/
+          [ "$(sudo stat -c %u ~/health-sh/secrets/telegram_token)" = 1000 ]   # раннер — uid 1001: chown сработал
+          for i in $(seq 36); do
+            (cd ~/health-sh && docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log') && break
+            sleep 5
+          done
+          (cd ~/health-sh && docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log')
+          # повторный запуск: обновление, ключи и пояс не тронуты, вопросов нет
+          unset TELEGRAM_TOKEN TELEGRAM_CHAT_ID ANTHROPIC_KEY HEALTH_TZ
+          bash ~/health-sh/install.sh --dir ~/health-sh --dist "$PWD/dist" --non-interactive --ci-fake-keys
+          grep -qx 'TZ=Europe/Berlin' ~/health-sh/.env
       - name: журналы при провале
         if: failure()
         working-directory: /home/runner/health-docker

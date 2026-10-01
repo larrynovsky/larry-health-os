@@ -231,7 +231,13 @@ def owner_weekly_journal(tmp_path, monkeypatch):
 # Два входа — процесс импортёра и прямой HTTP к api.ouraring.com; оба перехвачены. refresh_data
 # глотает исключения, поэтому сторож не бросает, а КОПИТ попытки и роняет тест в teardown.
 # Тест, который сам подменяет urlopen/subprocess.run, перекрывает сторожа своей подменой.
+# 01.10.2026 сюда же — Telegram мимо notify: food_quarterly шлёт `curl … api.telegram.org`, а
+# _no_real_telegram глушит только notify. В контейнере владельца каталог секретов прогона —
+# настоящий (conftest подменяет секреты, лишь если переменная пуста), и ночной pytest 01.10
+# прислал владельцу пищевой профиль ≥5 раз: каждый тест утреннего брифа = одна отправка.
+# Сток общий — хост api.telegram.org в argv процесса или в URL, кто бы ни звал.
 _IMPORTERS = ("import_oura.py", "import_apple_health.py")
+_TELEGRAM_HOST = "api.telegram.org"
 
 
 @pytest.fixture(autouse=True)
@@ -243,13 +249,16 @@ def _no_real_importers(monkeypatch):
 
     def _urlopen(req, *a, **kw):
         url = str(getattr(req, "full_url", req))
-        if "api.ouraring.com" in url:
-            attempts.append(url[:80])
+        if "api.ouraring.com" in url or _TELEGRAM_HOST in url:
+            attempts.append(url.rsplit("/", 1)[-1][:40] if _TELEGRAM_HOST in url else url[:80])
             raise OSError("тест не ходит в настоящий API Oura (conftest._no_real_importers)")
         return real_urlopen(req, *a, **kw)
 
     def _run(args, *a, **kw):
         argv = [str(x) for x in (args if isinstance(args, (list, tuple)) else [args])]
+        if any(_TELEGRAM_HOST in x for x in argv):     # в URL токен бота — в журнал не пишем (§19)
+            attempts.append("telegram: " + next(x for x in argv if _TELEGRAM_HOST in x).rsplit("/", 1)[-1])
+            return _sp.CompletedProcess(args, 1, b"", b"blocked by conftest._no_real_importers")
         if any(x.endswith(_IMPORTERS) for x in argv):
             attempts.append(" ".join(argv)[-80:])
             return _sp.CompletedProcess(args, 1, b"", b"blocked by conftest._no_real_importers")
@@ -257,7 +266,23 @@ def _no_real_importers(monkeypatch):
     monkeypatch.setattr(_ur, "urlopen", _urlopen)
     monkeypatch.setattr(_sp, "run", _run)
     yield
-    assert not attempts, f"тест запустил настоящий импортёр данных: {attempts[:3]}"
+    assert not attempts, f"тест пошёл наружу (импортёр/Oura/Telegram): {attempts[:3]}"
+
+
+@pytest.fixture(autouse=True)
+def _no_quarterly_food_delivery(monkeypatch):
+    """Квартальный пищевой профиль едет хвостом утреннего брифа (jobs/scheduled →
+    food_quarterly.maybe_deliver). В тестах брифа он не предмет проверки, а в первые 7 дней
+    квартала маркер у каждого прогона свежий → «пора слать» (замер 01.10: 7 тестов брифа).
+    Сток уже перекрыт _no_real_importers; здесь — чтобы бриф-тесты не краснели о чужом.
+    Тест самого food_quarterly подменяет deliver своим monkeypatch — его подмена сверху."""
+    try:
+        import food_quarterly as _fq
+    except Exception:  # noqa: BLE001 — модуля нет в этом окружении: глушить нечего
+        yield
+        return
+    monkeypatch.setattr(_fq, "deliver", lambda *a, **k: "")
+    yield
 
 
 # ── Тест не ходит в настоящий CalDAV (2026-09-30, docker-install) ─────────────────────────────

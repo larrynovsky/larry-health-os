@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REMOTE = "git@github.com:larrynovsky/larry-health-os.git"
 REPO = "larrynovsky/larry-health-os"
 # Что выпуск обязан нести (.github/workflows/release.yml): без любого из них урок не проходим.
-RELEASE_ASSETS = {"compose.yaml", "health.env", "com.larry.health.colima.plist"}
+RELEASE_ASSETS = {"compose.yaml", "health.env", "com.larry.health.colima.plist", "install.sh"}
 _TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 DEST = Path.home() / ".public_mirror" / "larry-health-os"
 # Отметка прочитанного (решение владельца 29.09: «после полного чтения»). Полное чтение экспорта
@@ -111,6 +111,33 @@ def _run_of(workflow: str, **flt: str) -> dict:
     return runs[0] if runs else {}
 
 
+def codeql_verdict(head: str, analyses: list[dict], alerts: list[dict]) -> str | None:
+    """Причина отказать выпуску по CodeQL или None (решение владельца 01.10, G7: находки видны
+    только на вкладке Security — без этого серьёзная уезжает к людям незамеченной).
+    Отказ: CodeQL ещё не разбирал этот коммит (старые «0 открытых» ничего не говорят о новом
+    коде) или есть открытые critical/high. Ложную находку закрывают на GitHub С ПРИЧИНОЙ — тогда
+    она не открыта и не держит выпуск."""
+    if not any(a.get("commit_sha") == head and "codeql" in (a.get("tool", {}).get("name", "").lower())
+               for a in analyses):
+        return f"CodeQL ещё не разобрал {head[:7]} — дождитесь прогона (вкладка Actions → CodeQL)"
+    serious = sorted(a["number"] for a in alerts
+                     if (a.get("rule", {}).get("security_severity_level") or "") in ("critical", "high"))
+    if serious:
+        return (f"открыты находки CodeQL critical/high: {', '.join('#' + str(n) for n in serious)}"
+                f" — исправить или закрыть с причиной (github.com/{REPO}/security/code-scanning)")
+    return None
+
+
+def _codeql_state() -> tuple[list[dict], list[dict]]:
+    import json
+    base = f"repos/{REPO}/code-scanning"
+    analyses = json.loads(_gh("api", f"{base}/analyses?ref=refs/heads/main&per_page=30"))
+    # --paginate склеивает страницы как «[…][…]» — читаем по объекту на строку.
+    lines = _gh("api", "--paginate", "--jq", ".[] | {number, rule: {security_severity_level: .rule.security_severity_level}}",
+                f"{base}/alerts?state=open&ref=refs/heads/main&per_page=100").splitlines()
+    return analyses, [json.loads(l) for l in lines if l.strip()]
+
+
 def release(tag: str, dest: Path) -> int:
     """Выпуск (решение владельца 30.09: только по его команде). Тег ставится на то, что УЖЕ
     лежит на GitHub, и только если урок на этом коммите прошёл (tutorial.yml) — выпуск не
@@ -132,6 +159,13 @@ def release(tag: str, dest: Path) -> int:
     if verdict != "success":
         print(f"⛔ урок на {head[:7]} не зелёный ({verdict or 'прогона нет'}): выпуск не делается"
               f" — gh run list --repo {REPO} --workflow tutorial.yml", file=sys.stderr)
+        return 1
+    try:
+        why = codeql_verdict(head, *_codeql_state())
+    except (subprocess.CalledProcessError, ValueError) as e:
+        why = f"не удалось прочитать CodeQL ({type(e).__name__}) — выпуск без проверки не делается"
+    if why:
+        print(f"⛔ {why}", file=sys.stderr)
         return 1
     _git(dest, "-c", "core.hooksPath=/dev/null", "tag", "-a", tag, "-m", f"Release {tag}")
     _git(dest, "push", "-q", "origin", tag)

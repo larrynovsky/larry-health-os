@@ -12,6 +12,11 @@
 
     python3 scripts/tutorial_run.py docs/tutorials/first_install.md --dist "$PWD/dist"
     python3 scripts/tutorial_run.py docs/tutorials/first_install.md --list   # что исполнится
+    python3 scripts/tutorial_run.py docs/tutorials/first_install.md --release  # как посторонний
+
+`--release` не подменяет адрес выпуска: файлы и образ берутся оттуда, откуда их возьмёт новичок.
+Это проверка открытости, которой CI не делает (там образ из того же коммита): закрытый пакет
+или репозиторий краснеют здесь, а не у первого человека. Запускать без входа в GitHub/ghcr.
 """
 from __future__ import annotations
 
@@ -32,8 +37,8 @@ def blocks(text: str) -> list[str]:
     return BLOCK.findall(text)
 
 
-def substituted(block: str, dist: str) -> str:
-    out = block.replace(RELEASE_URL, f"file://{dist.rstrip('/')}/")
+def substituted(block: str, dist: str | None) -> str:
+    out = block if dist is None else block.replace(RELEASE_URL, f"file://{dist.rstrip('/')}/")
     for k, v in FAKE.items():
         out = out.replace(f"'{k}'", f"'{v}'")
     return out
@@ -44,23 +49,28 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("page")
     ap.add_argument("--dist", help="каталог с compose.yaml и health.env вместо выпуска")
     ap.add_argument("--list", action="store_true", help="показать блоки и выйти")
+    ap.add_argument("--release", action="store_true",
+                    help="без подмены адреса: файлы и образ из открытого выпуска, как у новичка")
     a = ap.parse_args(argv)
+    if a.release and a.dist:
+        ap.error("--release и --dist взаимоисключают друг друга")
+    if not (a.list or a.release or a.dist):
+        ap.error("для прогона нужен --dist или --release")
     found = blocks(Path(a.page).read_text(encoding="utf-8"))
     if not found:
         print(f"⛔ в {a.page} нет блоков {MARK} — прогонять нечего", file=sys.stderr)
         return 1
     for i, b in enumerate(found, 1):
-        code = substituted(b, a.dist or "DIST")
+        code = substituted(b, None if a.release else (a.dist or "DIST"))
         print(f"── блок {i}/{len(found)} ──\n{code}", flush=True)
         if a.list:
             continue
-        if not a.dist:
-            ap.error("--dist обязателен для прогона")
         r = subprocess.run(["bash", "-euo", "pipefail", "-c", code])
         if r.returncode:
             print(f"⛔ блок {i} урока {a.page} упал (код {r.returncode})", file=sys.stderr)
             return 1
-    print(f"✅ {len(found)} блоков урока исполнены")
+    print(f"📋 {len(found)} блоков урока показаны (не исполнялись)" if a.list
+          else f"✅ {len(found)} блоков урока исполнены")
     return 0
 
 

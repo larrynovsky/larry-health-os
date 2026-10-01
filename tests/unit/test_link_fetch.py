@@ -167,3 +167,11 @@ def test_http_404_is_explained_in_words(tmp_path, monkeypatch):
     link_fetch.enqueue({"kind": "url", "url": "https://disk.yandex.ru/d/x"}, tmp_path)
     link_fetch.process_requests(tmp_path)
     assert "не найден или доступ по ссылке закрыт" in told[0]
+
+
+def test_lookalike_hosts_are_not_cloud(monkeypatch):
+    """CodeQL #37–#39: «evilgoogle.com» и «notdropbox.com» не переписываются в ссылку облака.
+    Падение = проверка хоста снова по голому суффиксу без точки."""
+    import link_fetch
+    for url in ("https://evilgoogle.com/file/d/1AbCdEfGhIjK/view", "https://notdropbox.com/s/abc/x.zip?dl=0"):
+        assert link_fetch._direct_url(url) == url

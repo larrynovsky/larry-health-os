@@ -177,6 +177,11 @@ def tenant_timezone() -> str:
             except Exception as e:  # noqa: BLE001 — сбой на GPS → идём на дом
                 log.warning("tenant_timezone: tf(GPS) упал: %r", e)
         hlat, hlon, _ = home_anchor()
+        if hlat is None or hlon is None:
+            # Дом не задан — нормальное состояние новой установки до знакомства; home_anchor
+            # уже сказал об этом. Не исключение: до 01.10 здесь падал float(None) и журнал
+            # нового человека получал «упал: TypeError» десятки раз за минуту (анонимный урок).
+            return os.environ.get("HEALTH_TZ") or "UTC"
         try:
             tz = tf.timezone_at(lat=float(hlat), lng=float(hlon))
             if tz:

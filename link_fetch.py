@@ -68,6 +68,10 @@ def _host_ok(host: str | None) -> bool:
     return any(h == a or h.endswith("." + a) for a in ALLOWED)
 
 
+def _host_ok_for(host: str, domain: str) -> bool:
+    return host == domain or host.endswith("." + domain)
+
+
 def _url_ok(url: str) -> bool:
     """https, без логина в адресе, хост из списка и НЕ внутренний адрес."""
     p = urllib.parse.urlsplit(url)
@@ -125,13 +129,15 @@ def _direct_url(url: str) -> str:
     p = urllib.parse.urlsplit(url)
     host = (p.hostname or "").lower()
     q = urllib.parse.parse_qs(p.query)
-    if host.endswith("google.com") and host != "drive.usercontent.google.com":
+    # Точный суффикс через точку: «evilgoogle.com» — не Google (CodeQL #37–#39; _url_ok и так
+    # отсёк бы такой адрес при скачивании, но разбор ссылки не должен на это опираться).
+    if _host_ok_for(host, "google.com") and host != "drive.usercontent.google.com":
         m = re.search(r"/d/([\w-]{10,})", p.path)
         fid = m.group(1) if m else (q.get("id") or [None])[0]
         if fid:
             return ("https://drive.usercontent.google.com/download?"
                     + urllib.parse.urlencode({"id": fid, "export": "download", "confirm": "t"}))
-    if host.endswith("dropbox.com") and not host.endswith("dropboxusercontent.com"):
+    if _host_ok_for(host, "dropbox.com"):
         q.pop("dl", None)
         q["dl"] = ["1"]
         return urllib.parse.urlunsplit(p._replace(query=urllib.parse.urlencode(q, doseq=True)))

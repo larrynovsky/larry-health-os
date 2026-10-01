@@ -1,7 +1,7 @@
 """Оракул онбординга: публичная зона поднимается на чужой машине (scripts/clean_clone_probe):
 выгрузка → scripts/install.py → init_db → импорт ключевых модулей, в чистом окружении.
 
-Судит только в каноне окружения (requirements.lock — Studio): установку зависимостей проба
+Судит только в каноне окружения (requirements.txt — Studio): установку зависимостей проба
 не проверяет (названо в её докстринге), и на машине без канона краснела бы не установка, а
 окружение (MacBook: нет python-multipart и ещё ~40 пакетов, замер 2026-09-23).
 """
@@ -13,7 +13,7 @@ import pytest
 
 from scripts import clean_clone_probe
 
-_LOCK = Path(__file__).resolve().parents[2] / "requirements.lock"
+_LOCK = Path(__file__).resolve().parents[2] / "requirements.txt"
 
 
 def _lock_missing() -> list[str]:
@@ -37,6 +37,6 @@ def _lock_missing() -> list[str]:
 def test_публичная_зона_поднимается_на_чужой_машине():
     missing = _lock_missing()
     if missing:
-        pytest.skip(f"окружение не по requirements.lock ({len(missing)} пакетов нет, напр. "
+        pytest.skip(f"окружение не по requirements.txt ({len(missing)} пакетов нет, напр. "
                     f"{missing[:3]}) — проба судит установку только в каноне окружения")
     assert clean_clone_probe.main([]) == 0

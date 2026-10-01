@@ -1,0 +1,71 @@
+[English](README.en.md) · **Русский**
+
+# Инструкции «как сделать»: с чего начать
+
+> **Тип документа:** How-to (Diátaxis), посадочная страница. Инструкций здесь полсотни, и они
+> написаны для трёх разных читателей. Найдите себя ниже — остальные списки можно не читать.
+
+Поставили систему по [уроку первой установки](../tutorials/first_install.md) — у вас нет копии
+этого репозитория, только папка `~/health-docker` с `compose.yaml`. Большая часть инструкций
+ниже написана раньше, для установки из клона репозитория со службами macOS (`launchctl`).
+Пока они не переписаны, переводите команды по одному правилу.
+
+## Правило перевода команд для установки из образа
+
+| В инструкции | У вас |
+|---|---|
+| `cd ~/health_scripts` | `cd ~/health-docker` |
+| `python3.11 <скрипт>.py …` | `docker compose exec cron python3 <скрипт>.py …` |
+| `launchctl kickstart -k …health.bot` (и другие службы) | `docker compose restart bot` (`dashboard`, `lab-intake`, `cron`) |
+| `launchctl list \| grep health`, плисты в `~/Library/LaunchAgents` | `docker compose ps` — плистов нет, расписание живёт внутри `cron` |
+| журналы служб `~/health_scripts/logs/…` (`bot_err.log` и др.) | `docker compose exec cron tail -n 50 /app/logs/<файл>` |
+| журналы задач `~/health/logs/…` | `docker compose exec cron ls /home/health/health/logs/` |
+
+`docker compose logs` почти пуст: службы пишут журналы в файлы, а не в вывод контейнера.
+
+Код в контейнере лежит в `/app`, и именно там исполняется команда: скрипты из инструкций
+находятся по тем же именам (проверено 01.10 на чистой установке из `v0.1.0`). Правило не
+покрывает Git, тесты и правку кода — для них нужен клон, это третий список.
+
+## 1. Вы пользуетесь системой через бота
+
+Терминал не нужен.
+
+- [Ответить на вопрос системы](answer_a_question.md)
+- [Пройти знакомство заново или исправить ответ](redo_onboarding.md)
+- [Прислать боту большой файл](send_large_file.md)
+- [Подключить кольцо Oura](connect_oura.md)
+- [Подключить «Здоровье» iPhone и Apple Watch](connect_apple_health.md)
+
+## 2. Вы обслуживаете свою установку
+
+Нужен терминал на машине, где стоит система. Команды — по правилу выше.
+
+- Установка и обновление: [поставить систему в Докере, своей сборкой](install_docker.md)
+- Ответить на звонки системы: [ночной звонок](night_cycle_respond.md) ·
+  [эскалация «человек столкнулся с проблемой»](service_trouble_alert.md) ·
+  [проверка сработала, а сообщение не пришло](diagnose_silent_check.md) ·
+  [защита заблокировала вызов модели](llm_guard_blocked.md)
+- Анализы: [конвейер распознавания](lab_pipeline.md) · [очередь ревью строк](lab_review_queue.md) ·
+  [снять карантин с пары](adjudicate_quarantine.md) ·
+  [отложить или закрыть вопрос о норме](record_analyte_norm_verdict.md) ·
+  [записать решение врача по наблюдению](record_surveillance_decision.md)
+- Данные и тексты: [конституции здоровья](update_constitutions.md) ·
+  [долгий анализ](run_analysis.md) · [пищевые правила](reseed_food_rules.md) ·
+  [сезонная таблица](reseed_seasonal_produce.md) · [список троп](refresh_trail_list.md)
+- Каналы: [почта](email_channel.md) · [еженедельный дайджест](weekly_digest.md) ·
+  [ротация журналов](rotate_logs.md)
+- **Не переведено на Докер, правило не поможет:** [добавить второго человека](add_person.md)
+  (в установке из образа второй человек пока не описан) и
+  [перевод из нативной установки в контейнер](pilot_switch.md) (только для тех, кто ставил
+  систему до образа).
+
+## 3. Вы разрабатываете систему
+
+Нужен клон: `git clone https://github.com/larrynovsky/larry-health-os.git`. Здесь все
+остальные инструкции: [Git](git_workflow.md), [тесты](run_tests.md),
+[упавший ночной прогон](handle_test_failure.md), [вторая машина](two_machine_setup.md),
+[своё дерево для нити](thread_worktree.md), [дашборд](extend_dashboard.md),
+[домены](add_domain.md), [опросники](add_instrument.md), [зависимости](dependency_updates.md),
+[документация](update_docs.md), [выпуск образа](release.md),
+[открытый репозиторий](publish_mirror.md) и прочие в этой папке.

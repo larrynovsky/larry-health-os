@@ -71,7 +71,7 @@ def test_mcp_server_smoke_known_case():
          '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"project_capabilities","arguments":{"query":"protocols"}}}\n'
          '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"project_intent","arguments":{"id":"morning_brief"}}}\n')
     import tempfile
-    ulog=tempfile.mktemp(prefix="pc_usage_")
+    fd,ulog=tempfile.mkstemp(prefix="pc_usage_"); os.close(fd)   # не mktemp (CodeQL #5)
     env=dict(os.environ,PYTHONPATH=_REPO,PROJECT_CONTEXT_ROOT=_REPO,PC_USAGE_LOG=ulog)
     out=_sp.run([sys.executable,"-m","project_context.mcp_server"],input=inp,
                 capture_output=True,text=True,env=env,timeout=120).stdout.strip().splitlines()

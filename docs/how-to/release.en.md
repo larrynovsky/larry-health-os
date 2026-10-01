@@ -1,25 +1,26 @@
-<!-- translation-of: docs/how-to/release.md sha256:f9fc778d3d09 -->
+<!-- translation-of: docs/how-to/release.md sha256:dccf6c2b715c -->
+<!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
+
 **English** · [Русский](release.md)
 
 # How to release a new image version
 
-> **Document type:** How-to (Diátaxis). For the owner. A release happens only on the owner's
-> command (decision of 30.09): the new version reaches everyone who updates by the tutorial.
+> **Document type:** How-to (Diátaxis). For the owner. Release — only on their command
+> (decision 30.09): a new version immediately reaches everyone who updates via the tutorial.
 
-A release is a `vX.Y.Z` tag in the public repository. The tag starts
-`.github/workflows/release.yml`: the image is built on GitHub's native runners for amd64 and
-arm64, goes to `ghcr.io` under the version number and `latest`, and the GitHub release gets the
-three files the tutorial downloads: `compose.yaml` (with this image's name), `health.env` and the
-Colima autostart agent.
+A release is a tag `vX.Y.Z` in the public repository. The tag triggers `.github/workflows/release.yml`:
+the image is built on GitHub's native runners for amd64 and arm64, pushed to `ghcr.io` under the version
+number and `latest`, and the GitHub release receives three files that the tutorial downloads: `compose.yaml`
+(with this image's name), `health.env`, and the Colima auto-start agent.
 
-## 1. Export and wait for the tutorial
+## 1. Push and wait for the tutorial
 
 ```bash
 cd ~/health_scripts
 python3.11 scripts/public_mirror.py --push
 ```
 
-The export starts `tutorial.yml` on GitHub: the first-install tutorial runs on a clean machine
+The push triggers `tutorial.yml` on GitHub: the first-install tutorial runs on a clean machine
 with the image from this commit. Wait for a green run:
 `gh run list --repo larrynovsky/larry-health-os --workflow tutorial.yml --limit 1`.
 
@@ -29,20 +30,28 @@ with the image from this commit. Wait for a green run:
 python3.11 scripts/public_mirror.py --release v0.1.0
 ```
 
-The command refuses if the mirror clone differs from GitHub, if the tag already exists, or if the
-tutorial on this commit is not green. Then it waits for `release.yml` (about half an hour, arm64
-takes longest) and checks the release files. A number is never rewritten: if you made a
-mistake, release the next one.
+The command will refuse if the mirror clone does not match GitHub, if such a tag already exists, if the tutorial
+on this commit is not green, if CodeQL has not yet analyzed this commit, or if there are open findings
+of critical/high severity on it (owner decision 01.10). A false finding is dismissed on the Security tab
+with a reason — it will then not block the release. Then it waits for `release.yml` (about half an hour, arm64 takes the longest) and
+verifies the release files. The version number cannot be overwritten: made a mistake — release the next one.
 
-## 3. First release: make the package public
+## 3. First release: make the repository public, then the package
 
-While the GHCR package is private, only the owner can pull the image — everyone else's tutorial
-fails with `denied`. Only the owner can open the package, once, by hand: GitHub → Your profile →
-Packages → `larry-health-os` → Package settings → Change visibility → Public. Check without
-logging in to GHCR: `docker logout ghcr.io; docker pull ghcr.io/larrynovsky/larry-health-os:v0.1.0`.
+The tutorial fetches release files from the repository page and the image from the GHCR package; if either
+is private — the tutorial fails for others (files — 404, image — `denied`). Only the owner can make them public,
+manually, in this order:
 
-## If the settings changed
+1. Repository: Settings → Danger Zone → Change visibility → Public. Reversible.
+2. Package: GitHub → Your profile → Packages → `larry-health-os` → Package settings → Change
+   visibility → Public. **Irreversible**: GitHub does not allow making a public package private again. That is why it goes second —
+   once the public repository has already been reviewed.
 
-On update the tutorial downloads only `compose.yaml`: a person's `.env` holds their time zone.
-If the release changed what `.env` contains (a new key), say so in the GitHub release notes
-(`gh release edit v0.1.1 --notes …`): the tutorial tells people to download `.env` again then.
+Verification — the tutorial as a new user would experience it, without being logged in to GitHub and GHCR, on a machine with no local copy of the image:
+`docker logout ghcr.io; python3 scripts/tutorial_run.py docs/tutorials/first_install.md --release`.
+
+## If settings have changed
+
+The tutorial on update downloads only `compose.yaml`: a person's `.env` stores their time zone.
+If the composition of `.env` has changed in the release (a new key), write this in the GitHub release description
+(`gh release edit v0.1.1 --notes …`): the tutorial instructs the user in that case to re-download `.env`.

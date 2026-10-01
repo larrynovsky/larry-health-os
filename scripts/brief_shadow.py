@@ -25,7 +25,8 @@ import brief_state as bs
 
 
 def run(start: date, end: date):
-    scratch = tempfile.mktemp(suffix="_shadow.db")
+    fd, scratch = tempfile.mkstemp(suffix="_shadow.db")   # не mktemp: имя не перехватить (CodeQL #4)
+    os.close(fd)
     conn = sqlite3.connect(scratch)
     conn.row_factory = sqlite3.Row
     prod = sqlite3.connect(f"file:{hdb.DB_PATH}?mode=ro", uri=True)

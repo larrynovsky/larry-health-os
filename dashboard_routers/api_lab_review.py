@@ -123,6 +123,10 @@ th{{background:#f2f2f2}}button{{padding:10px 16px;margin:8px 4px;font-size:16px}
 
 @router.post("/lab-review/{run_id}/promote", response_class=HTMLResponse)
 async def lab_review_promote(run_id: str, request: Request):
+    # run_id уходит отдельным аргументом lab_promote (без оболочки), но с «-» в начале он стал бы
+    # флагом (--execute). Форма прогона — буквы, цифры и . _ : + - (CodeQL #35, 2026-10-01).
+    if not re.fullmatch(r"[A-Za-z0-9][\w.:+-]{0,127}", run_id):
+        raise HTTPException(400, "bad run_id")
     form = await request.form()
     tenant = form.get("tenant", "")
     _tenant_dir(tenant)  # валидация тенанта (бросит 400 на мусор)
@@ -189,7 +193,9 @@ async def lab_review_promote(run_id: str, request: Request):
         out = (r.stdout or "") + ("\n[stderr]\n" + r.stderr if r.stderr else "")
         code = r.returncode
     except Exception as e:
-        out, code = f"ошибка запуска promote: {e}", -1
+        # Текст исключения (пути, окружение) — в журнал, наружу — факт (CodeQL #3).
+        __import__("logging").getLogger(__name__).error("lab_promote не запустился: %r", e)
+        out, code = "ошибка запуска promote — подробности в журнале дашборда", -1
     finally:
         if rej_path:
             try:

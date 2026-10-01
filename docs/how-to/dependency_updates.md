@@ -3,7 +3,7 @@
 # Как обновлять зависимости (SEC-19, 2026-07-06)
 
 Рецепт для системного python3.11 на Studio — канонического окружения health-os.
-Канон версий: `requirements.lock` (в git). Аудит уязвимостей: weekly
+Канон версий: `requirements.txt` (в git). Аудит уязвимостей: weekly
 `com.larry.health.pipaudit` → `logs/pip_audit_latest.json` → nightly
 `security_sensors` → triage → Telegram.
 
@@ -21,7 +21,7 @@
 2. На Studio: `ssh <studio_ssh> "/opt/homebrew/bin/python3.11 -m pip install 'pkg==X.Y.Z' --break-system-packages"`.
 3. Прогнать регрессию: `bash scripts/test_on_studio.sh` (или дождаться nightly).
 4. Обновить lock с MacBook (single-writer: файл в git правится здесь):
-   `{ head -3 requirements.lock; ssh <studio_ssh> "/opt/homebrew/bin/python3.11 -m pip freeze"; } > requirements.lock`
+   `{ head -3 requirements.txt; ssh <studio_ssh> "/opt/homebrew/bin/python3.11 -m pip freeze"; } > requirements.txt`
    — поправив дату во 2-й строке заголовка.
 5. Внепланово перегенерить аудит: `ssh <studio_ssh> "cd ~/health_scripts && /opt/homebrew/bin/python3.11 scripts/pip_audit_check.py"` — варн должен погаснуть.
 6. Commit lock (+ при advisory — строчка в SECURITY.md, если решение нетривиальное).
@@ -35,7 +35,7 @@
 
 ## Восстановление окружения с нуля
 
-`/opt/homebrew/bin/python3.11 -m pip install -r requirements.lock --break-system-packages`
+`/opt/homebrew/bin/python3.11 -m pip install -r requirements.txt --break-system-packages`
 
 ## Чего НЕ делать
 

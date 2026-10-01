@@ -29,3 +29,16 @@ def test_both_languages_mark_the_same_blocks():
 def test_list_runs_nothing_and_succeeds_on_live_page(capsys):
     assert tr.main([str(ROOT / "docs/tutorials/first_install.md"), "--list"]) == 0
     assert "── блок 1/" in capsys.readouterr().out
+
+
+def test_release_mode_keeps_public_address_and_list_is_honest(capsys):
+    """--release не подменяет адрес выпуска (прогон как у новичка, 01.10), а --list не
+    говорит «исполнены». Падение: анонимный прогон снова негде сделать, либо показ блоков
+    читается как их прогон."""
+    import scripts.tutorial_run as tr
+    page = (ROOT / "docs/tutorials/first_install.md").read_text(encoding="utf-8")
+    first = tr.blocks(page)[0]
+    assert tr.RELEASE_URL in tr.substituted(first, None)
+    assert tr.main([str(ROOT / "docs/tutorials/first_install.md"), "--list"]) == 0
+    out = capsys.readouterr().out
+    assert "исполнены" not in out and "не исполнялись" in out

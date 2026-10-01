@@ -1,5 +1,5 @@
 # requirements.txt — канон (до 01.10 назывался requirements.lock; Dependabot читает только *.txt) окружения health-os (системный python3.11, Studio)
-# Сгенерировано: 2026-07-17 (+pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
+# Сгенерировано: 2026-10-01 (urllib3 2.8.0 + oauthlib 4.0.0 — Dependabot #1–#5; прежде 2026-07-17: +pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
 # Обновление ТОЛЬКО через docs/how-to/dependency_updates.md (cooldown, по одному пакету)
 aiohappyeyeballs==2.6.1
 aiohttp==3.14.3
@@ -48,7 +48,7 @@ mdurl==0.1.2
 msgpack==1.2.1
 multidict==6.7.1
 numpy==2.4.4
-oauthlib==3.3.1
+oauthlib==4.0.0
 openpyxl==3.1.5
 packageurl-python==0.17.6
 packaging==26.0
@@ -98,7 +98,7 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzlocal==5.3.1
 uritemplate==4.2.0
-urllib3==2.7.0
+urllib3==2.8.0
 uvicorn==0.44.0
 uvloop==0.22.1
 watchfiles==1.1.1

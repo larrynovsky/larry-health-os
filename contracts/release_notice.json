@@ -1,0 +1,19 @@
+{
+  "module": "release_notice",
+  "public": ["pending", "mark_told"],
+  "depends_on": [],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен: есть ли невысказанная новая версия; отправку делает вызывающий (jobs/scheduled)",
+      "D2": "два входа: pending (что сказать или None) и mark_told (после отправки); прочее _private",
+      "D3": "только stdlib; внешний контракт — JSON releases/latest GitHub (tag_name, html_url)",
+      "D4": "~80 строк",
+      "D5": "tests/unit/test_release_notice.py: один раз на версию, числовое сравнение, сборка не из выпуска, сеть, чужая ссылка",
+      "D6": "общий инвариант с release.yml: HEALTH_RELEASE в образе = тег выпуска vX.Y.Z; назван в docstring и Dockerfile"
+    },
+    "rationale": "Модуль переписывается с нуля по докстрингу и пяти проверкам теста; отправка и расписание — у вызывающего.",
+    "date": "2026-10-01",
+    "oracle": "tests/unit/test_release_notice.py::test_новая_версия_сказана_один_раз"
+  }
+}

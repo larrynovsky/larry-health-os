@@ -36,3 +36,14 @@ def test_one_deploy_at_a_time_and_lock_before_head():
 def test_script_is_valid_bash():
     r = subprocess.run(["bash", "-n", str(SCRIPT)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def test_old_images_are_removed_and_disk_is_watched():
+    """Замер 01.10: 109 образов по одному на коммит заполнили диск Докера на 100% — база владельца
+    отвечала «disk I/O error». Уборка — ПОСЛЕ сверки, что службы на новом образе; образ этого
+    коммита не трогается; заполненный диск — тревога (notify.fault)."""
+    s = SCRIPT.read_text(encoding="utf-8")
+    done, clean = s.index("DONE=1"), s.index("image ls health-os")
+    assert done < clean, "уборка до сверки нового образа могла бы снести рабочий"
+    assert '[ "$t" = "$SHA" ] || [ "$t" = "local" ] ||' in s, "образ этого коммита обязан остаться"
+    assert '"$USED" -ge 85' in s and "notify.fault(\"диск Докера" in s

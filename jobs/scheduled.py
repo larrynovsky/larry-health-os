@@ -413,6 +413,19 @@ async def send_morning_report(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"food_quarterly piggyback failed: {e}")
 
+    # Новая версия системы (01.10): раз в сутки, одно сообщение на версию; только у установки из
+    # выпуска (HEALTH_RELEASE в образе). Маркер — после отправки: не дошло — скажем завтра.
+    try:
+        import release_notice as _rn
+        _new = await asyncio.to_thread(_rn.pending)
+        if _new:
+            await context.bot.send_message(chat_id=chat_id, text=i18n.t("release.notice", **_new),
+                                           parse_mode=None, disable_web_page_preview=True)
+            _rn.mark_told(_new["latest"])
+            log.info("release_notice: сказано о %s", _new["latest"])
+    except Exception as e:  # noqa: BLE001 — уведомление не роняет бриф
+        log.warning(f"release_notice piggyback failed: {e}")
+
     # После доставки перевзводим завтрашний бриф со свежим GPS-tz.
     # При смене пояса зафиксированный при регистрации tz устаревает.
     # Перевзвод после доставки ограничивает отставание следующим слотом.

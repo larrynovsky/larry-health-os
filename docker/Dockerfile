@@ -62,6 +62,11 @@ USER health
 RUN HEALTH_PRIMARY_HOST=health-os python3 scripts/install.py --apply --non-interactive --files-only \
         --data-dir /tmp/build-init/health --secrets-dir /tmp/build-init/secrets \
     && rm -rf /tmp/build-init
+# Номер выпуска (v1.2.3) кладёт release.yml; сборка не из выпуска оставляет пусто — по нему
+# release_notice решает, есть ли с чем сравнивать новую версию на GitHub. Стоит последним
+# слоем: смена номера не пересобирает зависимости.
+ARG HEALTH_RELEASE=""
 ENV HOME=/home/health \
     HEALTH_RUNTIME=container \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HEALTH_RELEASE=${HEALTH_RELEASE}

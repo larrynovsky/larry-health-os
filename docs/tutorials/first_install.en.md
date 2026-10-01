@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:b64462ec01e3 -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:b458325c12bf -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](first_install.md)
@@ -204,7 +204,9 @@ Bot is silent on `/start` — see step 6.
 
 ## How to update
 
-When a new version is released, download its `compose.yaml` — which contains the new image name — and bring the containers back up:
+Once a day, after the morning report, the bot will tell you about a new version — one message per
+version, with a link to the notes and the command. The short way to update: `cd ~/health-docker && bash install.sh`.
+Or by hand: when a new version is released, download its `compose.yaml` — which contains the new image name — and bring the containers back up:
 
 ```bash
 cd ~/health-docker

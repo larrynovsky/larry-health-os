@@ -16,7 +16,6 @@
 | `_owner_filter() -> filters.BaseFilter` | `filters.Chat(chat_id=[owner_chat_id()])` | пробрасывает `raise` | — | регистрация handler-ов |
 | `get_chat_id() -> int \| None` | `chat_id` или `None`, если файла нет | `None` (не raise) | нет (читает файл каждый раз) | доставка, где None-путь легитимен |
 | `get_token() -> str` | Telegram-токен из `<secrets_dir>/telegram_token` | `raise` (файл не найден) | нет | старт `Application.builder` |
-| `save_chat_id(cid: int) -> None` | пишет файл секрета | — | сбрасывает снимок только после рестарта | `/start` handler |
 
 ## Инварианты (под сторожами)
 

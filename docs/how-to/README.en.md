@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:99b67bea1203 -->
+<!-- translation-of: docs/how-to/README.md sha256:be5938abdc50 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -44,7 +44,9 @@ No terminal needed.
 
 A terminal on the machine where the system is installed is required. Use the rule above for commands.
 
-- Installation and updates: [install the system in Docker from an image](install_docker.md)
+- Installation and updates: [install the system in Docker from an image](install_docker.md) ·
+  [with an OpenAI or Gemini key](llm_provider.md)
+- The bot replied “I couldn't answer: something failed inside the system…” with a code: [find the cause by the code](bot_fault.md)
 - Respond to system alerts: [night cycle alert](night_cycle_respond.md) ·
   [escalation "a person has hit a problem"](service_trouble_alert.md) ·
   [check fired but no message arrived](diagnose_silent_check.md) ·

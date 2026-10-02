@@ -1,0 +1,110 @@
+{
+  "module": "llm_admission",
+  "public": [
+    "admission_budget",
+    "admission_candidates",
+    "admission_reference_md",
+    "admit_to_chain",
+    "judge_lab",
+    "judge_text",
+    "judge_treatment",
+    "load_admission_corpus",
+    "month_spent",
+    "owner_real_pages",
+    "run_admission",
+    "run_provider_admission",
+    "run_suite",
+    "set_admission_budget"
+  ],
+  "depends_on": [
+    {
+      "module": "hai_core",
+      "uses": [
+        "get_client",
+        "model_chain"
+      ],
+      "why": "тот же клиент, что прод (гард секретов по конструкции), и единственный дом цепочек ролей"
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "get_config",
+        "upsert_config",
+        "get_conn"
+      ],
+      "why": "бюджет, траты, вердикты, цепочки — system_config; эталон настоящих страниц — promoted-строки lab_results_staging",
+      "legacy": "у health_db сайдкар-контракта нет: фасад старше реестра контрактов"
+    },
+    {
+      "module": "lab_recognizer",
+      "uses": [
+        "recognition_prompts"
+      ],
+      "why": "допуск обязан идти на БОЕВЫХ промптах распознавателя — публичный вход recognition_prompts()",
+      "legacy": "у lab_recognizer сайдкар-контракта нет: модуль старше реестра; зависимость — только на публичный recognition_prompts()"
+    },
+    {
+      "module": "treatment_extractor",
+      "uses": [
+        "EXTRACTION_PROMPT"
+      ],
+      "why": "боевой промпт извлечения лечения",
+      "legacy": "сайдкар-контракта нет: модуль старше реестра"
+    },
+    {
+      "module": "epistemic_skill.loader",
+      "uses": [
+        "load_skill"
+      ],
+      "why": "текстовый набор идёт под той же дисциплиной, что боевые промпты",
+      "legacy": "сайдкар-контракта нет"
+    },
+    {
+      "module": "notify",
+      "uses": [
+        "notify_operator"
+      ],
+      "why": "итог прогона владельцу, решение 2026-10-01 «сама с уведомлением»",
+      "legacy": "сайдкар-контракта нет"
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "текст карточки — на языке человека",
+      "legacy": "сайдкар-контракта нет"
+    },
+    {
+      "module": "llm_client",
+      "uses": [
+        "profiles",
+        "guarded_client"
+      ],
+      "why": "допуск чужого провайдера идёт тем же гардом и переводчиком, что прод его установки; запас на рассуждение — из профиля"
+    },
+    {
+      "module": "doc_translation",
+      "uses": [
+        "switch_line",
+        "text_hash"
+      ],
+      "why": "справочник по таблице допуска — пара ru/en в форме, которую судит датчик переводов",
+      "legacy": "сайдкар-контракта нет"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — суд допуска модели к роли и запись результата (вердикт, цепочка владельца или таблица выпуска, траты, справочник из таблицы)",
+      "D2": "входы — run_admission() (цепочки владельца) и run_provider_admission() (таблица выпуска чужого провайдера); остальные публичные — судьи, шаги и рендер справочника; политика — данные corpus.json",
+      "D3": "hai_core.get_client/model_chain, health_db config, lab_recognizer.recognition_prompts — публичные; чужих приватных не трогает",
+      "D4": "~430 строк: судьи трёх наборов + бюджет + прогон; разбиение по наборам возможно, пока не окупается",
+      "D5": "tests/unit/test_llm_admission.py — 25 тестов; мутации (запись в начало цепочки, настоящие бланки чужому, снятый стоп-кран, резерв без запаса на рассуждение, снятый ранний стоп, лишние строки синтетики не судятся, допуск непрошедшей) краснеют",
+      "D6": "общий инвариант с lab_recognizer (two_model_reconciled) — admit не кладёт модель в обе цепочки opus/sonnet, распознаватель отказывает при совпадении"
+    },
+    "rationale": "Переписывается с нуля по corpus.json (политика и эталоны) и тестам; состояние — в system_config, у модуля своего нет.",
+    "date": "2026-10-02",
+    "oracle": "tests/unit/test_llm_admission.py::test_end_to_end_pass_lands_in_chain_and_fail_does_not"
+  }
+}

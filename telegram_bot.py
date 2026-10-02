@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Sprint 6 C1: bot/ pkg
 from bot.filters import (  # noqa: E402, F401
     TOKEN_FILE, CHAT_ID_FILE, owner_chat_id, assert_owner_configured,
-    get_token, get_chat_id, save_chat_id, _owner_filter,
+    get_token, get_chat_id, _owner_filter,
 )
 from bot.errors import _error_handler  # noqa: E402, F401
 from bot.utils import send_long  # noqa: E402, F401

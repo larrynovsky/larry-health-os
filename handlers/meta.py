@@ -23,7 +23,6 @@ import health_db as db
 import i18n
 import notify
 
-from bot.filters import save_chat_id
 from bot import actions
 from bot.utils import send_long, send_md
 
@@ -80,7 +79,10 @@ async def redo_onboarding(query, context, target):
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    save_chat_id(update.effective_chat.id)
+    # Чат НЕ записывается: сюда доходит только чат владельца (owner_filter), а без файла
+    # чата бот не стартует (assert_owner_configured). Запись переписывала то же значение
+    # и роняла /start у каждой установки в Докере, где ключи смонтированы только для
+    # чтения (нить first-contact, 02.10).
     db.init_db()
     # Первый вход (в профиле нет даже имени) — сразу знакомство (решение владельца 23.09:
     # «всё сразу при первом входе»).

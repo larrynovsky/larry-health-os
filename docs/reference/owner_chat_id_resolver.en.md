@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/owner_chat_id_resolver.md sha256:2eb71be1bfa6 -->
+<!-- translation-of: docs/reference/owner_chat_id_resolver.md sha256:2c083ac099bf -->
 **English** · [Русский](owner_chat_id_resolver.md)
 
 # Owner resolver: API and modes
@@ -17,7 +17,6 @@
 | `_owner_filter() -> filters.BaseFilter` | `filters.Chat(chat_id=[owner_chat_id()])` | propagates `raise` | — | handler registration |
 | `get_chat_id() -> int \| None` | `chat_id` or `None` if the file is missing | `None` (not raise) | no (reads the file every time) | delivery where the None path is legitimate |
 | `get_token() -> str` | Telegram token from `<secrets_dir>/telegram_token` | `raise` (file not found) | no | `Application.builder` startup |
-| `save_chat_id(cid: int) -> None` | writes the secret file | — | resets the snapshot only after a restart | `/start` handler |
 
 ## Invariants (guarded)
 

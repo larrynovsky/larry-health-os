@@ -34,7 +34,9 @@ log = logging.getLogger(__name__)
 
 from assessment_scheduler import tenant_data_path
 CONFIG_PATH = tenant_data_path("survivorship_config.yaml")  # конфиг ЭТОГО человека (28.09, этап Б)
-HAIKU_MODEL = hai_core.MODEL_DEFAULTS["haiku"]
+# Модель берётся при ВЫЗОВЕ через hai_core.get_model — до 2026-10-01 здесь стояла
+# константа из MODEL_DEFAULTS, и настройка/цепочка модели в БД этот модуль не достигала
+# (нить llm-provider: шесть таких модулей). Роль: haiku.
 
 
 def _load_config() -> dict:
@@ -104,7 +106,7 @@ def _haiku_compare(candidate_obs: str, existing: list[dict]) -> tuple[bool, int 
     try:
         client = get_client()
         resp = client.messages.create(
-            model=HAIKU_MODEL,
+            model=hai_core.get_model("haiku"),
             max_tokens=400,
             messages=[{"role": "user", "content": prompt}],
         )

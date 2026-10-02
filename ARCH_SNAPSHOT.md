@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.295 | **Дата:** 2026-10-01
+**Версия:** 15.300 | **Дата:** 2026-10-02
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -342,7 +342,7 @@ checkins_fts       -- виртуальная FTS5 таблица для полн
 <!-- GEN:MODULE_REGISTRY:START -->
 
 ## МОДУЛЬНЫЙ РЕЕСТР
-<!-- Авто-генерировано gen_blueprint.py 2026-10-01 -->
+<!-- Авто-генерировано gen_blueprint.py 2026-10-02 -->
 
 ### СЛОЙ ДАННЫХ
 ```
@@ -618,7 +618,12 @@ health_ai.py  # health_ai — публичный интерфейс intelligence
 
 hai_core.py
   get_client()
-  get_model(role) — Модель для роли. system_config.model.<role> > MODEL_DEFAULTS.
+  pick_from_chain(chain, available) — Первая модель цепочки, доступная по снимку; снимка нет — первая м
+  model_chain(role) — Цепочка допущенных моделей роли: system_config.model.<role> (стро
+  default_model(role) — Модель роли по умолчанию: у anthropic — MODEL_DEFAULTS, у чужого 
+  class ModelNotAdmitted
+  admitted_models(prov, role) — Модели, прошедшие допуск к роли на провайдере (таблица выпуска).
+  get_model(role) — Модель для роли: первая доступная из цепочки model_chain(role).
   model_for(task_role) — Модель для семантической роли задачи (ROLE_MODELS → get_model(tie
   answer_language(lang) — Язык ответа модели = язык человека (нить model-lang, 28.09).
   with_answer_language(build) — Декоратор сборщика system-промпта: дописывает answer_language() в
@@ -1162,6 +1167,7 @@ weekly_digest                → _time_inject, config_db, diagnosis_guard, hai_c
 genome_pipeline              → backfill_effect_alleles, fix_palindromic_het, generate_constitutions, genome_annotator, genome_parser, health_db, profile_reconciler, prs_pipeline
 hai_chat                     → _time_inject, config_db, gp_context, hai_context, hai_core, hai_reports, health_db, memory_facts_db
 hai_hypotheses               → _time_inject, cbcr_hypothesis, gp_context, hai_core, health_db, i18n, patient_context, secrets_paths
+llm_admission                → doc_translation, hai_core, health_db, i18n, lab_recognizer, llm_client, notify, treatment_extractor
 checkin_agent                → _time_inject, gp_context, hai_core, health_db, llm_client, patient_context, region_pack
 genome_intake                → config_db, genome_pipeline, health_db, i18n, infra_config, link_fetch, notify
 hai_core                     → _time_inject, calendar_client, health_db, i18n, llm_client, patient_context, region_pack
@@ -1190,6 +1196,7 @@ env_context                  → brief_cards, config_db, env_sources, location_s
 hae_checker                  → _time_inject, health_db, import_apple_health, infra_config, metrics_db
 loinc_match                  → _time_inject, health_db, lab_canon, lab_promote, profile_db
 memory_consolidation         → beliefs, hai_core, health_db, i18n, memory_facts_db
+model_health_check           → hai_core, health_db, i18n, llm_client, notify
 morning_test_summary         → _time_inject, health_db, infra_config, plist_env_liveness, test_failure_handler
 proposals_db                 → _fmt_helpers, _time_inject, health_db, i18n, problems_db
 assessment_importer          → _time_inject, assessment_scheduler, health_db, i18n
@@ -1201,6 +1208,7 @@ lab_specialized              → health_db, lab_canon, lab_promote, labs_db
 location_signal              → _time_inject, config_db, health_db, memory_facts_db
 monthly_api_report           → _time_inject, i18n, model_health_check, notify
 night_investigator           → hai_core, i18n, llm_client, owner_gate
+notify                       → _time_inject, i18n, release_notice, secrets_paths
 oura_freshness_check         → health_db, i18n, notify, secrets_paths
 pgs_discovery                → genome_weights, health_db, pgs_reference, prs_pipeline
 publication_reader           → _time_inject, hai_core, health_db, patient_context
@@ -1232,8 +1240,7 @@ lab_staging_summary          → health_db, lab_canon, labs_db
 lab_triage                   → health_db, lab_canon, lab_oracles
 link_fetch                   → genome_intake, i18n, notify
 memory_facts_db              → beliefs, health_db, memory_salience
-model_health_check           → hai_core, i18n, notify
-notify                       → _time_inject, i18n, secrets_paths
+night_repair                 → infra_config, notify, secrets_paths
 profile_db                   → _time_inject, health_db, treatment_summary
 reminders_backend            → _time_inject, config_db, secrets_paths
 smoke_tests                  → gp_agent, health_ai, health_db
@@ -1264,10 +1271,10 @@ hae_db                       → _time_inject, health_db
 import_coordinator           → config_db, health_db
 import_hr_activity           → health_db, import_apple_health
 lab_recognizer               → hai_core, lab_canon
+llm_client                   → llm_translate, secret_guard
 log_rotate                   → hae_checker, secrets_paths
 memory_truthcheck            → health_db, memory_consolidation
 metrics_db                   → _time_inject, health_db
-night_repair                 → infra_config, secrets_paths
 norm_documents               → _time_inject, lab_canon
 parked_decisions             → _time_inject, config_db
 periods_db                   → _time_inject, health_db
@@ -1321,7 +1328,6 @@ import_status_db             → health_db
 lab_backfill_report          → health_db
 lab_fuzzy                    → health_db
 lab_oracles                  → lab_canon
-llm_client                   → secret_guard
 loinc_loader                 → health_db
 memory_config                → config_db
 memory_db                    → health_db
@@ -1589,6 +1595,10 @@ XFAIL — известные баги, документированы как `pa
 ## ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ
 
 <!-- GEN:ARCH_LOG:START -->
+- `2026-10-02` — `night_repair` + зависимость: notify; `notify` + зависимость: release_notice
+- `2026-10-02` — `llm_admission` + зависимость: doc_translation, llm_client
+- `2026-10-02` — новый модуль `llm_admission` (зависит от: hai_core, health_db, i18n, lab_recognizer, notify, treatment_extractor); `llm_client` + зависимость: llm_translate; `model_health_check` + зависимость: llm_client
+- `2026-10-01` — `model_health_check` + зависимость: health_db
 - `2026-09-30` — новый модуль `night_repair` (зависит от: infra_config, secrets_paths)
 - `2026-09-30` — `food_genome` + зависимость: region_pack
 - `2026-09-30` — `reminders_sync` + зависимость: notify

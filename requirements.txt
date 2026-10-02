@@ -1,5 +1,5 @@
 # requirements.txt — канон (до 01.10 назывался requirements.lock; Dependabot читает только *.txt) окружения health-os (системный python3.11, Studio)
-# Сгенерировано: 2026-10-01 (urllib3 2.8.0 + oauthlib 4.0.0 — Dependabot #1–#5; прежде 2026-07-17: +pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
+# Сгенерировано: 2026-10-02 (+openai 3.19.2, google-genai 2.25.0 с зависимостями, google-auth 2.58.0, h3 4.5.0 и flatbuffers 25.12.19 (зависимости timezonefinder, стояли на Studio, в замке не было) — нить llm-provider, карантин ≥3 дней; прежде 2026-10-01: urllib3 2.8.0 + oauthlib 4.0.0 — Dependabot #1–#5; прежде 2026-07-17: +pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
 # Обновление ТОЛЬКО через docs/how-to/dependency_updates.md (cooldown, по одному пакету)
 aiohappyeyeballs==2.6.1
 aiohttp==3.14.3
@@ -24,22 +24,27 @@ docstring_parser==0.17.0
 et_xmlfile==2.0.0
 fastapi==0.135.3
 filelock==3.29.5
+flatbuffers==25.12.19
 frozenlist==1.8.0
 google-api-core==2.31.0
 google-api-python-client==2.198.0
-google-auth==2.55.1
+google-auth==2.58.0
 google-auth-httplib2==0.4.0
 google-auth-oauthlib==1.4.0
+google-genai==2.25.0
 googleapis-common-protos==1.75.0
 h11==0.16.0
+h3==4.5.0
 httpcore==1.0.9
+httpcore2==2.13.1
 httplib2==0.32.0
 httptools==0.7.1
 httpx==0.28.1
+httpx2==2.13.1
 idna==3.18
 iniconfig==2.3.0
 Jinja2==3.1.6
-jiter==0.13.0
+jiter==0.17.0
 license-expression==30.4.4
 Markdown==3.10.2
 markdown-it-py==4.2.0
@@ -49,6 +54,7 @@ msgpack==1.2.1
 multidict==6.7.1
 numpy==2.4.4
 oauthlib==4.0.0
+openai==3.19.2
 openpyxl==3.1.5
 packageurl-python==0.17.6
 packaging==26.0
@@ -92,8 +98,11 @@ six==1.17.0
 sniffio==1.3.1
 sortedcontainers==2.4.0
 starlette==1.3.1
+tenacity==9.1.4
+timezonefinder==8.2.5
 tomli==2.4.1
 tomli_w==1.2.0
+truststore==0.10.4
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzlocal==5.3.1
@@ -104,4 +113,3 @@ uvloop==0.22.1
 watchfiles==1.1.1
 websockets==16.0
 yarl==1.23.0
-timezonefinder==8.2.5

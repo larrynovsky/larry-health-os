@@ -5,6 +5,8 @@
     "get_history",
     "get_model",
     "get_system_prompt",
+    "model_chain",
+    "pick_from_chain",
     "save_message"
   ],
   "depends_on": [],

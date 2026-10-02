@@ -79,7 +79,31 @@ def _client_file() -> Path:
 
 
 def _token_file() -> Path:
+    """Токен, который кладёт авторизация (--setup) — в каталоге ключей тенанта."""
     return _secrets_dir() / "google_calendar_token.json"
+
+
+def _live_token_file() -> Path:
+    """Обновлённый токен — в данных тенанта, куда запись разрешена.
+
+    В Докере каталог ключей смонтирован только для чтения (517ed05, 30.09): обновить токен там
+    нельзя, и синхронизация 30.09–02.10 падала каждый час с Errno 30, а кэш календаря застыл
+    (нить calendar-token, 02.10). Каталог ключей остаётся домом авторизации; сюда пишется
+    только то, что токен сделал сам — обновление по уже выданному разрешению.
+    """
+    return _data_dir() / "google_calendar_token.json"
+
+
+def _token_source() -> Path:
+    """Откуда читать: обновлённый, если он новее авторизации; иначе — авторизация.
+
+    Новее по времени файла: повторный --setup (новое разрешение) обязан побеждать старое
+    обновление, иначе переавторизация не действовала бы, пока не удалишь файл руками.
+    """
+    seed, live = _token_file(), _live_token_file()
+    if live.exists() and (not seed.exists() or live.stat().st_mtime >= seed.stat().st_mtime):
+        return live
+    return seed
 
 
 # ── OAuth ─────────────────────────────────────────────────────────────────────
@@ -93,7 +117,7 @@ def _get_credentials():
         log.error("pip install google-api-python-client google-auth-oauthlib --break-system-packages")
         return None
 
-    token_file = _token_file()
+    token_file = _token_source()
     creds = None
 
     if token_file.exists():
@@ -105,8 +129,11 @@ def _get_credentials():
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            token_file.write_text(creds.to_json())
-            log.info("Google Calendar token refreshed → %s", token_file)
+            live = _live_token_file()
+            live.parent.mkdir(parents=True, exist_ok=True)
+            live.touch(mode=0o600, exist_ok=True)
+            live.write_text(creds.to_json())
+            log.info("Google Calendar token refreshed → %s", live)
             return creds
         except Exception as exc:
             log.error("Token refresh failed (%s). Запустите --setup заново.", exc)

@@ -151,6 +151,12 @@ doc_flag — только как напечатано (H/L, N — если «н�
 {_SCHEMA}"""
 
 
+def recognition_prompts() -> tuple[str, str]:
+    """Боевые промпты двух проходов (p1, p2) — для допуска модели к ролям распознавателя
+    (llm_admission): допуск обязан идти на тех же словах, что работа, а не на копии."""
+    return _prompt_p1(_VOCAB), _prompt_p2(_VOCAB)
+
+
 _MAX_EDGE = 1568   # рекомендованный максимум длинной стороны для vision API
 _JPEG_Q = 85
 _MAX_PAGES = int(os.environ.get("HEALTH_LAB_MAX_PAGES", "20"))  # анти-runaway (дефолт 20); override env HEALTH_LAB_MAX_PAGES для больших многостраничных буклетов
@@ -470,6 +476,13 @@ def recognize(doc_path: str | Path, date: str,
     doc_path = Path(doc_path)
     vocab = vocab or _VOCAB
     prompt_p1, prompt_p2 = _prompt_p1(vocab), _prompt_p2(vocab)
+    # Два зрения обязаны быть РАЗНЫМИ моделями (инвариант two_model_reconciled). С
+    # 2026-10-01 модель роли может смениться сама (цепочка допущенных моделей) — и обе
+    # роли способны сойтись на одной модели без единой правки этого файла. Тогда сверка
+    # двух проходов перестаёт ловить ошибки чтения: отказ громкий, а не тихое «согласие».
+    if hai_core.get_model(model_pass1) == hai_core.get_model(model_pass2):
+        raise RuntimeError(f"lab_recognizer: оба прохода резолвятся в одну модель "
+                           f"{hai_core.get_model(model_pass1)!r} — независимость сверки потеряна")
     rendered = _render_pages(doc_path, pages)
     # НОМЕР СТРАНИЦЫ ОБЯЗАН БЫТЬ НАСТОЯЩИМ (2026-08-08). При адресном перечитывании
     # `enumerate(..., start=1)` приписал бы строкам со стр. 4 номер 1, и провенанс

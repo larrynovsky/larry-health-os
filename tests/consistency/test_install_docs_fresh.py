@@ -226,3 +226,14 @@ def test_regen_accepts_json_in_one_outer_fence(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(da, "translate_page", Mock())
     assert da.regenerate_install_page(install.INSTALL_DOC_PAGES[0], dry_run=True)
     assert "+новый факт" in capsys.readouterr().out
+
+
+def test_regen_accepts_json_after_prose(tmp_path, monkeypatch, capsys):
+    """02.10: модель сначала разобрала расхождения прозой, JSON — в ограде после неё; отказ дважды."""
+    body = _OLD.replace("старый факт", "новый факт")
+    reply = "Сначала разберу расхождения.\n\n**Факты:** …\n\n```json\n" + _reply(body) + "\n```"
+    da, path, _ = _sandbox(tmp_path, monkeypatch, [reply])
+    path.write_text(_OLD, encoding="utf-8")
+    monkeypatch.setattr(da, "translate_page", Mock())
+    assert da.regenerate_install_page(install.INSTALL_DOC_PAGES[0], dry_run=True)
+    assert "+новый факт" in capsys.readouterr().out

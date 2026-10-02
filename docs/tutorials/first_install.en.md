@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:b458325c12bf -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:69102c3a5f35 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](first_install.md)
@@ -291,6 +291,7 @@ Next — **step 8**: the bot introduction.
 ## If something went wrong
 
 - **`bot` in state `Restarting`** — step 6: bot log, most commonly the token or id.
+- **The bot replied “I couldn't answer: something failed inside the system…” with a code** — one command or button failed; the code finds it in the log: [“The bot replied ‘something broke’”](../how-to/bot_fault.md) ([English](../how-to/bot_fault.en.md)).
 - **After a Mac reboot the bot is `Restarting` again, and the log shows `Timed out` or `name resolution`** — the virtual machine came up before the network and cannot resolve domain names. Stop Colima, set a DNS address for Docker, and start again:
 
   ```bash

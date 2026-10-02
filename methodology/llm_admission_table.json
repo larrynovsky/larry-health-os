@@ -1,0 +1,103 @@
+{
+ "_why": "Таблица допуска моделей чужих провайдеров к ролям — выпускаемые данные. Пишет llm_admission (--provider X --table), руками не правится. Пустая роль = функция на этом провайдере не работает (политика по умолчанию 2026-10-02).",
+ "openai": {
+  "opus": {
+   "gpt-5.6-sol": {
+    "passed": false,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.2",
+    "model_ids": [
+     "gpt-5.6-sol"
+    ],
+    "suites": {
+     "lab_vision_p1": {
+      "items": 3,
+      "errors": [
+       "lab_hard.jpg: WBC: лишняя строка 7.15",
+       "lab_hard.jpg: HGB: лишняя строка 13.8",
+       "lab_hard.jpg: MCH: лишняя строка 30.4",
+       "lab_hard.jpg: MCHC: лишняя строка 34.1",
+       "lab_hard.jpg: PLT: лишняя строка 262"
+      ]
+     }
+    }
+   }
+  },
+  "sonnet": {
+   "gpt-5.6-terra": {
+    "passed": false,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.2",
+    "model_ids": [
+     "gpt-5.6-terra"
+    ],
+    "suites": {
+     "lab_vision_p2": {
+      "items": 3,
+      "errors": [
+       "lab_hard.jpg: MCH: 29.3 вместо 29.9"
+      ]
+     }
+    }
+   }
+  },
+  "haiku": {
+   "gpt-5.6-luna": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.2",
+    "model_ids": [
+     "gpt-5.6-luna"
+    ],
+    "suites": {
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  },
+  "haiku_pinned": {
+   "gpt-5.6-luna": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.2",
+    "model_ids": [
+     "gpt-5.6-luna"
+    ],
+    "suites": {
+     "treatment": {
+      "items": 2,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  }
+ },
+ "gemini": {
+  "opus": {
+   "gemini-3.1-pro-preview": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.2",
+    "model_ids": [
+     "gemini-3.1-pro-preview"
+    ],
+    "suites": {
+     "lab_vision_p1": {
+      "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  }
+ }
+}

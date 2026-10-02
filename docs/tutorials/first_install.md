@@ -1,4 +1,4 @@
-<!-- install-provenance: sha256:34a7dd23b8e1 -->
+<!-- install-provenance: sha256:cd44a6097607 -->
 [English](first_install.en.md) · **Русский**
 
 # Первая установка Larry Health OS
@@ -400,6 +400,8 @@ Set-Content -Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\he
 ## Если что-то пошло не так
 
 - **`bot` в состоянии `Restarting`** — шаг 6: журнал бота, чаще всего токен или id.
+- **Бот ответил «Не получилось ответить: сбой внутри системы…» с кодом** — у одной команды или кнопки
+  случился сбой; по коду его находят в журнале: [«Бот ответил „что-то сломалось“»](../how-to/bot_fault.md) ([English](../how-to/bot_fault.en.md)).
 - **После перезагрузки Мака бот снова `Restarting`, а в журнале `Timed out` или
   `name resolution`** — виртуальная машина поднялась раньше сети и не находит имена сайтов.
   Остановите Colima, пропишите Докеру адрес DNS и запустите снова:

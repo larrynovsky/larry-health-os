@@ -1,9 +1,12 @@
 {
   "module": "llm_client",
   "public": [
-    "guarded_client",
     "api_key",
-    "guard_outgoing"
+    "guard_outgoing",
+    "guarded_client",
+    "is_model_not_found",
+    "profiles",
+    "provider"
   ],
   "depends_on": [
     {
@@ -13,6 +16,16 @@
       ],
       "why": "единственный детектор значений секретов в исходящем тексте (SEC-21); llm_client не повторяет его логику, а вызывает — иначе завёл бы второй дом одному знанию (§17)",
       "legacy": "secret_guard — легаси-модуль SEC-21 без сайдкара, вне периметра §15 (заведён 2026-07-06, до гейта)"
+    },
+    {
+      "module": "llm_translate",
+      "uses": [
+        "to_openai",
+        "from_openai",
+        "to_gemini",
+        "from_gemini"
+      ],
+      "why": "чужой провайдер: запрос формата Anthropic → родной SDK и ответ обратно; гард стоит до перевода"
     }
   ],
   "disposability": {

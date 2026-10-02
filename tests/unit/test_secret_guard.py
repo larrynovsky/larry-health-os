@@ -90,3 +90,24 @@ def test_guard_failure_only_journals(monkeypatch, fault_journal):
     result = doc_agent.analyze_diff("fictional change", "fictional diff")
     assert "error" in result and sent == []
     assert "SEC-21" in fault_journal.read_text()
+
+
+def test_oversized_secret_file_is_blindness_not_clean(tmp_path):
+    """До 2026-10-01 файл >64 КБ давал пустой набор игл — «чисто» вместо «не смотрел»."""
+    dirs = _secrets(tmp_path, big_json="x" * (sg._MAX_FILE_BYTES + 1) + FAKE_TOKEN)
+    hits = sg.find_secret_values("любой текст", dirs=dirs)
+    assert len(hits) == 1 and hits[0].startswith("!secret_guard не отработал")
+    assert "big_json" in hits[0] and FAKE_TOKEN not in hits[0]
+
+
+def test_unreadable_secret_file_is_blindness(tmp_path, monkeypatch):
+    dirs = _secrets(tmp_path, oura_token="OURA9876543210FEDCBA\n")
+    real = Path.read_text
+
+    def boom(self, *a, **k):
+        if self.name == "oura_token":
+            raise PermissionError("нет доступа")
+        return real(self, *a, **k)
+    monkeypatch.setattr(Path, "read_text", boom)
+    hits = sg.find_secret_values("текст", dirs=dirs)
+    assert hits and hits[0].startswith("!secret_guard не отработал")

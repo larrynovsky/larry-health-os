@@ -172,6 +172,7 @@ if [[ "$SCHEDULED" == "true" ]]; then
             "$PY" -c 'import notify; notify.fault("run_checks: tenant integrity failed; see tenant artifact", person_key=None)' || true
         fi
         $PY oura_freshness_check.py --notify >> "$LOG" 2>&1 || true
+        $PY model_health_check.py --daily --notify >> "$LOG" 2>&1 || true
         $PY -c "import memory_truthcheck as m; print('A1', m.apply_confirmations()['bumped'])" >> "$LOG" 2>&1 || true
         exit 0
     fi
@@ -214,6 +215,15 @@ if [[ "$SCHEDULED" == "true" ]]; then
     # обрыве (age > conit-лимит×2). Закрывает дыру: integrity кладёт стейл в
     # 'failures', а triage форвардит только 'warnings'. См. oura_freshness_check.py.
     $PY oura_freshness_check.py --notify >> "$LOG" 2>&1 || true
+
+    # Жизненный цикл LLM-моделей (2026-10-01, нить llm-provider): ЕЖЕДНЕВНО, не раз в месяц.
+    # Снимок доступности читает hai_core.get_model; отозвана активная модель — переход на
+    # следующую допущенную из цепочки model.<role> и уведомление владельцу (его решение 01.10).
+    $PY model_health_check.py --daily --notify >> "$LOG" 2>&1 || true
+    # Допуск преемников к цепочкам (2026-10-02): раз в 7 дней по метке, в пределах бюджета
+    # владельца llm.admission.budget (нет бюджета — не тратит). Только у владельца данных:
+    # у тенанта цепочки пока не наследуются (долг BL-LLM-CHAIN-PARITY-1).
+    $PY llm_admission.py --weekly --notify >> "$LOG" 2>&1 || true
 
     # A1 (2026-07-07): бамп confirmations на подтверждённых каноном state (идемпотентно).
     # Заполняет пустую сетку confirmations (аудит 0/501 — «производитель сетки»); авто-

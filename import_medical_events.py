@@ -36,7 +36,9 @@ CR_DIR        = ICLOUD_HEALTH / "CR"
 # тип-ошибка невозможна там, где нет операции над типами.
 DOC_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
 
-MODEL = hai_core.MODEL_DEFAULTS["haiku_pinned"]
+# Модель берётся при ВЫЗОВЕ через hai_core.get_model — до 2026-10-01 здесь стояла
+# константа из MODEL_DEFAULTS, и настройка/цепочка модели в БД этот модуль не достигала
+# (нить llm-provider: шесть таких модулей). Роль: haiku_pinned.
 TEXT_LIMIT = 12000
 OCR_MIN_CHARS = 80   # меньше — OCR ничего внятного не прочёл, сверять не с чем
 PER_POLL = 5          # не больше стольких новых документов за проход вотчера
@@ -137,7 +139,7 @@ def llm_extract_image(img_path, filename: str) -> dict:
 
         client = llm_client.guarded_client()
         resp = client.messages.create(
-            model=MODEL,
+            model=hai_core.get_model("haiku_pinned"),
             max_tokens=2048,
             messages=[{
                 "role": "user",
@@ -227,7 +229,7 @@ def llm_extract(filename: str, text: str) -> dict:
     user_msg = f"Имя файла: {filename}\n\nТекст документа (первые {TEXT_LIMIT} символов):\n{text[:TEXT_LIMIT]}"
 
     resp = client.messages.create(
-        model=MODEL,
+        model=hai_core.get_model("haiku_pinned"),
         max_tokens=2048,
         messages=[
             {"role": "user", "content": f"{EXTRACT_PROMPT}\n\n{user_msg}" + hai_core.answer_language()}

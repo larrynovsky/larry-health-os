@@ -43,21 +43,33 @@ def test_meta_module_exports_register():
         assert hasattr(m, fn), f"handlers.meta missing {fn}"
 
 
-def test_cmd_start_saves_chat_id_and_replies(tg):
+def test_cmd_start_works_with_read_only_secrets(tg):
+    """/start ничего не пишет в каталог ключей: в Докере он смонтирован только для чтения.
+
+    До 02.10 первая строка /start писала номер чата в этот каталог и роняла /start у каждой
+    установки в Докере (OSError Errno 30); оба прежних теста подменяли ровно эту строку.
+    Здесь не подменено ничего, что касается каталога: он реально без права записи.
+    """
+    import os
+    import stat
     from handlers.meta import cmd_start
-    from bot.filters import owner_chat_id
+    from bot.filters import CHAT_ID_FILE, owner_chat_id
 
     upd = _attach_reply(tg.make_update(text="/start", chat_id=owner_chat_id()), tg)
-    ctx = _make_context()
+    secrets = CHAT_ID_FILE.parent
+    mode = stat.S_IMODE(secrets.stat().st_mode)
+    file_mode = stat.S_IMODE(CHAT_ID_FILE.stat().st_mode)
+    os.chmod(CHAT_ID_FILE, 0o400)
+    os.chmod(secrets, 0o500)
+    try:
+        assert not os.access(secrets, os.W_OK), "стенд не воспроизводит монтирование только для чтения"
+        with patch("handlers.meta.db.init_db", return_value=None), \
+             patch("handlers.meta.db.get_patient_profile", return_value={"identity.name": "Т"}):
+            asyncio.run(cmd_start(upd, _make_context()))
+    finally:
+        os.chmod(secrets, mode)
+        os.chmod(CHAT_ID_FILE, file_mode)
 
-    # Профиль уже заполнен — обычное приветствие; пустой профиль ведёт в знакомство
-    # (tests/unit/test_onboarding_dialog.py, нить onboarding-dialog 2026-09-23).
-    with patch("handlers.meta.save_chat_id") as mock_save, \
-         patch("handlers.meta.db.init_db", return_value=None), \
-         patch("handlers.meta.db.get_patient_profile", return_value={"identity.name": "Т"}):
-        asyncio.run(cmd_start(upd, ctx))
-
-    mock_save.assert_called_once_with(owner_chat_id())
     assert any("Привет" in m["text"] for m in tg.outgoing)
 
 

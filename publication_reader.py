@@ -32,7 +32,9 @@ from hai_core import get_client
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-HAIKU_MODEL = hai_core.MODEL_DEFAULTS["haiku"]
+# Модель берётся при ВЫЗОВЕ через hai_core.get_model — до 2026-10-01 здесь стояла
+# константа из MODEL_DEFAULTS, и настройка/цепочка модели в БД этот модуль не достигала
+# (нить llm-provider: шесть таких модулей). Роль: haiku.
 DEFAULT_MAX_PER_RUN = 10
 
 
@@ -87,7 +89,7 @@ ANALYSIS_PROMPT_TEMPLATE = (
 def _haiku_call(prompt: str, max_tokens: int = 400) -> str:
     client = get_client()
     resp = client.messages.create(
-        model=HAIKU_MODEL,
+        model=hai_core.get_model("haiku"),
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )

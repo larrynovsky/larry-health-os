@@ -127,3 +127,67 @@ def test_journal_writes_to_redirected_path_not_prod(monkeypatch, tmp_path):
     assert redirected.exists() and "SECRET_FOUND" in redirected.read_text(encoding="utf-8")
     after = prod.stat().st_size if prod.exists() else 0
     assert after == before, "блок из теста дописал БОЕВОЙ журнал — отравление вернулось"
+
+
+# ── 2026-10-01, BL-SECRETS-GUARD-GAPS-1: исходящий текст вне блоков type=text ──
+# Проба Кодекса 01.10 (по зеркалу 76717c0): секрет в tool_result → SENT, 1 вызов
+# транспорта. Тесты ниже идут через НАСТОЯЩИЙ secret_guard с подложенным каталогом
+# секретов — мок find_secret_values скрыл бы ровно то, что извлекается из запроса.
+_PLANTED = "sk-fake-0a1b2c3d4e5f6a7b8c9d"
+
+
+def _real_guard_client(monkeypatch, tmp_path):
+    d = tmp_path / ".health_secrets"
+    d.mkdir()
+    (d / "anthropic_key").write_text(_PLANTED + "\n")
+    monkeypatch.setattr(lc.secret_guard, "secrets_dir", lambda: d)
+    monkeypatch.setenv("HEALTH_LLM_GUARD_LOG", str(tmp_path / "guard.log"))
+    inner = _Inner()
+    return lc._GuardedClient(inner), inner
+
+
+class _SdkBlock:
+    """Двойник pydantic-блока SDK: история с ним уходит обратно в API (hai_chat)."""
+    def __init__(self, **kw):
+        self._kw = kw
+
+    def model_dump(self):
+        return dict(self._kw)
+
+
+@pytest.mark.parametrize("where, kw", [
+    ("tool_result", dict(messages=[{"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "t1", "content": f"файл: {_PLANTED}"}]}])),
+    ("tool_result_blocks", dict(messages=[{"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "t1",
+         "content": [{"type": "text", "text": _PLANTED}]}]}])),
+    ("tool_use_input", dict(messages=[{"role": "assistant", "content": [
+        {"type": "tool_use", "id": "t1", "name": "read", "input": {"q": _PLANTED}}]}])),
+    ("tools_description", dict(messages=[{"role": "user", "content": "q"}],
+                               tools=[{"name": "x", "description": f"ключ {_PLANTED}",
+                                       "input_schema": {"type": "object"}}])),
+    ("sdk_object_block", dict(messages=[{"role": "assistant", "content": [
+        _SdkBlock(type="tool_use", id="t1", name="read", input={"q": _PLANTED})]}])),
+])
+def test_secret_outside_text_blocks_is_blocked(monkeypatch, tmp_path, where, kw):
+    c, inner = _real_guard_client(monkeypatch, tmp_path)
+    with pytest.raises(lc.SecretLeakBlocked):
+        c.messages.create(model="m", max_tokens=1, **kw)
+    assert not inner.calls, f"{where}: секрет ушёл в транспорт"
+
+
+def test_stream_is_guarded_too(monkeypatch, tmp_path):
+    c, inner = _real_guard_client(monkeypatch, tmp_path)
+    inner.stream = lambda **kw: inner.calls.append(kw)
+    with pytest.raises(lc.SecretLeakBlocked):
+        c.messages.stream(messages=[{"role": "user", "content": _PLANTED}])
+    assert not inner.calls
+
+
+def test_base64_media_still_not_scanned_real_guard(monkeypatch, tmp_path):
+    """Граница названа: base64-данные медиа не сканируются — и это единственное исключение."""
+    c, inner = _real_guard_client(monkeypatch, tmp_path)
+    c.messages.create(messages=[{"role": "user", "content": [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": _PLANTED}},
+        {"type": "text", "text": "разбери"}]}])
+    assert len(inner.calls) == 1

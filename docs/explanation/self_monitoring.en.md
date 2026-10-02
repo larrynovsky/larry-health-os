@@ -1,57 +1,53 @@
-<!-- translation-of: docs/explanation/self_monitoring.md sha256:afbc77d448dd -->
+<!-- translation-of: docs/explanation/self_monitoring.md sha256:18bffaa1ca52 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](self_monitoring.md)
 
-# Self-Monitoring: The System Watches Itself
+# Self-monitoring: the system watches itself — how the self-check works
 
-## What Changed
+## What changed
 
-- **Alert after the first missed run** (owner decision September 23, "general rule"). Eight liveness sensors each had their own tolerance for missed runs — from two hours to nine days. There is no longer any tolerance: a sensor turns red as soon as a job has failed to run even once according to its schedule. The schedule is taken from wherever it lives: for operating-system jobs — from their schedule file; for bot jobs — from the timestamp the job itself writes to indicate how often it runs; for the morning brief — from its time setting. The cost, accepted consciously: a single random failure also triggers an alert; for engineering jobs — into the engineering queue, not to the owner.
+- **The signal-delivery boundary to the repairer has been clarified.** The promise "the signal will arrive" is now explicitly limited: repair is only guaranteed on the installation where the night-repair process lives (the owner, a Studio instance with a fresh `notify.repairer_alive` mark). On a foreign installation a failure drops into an engineering queue that nobody processes; the bot does not promise a fix — it hands the operator a failure code, and what happens next is the operator's concern. This caveat was not on the page before.
 
-- **New invariant: the list of covered scheduled jobs is computed from code** (`job_coverage_is_read_from_code`, status: holding). Previously there was no guaranteed mechanism for this; now the system does not rely on manual records — a divergence between the registry and the code becomes a loud signal, not a silent failure. *Boundary*: auto-discovery works only for sensors whose schedule is given as a simple string; indirect and threshold-based sensors are still recorded manually.
-
-- **New invariant: a liveness sensor does not stay silent when it cannot read a timestamp** (`liveness_sensor_does_not_read_bad_stamp_as_alive`, status: holding). Previously such a sensor could report nothing — and that would look like "all is well." Now it explicitly signals "cannot judge." *Boundary*: strict verification of this behavior covers only a named list of functions; sensors outside that list go through only a general numerical check.
-
-**Updated:** 2026-09-23
+**Updated:** 2026-10-02
 
 
-## Why It Exists
+## Why it exists
 
-When everything is running it is easy to think everything is fine. But "everything is running" and "you know about it" are two different claims.
+Imagine: everything is working. No alerts, no complaints. And somewhere inside, one check has been quietly failing for days — sending a signal into a log that nobody opens.
 
-Imagine a quiet day: one of the checks starts failing, sends a signal… and the signal goes into a log that nobody opens. From the outside — silence. The system looks alive. And inside, something is already broken.
+That is exactly what the most unpleasant kind of breakage looks like: not loud, but invisible. The system thinks it is watching over you. You think the system is watching over you. In reality, nobody is watching.
 
-That gap — between "caught" and "reported" — is exactly what self-monitoring closes. Its job is not to watch your health. Its job is to watch that the system watching your health has not lost its voice.
+Self-monitoring exists so that this gap is impossible. Not "we catch errors," but "we know the signal reached you." Those are different things — and it is precisely in the space between them that the most important information usually gets lost.
 
-## What It Does, in Plain Terms
+## What it does, in plain terms
 
-Every day, early in the morning, the system runs a check on itself: are the data intact, are they fresh, are the key metrics that make up the picture of your state all present. If any of this breaks — it becomes known immediately, not when someone happens to open a log.
+Every morning the system checks itself: is the database intact, is the data fresh, are the key metrics in place. This is not background noise — a critical failure raises a flag rather than sinking into a log.
 
-But checking that a check ran is not enough. The main rule is this: **verify the signal path all the way to you**, not merely the fact that a check exists somewhere. The signal must get through.
+But the check itself is only half the job. The core rule is: **you must verify the entire signal path to you, not just the fact that a check exists.** Detecting a problem and reporting it are not the same thing.
 
-That is why alerts are delivered on a "everything except known noise" basis, not on an "only what is explicitly permitted" basis. The difference matters: if a new failure was not on the permitted list — under the old approach it would simply have disappeared. Here it will get through.
+That is why alerts are delivered on the principle of "deliver everything except what explicitly requires no action" — not the other way around. The system does not ask "am I allowed to say something about this?"; it asks "is there a reason to stay silent?" This is intentional: if the list of "what to report" is assembled by hand, a new failure can easily never make the list.
 
-One more thing the system watches: there are external data without which part of the analytics quietly degrades — it does not break loudly, it simply starts working worse. Those data are now under supervision: the system knows where they live and checks that they are present and not empty.
+The system also watches its own schedule. If a task was supposed to run and did not — the signal arrives after the very first missed run. There is no "let's wait one more time." Each task's rhythm is stored where it is declared: the scheduler calendar, the job's own receipt. No duplicate manual records — because those copies are exactly what used to diverge from reality and cry out about problems that did not exist.
 
-A separate matter concerns the sensors that watch whether scheduled jobs actually ran. Previously the list of such sensors was written by hand, and it happened a couple of times: a job was covered, a sensor existed, but someone forgot to add the line to the registry — and the system would cry "no sensor" about a job that was actually being watched. Now this list is computed from code, not copied by hand. A manual copy of the computed result is a finding, a reason to investigate.
+External sources are a separate story. If an important file or knowledge base is unavailable, the system does not stay silent and does not pretend everything is fine: it says aloud that it could not read. A sensor with an unreadable timestamp responds "cannot judge" — rather than pretending to be alive.
 
-Finally, a job's liveness sensor must not stay silent when it cannot read a timestamp. Silence is not "all is well" — it is a loss of information. Now such a sensor honestly says "cannot judge" rather than pretending nothing happened.
+Task-to-sensor coverage is not rewritten by hand either: the system reads from the code itself which tasks are under observation. A manual copy of that information is a reason to be suspicious.
 
-## What to Honestly Say About Its limits
+## What to honestly say about its limits
 
-Self-monitoring is holding — but "holding" and "verified everywhere" are different things. Here is where the boundary runs clearly.
+All the promises described above hold. But "holds" and "verified under any conditions" are different statements. Here is where the line between them falls.
 
-**Coverage of scheduled jobs is computed from code — but not for all sensors.** Only those that use a specific way of specifying a schedule are found automatically. Sensors tied directly to a numeric threshold, and indirect ones — for example, digest-type or dead-man's-switch-type — are still recorded by hand and may diverge from what is actually in the code. Furthermore, if a job's schedule label is given not as a simple string but as a computed expression, the system will not infer it — and the census will cry "no sensor" even if a sensor exists. This is a loud signal, not a silent failure — but it is still a limit.
+**Delivery does not work the same everywhere.** The signal reaches someone who can fix things only where the night-repair process lives. On a foreign installation the failure goes into a queue that nobody processes. That is why the bot promises a fix only when it knows the repairer is active; otherwise it hands a failure code to the operator — what happens next is the operator's concern.
 
-**Strict verification of liveness sensor behavior does not cover all sensors.** There is a named list of functions that are checked with particular thoroughness — that they do not stay silent on bad data. A new sensor written outside that list falls only under the general numerical check of the whole file: it will be noticed that something changed, but the behavior will not be verified in detail. This is not a gap — but it is not the same degree of confidence.
+**Task coverage is read from the code — but not all of it.** Only sensors of a certain kind are found automatically. Threshold sensors and indirect sensors are still recorded by hand and can diverge from reality. If a label in the code is not a plain string but a computed expression, the system will not guess it and will report a missing sensor — loudly, not silently.
 
-There are no other unfulfilled or disputed promises in this subsystem as of today.
+**The strict silence zone is not the whole file.** The rule "a sensor may not stay silent about an unreadable timestamp" applies to a named list of functions. A new sensor written outside that list is only covered by the general numeric check.
 
-## Where This Lives in the System
+**The first missed run rings the alarm — and that is a deliberate choice.** A single failure now also raises an alert. The owner accepted the cost of this decision knowingly. Task-liveness sensors signal to the engineering queue and the Monday digest — not directly to the owner.
 
-The core check logic lives in **`integrity_tests.py`** — it describes what exactly is checked every morning and which sensors are registered. The census of scheduled jobs and the coverage computed from code are in **`producer_registry.py`**; the named strict zone for the silence guard is in `tests/consistency/test_silent_handler_guard.py`.
+**Several edge cases exist in the schedule sensors.** A task with a late-arrival tolerance may look like a missed run in the short window before the system has had a chance to check. An interval task is judged by the age of its receipt, not by the exact moment of launch — differences of seconds between runs are not accounted for. A task that has not declared its rhythm before the first run after an update is considered "not judged" — the system says so aloud.
 
-The intent of the subsystem — why it is structured this way, what problem it closes, and what is considered its area of responsibility — is recorded in **`subsystem_intent.yaml`**.
+## Where this lives in the system
 
-The external data that the system is required to keep under supervision are listed in **`external_dependencies.yaml`** — this is the registry of what lives outside and without which part of the analytics would begin to degrade unnoticed.
+The main work happens in **`integrity_tests.py`** — that is where the checks themselves live, along with the list of functions in the strict zone and the logic for reading coverage from the code. The intentions and principles of the subsystem are recorded in **`subsystem_intent.yaml`** — this is not technical documentation but an explanation of why things are arranged the way they are. The external dependencies that the system is required to keep under watch are listed in **`external_dependencies.yaml`**: if anything listed there becomes unavailable, `integrity_tests` will say so rather than degrading silently.

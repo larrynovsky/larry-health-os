@@ -843,7 +843,18 @@
     "hypothesis_semantic_check",
     "i18n"
   ],
+  "llm_admission": [
+    "doc_translation",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "lab_recognizer",
+    "llm_client",
+    "notify",
+    "treatment_extractor"
+  ],
   "llm_client": [
+    "llm_translate",
     "secret_guard"
   ],
   "location_signal": [
@@ -911,7 +922,9 @@
   ],
   "model_health_check": [
     "hai_core",
+    "health_db",
     "i18n",
+    "llm_client",
     "notify"
   ],
   "monthly_api_report": [
@@ -972,6 +985,7 @@
   ],
   "night_repair": [
     "infra_config",
+    "notify",
     "secrets_paths"
   ],
   "norm_documents": [
@@ -981,6 +995,7 @@
   "notify": [
     "_time_inject",
     "i18n",
+    "release_notice",
     "secrets_paths"
   ],
   "oura_freshness_check": [

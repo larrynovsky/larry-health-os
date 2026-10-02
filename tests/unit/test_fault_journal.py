@@ -36,8 +36,12 @@ def _load(file, names, **env):
     return SimpleNamespace(**env)
 
 
+# fault и то, на чём он стоит (нить first-contact, 02.10: выбор текста по живости ремонта).
+_FAULT_NAMES = {"fault", "_faults_journal", "repairer_alive", "REPAIR_SEEN", "REPAIR_FRESH_S"}
+
+
 def _notify(operator):
-    return _load("notify.py", {"fault"}, Path=Path, os=os, __file__=str(ROOT / "notify.py"),
+    return _load("notify.py", _FAULT_NAMES, Path=Path, os=os, __file__=str(ROOT / "notify.py"),
                  secrets_dir=lambda: Path("invented-tenant"), notify_operator=operator)
 
 
@@ -46,6 +50,10 @@ class FaultRoutingTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.journal = Path(temp.name) / "nested" / "faults.jsonl"
+        # Установка с живым ночным ремонтом: человеку — «передал на починку». Без отметки —
+        # другой текст, его судит tests/unit/test_first_contact.py.
+        self.journal.parent.mkdir(parents=True, exist_ok=True)
+        (self.journal.parent / "night_repair_seen").write_text(str(int(datetime.now().timestamp())))
         env = patch.dict(os.environ, HEALTH_FAULTS_JOURNAL=str(self.journal))
         env.start()
         self.addCleanup(env.stop)
@@ -63,7 +71,8 @@ class FaultRoutingTests(unittest.TestCase):
             self.assertEqual(person, i18n.t("common.error.our_side", "ru"))
             self.assertNotIn("FAKE_529", person)
             record = self.records()[-1]
-            self.assertEqual(set(record), {"ts", "tenant", "where", "text"})
+            self.assertEqual(set(record), {"ts", "code", "tenant", "where", "text"})
+            self.assertRegex(record["code"], r"^[0-9a-f]{6}$")   # код сбоя для человека (first-contact)
             self.assertEqual(record["where"], where)
             self.assertEqual(record["text"], tech[:500])
             self.assertEqual(record["tenant"], "invented-tenant")
@@ -74,7 +83,7 @@ class FaultRoutingTests(unittest.TestCase):
 
     def test_default_journal_path_is_relative_to_repo(self):
         root = self.journal.parent
-        notify = _load("notify.py", {"fault"}, Path=Path, os=os,
+        notify = _load("notify.py", _FAULT_NAMES, Path=Path, os=os,
                        __file__=str(root / "notify.py"), secrets_dir=lambda: Path("invented-tenant"))
         with patch.dict(os.environ):
             os.environ.pop("HEALTH_FAULTS_JOURNAL", None)
@@ -82,7 +91,7 @@ class FaultRoutingTests(unittest.TestCase):
         self.assertEqual(json.loads((root / "logs" / "faults.jsonl").read_text())["where"], "worker")
 
     def test_failed_journal_write_warns_and_keeps_person_line(self):
-        self.journal.mkdir(parents=True)  # каталог вместо файла
+        self.journal.mkdir()  # каталог вместо файла
         operator = Mock()
         with self.assertLogs(level="WARNING") as logs:
             person = _notify(operator).fault("worker: FAKE_529", lang="ru")
@@ -91,7 +100,7 @@ class FaultRoutingTests(unittest.TestCase):
         operator.assert_not_called()
 
     def test_journal_rotation_keeps_last_2000_complete_lines(self):
-        self.journal.parent.mkdir(parents=True)
+        self.journal.parent.mkdir(parents=True, exist_ok=True)
         records = [{"ts": "2000-01-04T12:00:00+00:00", "tenant": "invented-tenant",
                     "where": "worker", "text": f"{i}: " + "x" * 400} for i in range(2300)]
         self.journal.write_text("".join(json.dumps(r) + "\n" for r in records))
@@ -111,7 +120,7 @@ class FaultRoutingTests(unittest.TestCase):
         return monitor.check_fault_journal(), warnings
 
     def test_integrity_groups_by_tenant_and_where_with_24_hour_boundary(self):
-        self.journal.parent.mkdir(parents=True)
+        self.journal.parent.mkdir(parents=True, exist_ok=True)
         rows = [
             ("2000-01-04T11:00:00+00:00", "invented-a", "worker", "latest " + "x" * 210),
             ("2000-01-03T12:00:00+00:00", "invented-a", "worker", "boundary"),
@@ -133,7 +142,7 @@ class FaultRoutingTests(unittest.TestCase):
 
     def test_integrity_missing_empty_and_expired_journal_pass(self):
         self.assertEqual(self.integrity(), ({"groups": 0, "faults": 0}, []))
-        self.journal.parent.mkdir(parents=True)
+        self.journal.parent.mkdir(parents=True, exist_ok=True)
         self.journal.write_text("")
         self.assertEqual(self.integrity(), ({"groups": 0, "faults": 0}, []))
         self.journal.write_text(json.dumps({"ts": "1999-01-01T00:00:00+00:00",
@@ -141,7 +150,7 @@ class FaultRoutingTests(unittest.TestCase):
         self.assertEqual(self.integrity(), ({"groups": 0, "faults": 0}, []))
 
     def test_integrity_unreadable_or_corrupt_journal_warns(self):
-        self.journal.mkdir(parents=True)
+        self.journal.mkdir(parents=True, exist_ok=True)
         _, warnings = self.integrity()
         self.assertEqual(len(warnings), 1)
         self.assertIn(str(self.journal), warnings[0][1])

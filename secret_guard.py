@@ -44,13 +44,20 @@ _DATEISH_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$")
 
 
-def _needles_from_file(f: Path) -> set[str]:
+def _needles_from_file(f: Path) -> set[str] | None:
+    """Иглы файла; None — файл НЕ ПРОСКАНИРОВАН (слепота, а не «чисто»).
+
+    До 2026-10-01 большой файл и ошибка чтения давали пустой набор — тот же
+    ответ, что «в файле нет игл»: секрет из такого файла уходил молча.
+    Замер перед переводом в fail-closed (01.10, Studio): в каталогах секретов
+    владельца (15 файлов) и партнёра (7) нет ни одного файла больше 60 КБ —
+    блок не сработает на живых данных."""
     try:
         if f.stat().st_size > _MAX_FILE_BYTES:
-            return set()
+            return None
         text = f.read_text(errors="ignore")
     except OSError:
-        return set()
+        return None
     out = set()
     for tok in _TOKEN_RE.findall(text):
         if _DATEISH_RE.match(tok):
@@ -78,7 +85,12 @@ def find_secret_values(text: str, dirs: list[Path] | None = None) -> list[str]:
             for f in sorted(d.iterdir()):
                 if not f.is_file():
                     continue
-                for needle in _needles_from_file(f):
+                needles = _needles_from_file(f)
+                if needles is None:
+                    hits.add(f"!secret_guard не отработал: {d.name}/{f.name} не прочитан "
+                             f"(больше {_MAX_FILE_BYTES // 1024} КБ или ошибка чтения)")
+                    continue
+                for needle in needles:
                     if needle in text:
                         hits.add(f"{d.name}/{f.name}")
                         break

@@ -208,10 +208,20 @@ def _no_real_neighbors(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def fault_journal(tmp_path, monkeypatch):
-    """Сбои тестов не попадают в журнал, который читает настоящий integrity."""
-    path = tmp_path / "faults.jsonl"
+def fault_journal(tmp_path_factory, monkeypatch):
+    """Сбои тестов не попадают в журнал, который читает настоящий integrity.
+
+    Рядом — свежая отметка ночного ремонта: по умолчанию тест живёт в установке владельца, где
+    чинящий есть, и fault отвечает «передал на починку». Установку без чинящего тесты строят
+    сами (tests/unit/test_first_contact.py, нить first-contact 02.10)."""
+    import time
+    import notify
+    # Свой каталог ВНЕ tmp_path теста: тесты, считающие файлы в tmp_path, не видят ни журнала,
+    # ни отметки (полный прогон 02.10: два красных от лишнего файла).
+    home = tmp_path_factory.mktemp("faults")
+    path = home / "faults.jsonl"
     monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(path))
+    (home / notify.REPAIR_SEEN).write_text(str(int(time.time())))
     return path
 
 
@@ -706,3 +716,48 @@ def pytest_collection_modifyitems(config, items):
                                    "в публичной выгрузке их нет (pii_census.is_public_export)")
     for item in marked:
         item.add_marker(skip)
+
+
+# ── Тест не ходит к настоящим OpenAI и Google (2026-10-02, нить llm-provider) ──────────────────
+# Тот же класс, что _no_real_importers (C-111, C-122): новый канал приходит вместе со стражем.
+# Обе родные библиотеки ходят через httpx — перехват на уровне отправки запроса закрывает и
+# синхронный, и асинхронный клиент, кто бы их ни построил. Хосты — из профилей провайдеров
+# (methodology/llm_providers.json), а не списком здесь: новый провайдер в профиле — сразу под стражем.
+def _llm_foreign_hosts() -> set:
+    import json as _json
+    p = Path(__file__).resolve().parents[1] / "methodology" / "llm_providers.json"
+    try:
+        prof = _json.loads(p.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return set()
+    return {h for k, v in prof.items() if not k.startswith("_") and k != "anthropic"
+            for h in v.get("hosts", [])}
+
+
+@pytest.fixture(autouse=True)
+def _no_real_llm_providers(monkeypatch, request):
+    try:
+        import httpx as _hx
+    except Exception:  # noqa: BLE001 — httpx нет: и чужих библиотек тоже нет
+        yield
+        return
+    hosts, attempts = _llm_foreign_hosts(), []
+    real_send, real_asend = _hx.Client.send, _hx.AsyncClient.send
+
+    def _send(self, request, *a, **kw):
+        if request.url.host in hosts:
+            attempts.append(request.url.host)
+            raise _hx.ConnectError("blocked by conftest._no_real_llm_providers", request=request)
+        return real_send(self, request, *a, **kw)
+
+    async def _asend(self, request, *a, **kw):
+        if request.url.host in hosts:
+            attempts.append(request.url.host)
+            raise _hx.ConnectError("blocked by conftest._no_real_llm_providers", request=request)
+        return await real_asend(self, request, *a, **kw)
+    monkeypatch.setattr(_hx.Client, "send", _send)
+    monkeypatch.setattr(_hx.AsyncClient, "send", _asend)
+    yield
+    if getattr(request.function, "llm_block_expected", False):   # позитивный контроль стража
+        return
+    assert not attempts, f"тест пошёл к настоящему LLM-провайдеру: {sorted(set(attempts))}"

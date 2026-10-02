@@ -40,6 +40,8 @@ INTERNAL = {
     "treatment_extractor.py", "doc_triage.py", "handlers/symptom.py", "model_health_check.py",
     "lab_drytest.py", "scripts/replay_beliefs.py", "scripts/replay_staleness.py",
     "doc_agent.py", "night_investigator.py", "test_failure_handler.py",
+    "plans/measure_llm_providers_2026-10-01.py",   # замер провайдеров: ответ читает код-судья
+    "llm_admission.py",   # допуск моделей: ответ читает код-судья, не человек
 }
 
 

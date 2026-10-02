@@ -1,49 +1,76 @@
-<!-- translation-of: docs/explanation/install_path.md sha256:8cdedb9a27c9 -->
+<!-- translation-of: docs/explanation/install_path.md sha256:424bfe8aee58 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](install_path.md)
 
-# Installation Path: a Tutorial That Runs, and an Image That the Owner Releases
+# Installation path: a tutorial that executes, and an image that the owner releases
 
-## What Changed
+## What changed
 
-First version of this section.
+- **The boundary of the `tutorial_executes` invariant has been clarified.** It is now explicitly fixed: Telegram in CI is fake, real message delivery is not checked. The bot's path after a token failure — `/start`, onboarding, cards — is a separate invariant, not part of the tutorial run. This is a restriction, not an expansion of the check.
+- **The `first_contact_executes` invariant has been added with status `open`.** The mechanism is described and the intent is recorded, but the check is not performed. There is currently no automatic confirmation that a person will go through bot onboarding without errors. When it appears, it will also have its own limits.
 
 **Updated:** 2026-09-30
 
+**Updated:** 2026-10-02
 
-## Why It Exists
 
-Documentation breaks quietly. The owner renames a service or adds a new key to the configuration — and the installation tutorial stays the same. Nobody shouts. Nobody notices. The first person to see it is a stranger on an unfamiliar machine: they follow the instructions, something doesn't add up, and they silently leave.
+## Why it exists
 
-This subsystem exists precisely so that the gap between "what is written" and "what works" does not accumulate unnoticed. Not because someone is insufficiently careful, but because such a gap is a natural property of any living system if it is not deliberately tracked.
+When a person installs an unfamiliar program for the first time, they read the instructions — and trust that the instructions describe what is in front of them. Usually this is not the case. The instructions are written once, the code lives its own life, and by the time the third unfamiliar person opens the page, the service name is different, a key is missing, the template count is different. They follow every step, nothing works, they quietly close the tab. Nobody notices.
 
-The second problem is the image. When a system is packaged into an image and published publicly, it is not merely a convenience for a newcomer. It is a second publication of everything that lives in the repository: every file from the tree ends up in the image layers as well. That means the image demands the same deliberate decisions as the repository itself — and it must be released by the owner, intentionally, not by automation under some accidental set of circumstances.
+This subsystem exists precisely so that such a gap does not accumulate unnoticed. Not to make installation easy — that is a separate task. But to ensure that the tutorial and the real installer speak about the same thing, and that this can be verified rather than merely promised.
 
-## What It Does, in Plain Words
+The second task is the image. An image is not just a build: it carries everything that lives in the public tree. It is a second publication of the same data, just in a different form. That is why who releases the image and when is not a technical question, but a question of what goes out and whose responsibility it is.
 
-The subsystem holds three things at once.
+## What it does, in plain terms
 
-**The tutorial is synchronized with the installer.** The installer is a script that knows the truth about itself: which services it starts, which keys it expects, exactly what it does. From this truth a control stamp is computed — a mark that is embedded directly into the tutorial page. If anything in the installer changes, the stamp stops matching, and this is immediately visible: tests go red and say plainly that the page needs to be updated. The stamp does not check whether every paragraph is written correctly — it checks that the page was regenerated at all after the changes. Correctness of the text is checked by the next mechanism.
+**The tutorial carries a stamp.** The installation page contains a hidden marker — a hash of what the installer knows about itself: which services it creates, which keys it expects, what it configures by default. When any of this changes, the stamp stops matching. The test notices this and reports which page needs to be regenerated. The stamp prevents a code change from slipping past the document unnoticed.
 
-**The tutorial runs exactly as written.** Parts of the tutorial that are specially marked for verification are literally executed in a clean environment — as if a newcomer who has just downloaded two files is sitting at the keyboard. After that the system must respond: the dashboard opens, the services are running, the bot reaches a predictable failure on a fake key. If anything at all is wrong — the release does not happen. The image does not receive a tag until the tutorial has passed on the exact code from which the image is built.
+**The tutorial executes.** Tutorial blocks that are specifically marked for checking are run in CI on a clean machine — exactly as written, with an image from the same code state. After this, the system must respond, the required services must come up, and the bot must reach the expected failure point on the fake token. If something is wrong — the tutorial is red.
 
-**The image is released only by the owner, only from the public repository.** Building and publishing the image is triggered exclusively by an explicit command from the owner, on a tag, and only from a specific public repository. This is not merely a convention — it is a verifiable condition embedded in the build process. The image does not go to the public registry from the working repository.
+**The image is released only by the owner.** The image is built by a separate process, only on the owner's command, only from the open repository, and only if the tutorial passed the check on that specific commit. The image is not published from the working repository. The package in the public registry also becomes public manually — not automatically.
 
-## What Is Honest to Say About Its Limits
+**A newcomer installs from two files.** A ready-made image and docker compose — no cloning, no building. On Windows — via WSL2, and this is honestly marked in the tutorial as not checked.
 
-All three promises currently hold. But "holds" and "verified everywhere" are different claims, and it is important not to conflate the two here.
+## What to say honestly about its limits
 
-**The stamp judges the fact of an update, not the correctness of the text.** It sees that the page was regenerated after the installer's facts changed. It does not see whether every step is described correctly. Correctness of the steps is the job of the tutorial run — and only for marked blocks. Furthermore, the facts are what the installer knows about itself; whether the service is actually listening on the right port in a specific environment is outside the stamp's scope.
+It is important to distinguish three things here: what holds, what holds but is not fully checked everywhere, and what is not yet done.
 
-**The tutorial runs only on Linux, only marked blocks.** The Mac steps and the Windows/WSL2 branch are not run in CI. Windows is explicitly marked in the tutorial as not verified. The bot's path after the Telegram failure — onboarding, working with cards — is also not run in CI: only the fact of failure on a fake token is checked. Also: CI lives in the public repository; in the owner's working repository the tutorial is not run automatically — the stamp and tests work there, but not the full run.
+---
 
-**The image carries everything that made it into the public tree.** If something entered the repository unnoticed — through transcription or reading — it will appear in the image layers as well. This is not a separate vulnerability of this subsystem, but a property of publication as such: the image is a second copy of the same thing. Finally, the protection against a third party building an image under our name is a line in the build file; a fork with a modified file will build its own image under its own name in the registry, but cannot take our name.
+**The installation page stamp holds — but it has a limit that must be named.**
 
-## Where This Lives in the System
+The stamp says: "the page was regenerated after the installer's facts changed." It does not say: "the page text is correct." The correctness of the text is checked only by the tutorial run in CI — and only for marked blocks. A gap between the stamp and reality is possible where blocks are not marked.
 
-The actual truth about the installer is held by `scripts/install.py` — it computes what are called the installation facts: services, ports, keys, volumes, and so on. From these facts the stamp is born, and it lives in the tutorial pages.
+In addition, the installer's facts are what the installer knows about itself: service names, keys, ports in the configuration. Whether a service is actually listening on a port after startup is outside the facts. That is checked by the run, not the stamp.
 
-The intent and boundaries of the entire subsystem are described in `subsystem_intent.yaml` — a declaration of what the subsystem promises and why it is structured the way it is.
+---
 
-The connections to the rest of the system are direct: the facts stamp is built on the same logic as the intent stamps in other subsystems — a unified way of tracking the freshness of living documents. The tutorial in CI is part of the same chain that guards the release: the image does not go out into the world until the tutorial has passed on that exact code.
+**The tutorial run holds — but only on Linux, only for marked blocks, and with restrictions.**
+
+The Mac steps (Colima, launchctl) and the Windows/WSL2 branch are not run in CI. Windows is explicitly marked in the tutorial as not checked. Telegram in CI is fake: real message delivery, markup on a phone, and timings are not seen by the check. The bot's path beyond the token failure — cards, documents, usage scenarios — is a separate story, and the tutorial run does not touch it.
+
+CI lives only in the open repository: in the owner's working repository the tutorial does not execute automatically — a different guard is there.
+
+---
+
+**First contact is what is not yet done, and this must be named directly.**
+
+The intent: the user's first conversation with the bot — /start, onboarding, /help — should be run in CI just as automatically as the tutorial. The mechanism is described, the intent is recorded. But this invariant is currently open: it is not performed. This means there is currently no automatic check that a person will actually complete onboarding without errors on their own machine. When the check appears, it will also have its own limits: Telegram is faked, only one path through onboarding is checked, the "skip" and "repeat" branches are not run, the model is not called.
+
+---
+
+**The image holds — but carries the entire public tree.**
+
+This is not just a build. Everything that has entered the public tree goes into the image layers as well. If something got there by inattention — it will go into the image too. The protection here is review and reading before publication, but not the build process itself.
+
+Restriction by fork: the guard is a string in the workflow. A fork of the open repository with a modified workflow will build its own image under its own name. This will not occupy the name in the registry, but it should be understood that the mechanism goes no deeper than this.
+
+## Where this is in the system
+
+The installer lives in `scripts/install.py` — it knows about itself what goes into the stamp: services, ports, keys, volumes, default settings. The facts that the installation pages are checked against come from it.
+
+The intent of the subsystem — what it should do and why — is recorded in `subsystem_intent.yaml`. This is not a technical configuration file, but a record of a decision: why this mechanism exists, what it promises, and where its boundary is.
+
+The stamp, tests, tutorial run, and image release are all parts of one chain. They do not exist separately: a stamp without a run gives no confidence in correctness, a run without a green status gives no tag, a tag without the owner's command gives no public image. The chain is intentionally not fully automated — the last step is always human.

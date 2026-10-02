@@ -9,9 +9,10 @@
 у равных писателей, расходится (константа BLOOD разошлась между двумя
 писателями канона, словарь модулей — с деревом, путь бэкапа — с реальностью).
 
-ЧТО ДЕЛАЕТ: отдаёт клиента, у которого `messages.create` перед отправкой
-прогоняет ТЕКСТОВЫЕ блоки через `secret_guard`. Изображения не сканируются —
-решение названо здесь, в одном месте, а не подразумевается в двадцати.
+ЧТО ДЕЛАЕТ: отдаёт клиента, у которого `messages.create`/`stream` перед
+отправкой прогоняют ВЕСЬ исходящий текст (system, любые блоки сообщений, tools)
+через `secret_guard`. Не сканируются только base64-данные медиа — решение
+названо в `_strings`, в одном месте, а не подразумевается в двадцати.
 
 ЧЕГО НЕ ДЕЛАЕТ (домен узкий намеренно, D1): не выбирает модель, не задаёт
 max_tokens, не ретраит, не логирует промпты. Всё это остаётся у вызывающих.
@@ -60,26 +61,74 @@ class GuardUnavailable(RuntimeError):
     """
 
 
-def api_key() -> str:
-    return _KEY_FILE.read_text().strip()
+# Профили провайдеров (ключ, хосты, запас вывода на рассуждение, судьба temperature,
+# модели ролей по умолчанию) — ДАННЫЕ: methodology/llm_providers.json.
+_PROFILES_FILE = Path(__file__).parent / "methodology" / "llm_providers.json"
 
 
-def _texts(messages, system=None) -> str:
-    """Только текстовые части запроса. base64 картинок не сканируется:
-    секрет в пикселях текстовым поиском не ищется, а тащить сотни килобайт
-    в скан значит платить за иллюзию покрытия."""
-    parts = []
-    if isinstance(system, str):
-        parts.append(system)
-    elif isinstance(system, list):
-        parts += [b.get("text", "") for b in system if isinstance(b, dict)]
-    for m in messages or []:
-        c = m.get("content") if isinstance(m, dict) else None
-        if isinstance(c, str):
-            parts.append(c)
-        elif isinstance(c, list):
-            parts += [b.get("text", "") for b in c
-                      if isinstance(b, dict) and b.get("type") == "text"]
+def profiles() -> dict:
+    import json
+    return {k: v for k, v in json.loads(_PROFILES_FILE.read_text(encoding="utf-8")).items()
+            if not k.startswith("_")}
+
+
+def provider() -> str:
+    """Провайдер УСТАНОВКИ (решение человека при установке, переменная HEALTH_LLM_PROVIDER
+    из .env; нет — anthropic, как до 2026-10-02). Неизвестный — громкий отказ."""
+    import os
+    p = (os.environ.get("HEALTH_LLM_PROVIDER") or "anthropic").strip().lower()
+    if p not in profiles():
+        raise ValueError(f"HEALTH_LLM_PROVIDER={p!r}: такого провайдера нет в methodology/llm_providers.json")
+    return p
+
+
+def api_key(prov: str | None = None) -> str:
+    """Ключ провайдера. Дом всех ключей — тот же каталог, что у anthropic_key;
+    имя файла — из профиля провайдера (openai_key, gemini_key, …)."""
+    prov = prov or provider()
+    if prov == "anthropic":
+        return _KEY_FILE.read_text().strip()
+    return (_KEY_FILE.parent / profiles()[prov]["key_file"]).read_text().strip()
+
+
+def is_model_not_found(exc: BaseException) -> bool:
+    """«Модели нет у провайдера» у любого из SDK — для датчика отзыва моделей."""
+    code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    return code == 404 or type(exc).__name__ == "NotFoundError"
+
+
+def _strings(x, out: list) -> None:
+    """Все строки исходящей структуры, кроме base64-данных медиа.
+
+    До 2026-10-01 скан брал только system и блоки type=text: содержимое
+    tool_result, аргументы tool_use и описания tools уходили провайдеру мимо
+    гарда (проба Кодекса 01.10: секрет в tool_result → SENT, 1 вызов транспорта).
+    Белый список типов блоков отстаёт от SDK по построению — поэтому обход
+    ВСЕГО, а исключение одно и названо: `source.data` при `source.type=base64`
+    (картинка/документ — секрет в пикселях текстовым поиском не ищется, а
+    сотни килобайт base64 дали бы иллюзию покрытия). Блоки SDK (pydantic)
+    приводятся к dict через model_dump — их передают обратно в историю
+    (hai_chat, cbcr_hypothesis)."""
+    if isinstance(x, str):
+        out.append(x)
+    elif isinstance(x, dict):
+        for k, v in x.items():
+            if k == "data" and x.get("type") == "base64":
+                continue
+            _strings(v, out)
+    elif isinstance(x, (list, tuple)):
+        for v in x:
+            _strings(v, out)
+    elif hasattr(x, "model_dump"):
+        _strings(x.model_dump(), out)
+
+
+def _texts(messages, system=None, tools=None) -> str:
+    """Весь исходящий текст запроса: system, сообщения (любые блоки), tools."""
+    parts: list = []
+    _strings(system, parts)
+    _strings(messages, parts)
+    _strings(tools, parts)
     return "\n".join(p for p in parts if p)
 
 
@@ -130,9 +179,9 @@ def _journal(kind: str, detail: str) -> None:
 _HOWTO = " → что делать: docs/how-to/llm_guard_blocked.md"
 
 
-def guard_outgoing(messages, system=None) -> None:
+def guard_outgoing(messages, system=None, tools=None) -> None:
     """Поднимает GuardUnavailable при слепоте и SecretLeakBlocked при находке."""
-    hits = secret_guard.find_secret_values(_texts(messages, system))
+    hits = secret_guard.find_secret_values(_texts(messages, system, tools))
     blind = [h for h in hits if h.startswith("!")]
     if blind:
         _journal("GUARD_BLIND", "; ".join(blind))
@@ -149,10 +198,16 @@ class _GuardedMessages:
         self._inner = inner
 
     def create(self, **kw):
-        guard_outgoing(kw.get("messages"), kw.get("system"))
+        guard_outgoing(kw.get("messages"), kw.get("system"), kw.get("tools"))
         return self._inner.create(**kw)
 
-    def __getattr__(self, name):        # stream/count_tokens и прочее — как есть
+    def stream(self, **kw):
+        # До 01.10 stream уходил через __getattr__ без гарда; вызывающих нет,
+        # но «нет вызывающих» — не защита: первый же новый вызов прошёл бы мимо.
+        guard_outgoing(kw.get("messages"), kw.get("system"), kw.get("tools"))
+        return self._inner.stream(**kw)
+
+    def __getattr__(self, name):        # count_tokens/batches — без генерации текста ответа
         return getattr(self._inner, name)
 
 
@@ -165,7 +220,72 @@ class _GuardedClient:
         return getattr(self._inner, name)
 
 
-def guarded_client(async_=False):
+class _ForeignModels:
+    """models.list() в форме, которую читают датчик отзыва и допуск: .id и .created_at."""
+    def __init__(self, prov, sdk):
+        self._prov, self._sdk = prov, sdk
+
+    def list(self, limit=100):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace as NS
+        out = []
+        if self._prov == "openai":
+            for m in self._sdk.models.list():
+                ts = datetime.fromtimestamp(getattr(m, "created", 0) or 0, timezone.utc).isoformat()
+                out.append(NS(id=m.id, created_at=ts))
+        else:
+            for m in self._sdk.models.list():
+                out.append(NS(id=m.name.removeprefix("models/"), created_at=""))
+        return out[:limit] if limit else out
+
+
+class _ForeignMessages:
+    """messages.create в формате Anthropic → родная библиотека провайдера → ответ в форме,
+    которую читают вызывающие (llm_translate). Решение владельца 2026-10-01 «вариант а»."""
+    def __init__(self, prov, sdk, async_):
+        self._prov, self._sdk, self._async = prov, sdk, async_
+
+    def create(self, **kw):
+        import llm_translate as T
+        prof = profiles()[self._prov]
+        if self._prov == "openai":
+            req = T.to_openai(kw, prof)
+            if self._async:
+                async def _a():
+                    return T.from_openai(await self._sdk.responses.create(**req))
+                return _a()
+            return T.from_openai(self._sdk.responses.create(**req))
+        req = T.to_gemini(kw, prof)
+        models = self._sdk.aio.models if self._async else self._sdk.models
+        if self._async:
+            async def _g():
+                return T.from_gemini(await models.generate_content(
+                    model=req["model"], contents=req["contents"], config=req["config"]))
+            return _g()
+        return T.from_gemini(models.generate_content(
+            model=req["model"], contents=req["contents"], config=req["config"]))
+
+    def stream(self, **kw):
+        raise NotImplementedError(f"stream не переведён для {self._prov} — вызывающих нет (замер 01.10)")
+
+
+class _ForeignClient:
+    def __init__(self, prov, async_):
+        if prov == "openai":
+            import openai
+            sdk = (openai.AsyncOpenAI if async_ else openai.OpenAI)(api_key=api_key(prov))
+            listing = openai.OpenAI(api_key=api_key(prov)) if async_ else sdk
+        elif prov == "gemini":
+            from google import genai
+            sdk = listing = genai.Client(api_key=api_key(prov))
+        else:
+            raise ValueError(f"провайдер {prov!r} не подключён к переводчику")
+        self._sdk = sdk          # держим ссылку: клиент genai закрывается при сборке мусора
+        self.messages = _ForeignMessages(prov, sdk, async_)
+        self.models = _ForeignModels(prov, listing)
+
+
+def guarded_client(async_=False, prov: str | None = None):
     """Клиент с гардом на исходящем тексте.
 
     Имя не `get`: оно занято `parked_decisions.get`, и дубль-гейт справедливо
@@ -174,7 +294,16 @@ def guarded_client(async_=False):
 
     async_=True обязателен там, где вызовы идут из event loop: sync-клиент под
     run_in_executor даёт [Errno 11] EDEADLK на macOS (ложный путь C-30).
+
+    prov — явный провайдер вместо провайдера установки: только допуск моделей
+    (llm_admission --provider) прогоняет чужую модель с установки anthropic.
     """
+    prov = prov or provider()
+    if prov not in profiles():
+        raise ValueError(f"провайдер {prov!r}: нет в methodology/llm_providers.json")
+    if prov != "anthropic":
+        # Тот же гард по ВСЕМУ исходящему тексту стоит до перевода и транспорта.
+        return _GuardedClient(_ForeignClient(prov, async_))
     import anthropic
     ctor = anthropic.AsyncAnthropic if async_ else anthropic.Anthropic
     return _GuardedClient(ctor(api_key=api_key()))

@@ -49,23 +49,105 @@ MODEL_DEFAULTS = {
 }
 
 
-def get_model(role: str) -> str:
-    """Модель для роли. system_config.model.<role> > MODEL_DEFAULTS.
-    Неизвестная роль → KeyError (явная ошибка, не тихий дефолт).
-    БД недоступна → код-дефолт MODEL_DEFAULTS + log.warning (запаска не
-    молча, audit 2026-06-17): тихий неверный дефолт хуже, чем шумный.
-    """
+# Свежесть снимка доступности моделей: его пишет model_health_check каждый день (run_checks).
+# Старше — снимку не верим и берём первую модель цепочки (вызов упадёт громко, а не молча
+# переключится по устаревшему знанию). Значение — ритм записи ×3, а не клинический порог.
+_AVAILABILITY_MAX_AGE_H = 72
+
+
+def pick_from_chain(chain: list[str], available: set[str] | None) -> str:
+    """Первая модель цепочки, доступная по снимку; снимка нет — первая модель.
+
+    Цепочка = модели, ПРОШЕДШИЕ проверку для роли, по порядку предпочтения (решение
+    владельца 2026-10-01: при отзыве модели система переключается сама и уведомляет).
+    Ни одна не доступна — первая: вызов упадёт громко, уведомление шлёт датчик."""
+    if not chain:
+        raise ValueError("пустая цепочка моделей")
+    if available:
+        for m in chain:
+            if m in available:
+                return m
+    return chain[0]
+
+
+def _available_models() -> set[str] | None:
+    from datetime import timezone
+    try:
+        snap = db.get_config("llm.available")
+    except Exception as e:
+        log.warning("llm.available недоступен (%s) — беру первую модель цепочки", e)
+        return None
+    if not isinstance(snap, dict) or not snap.get("checked_at"):
+        return None
+    try:
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(snap["checked_at"])  # time-inject: ok
+    except ValueError:
+        return None
+    if age.total_seconds() > _AVAILABILITY_MAX_AGE_H * 3600:
+        return None
+    return set(snap.get("ids") or [])
+
+
+def model_chain(role: str) -> list[str]:
+    """Цепочка допущенных моделей роли: system_config.model.<role> (строка или список)
+    > MODEL_DEFAULTS. Неизвестная роль → KeyError."""
     try:
         stored = db.get_config(f"model.{role}")
     except Exception as e:
         log.warning(
-            "get_model(%r): DB get_config недоступен (%s) — беру код-дефолт MODEL_DEFAULTS",
+            "get_model/model_chain(%r): DB get_config недоступен (%s) — беру код-дефолт MODEL_DEFAULTS",
             role, e,
         )
         stored = None
+    if isinstance(stored, list) and stored:
+        return [str(m) for m in stored]
     if stored:
-        return str(stored)
-    return MODEL_DEFAULTS[role]
+        return [str(stored)]
+    return [default_model(role)]
+
+
+def default_model(role: str) -> str:
+    """Модель роли по умолчанию: у anthropic — MODEL_DEFAULTS, у чужого провайдера —
+    role_defaults его профиля (methodology/llm_providers.json). KeyError — громко."""
+    prov = llm_client.provider()
+    if prov == "anthropic":
+        return MODEL_DEFAULTS[role]
+    MODEL_DEFAULTS[role]                    # неизвестная роль — KeyError, как раньше
+    return llm_client.profiles()[prov]["role_defaults"][role]
+
+
+class ModelNotAdmitted(RuntimeError):
+    """Модель роли не прошла допуск на провайдере установки — функция не работает, а не
+    отвечает непроверенной моделью (политика по умолчанию, нить llm-provider 2026-10-02)."""
+
+
+_ADMISSION_TABLE = Path(__file__).parent / "methodology" / "llm_admission_table.json"
+
+
+def admitted_models(prov: str, role: str) -> set[str]:
+    """Модели, прошедшие допуск к роли на провайдере (таблица выпуска)."""
+    import json
+    try:
+        t = json.loads(_ADMISSION_TABLE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return set()
+    return {m for m, v in (t.get(prov) or {}).get(role, {}).items() if v.get("passed")}
+
+
+def get_model(role: str) -> str:
+    """Модель для роли: первая доступная из цепочки model_chain(role).
+    Неизвестная роль → KeyError (явная ошибка, не тихий дефолт).
+    БД недоступна → код-дефолт MODEL_DEFAULTS + log.warning (запаска не
+    молча, audit 2026-06-17): тихий неверный дефолт хуже, чем шумный.
+    """
+    chain = model_chain(role)
+    model = chain[0] if len(chain) == 1 else pick_from_chain(chain, _available_models())
+    prov = llm_client.provider()
+    if prov != "anthropic" and model not in admitted_models(prov, role):
+        raise ModelNotAdmitted(f"{prov}: модель {model!r} роли {role!r} не прошла допуск "
+                               f"(methodology/llm_admission_table.json) — функция не работает, "
+                               f"чтобы не отвечать непроверенной моделью")
+    return model
 
 
 # ── Семантические роли задач → тир модели (единый источник планки, 2026-07-01) ──

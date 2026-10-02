@@ -71,6 +71,28 @@ def _read_runtime_file(name: str) -> str:
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
 
+def _mark_repairer_seen() -> bool:
+    """Отметка «чинящий жив» в logs/ того же рантайма, чей стол только что прочитан.
+
+    Её читает notify.repairer_alive: по ней бот решает, правда ли «передал на починку». Пишется
+    только туда, откуда ремонт берёт улики, — обещать починку рантайму, который он не читает,
+    значило бы врать тем же способом, что посторонним до 02.10 (нить first-contact).
+    """
+    from notify import REPAIR_SEEN      # одно имя на писателя и читателя
+    stamp = str(int(time.time()))
+    rt = Path("~/health/RUNTIME").expanduser()
+    runtime = rt.read_text(encoding="utf-8").strip() if rt.exists() else "native"
+    if runtime == "container":
+        env = dict(os.environ, DOCKER_CONTEXT="colima-health",
+                   PATH="/opt/homebrew/bin:/usr/local/bin:" + os.environ.get("PATH", ""))
+        r = _run(["docker", "exec", "health-cron-1", "sh", "-c",
+                  f"echo {stamp} > /app/logs/{REPAIR_SEEN}"], env=env, timeout=60)
+        return r.returncode == 0
+    (REPO / "logs").mkdir(parents=True, exist_ok=True)
+    (REPO / "logs" / REPAIR_SEEN).write_text(stamp, encoding="utf-8")
+    return True
+
+
 def _open_fix_cards(store: dict) -> list[dict]:
     """Открытые карточки инженерной очереди, старшие первыми."""
     cards = [{"id": k, **v} for k, v in store.items()
@@ -288,6 +310,7 @@ def run_night() -> int:
     raw = _read_runtime_file("parked_decisions.json")
     receipt = {"at": int(time.time()), "store_read": bool(raw)}
     if raw:
+        receipt["seen_marked"] = _mark_repairer_seen()
         integ = _read_runtime_file("integrity_latest.json")
         res = repair_step(json.loads(raw), json.loads(integ) if integ else {},
                           _read_runtime_file("pytest_failed_state.tsv"), state, _author, _reviewer, time.time())

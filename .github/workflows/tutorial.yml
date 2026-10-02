@@ -2,7 +2,7 @@
 # docs/tutorials/first_install.md идут как их прочтёт человек (scripts/tutorial_run.py), образ и
 # файлы запуска собраны из ЭТОГО коммита — урок проверяется до выпуска, а не после.
 # Краснеет, если урок разошёлся с системой: команда упала, служба не поднялась, дашборд не
-# ответил, бот не дошёл до чтения токена.
+# ответил, бот не дошёл до чтения токена, человек не прошёл /start и знакомство.
 name: tutorial
 
 on:
@@ -62,6 +62,13 @@ jobs:
             sleep 5
           done
           docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log'
+      - name: первый контакт — /start и всё знакомство, как их получит человек
+        # Нить first-contact (02.10): урок кончался на InvalidToken, а /start падал у каждой
+        # установки в Докере — ключи смонтированы только для чтения, а /start писал туда номер
+        # чата. Те же обработчики, что слушают Telegram (bot.main.build_app), в контейнере бота
+        # с его монтированием; поддельный только сетевой слой Telegram. База — свежая, из урока.
+        working-directory: /home/runner/health-docker
+        run: docker compose run --rm --no-deps -T bot python3 /app/scripts/first_contact_smoke.py
       - name: install.sh — тот же путь одной командой (проверка, установка, повтор = обновление)
         run: |
           (cd ~/health-docker && docker compose down -v)            # порт 8001 — второй установке
@@ -80,6 +87,25 @@ jobs:
           unset TELEGRAM_TOKEN TELEGRAM_CHAT_ID ANTHROPIC_KEY HEALTH_TZ
           bash ~/health-sh/install.sh --dir ~/health-sh --dist "$PWD/dist" --non-interactive --ci-fake-keys
           grep -qx 'TZ=Europe/Berlin' ~/health-sh/.env
+          grep -qx 'HEALTH_LLM_PROVIDER=anthropic' ~/health-sh/.env           # повтор выбор не меняет
+      - name: install.sh с другим поставщиком моделей — до предсказуемого отказа непроверенной модели
+        run: |
+          for prov in openai gemini; do
+            LLM_KEY="ci-fake-${prov}" bash ~/health-sh/install.sh --dir ~/health-sh --dist "$PWD/dist" \
+              --non-interactive --ci-fake-keys --provider "$prov"
+            grep -qx "HEALTH_LLM_PROVIDER=${prov}" ~/health-sh/.env
+            sudo test -s ~/health-sh/secrets/${prov}_key
+            (cd ~/health-sh && docker compose exec -T cron python3 -c "
+          import hai_core, llm_client
+          assert llm_client.provider() == '${prov}', llm_client.provider()
+          try:
+              hai_core.get_model('opus')
+          except hai_core.ModelNotAdmitted as e:
+              print('ожидаемый отказ:', e)
+          else:
+              assert hai_core.admitted_models('${prov}', 'opus'), 'модель без допуска отвечает'
+          ")
+          done
       - name: журналы при провале
         if: failure()
         working-directory: /home/runner/health-docker

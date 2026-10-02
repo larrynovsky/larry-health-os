@@ -1,0 +1,24 @@
+{
+  "module": "llm_translate",
+  "public": [
+    "from_gemini",
+    "from_openai",
+    "to_gemini",
+    "to_openai"
+  ],
+  "depends_on": [],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — перевод формата Anthropic Messages в запрос OpenAI Responses / google-genai и ответа обратно; сети, ключей и БД модуль не касается",
+      "D2": "четыре чистые функции to_/from_ по провайдеру; блоки ответа и UnsupportedFeature — типы результата, не вход",
+      "D3": "зависимостей от соседей нет: только stdlib; SDK зовёт llm_client, не переводчик",
+      "D4": "~270 строк, по ~80 на провайдера; новый провайдер — новая пара функций, а не ветки в старых",
+      "D5": "tests/unit/test_llm_translate.py — 9 тестов на записанных ответах настоящих API (tests/fixtures/llm_translate) и 48 ответах замера; мутации (MAX_TOKENS→end_turn у обоих, потеря provider_raw/thought_signature, подмена call_id) краснеют",
+      "D6": "общий инвариант с llm_client: ответ переводчика читается теми же полями, что ответ anthropic SDK (content[].type/text, stop_reason, usage) — test_message_has_the_shape_readers_use"
+    },
+    "rationale": "Переписывается с нуля по фикстурам настоящих ответов и тестам; состояния нет, швы (id вызова, адрес по имени у Gemini, подпись мысли, обрезка ≠ конец) перечислены в тестах поимённо.",
+    "date": "2026-10-02",
+    "oracle": "tests/unit/test_llm_translate.py::test_stop_reasons_tool_end_truncated"
+  }
+}

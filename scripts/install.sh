@@ -16,8 +16,8 @@ set +x
 set -euo pipefail
 
 # Ключи из окружения забираем и снимаем сразу — дочерние процессы их не унаследуют.
-ENV_TG="${TELEGRAM_TOKEN:-}"; ENV_ID="${TELEGRAM_CHAT_ID:-}"; ENV_AK="${ANTHROPIC_KEY:-}"
-unset TELEGRAM_TOKEN TELEGRAM_CHAT_ID ANTHROPIC_KEY
+ENV_TG="${TELEGRAM_TOKEN:-}"; ENV_ID="${TELEGRAM_CHAT_ID:-}"; ENV_AK="${ANTHROPIC_KEY:-}"; ENV_LK="${LLM_KEY:-}"
+unset TELEGRAM_TOKEN TELEGRAM_CHAT_ID ANTHROPIC_KEY LLM_KEY
 
 RELEASE_URL="https://github.com/larrynovsky/larry-health-os/releases/latest/download"
 IMAGE_NAME="larry-health-os"
@@ -26,6 +26,7 @@ MODE=install
 DIST=""            # каталог с compose.yaml/health.env вместо выпуска (CI, проверка невыпущенного)
 INTERACTIVE=1
 VERIFY=1           # проверять токен Telegram и ключ Anthropic по сети
+PROVIDER="${LLM_PROVIDER:-}"   # пусто = anthropic (урок — один путь); выбор — docs/how-to/llm_provider.md
 CI_FAKE=0          # --ci-fake-keys: ключи заведомо поддельные (CI) — бот обязан упасть на InvalidToken
 FAILS=0
 WARNS=0
@@ -48,14 +49,18 @@ usage() {
   --non-interactive  без вопросов: пояс из HEALTH_TZ, ключи из TELEGRAM_TOKEN,
                      TELEGRAM_CHAT_ID, ANTHROPIC_KEY
   --no-verify        не проверять ключи по сети (и их формат)
-  --dist КАТАЛОГ     взять compose.yaml и health.env из каталога, а не из выпуска" \
+  --dist КАТАЛОГ     взять compose.yaml и health.env из каталога, а не из выпуска
+  --provider ИМЯ     поставщик моделей: anthropic (по умолчанию), openai, gemini;
+                     ключ не-Anthropic в --non-interactive — из LLM_KEY" \
 "Usage: bash install.sh [--check] [--dir DIR] [--non-interactive] [--no-verify]
   --check            only check dependencies, change nothing
   --dir DIR          where to install (default ~/health-docker)
   --non-interactive  no questions: time zone from HEALTH_TZ, keys from TELEGRAM_TOKEN,
                      TELEGRAM_CHAT_ID, ANTHROPIC_KEY
   --no-verify        do not verify keys online (nor their format)
-  --dist DIR         take compose.yaml and health.env from DIR instead of the release"
+  --dist DIR         take compose.yaml and health.env from DIR instead of the release
+  --provider NAME    model provider: anthropic (default), openai, gemini;
+                     a non-Anthropic key in --non-interactive comes from LLM_KEY"
 }
 
 while [ $# -gt 0 ]; do
@@ -64,6 +69,7 @@ while [ $# -gt 0 ]; do
     --dir) [ $# -ge 2 ] || die "--dir: нужен каталог" "--dir needs a directory"; DIR="$(abspath "$2")"; shift ;;
     --dist) [ $# -ge 2 ] || die "--dist: нужен каталог" "--dist needs a directory"; DIST="$(abspath "$2")"; shift ;;
     --non-interactive) INTERACTIVE=0 ;;
+    --provider) [ $# -ge 2 ] || die "--provider: нужно имя" "--provider needs a name"; PROVIDER="$2"; shift ;;
     --no-verify) VERIFY=0 ;;
     --ci-fake-keys) VERIFY=0; CI_FAKE=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -75,6 +81,11 @@ if [ "$MODE" = install ] && [ "$INTERACTIVE" = 1 ] && [ ! -t 0 ]; then
   die "Нет терминала для вопросов. Скачайте скрипт файлом и запустите: bash install.sh (или --non-interactive)." \
       "No terminal for questions. Download the script as a file and run: bash install.sh (or --non-interactive)."
 fi
+
+case "${PROVIDER:-anthropic}" in
+  anthropic|openai|gemini) ;;
+  *) die "Неизвестный поставщик моделей: ${PROVIDER} (anthropic, openai, gemini)" "Unknown model provider: ${PROVIDER} (anthropic, openai, gemini)" ;;
+esac
 
 # ── 1. Проверка ──────────────────────────────────────────────────────────────────────────────
 say "Проверяю, всё ли есть для установки…" "Checking prerequisites…"
@@ -317,6 +328,16 @@ else
   mv .env.part .env
   ok "часовой пояс: ${tz}" "time zone: ${tz}"
 fi
+# Поставщик моделей: названный явно (--provider / LLM_PROVIDER) пишется в .env; не названный —
+# берётся из .env (повтор = обновление не меняет выбор), иначе anthropic.
+if [ -n "$PROVIDER" ]; then
+  if grep -q '^HEALTH_LLM_PROVIDER=' .env; then
+    sed "s#^HEALTH_LLM_PROVIDER=.*#HEALTH_LLM_PROVIDER=${PROVIDER}#" .env > .env.part && mv .env.part .env
+  else printf 'HEALTH_LLM_PROVIDER=%s\n' "$PROVIDER" >> .env; fi
+else
+  PROVIDER="$(sed -n 's/^HEALTH_LLM_PROVIDER=//p' .env | tail -n1)"; PROVIDER="${PROVIDER:-anthropic}"
+fi
+ok "поставщик моделей: ${PROVIDER}" "model provider: ${PROVIDER}"
 
 # ── 3. Ключи ─────────────────────────────────────────────────────────────────────────────────
 SEC="${DIR}/secrets"
@@ -346,11 +367,16 @@ tg_check() {  # итог — в TG_STATUS (ok / bad / net), имя бота — 
   TG_NAME="$(printf '%s' "$out" | sed -n 's/.*"username":"\([^"]*\)".*/\1/p')"
   case "$code" in 200) TG_STATUS=ok ;; 401|404) TG_STATUS=bad ;; *) TG_STATUS=net ;; esac
 }
-ak_check() {  # → ok / bad / net (список моделей бесплатен)
-  local code
-  code="$(printf 'header = "x-api-key: %s"\nheader = "anthropic-version: 2023-06-01"\nurl = "https://api.anthropic.com/v1/models"\n' "$1" \
-          | curl -q -s -o /dev/null -w '%{http_code}' --max-time 20 -K - 2>/dev/null || true)"
-  case "$code" in 200) echo ok ;; 401|403) echo bad ;; *) echo net ;; esac
+key_check() {  # key_check <поставщик> <ключ> → ok / bad / net (список моделей бесплатен у всех)
+  local cfg code
+  case "$1" in   # хосты встроены (methodology/llm_providers.json), пользовательского адреса нет
+    anthropic) cfg='header = "x-api-key: %s"\nheader = "anthropic-version: 2023-06-01"\nurl = "https://api.anthropic.com/v1/models"\n' ;;
+    openai) cfg='header = "Authorization: Bearer %s"\nurl = "https://api.openai.com/v1/models"\n' ;;
+    gemini) cfg='header = "x-goog-api-key: %s"\nurl = "https://generativelanguage.googleapis.com/v1beta/models"\n' ;;
+  esac
+  # shellcheck disable=SC2059  # формат — константа из case выше, ключ — аргумент
+  code="$(printf "$cfg" "$2" | curl -q -s -o /dev/null -w '%{http_code}' --max-time 20 -K - 2>/dev/null || true)"
+  case "$code" in 200) echo ok ;; 400|401|403) echo bad ;; *) echo net ;; esac
 }
 keep_unverified() {  # сеть подвела, а не ключ: сохранить без проверки?
   [ "$INTERACTIVE" = 1 ] || return 1
@@ -386,18 +412,30 @@ while ! has_secret telegram_chat_id; do
   fi
   put_secret telegram_chat_id "$c"
 done
-while ! has_secret anthropic_key; do
-  say "Ключ Anthropic: console.anthropic.com → API Keys (и пополните баланс)." "Anthropic key: console.anthropic.com → API Keys (and top up the balance)."
-  k="$(ask_secret "$ENV_AK" "Ключ Anthropic (не будет виден)" "Anthropic key (input hidden)" 1)"; ENV_AK=""
+case "$PROVIDER" in
+  anthropic) KF=anthropic_key; KV="$ENV_AK"; KN="Anthropic"
+             KH_RU="Ключ Anthropic: console.anthropic.com → API Keys (и пополните баланс)."
+             KH_EN="Anthropic key: console.anthropic.com → API Keys (and top up the balance)." ;;
+  openai)    KF=openai_key; KV="$ENV_LK"; KN="OpenAI"
+             KH_RU="Ключ OpenAI: platform.openai.com → API keys (и пополните баланс)."
+             KH_EN="OpenAI key: platform.openai.com → API keys (and top up the balance)." ;;
+  gemini)    KF=gemini_key; KV="$ENV_LK"; KN="Gemini"
+             KH_RU="Ключ Gemini: aistudio.google.com → Get API key."
+             KH_EN="Gemini key: aistudio.google.com → Get API key." ;;
+esac
+ENV_AK=""; ENV_LK=""
+while ! has_secret "$KF"; do
+  say "$KH_RU" "$KH_EN"
+  k="$(ask_secret "$KV" "Ключ ${KN} (не будет виден)" "${KN} key (input hidden)" 1)"; KV=""
   if [ "$VERIFY" = 1 ]; then
-    case "$(ak_check "$k")" in
-      ok) ok "ключ Anthropic принят (баланс так не проверить — пополните его)" "Anthropic key accepted (the balance cannot be checked this way — top it up)" ;;
-      bad) warn "Anthropic не принял ключ" "Anthropic rejected the key"; [ "$INTERACTIVE" = 1 ] && continue; exit 1 ;;
-      *) warn "Anthropic недоступен — ключ не проверен" "Anthropic unreachable — key not checked"
+    case "$(key_check "$PROVIDER" "$k")" in
+      ok) ok "ключ ${KN} принят (баланс так не проверить — пополните его)" "${KN} key accepted (the balance cannot be checked this way — top it up)" ;;
+      bad) warn "${KN} не принял ключ" "${KN} rejected the key"; [ "$INTERACTIVE" = 1 ] && continue; exit 1 ;;
+      *) warn "${KN} недоступен — ключ не проверен" "${KN} unreachable — key not checked"
          keep_unverified || { [ "$INTERACTIVE" = 1 ] && continue; exit 1; } ;;
     esac
   fi
-  put_secret anthropic_key "$k"
+  put_secret "$KF" "$k"
 done
 t=""; k=""
 
@@ -426,6 +464,14 @@ for _ in $(seq 36); do
 done
 bad_token=0
 docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log' 2>/dev/null && bad_token=1
+
+# Не-Anthropic: работают только роли, чьи модели прошли допуск (таблица выпуска в образе);
+# остальные функции отказывают громко, а не отвечают непроверенной моделью.
+if [ "$PROVIDER" != anthropic ]; then
+  roles="$(docker compose exec -T cron python3 -c "import hai_core, llm_client as c; p = c.provider(); print(' '.join(r for r in ('opus', 'sonnet', 'haiku', 'haiku_pinned') if hai_core.admitted_models(p, r)) or '-')" 2>/dev/null || echo '?')"
+  warn "${PROVIDER}: допущены роли моделей: ${roles} — остальное не работает (docs/how-to/llm_provider.md)" \
+       "${PROVIDER}: admitted model roles: ${roles} — everything else is off (docs/how-to/llm_provider.md)"
+fi
 
 # Итог считается в конце, по свежему состоянию.
 BROKEN=0

@@ -45,3 +45,27 @@ def test_install_sh_is_a_release_asset():
     spec.loader.exec_module(pm)
     assert "install.sh" in pm.RELEASE_ASSETS
     assert re.search(r"cp scripts/install\.sh dist/install\.sh", (ROOT / ".github/workflows/release.yml").read_text())
+
+
+def test_unknown_provider_is_refused_before_any_change(tmp_path):
+    d = tmp_path / "health-docker"
+    r = subprocess.run(["bash", str(SH), "--check", "--provider", "acme", "--dir", str(d)], capture_output=True,
+                       text=True, timeout=60, env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "LANG": "C"})
+    assert r.returncode == 1 and "Unknown model provider" in r.stderr
+    assert not d.exists()
+
+
+def test_installer_providers_match_the_profiles():
+    """Установщик проверяет ключ по models_url профиля и кладёт его в key_file профиля: разойдутся —
+    ключ проверят у одного хоста, а система пойдёт к другому или не найдёт файл."""
+    import json
+    prof = {k: v for k, v in json.loads((ROOT / "methodology" / "llm_providers.json").read_text()).items()
+            if not k.startswith("_")}
+    text = SH.read_text()
+    check = text[text.index("key_check() {"):text.index("keep_unverified() {")]
+    urls = dict(re.findall(r'^\s+(\w+)\) cfg=.*url = "([^"]+)"', check, re.M))
+    files = dict(re.findall(r'^\s+(\w+)\)\s+KF=(\w+);', text, re.M))
+    assert urls == {n: p["models_url"] for n, p in prof.items()}
+    assert files == {n: p["key_file"] for n, p in prof.items()}
+    allowed = re.search(r'^\s+(\S+)\) ;;\n\s+\*\) die "Неизвестный поставщик', text, re.M).group(1)
+    assert set(allowed.split("|")) == set(prof)

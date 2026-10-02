@@ -48,6 +48,14 @@ contacts:
     path: health/ (CR/, сканы анализов)
     note: исходные документы анализов; код только читает.
 
+  - file: plans/measure_llm_providers_2026-10-01.py
+    kind: source_inbox
+    path: health/CR/ (два PDF анализов владельца)
+    note: >-
+      Разовый замер нити llm-provider (01.10.2026, решение владельца «на настоящих
+      бланках»): читает две страницы бланков для сравнения моделей. Только чтение,
+      путь — через infra_config.cloud_dir; ничего в облако не пишет.
+
   - file: lab_intake_watcher.py
     kind: source_inbox
     path: health/CR/ (только у владельца) + HEALTH_DATA_DIR/incoming

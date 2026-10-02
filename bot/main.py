@@ -61,17 +61,27 @@ def main():
     db.init_db()
     ai._ensure_history_table()
 
-    token = get_token()
+    app = build_app(get_token())
+    log.info("Бот запущен (Claude API backend)")
+    app.run_polling(drop_pending_updates=True)
+
+
+def build_app(token: str, request=None) -> Application:
+    """Приложение бота со всеми обработчиками — ровно то, что слушает Telegram.
+
+    Отдельно от main(), чтобы проверка первого контакта (scripts/first_contact_smoke.py)
+    гоняла ТЕ ЖЕ обработчики, фильтры и обработчик ошибок, а не свою копию регистрации:
+    копия разъехалась бы с ботом молча. `request` — подмена сетевого слоя Telegram
+    (в проверке — поддельный, в работе — None, то есть настоящий).
+    """
     # Outbox заключений консилиума: на старте — и далее каждые 5 мин
     # (jobs.scheduled.deliver_unsent_outcomes_job). Переехало из этого
     # файла 2026-08-29: одна функция, два вызова.
     from jobs.scheduled import deliver_unsent_outcomes
-    app   = (
-        Application.builder()
-        .token(token)
-        .post_init(deliver_unsent_outcomes)
-        .build()
-    )
+    builder = Application.builder().token(token).post_init(deliver_unsent_outcomes)
+    if request is not None:
+        builder = builder.request(request).get_updates_request(request)
+    app = builder.build()
 
     owner = _owner_filter()
 
@@ -133,9 +143,7 @@ def main():
     _cb_h.register(app)
     import bot.actions as _actions
     _actions.register(app)
-
-    log.info("Бот запущен (Claude API backend)")
-    app.run_polling(drop_pending_updates=True)
+    return app
 
 
 def run(entry=None) -> None:

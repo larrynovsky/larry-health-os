@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from secrets_paths import (SECRET_SCOPE, referenced_secret_names,  # noqa: E402
-                           referenced_via_variable)
+                           referenced_via_provider_profiles, referenced_via_variable)
 
 РЕЕСТР = {"smtp_host": "owner", "telegram_token": "tenant", "read_token": "owner"}
 
@@ -94,7 +94,19 @@ def test_живой_репозиторий_без_мёртвых_секрето�
                  if "__pycache__" not in str(f)]
     объявлено = {n for n, sc in SECRET_SCOPE.items() if sc != "state"}
     без_читателя = sorted(объявлено - (referenced_secret_names(исходники)
-                                       | referenced_via_variable(исходники)))
+                                       | referenced_via_variable(исходники)
+                                       | referenced_via_provider_profiles(ROOT)))
     assert без_читателя == [], (
         f"секрет без читателя в реестре: {без_читателя} — новый мёртвый секрет (находка) "
         f"или новая форма чтения (чинить сканер)")
+
+
+def test_ключ_поставщика_читается_по_профилю_и_только_по_нему(tmp_path):
+    """02.10: openai_key/gemini_key читает llm_client.api_key по key_file профиля. Имя без
+    профиля (deepseek_key до подключения) формой не считается — иначе мёртвый ключ спрятался бы."""
+    (tmp_path / "methodology").mkdir()
+    (tmp_path / "methodology" / "llm_providers.json").write_text(
+        '{"_why": "x", "openai": {"key_file": "openai_key"}}', encoding="utf-8")
+    assert referenced_via_provider_profiles(tmp_path) == {"openai_key"}
+    assert referenced_via_provider_profiles(tmp_path / "нет") == set()
+    assert "gemini_key" in referenced_via_provider_profiles(ROOT)

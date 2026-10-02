@@ -50,10 +50,6 @@ def get_chat_id() -> int | None:
     return int(CHAT_ID_FILE.read_text().strip()) if CHAT_ID_FILE.exists() else None
 
 
-def save_chat_id(cid: int) -> None:
-    CHAT_ID_FILE.write_text(str(cid))
-
-
 def owner_chat_id() -> int:
     """Owner chat_id — ленивый + мемоизированный резолв.
 

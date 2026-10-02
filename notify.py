@@ -179,6 +179,30 @@ def notify_operator(msg: str, fallback: bool = True) -> str:
     return _deliver(msg, fallback, owner_secrets_dir())
 
 
+REPAIR_SEEN = "night_repair_seen"      # отметку кладёт night_repair.run_night рядом с журналом сбоев
+REPAIR_FRESH_S = 2 * 24 * 3600         # ремонт ночной: две пропущенные ночи подряд — чинящего нет
+
+
+def _faults_journal() -> Path:
+    return Path(os.environ.get("HEALTH_FAULTS_JOURNAL") or
+                Path(__file__).resolve().parent / "logs" / "faults.jsonl")
+
+
+def repairer_alive() -> bool:
+    """Есть ли у ЭТОЙ установки тот, кто чинит сбои: свежая отметка ночного ремонта.
+
+    Обещание «передал на починку» — утверждение о живом потребителе журнала (§18), поэтому
+    оно выводится из отметки со сроком, а не из настройки. Ремонт живёт только там, где его
+    поставили (у владельца — Studio); у постороннего отметки нет, и обещать нечего.
+    """
+    from _time_inject import get_now
+    try:
+        seen = int((_faults_journal().parent / REPAIR_SEEN).read_text().strip())
+    except (OSError, ValueError):
+        return False
+    return 0 <= get_now().timestamp() - seen <= REPAIR_FRESH_S
+
+
 def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -> "str | None":
     """Технический сбой — в журнал, человеку — одна человеческая строка.
 
@@ -189,22 +213,30 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -
 
     Решение владельца 2026-09-28 (batch 4b): владелец не почтальон. Журнал читает
     integrity, его артефакт — ночной цикл. Мед-данных и секретов в tech не класть.
+
+    Текст по умолчанию обещает починку — только если чинящий жив (`repairer_alive`). Нет
+    его — оператору установки (посторонний на своей машине) уходит код сбоя и куда с ним
+    идти, тенанту — что узнает владелец (нить first-contact, 02.10: посторонний получал
+    «ничего делать не нужно», а чинить было некому). Код рождается здесь и пишется в ту
+    же строку журнала: код в сообщении и в журнале не могут разойтись.
     """
     import fcntl
+    import hashlib
     import json
     import logging
     from collections import deque
     from _time_inject import get_now
 
+    ts = get_now().astimezone().isoformat()
+    code = hashlib.sha1(f"{ts}\n{tech}".encode()).hexdigest()[:6]
     try:
         parts = tech.split(":", 2)
         where = parts[0]
         if len(parts) > 1 and ("/" in where or where.endswith((".py", ".sh"))):
             where += ":" + parts[1]
-        record = {"ts": get_now().astimezone().isoformat(),
+        record = {"ts": ts, "code": code,
                   "tenant": Path(secrets_dir()).name, "where": where, "text": tech[:500]}
-        path = Path(os.environ.get("HEALTH_FAULTS_JOURNAL") or
-                    Path(__file__).resolve().parent / "logs" / "faults.jsonl")
+        path = _faults_journal()
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a+", encoding="utf-8") as journal:
             # Бот и службы могут писать одновременно, в том числе во время обрезки.
@@ -221,6 +253,13 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -
         logging.getLogger(__name__).warning("Журнал сбоев не записан: %s", exc)
     if person_key is None:
         return None
+    if person_key == "common.error.our_side" and not repairer_alive():
+        from secrets_paths import is_owner   # единый сигнал владельца установки (D2)
+        person_key = "common.error.self_hosted" if is_owner() else "common.error.owner_will_know"
+        import i18n
+        from release_notice import REPO   # один дом адреса открытого репозитория
+        kw = {**kw, "code": code, "link": f"https://github.com/{REPO}/blob/main/docs/how-to/"
+                                          + i18n.t("common.error.fault_page")}
     import i18n
     return i18n.t(person_key, **kw)
 

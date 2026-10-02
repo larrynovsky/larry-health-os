@@ -208,6 +208,19 @@ _SECRETS_MARKER = re.compile(r'secrets_dir\(|owner_secrets_dir\(|\.health_secret
 _VAR_REF = re.compile(r'\b[a-z_][a-z0-9_]*\s*/\s*"([A-Za-z_][A-Za-z0-9_.]*)"')
 
 
+def referenced_via_provider_profiles(root: Path | None = None) -> set:
+    """ТРЕТЬЯ ФОРМА ЧТЕНИЯ (02.10, llm-provider): ключ поставщика моделей llm_client.api_key
+    читает по имени из профиля (methodology/llm_providers.json → key_file) — данные, не литерал.
+    Профиля нет — и формы нет: имя без профиля остаётся «без читателя»."""
+    import json
+    p = (root or Path(__file__).parent) / "methodology" / "llm_providers.json"
+    try:
+        prof = json.loads(p.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return set()
+    return {v["key_file"] for k, v in prof.items() if not k.startswith("_")}
+
+
 def referenced_via_variable(sources, scope=None) -> set:
     """Имена реестра, читаемые формой `<переменная> / "имя"` в файле-с-секретами.
 
@@ -262,6 +275,9 @@ SECRET_SCOPE: dict[str, str] = {
     "caldav.json": "tenant",            # 30.09: свой CalDAV-ящик напоминаний (reminders_backend, docker-install)
     # owner-level: один на систему, у партнёра отсутствует ОСОЗНАННО
     "anthropic_key": "owner",       # владелец платит за API всех тенантов
+    # 02.10, llm-provider: ключ другого поставщика моделей (HEALTH_LLM_PROVIDER), тот же класс
+    "openai_key": "owner",
+    "gemini_key": "owner",
     "aqicn_token": "owner",         # общий погодный источник, не персональный
     "healthcheck_url": "owner",     # dead-man боевого монитора
     "sync_token": "owner",          # bot → Studio FastAPI

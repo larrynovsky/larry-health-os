@@ -834,7 +834,13 @@ def regenerate_install_page(page: str, dry_run: bool = False) -> bool:
         # попытки подряд, обе отказ «Expecting value») — снимаем ОДНУ внешнюю ограду, не больше.
         text = resp.content[0].text.strip()
         fenced = re.fullmatch(r"```(?:json)?[ \t]*\n(.*)\n```", text, re.S)
-        answer = json.loads(fenced.group(1) if fenced else text)
+        # Замер 02.10: ответ начался с разбора расхождений прозой, JSON — в ограде после неё
+        # (две попытки подряд, обе «Expecting value»). Берём объект, начинающийся с {"page".
+        start = text.find('{"page"')
+        if not fenced and start > 0:
+            answer = json.JSONDecoder().raw_decode(text[start:])[0]
+        else:
+            answer = json.loads(fenced.group(1) if fenced else text)
         body, changes = answer["page"], answer["tutorial_changes"]
         if not isinstance(body, str) or not isinstance(changes, list):
             raise ValueError("неверная форма ответа модели")

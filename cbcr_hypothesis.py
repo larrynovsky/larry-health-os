@@ -44,7 +44,12 @@ log = logging.getLogger(__name__)
 
 MANIFEST_PATH = Path(__file__).resolve().parent / "methodology" / "cbcr" / "cbcr_manifest.md"  # git (СК-1: load-bearing не в iCloud, 2026-07-11)
 
-MODEL = hai_core.MODEL_DEFAULTS["sonnet"]
+# Роль модели, не литерал: модель резолвится при вызове (hai_core.get_model), см. _model().
+MODEL_ROLE = "sonnet"
+
+
+def _model() -> str:
+    return hai_core.get_model(MODEL_ROLE)
 MAX_TOOL_ITERATIONS = 5
 MAX_TOKENS_GEN = 8000
 
@@ -356,13 +361,13 @@ def generate_hypothesis(observation: dict) -> dict:
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         resp = client.messages.create(
-            model=MODEL,
+            model=_model(),
             max_tokens=MAX_TOKENS_GEN,
             system=system_prompt,
             tools=[tool_schema],
             messages=messages,
         )
-        total_cost_usd += _estimate_cost_usd(getattr(resp, "usage", None), MODEL)
+        total_cost_usd += _estimate_cost_usd(getattr(resp, "usage", None), _model())
 
         # Если LLM запросила tool — выполняем и продолжаем loop
         if resp.stop_reason == "tool_use":
@@ -399,7 +404,7 @@ def generate_hypothesis(observation: dict) -> dict:
         parsed["hypothesis_id"] = _hypothesis_id(observation)  # B2: ID из кода
         parsed.setdefault("provenance", {})
         parsed["provenance"]["generator"] = "cbcr_hypothesis.generate_hypothesis"
-        parsed["provenance"]["model"] = MODEL
+        parsed["provenance"]["model"] = _model()
         parsed["provenance"]["model_version_date"] = str(get_today())  # B1: реальная дата вызова
         parsed["provenance"]["tool_iterations"] = iteration
         parsed["provenance"]["wiki_reads"] = _collect_wiki_reads(messages)  # B3: из tool_use blocks
@@ -408,7 +413,7 @@ def generate_hypothesis(observation: dict) -> dict:
         parsed["structural_confidence"] = compute_structural_confidence(parsed)
         log.info(
             f"CBCR generate_hypothesis: tool_iter={iteration}, "
-            f"cost=${total_cost_usd:.4f}, model={MODEL}"
+            f"cost=${total_cost_usd:.4f}, model={_model()}"
         )
         return parsed
 
@@ -424,7 +429,7 @@ if __name__ == "__main__":
     if "--check-config" in sys.argv:
         print(f"Manifest: {MANIFEST_PATH.exists()} ({MANIFEST_PATH})")
         print(f"Key:      {llm_client._KEY_FILE.exists()}")
-        print(f"Model:    {MODEL}")
+        print(f"Model:    {_model()}")
         sys.exit(0)
     obs = {
         "trigger": "drift",
@@ -763,13 +768,13 @@ def critique_hypothesis(hypothesis: dict, observation: dict | None = None) -> di
     total_cost_usd = 0.0  # W5A-INT-7
     for iteration in range(MAX_TOOL_ITERATIONS):
         resp = client.messages.create(
-            model=MODEL,
+            model=_model(),
             max_tokens=2000,
             system=CRITIQUE_SYSTEM,
             tools=[tool_schema],
             messages=messages,
         )
-        total_cost_usd += _estimate_cost_usd(getattr(resp, "usage", None), MODEL)
+        total_cost_usd += _estimate_cost_usd(getattr(resp, "usage", None), _model())
         if resp.stop_reason == "tool_use":
             assistant_blocks = resp.content
             tool_results: list[dict] = []

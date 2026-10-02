@@ -198,7 +198,8 @@ for _mod, _declared in sorted(_reexports.items()):
 # алёрт тенанта уходит владельцу (баг: гипотезы партнёра ушли владельцу). Whitelist:
 # канонические резолверы + admin-global (алерты инфры → всегда владельцу) + doc-генераторы.
 from secrets_paths import (ADMIN_GLOBAL_TG_ALLOW, GUARDED_SUFFIXES, SECRET_SCOPE,
-                           referenced_secret_names, referenced_via_variable)
+                           referenced_secret_names, referenced_via_provider_profiles,
+                           referenced_via_variable)
 # Единый источник admin-global отправителей — secrets_paths.ADMIN_GLOBAL_TG_ALLOW
 # (тот же список читает датчик полноты доставки). Здесь + канонические резолверы и
 # doc-генераторы: легитимно упоминают .health_secrets, но не отправители-утечки.
@@ -248,7 +249,8 @@ _secret_sources = [f.read_text(encoding="utf-8", errors="ignore")
 # и только для ОБЪЯВЛЕННОГО имени — иначе она спрятала бы мёртвый секрет (замер:
 # без этого сужения форма ловит 77 пар вне реестра).
 _read = (referenced_secret_names(_secret_sources)
-         | referenced_via_variable(_secret_sources))
+         | referenced_via_variable(_secret_sources)
+         | referenced_via_provider_profiles(ROOT))
 _unread = sorted(_declared - _read)
 if _unread:
     warn("секреты без читателя",

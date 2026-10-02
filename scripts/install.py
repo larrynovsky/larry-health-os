@@ -35,8 +35,8 @@ INSTALL_PROVENANCE = re.compile(r"<!-- install-provenance: (sha256:[0-9a-f]{12})
 # Необязательные интеграции читают файлы в разных модулях (llm_client, reminders_backend,
 # google_calendar_fetcher, import_oura). Общего реестра необязательных ключей нет:
 # здесь один список для установочных страниц, не перечень всех секретов владельца.
-INSTALL_OPTIONAL_SECRETS = ("anthropic_key", "caldav.json", "google_calendar_account",
-                            "google_calendar_token.json", "oura_token")
+INSTALL_OPTIONAL_SECRETS = ("anthropic_key", "caldav.json", "gemini_key", "google_calendar_account",
+                            "google_calendar_token.json", "openai_key", "oura_token")
 
 # шаблон → место в репо (.tmpl — подстановка {{КЛЮЧ}} значениями установки)
 FILES = [
@@ -311,7 +311,8 @@ def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_
     # HEALTH_PY — шов run_checks.sh (по умолчанию /opt/homebrew/bin/python3.11, в образе его нет).
     env = {"TZ": tz, "HEALTH_TZ": tz, "HEALTH_DATA_DIR": values["DATA"], "HEALTH_PY": "python3",
            "HEALTH_SECRETS_DIR": values["SECRETS"],
-           "HEALTH_LAUNCHAGENTS_DIR": plists_dir, "HEALTH_RUNTIME": "container"}
+           "HEALTH_LAUNCHAGENTS_DIR": plists_dir, "HEALTH_RUNTIME": "container",
+           "HEALTH_LLM_PROVIDER": "anthropic"}   # выбор — install.sh --provider (docs/how-to/llm_provider.md)
     def _no_path(pl: dict) -> dict:
         env_ = {k: v for k, v in pl.get("EnvironmentVariables", {}).items() if k != "PATH"}
         return {**pl, "EnvironmentVariables": env_} if "EnvironmentVariables" in pl else pl

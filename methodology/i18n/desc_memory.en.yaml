@@ -127,6 +127,9 @@
 1102d24242a5:
   ru: документы нормы свежи (sha256 / updated_at по next_check)
   en: norm documents are fresh (sha256 / updated_at by next_check)
+11990533a96e:
+  ru: 'Модель для роли: первая доступная из цепочки model_chain(role).'
+  en: 'Model for the role: first available from model_chain(role).'
 11b215e4d0a1:
   ru: 'SX-1.8: list active alerts, опционально фильтр по source LIKE pattern.'
   en: 'SX-1.8: list active alerts, optionally filtered by source LIKE pattern.'
@@ -1054,6 +1057,9 @@
 76876fa0b300:
   ru: архив сырья HAE сжат (ротатор, старше 15 дней)
   en: HAE raw archive is compressed (rotator, older than 15 days)
+76d2c4843975:
+  ru: 'Модель роли по умолчанию: у anthropic — MODEL_DEFAULTS, у чужого провайдера —'
+  en: 'Default role model: for anthropic — MODEL_DEFAULTS, for a third-party provider —'
 770b3e15f21c:
   ru: у каждого класса лаб-строк есть вердикт о доме
   en: every lab-row class has a house verdict
@@ -1396,9 +1402,6 @@
 9af18d843386:
   ru: шаги из flat daily_metrics видны через get_day()
   en: steps from flat daily_metrics are accessible via get_day()
-9cbb174f820a:
-  ru: Модель для роли. system_config.model.<role> > MODEL_DEFAULTS.
-  en: Model for a role. system_config.model.<role> > MODEL_DEFAULTS.
 9cc07ca28c2c:
   ru: граница двух домов лабораторных данных цела
   en: boundary between the two lab-data houses is intact
@@ -1549,6 +1552,9 @@ ab01bc6b724a:
 ab19748848d3:
   ru: ключевые метрики (HRV + sleep) присутствуют
   en: key metrics (HRV + sleep) are present
+ab326e2c51ac:
+  ru: Первая модель цепочки, доступная по снимку; снимка нет — первая модель.
+  en: First model in the chain available by snapshot; if no snapshot — first model.
 ab658bfcc697:
   ru: протоколы читаются
   en: protocols are readable
@@ -1729,6 +1735,9 @@ bd2d805f6279:
 bd376242da92:
   ru: Создаёт новый период (active=1, deleted_at=NULL по дефолту).
   en: Creates a new period (active=1, deleted_at=NULL by default).
+bd762a43541c:
+  ru: Модели, прошедшие допуск к роли на провайдере (таблица выпуска).
+  en: Models that have passed role admission on the provider (release table).
 be8cee306871:
   ru: 'FAIL: в архиве сырья HAE лежат несжатые выгрузки старше 15 дней (решение владельца 26.09).'
   en: 'FAIL: HAE raw archive contains uncompressed exports older than 15 days (owner decision 26.09).'
@@ -2161,6 +2170,9 @@ ec3ffd82f226:
 ec5da50e4100:
   ru: 'НИТЬ-СИРОТА: ветка жива, а в реестре нитей её нет — её не видит ни одна сессия.'
   en: 'ORPHAN THREAD: branch is alive but absent from the thread registry — no session can see it.'
+ecdebd3e8528:
+  ru: 'Цепочка допущенных моделей роли: system_config.model.<role> (строка или список)'
+  en: 'Chain of permitted models for the role: system_config.model.<role> (string or list).'
 ed19ebd6b76f:
   ru: Последние n результатов конкретного теста для построения тренда.
   en: Last n results for a specific test for trend construction.

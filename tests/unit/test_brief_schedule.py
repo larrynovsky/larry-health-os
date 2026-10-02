@@ -91,7 +91,6 @@ def test_start_help_and_registered_jobs_share_schedule_sources(db, monkeypatch):
     monkeypatch.setattr(scheduled, "_store_active_tz", lambda name: None)
     monkeypatch.setattr(scheduled, "_schedule_morning_catchup", lambda app: None)
     monkeypatch.setattr(scheduled, "wd_send_hour", lambda: 9)
-    monkeypatch.setattr(meta, "save_chat_id", lambda cid: None)
     monkeypatch.setattr(meta.db, "init_db", lambda: None)
     monkeypatch.setattr(meta.db, "get_patient_profile", lambda: {"identity.name": "Fictional person"})
     jq = SimpleNamespace(run_daily=Mock(), run_monthly=Mock(), run_once=Mock(),

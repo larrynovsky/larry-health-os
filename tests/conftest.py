@@ -208,6 +208,17 @@ def _no_real_neighbors(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _owner_root_is_not_the_machines(tmp_path_factory, monkeypatch):
+    """Метка переезда настоящего владельца (~/health/RUNTIME на Studio) не доезжает до тестов.
+
+    Без этого тест, гоняющий датчик на чужом тенанте, видел «владелец в контейнере» и
+    получал пропуск вместо вердикта — 7 красных в первом полном прогоне tenant-run-scope
+    02.10. Тесты самой метки снимают шов и судят свой tmp-дом."""
+    import secrets_paths as _sp
+    monkeypatch.setenv(_sp.OWNER_ROOT_ENV, str(tmp_path_factory.mktemp("owner_root")))
+
+
+@pytest.fixture(autouse=True)
 def fault_journal(tmp_path_factory, monkeypatch):
     """Сбои тестов не попадают в журнал, который читает настоящий integrity.
 

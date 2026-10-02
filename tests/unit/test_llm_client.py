@@ -191,3 +191,271 @@ def test_base64_media_still_not_scanned_real_guard(monkeypatch, tmp_path):
         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": _PLANTED}},
         {"type": "text", "text": "разбери"}]}])
     assert len(inner.calls) == 1
+
+
+@pytest.fixture(params=[("anthropic", False), ("anthropic", True),
+                        ("deepseek", False), ("deepseek", True)])
+def http_guard_client(request, monkeypatch, tmp_path):
+    """Настоящий SDK и secret_guard; единственная подмена — HTTP-транспорт."""
+    import anthropic
+    import httpx
+    from anthropic._client import Anthropic, AsyncAnthropic
+    prov, async_ = request.param
+    d = tmp_path / "secrets"
+    d.mkdir()
+    (d / "planted_key").write_text(_PLANTED)
+    monkeypatch.setattr(lc.secret_guard, "secrets_dir", lambda: d)
+    monkeypatch.setattr(lc, "api_key", lambda *a: "fake-api-key")
+    requests = []
+
+    def respond(req):
+        requests.append(req)
+        if req.url.path.endswith("count_tokens"):
+            return httpx.Response(200, json={"input_tokens": 7})
+        if req.url.path.endswith("models"):
+            return httpx.Response(200, json={"data": [{"id": "m", "type": "model",
+                "display_name": "M", "created_at": "2026-10-02T00:00:00Z"}], "has_more": False})
+        return httpx.Response(200, json={"id": "msg_test", "type": "message", "role": "assistant",
+            "model": "m", "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1, "output_tokens": 1}})
+
+    transport = httpx.MockTransport(respond)
+    http = (httpx.AsyncClient if async_ else httpx.Client)(transport=transport)
+    ctor = AsyncAnthropic if async_ else Anthropic
+    sdk = ctor(api_key="fake-api-key", base_url="https://llm.test", http_client=http, max_retries=0)
+    monkeypatch.setattr(anthropic, "AsyncAnthropic" if async_ else "Anthropic", lambda **kw: sdk)
+    c = lc.guarded_client(async_=async_, prov=prov)
+    yield c, requests, async_
+    if async_:
+        import asyncio
+        asyncio.run(sdk.close())
+    else:
+        sdk.close()
+
+
+def _http_message_call(c, method, kw, async_):
+    import asyncio
+    import inspect
+    if method == "create_stream":
+        method, kw = "create", {**kw, "stream": True}
+    if method == "count_tokens":
+        kw = {k: v for k, v in kw.items() if k != "max_tokens"}
+    if async_:
+        async def call():
+            if method == "stream":
+                async with c.messages.stream(**kw):
+                    pass
+            else:
+                r = getattr(c.messages, method)(**kw)
+                r = await r if inspect.isawaitable(r) else r
+                if kw.get("stream"):
+                    await r.close()
+                return r
+        return asyncio.run(call())
+    if method == "stream":
+        with c.messages.stream(**kw):
+            pass
+    else:
+        r = getattr(c.messages, method)(**kw)
+        if kw.get("stream"):
+            r.close()
+        return r
+
+
+@pytest.mark.parametrize("method", ["create", "create_stream", "stream", "count_tokens"])
+@pytest.mark.parametrize("where", ["messages", "system", "tools", "extra_body", "extra_headers",
+                                   "extra_query", "metadata", "stop_sequences"])
+def test_http_all_message_arguments_guarded(http_guard_client, method, where):
+    c, requests, async_ = http_guard_client
+    kw = dict(model="m", max_tokens=1, messages=[{"role": "user", "content": "q"}])
+    if where == "messages":
+        kw[where][0]["content"] = _PLANTED
+    elif where == "tools":
+        kw[where] = [{"name": "x", "description": _PLANTED, "input_schema": {"type": "object"}}]
+    elif where in ("extra_body", "extra_headers", "extra_query"):
+        kw[where] = {"note": _PLANTED}
+    elif where == "metadata":
+        kw[where] = {"user_id": _PLANTED}
+    elif where == "stop_sequences":
+        kw[where] = [_PLANTED]
+    else:
+        kw[where] = _PLANTED
+    error = None
+    try:
+        _http_message_call(c, method, kw, async_)
+    except Exception as e:
+        error = e
+    leaked = sum(_PLANTED.encode() in r.content for r in requests)
+    assert requests == [], f"{method}/{where}: HTTP requests={len(requests)}, bodies with planted secret={leaked}"
+    assert isinstance(error, lc.SecretLeakBlocked)
+
+
+@pytest.mark.parametrize("path", ["messages.batches", "messages.with_raw_response",
+    "messages.with_streaming_response", "messages.unknown", "beta", "completions",
+    "post", "get", "copy", "unknown"])
+def test_http_unlisted_sdk_attributes_rejected(http_guard_client, path):
+    c, requests, _ = http_guard_client
+    obj = c
+    with pytest.raises(AttributeError, match="guard|гард"):
+        for name in path.split("."):
+            obj = getattr(obj, name)
+    assert requests == []
+
+
+def test_http_with_options_preserves_guard(http_guard_client):
+    c, requests, async_ = http_guard_client
+    clone = c.with_options(timeout=5)
+    error = None
+    try:
+        _http_message_call(clone, "create", dict(model="m", max_tokens=1,
+            messages=[{"role": "user", "content": _PLANTED}]), async_)
+    except Exception as e:
+        error = e
+    leaked = sum(_PLANTED.encode() in r.content for r in requests)
+    assert requests == [], f"with_options: HTTP requests={len(requests)}, bodies with planted secret={leaked}"
+    assert isinstance(error, lc.SecretLeakBlocked)
+    assert clone.messages.create != c.messages.create
+    _http_message_call(clone, "create", dict(model="m", max_tokens=1,
+        messages=[{"role": "user", "content": "q"}]), async_)
+    assert len(requests) == 1
+
+
+@pytest.mark.parametrize("method", ["create", "create_stream", "stream", "count_tokens"])
+def test_http_clean_messages_and_base64_reach_transport(http_guard_client, method):
+    c, requests, async_ = http_guard_client
+    kw = dict(model="m", max_tokens=1, messages=[{"role": "user", "content": "q"}],
+        extra_body={"content": [{"type": "image", "source": {
+            "type": "base64", "media_type": "image/jpeg", "data": _PLANTED}}]})
+    result = _http_message_call(c, method, kw, async_)
+    if method == "count_tokens":
+        assert result.input_tokens == 7
+    assert len(requests) == 1
+    assert _PLANTED.encode() in requests[0].content
+
+
+@pytest.mark.parametrize("http_guard_client", [("anthropic", False), ("anthropic", True)], indirect=True)
+def test_anthropic_async_models_page_preserved(http_guard_client):
+    import asyncio
+    c, requests, async_ = http_guard_client
+    if async_:
+        async def listing():
+            page = await c.models.list(limit=100)
+            assert page.data[0].id == "m"
+            return [m.id async for m in page]
+        assert asyncio.run(listing()) == ["m"]
+    else:
+        assert [m.id for m in c.models.list(limit=100)] == ["m"]
+    assert len(requests) == 1
+
+
+@pytest.mark.parametrize("http_guard_client", [("anthropic", False), ("anthropic", True)], indirect=True)
+@pytest.mark.parametrize("route", ["batches", "raw", "streaming_raw", "beta", "completions", "copy"])
+def test_http_sdk_escape_attempt_never_sends_secret(http_guard_client, route):
+    """При откате исключение SDK после отправки НЕ делает тест зелёным."""
+    import asyncio
+    import inspect
+    c, requests, async_ = http_guard_client
+    kw = dict(model="m", max_tokens=1, messages=[{"role": "user", "content": _PLANTED}])
+    error = None
+
+    def attempt():
+        if route == "batches":
+            return c.messages.batches.create(requests=[{"custom_id": "x", "params": kw}])
+        if route == "raw":
+            return c.messages.with_raw_response.create(**kw)
+        if route == "streaming_raw":
+            return c.messages.with_streaming_response.create(**kw)
+        if route == "beta":
+            return c.beta.messages.create(**kw)
+        if route == "completions":
+            return c.completions.create(model="m", max_tokens_to_sample=1, prompt=_PLANTED)
+        return c.copy().messages.create(**kw)
+
+    try:
+        if async_:
+            async def call():
+                r = attempt()
+                if hasattr(r, "__aenter__"):
+                    async with r:
+                        pass
+                elif inspect.isawaitable(r):
+                    await r
+            asyncio.run(call())
+        else:
+            r = attempt()
+            if hasattr(r, "__enter__"):
+                with r:
+                    pass
+    except Exception as e:
+        error = e
+    leaked = sum(_PLANTED.encode() in r.content for r in requests)
+    assert requests == [], f"{route}: HTTP requests={len(requests)}, bodies with planted secret={leaked}"
+    assert isinstance(error, AttributeError) and "гард" in str(error)
+
+
+@pytest.mark.parametrize("http_guard_client", [("anthropic", False), ("anthropic", True)], indirect=True)
+@pytest.mark.parametrize("method", ["list", "retrieve"])
+@pytest.mark.parametrize("field", ["extra_body", "extra_headers"])
+def test_http_models_extensions_guarded(http_guard_client, method, field):
+    c, requests, _ = http_guard_client
+    with pytest.raises(lc.SecretLeakBlocked):
+        args = ("m",) if method == "retrieve" else ()
+        getattr(c.models, method)(*args, **{field: {"note": _PLANTED}})
+    assert requests == []
+    with pytest.raises(AttributeError, match="гард"):
+        c.models.with_raw_response
+
+
+def test_http_with_options_headers_guarded(http_guard_client):
+    c, requests, _ = http_guard_client
+    with pytest.raises(lc.SecretLeakBlocked):
+        c.with_options(default_headers={"x-note": _PLANTED})
+    assert requests == []
+
+
+def test_http_client_close_preserved(http_guard_client):
+    import asyncio
+    c, _, async_ = http_guard_client
+    if async_:
+        asyncio.run(c.close())
+    else:
+        c.close()
+    sdk = c._inner._sdk if isinstance(c._inner, lc._CompatClient) else c._inner
+    assert sdk.is_closed()
+
+
+@pytest.mark.parametrize("where", ["extra_body", "extra_headers", "extra_query"])
+def test_http_secret_in_field_name_is_guarded(http_guard_client, where):
+    c, requests, async_ = http_guard_client
+    kw = dict(model="m", max_tokens=1, messages=[{"role": "user", "content": "q"}],
+              **{where: {_PLANTED: "q"}})
+    with pytest.raises(lc.SecretLeakBlocked):
+        _http_message_call(c, "create", kw, async_)
+    assert requests == []
+
+
+@pytest.mark.parametrize("where", ["extra_headers", "extra_query"])
+def test_http_sdk_mapping_and_duplicate_values_guarded(http_guard_client, where):
+    import httpx
+    c, requests, async_ = http_guard_client
+    ctor = httpx.Headers if where == "extra_headers" else httpx.QueryParams
+    # QueryParams.items() видит только первое значение: игла — во втором.
+    kw = dict(model="m", max_tokens=1, messages=[{"role": "user", "content": "q"}],
+              **{where: ctor([("note", "q"), ("note", _PLANTED)])})
+    error = None
+    try:
+        _http_message_call(c, "create", kw, async_)
+    except Exception as e:
+        error = e
+    assert requests == [], f"{where}: SDK Mapping пропущен гардом"
+    assert isinstance(error, lc.SecretLeakBlocked)
+
+
+@pytest.mark.parametrize("where", ["extra_body", "extra_headers"])
+def test_http_base64_marker_outside_media_does_not_hide_secret(http_guard_client, where):
+    c, requests, async_ = http_guard_client
+    kw = dict(model="m", max_tokens=1, messages=[{"role": "user", "content": "q"}],
+              **{where: {"type": "base64", "data": _PLANTED}})
+    with pytest.raises(lc.SecretLeakBlocked):
+        _http_message_call(c, "create", kw, async_)
+    assert requests == []

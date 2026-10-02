@@ -90,7 +90,7 @@ jobs:
           grep -qx 'HEALTH_LLM_PROVIDER=anthropic' ~/health-sh/.env           # повтор выбор не меняет
       - name: install.sh с другим поставщиком моделей — до предсказуемого отказа непроверенной модели
         run: |
-          for prov in openai gemini; do
+          for prov in openai gemini deepseek; do
             LLM_KEY="ci-fake-${prov}" bash ~/health-sh/install.sh --dir ~/health-sh --dist "$PWD/dist" \
               --non-interactive --ci-fake-keys --provider "$prov"
             grep -qx "HEALTH_LLM_PROVIDER=${prov}" ~/health-sh/.env

@@ -1258,6 +1258,9 @@
 8b767bdd56e8:
   ru: Возвращает (is_stale, age_hours) для источника данных.
   en: Returns (is_stale, age_hours) for a data source.
+8c80c9a721f4:
+  ru: Цепочка роли из базы этой установки (или модель по умолчанию) — без запасных таблицы
+  en: Role chain from this installation's database (or default model) — no fallback tables.
 8d4e11203e85:
   ru: Upsert расписания мониторинга. default не перебивает encounter/manual.
   en: Upsert monitoring schedule. default does not override encounter/manual.
@@ -2224,9 +2227,6 @@ f28752b0ff21:
 f2e0de87e0af:
   ru: Закрывает ОТКРЫТУЮ (или отложенную) задачу. True — закрыта; False — такой нет
   en: Closes an OPEN (or deferred) task. True — closed; False — not found.
-f3c48a6a9868:
-  ru: то же в днях (обратная совместимость)
-  en: same in days (backward compatibility)
 f4085fe15539:
   ru: Claude сам запрашивает нужные данные через tool use.
   en: Claude requests the needed data itself via tool use.

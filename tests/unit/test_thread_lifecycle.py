@@ -1191,3 +1191,91 @@ def test_потомок_деплоя_не_уносит_замок(песочни
     if pid.exists():
         subprocess.run(["kill", pid.read_text().strip()], capture_output=True)
     assert суд.returncode == 0, "замок пережил закрытие — его унёс потомок деплоя"
+
+
+@pytest.mark.parametrize("phase,state", [
+    (phase, state)
+    for phase in ("start", "cleanup")
+    for state in ("modified", "staged", "deleted", "untracked", "clean", "ignored")
+] + [("cleanup", "status-error"), ("cleanup", "late-write")])
+def test_thread_finish_dirty_tree(песочница, phase, state):
+    """Настоящие блоки скрипта и git; полный finish/Studio/сеть не запускаются."""
+    repo, home, журнал = песочница
+    slug, branch = "dirty-guard", "thread/dirty-guard"
+    tree = home / ".worktrees" / РЕПО / slug
+    result = _git(repo, "worktree", "add", "-q", "-b", branch, str(tree),
+                  "main", home=home)
+    assert result.returncode == 0, result.stderr
+    tracked = tree / "f.txt"
+    if state in ("modified", "staged"):
+        tracked.write_text("uncommitted work\n", encoding="utf-8")
+        if state == "staged":
+            assert _git(tree, "add", "f.txt", home=home).returncode == 0
+    elif state == "deleted":
+        tracked.unlink()
+    elif state == "untracked":
+        (tree / "draft").mkdir()
+        (tree / "draft/note.txt").write_text("new work\n", encoding="utf-8")
+        # Уборка должна видеть untracked и при пользовательском скрытии в status.
+        if phase == "cleanup":
+            assert _git(repo, "config", "status.showUntrackedFiles", "no", home=home).returncode == 0
+    elif state == "ignored":
+        ignore = home / "ignore"
+        ignore.write_text("ignored.tmp\n", encoding="utf-8")
+        assert _git(repo, "config", "core.excludesFile", str(ignore), home=home).returncode == 0
+        (tree / "ignored.tmp").write_text("ignored\n", encoding="utf-8")
+    elif state == "status-error":
+        (tree / ".git").unlink()
+
+    main_before = _git(repo, "rev-parse", "main", home=home).stdout
+    branch_before = _git(repo, "rev-parse", branch, home=home).stdout
+    files_before = {p.relative_to(tree): p.read_bytes()
+                    for p in tree.rglob("*") if p.is_file()}
+    index_before = _git(tree, "diff", "--cached", home=home).stdout
+    _звали(журнал)
+    source = FINISH.read_text(encoding="utf-8")
+    if phase == "start":
+        block = source[source.index("set -uo pipefail"):source.index('\nCURRENT=')]
+        block += '\nprintf "start passed\\n"\n'
+    else:
+        # После arch_regen до EOF: включает guard и уборку в обеих версиях.
+        start = source.index('\nfi\n', source.index('if ! bash "$MAIN_TREE/scripts/arch_regen.sh"')) + 4
+        block = "set -uo pipefail\n" + source[start:]
+    if state == "late-write":
+        # Вносим настоящую правку ПОСЛЕ status, перед настоящим git remove.
+        block = ('git() {\n'
+                 '  if [[ "$*" == *" worktree remove "* ]]; then\n'
+                 '    printf "late work\\n" > "$TREE/f.txt"\n'
+                 '  fi\n'
+                 '  command git "$@"\n'
+                 '}\n' + block)
+        files_before[Path("f.txt")] = b"late work\n"
+    env = _env(home)
+    env.update(MAIN_TREE=str(repo), TREE=str(tree), BRANCH=branch, SLUG=slug)
+    result = subprocess.run(["/bin/bash", "-c", block, "thread-finish-block", slug],
+                            cwd=repo, env=env, capture_output=True, text=True, timeout=30)
+    dirty = state not in ("clean", "ignored")
+    assert result.returncode == (4 if phase == "start" and dirty else 0), result.stderr
+    assert _git(repo, "rev-parse", "main", home=home).stdout == main_before
+    assert _звали(журнал) == [], "блок проверки/уборки позвал хук"
+    if phase == "start" or dirty:
+        assert tree.is_dir(), "уборка уничтожила незакоммиченную работу"
+        assert {p.relative_to(tree): p.read_bytes()
+                for p in tree.rglob("*") if p.is_file()} == files_before
+        assert _git(repo, "rev-parse", branch, home=home).stdout == branch_before
+        assert _git(tree, "diff", "--cached", home=home).stdout == index_before
+        if dirty:
+            assert result.stderr, "отказ/предупреждение не доставлено в stderr"
+            if state not in ("status-error", "late-write"):
+                assert ("draft/" if state == "untracked" else "f.txt") in result.stderr
+            if phase == "cleanup" and state != "late-write":
+                assert "слияние и деплой прошли" in result.stderr
+                assert "НЕ убираю" in result.stderr
+                if state != "status-error":
+                    assert "закоммить в нити или удали руками" in result.stderr
+        else:
+            assert "start passed" in result.stdout
+    else:
+        assert not tree.exists(), "чистое дерево не убрано"
+        assert _git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}",
+                    home=home).returncode != 0

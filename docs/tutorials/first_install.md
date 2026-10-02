@@ -1,4 +1,4 @@
-<!-- install-provenance: sha256:cd44a6097607 -->
+<!-- install-provenance: sha256:0349804d7eb2 -->
 [English](first_install.en.md) · **Русский**
 
 # Первая установка Larry Health OS
@@ -180,7 +180,7 @@ docker compose ps
 ```
 
 Первый запуск скачивает образ — несколько минут, на экране бегут строки загрузки. Ожидаются
-четыре строки — `bot`, `cron`, `dashboard`, `lab-intake` — в колонке STATUS `Up …`. Первые
+пять строк — `bot`, `cron`, `dashboard`, `ingest`, `lab-intake` — в колонке STATUS `Up …`. Первые
 секунды у `cron` может стоять `health: starting`: он создаёт пустую базу, а остальные ждут его.
 База и журналы живут в томах Докера: обновление образа их не трогает.
 

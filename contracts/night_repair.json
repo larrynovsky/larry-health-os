@@ -8,7 +8,8 @@
     "reject_fix",
     "show_fix",
     "run_night",
-    "repair_step"
+    "repair_step",
+    "pick_cards"
   ],
   "depends_on": [
     {
@@ -40,7 +41,7 @@
     "verdict": "disposable",
     "items": {
       "D1": "один домен — ночной ремонт: разобрать карточку инженерной очереди в починку (патч или шаги среды) и заставить сессию решить её до коммита в main. Стол не пишет (только читает); в logs/ того же рантайма кладёт одну отметку «чинящий жив» — по ней бот решает, правда ли «передал на починку» (first-contact, 02.10), не звонит владельцу, не деплоит.",
-      "D2": "вход main(argv) с командами run / --gate / show / land / close / reject; прочее _private. Автор и ревьюер, прогон тестов и доставка починки передаются параметрами — поведение проверяемо без Studio, claude и ssh.",
+      "D2": "вход main(argv) с командами run / --gate / show / land / close / reject; прочее _private. Автор и ревьюер, прогон тестов и доставка починки передаются параметрами — поведение проверяемо без Studio, claude и ssh. pick_cards(todo, integrity, harm) — порядок ночи: первое место самой вредной карточке (уровень вреда датчика из project_context/integrity_sensors.json), остальные старейшим (repair-order, 02.10).",
       "D3": "стол и отчёты рантайма читаются как файлы (docker exec cat) — формат parked_decisions.json и integrity_latest.json, не их модули; стенд — через скрипт test_on_studio.sh; адрес — infra_config.",
       "D4": "~490 строк: половина — обвязка сессии (гейт, land/close/reject), треть — ночной проход, остальное — промпты и самопроверка. Кандидат на разбиение по машинам (Studio/MacBook), если разрастётся.",
       "D5": "tests/unit/test_night_repair.py (гейт только на main, пропуск вслух при молчании Studio; land требует красного без правки и зелёного с ней; вид «среда» не сливается патчем) + --selftest (улики по метке, новая метка при новой причине, фильтр ORACLE.txt, повторный разбор не идёт). Мутации: снять проверку ветки, «красный без правки», вид среды, молчание Studio — каждая краснеет.",
@@ -48,6 +49,6 @@
     },
     "rationale": "Переписываем с нуля по контракту и тестам: вход — команды, внешние действия (claude, codex, ssh, стенд) — параметры.",
     "date": "2026-09-30",
-    "oracle": "tests/unit/test_night_repair.py; python3.11 night_repair.py --selftest"
+    "oracle": "tests/unit/test_night_repair.py; python3.11 night_repair.py --selftest; tests/unit/test_night_repair_order.py"
   }
 }

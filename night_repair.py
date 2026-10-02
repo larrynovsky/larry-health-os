@@ -87,7 +87,11 @@ def _mark_repairer_seen() -> bool:
                    PATH="/opt/homebrew/bin:/usr/local/bin:" + os.environ.get("PATH", ""))
         r = _run(["docker", "exec", "health-cron-1", "sh", "-c",
                   f"echo {stamp} > /app/logs/{REPAIR_SEEN}"], env=env, timeout=60)
-        return r.returncode == 0
+        if r.returncode != 0:
+            return False
+        # Журнал хоста (процессы партнёра) с 02.10 читает ночная проверка контейнера
+        # (HEALTH_FAULTS_EXTRA, нить partner-faults) — его сбои доходят до ремонта, и обещание
+        # «передал на починку» там тоже правда. Отметка — рядом с журналом хоста.
     (REPO / "logs").mkdir(parents=True, exist_ok=True)
     (REPO / "logs" / REPAIR_SEEN).write_text(stamp, encoding="utf-8")
     return True
@@ -213,7 +217,52 @@ def _repair_one(card: dict, ev: str, author, reviewer, now: float) -> dict:
         shutil.rmtree(wt, ignore_errors=True)
 
 
-def repair_step(store: dict, integrity: dict, failed_tsv: str, state: dict, author, reviewer, now: float) -> dict:
+# ── Порядок: одно место самому вредному, остальные — самым старым ─────────────
+# Решение владельца 02.10 (нить repair-order): по старшинству карточка «неверный совет человеку»
+# стояла за неделю внутренней уборки, а календарь владельца двое суток ждал своей очереди.
+# Вред — свойство датчика, объявленное один раз (project_context/integrity_sensors.json, «harm»),
+# а не суждение модели каждую ночь. Второе место — старейшей: так ни одна карточка не висит вечно.
+HARM_ORDER = ("person", "data", "system")
+_BOT_FAULT = re.compile(r"^сбой: (handlers/|bot/|необработанная ошибка бота)")
+
+
+def _harm_of_sensor() -> dict:
+    """{имя датчика: человек|данные|система} из единственного дома свойства."""
+    f = REPO / "project_context" / "integrity_sensors.json"
+    data = json.loads(f.read_text(encoding="utf-8")).get("harm") or {}
+    return {fn: tier for tier, fns in data.items() if tier in HARM_ORDER for fn in fns}
+
+
+def _card_harm(card: dict, integrity: dict, harm: dict) -> tuple[int, int]:
+    """(уровень вреда, −повторов за сутки) карточки; не нашли её находку — «система», 0."""
+    import finding_identity
+    kind, _, key = card["id"].partition(":")
+    sensor_of = integrity.get("sensor_of") or {}
+    items = [("warn", it) for it in integrity.get("warnings") or []] + \
+            [("integrity", it) for it in (integrity.get("failures") or []) + (integrity.get("code_failures") or [])]
+    for k, it in items:
+        label = str(it[0]) if isinstance(it, (list, tuple)) and it else str(it)
+        detail = str(it[1]) if isinstance(it, (list, tuple)) and len(it) > 1 else ""
+        probe = label if k == "warn" else str(it)
+        if k != kind or finding_identity.finding_key(probe) != key:
+            continue
+        tier = "person" if _BOT_FAULT.match(label) else harm.get(sensor_of.get(label, ""), "system")
+        m = re.search(r"(\d+) раз за сутки", detail)
+        return HARM_ORDER.index(tier), -(int(m.group(1)) if m else 0)
+    return HARM_ORDER.index("system"), 0
+
+
+def pick_cards(todo: list, integrity: dict, harm: dict, n: int = MAX_CARDS) -> list:
+    """Первое место — самой вредной (среди равных — чаще повторяющейся, потом старейшей),
+    остальные места — старейшим из оставшихся. todo уже упорядочен по возрасту."""
+    if len(todo) <= n or n < 1:
+        return todo[:n]
+    first = min(todo, key=lambda ce: _card_harm(ce[0], integrity, harm))
+    return [first] + [ce for ce in todo if ce is not first][:n - 1]
+
+
+def repair_step(store: dict, integrity: dict, failed_tsv: str, state: dict, author, reviewer, now: float,
+                harm: dict | None = None) -> dict:
     """Чистая по сути часть прохода: какие карточки разобрать (≤MAX_CARDS), память разборов."""
     state.setdefault("attempted", {})
     todo = []
@@ -222,7 +271,7 @@ def repair_step(store: dict, integrity: dict, failed_tsv: str, state: dict, auth
         if state["attempted"].get(c["id"]) != _mark(c, ev):
             todo.append((c, ev))
     done = []
-    for c, ev in todo[:MAX_CARDS]:
+    for c, ev in pick_cards(todo, integrity, _harm_of_sensor() if harm is None else harm):
         try:
             r = _repair_one(c, ev, author, reviewer, now)
         except (subprocess.SubprocessError, OSError) as e:

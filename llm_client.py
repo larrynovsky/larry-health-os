@@ -28,8 +28,10 @@ max_tokens, не ретраит, не логирует промпты. Всё э
 ослабить мультитенантную изоляцию (SEC-31), а она дороже. Слепота записана,
 а не забыта; в терминах Таненбаума conit гарда уже conit клиента.
 """
+# INTENT: llm_exit — один гард, один переводчик, смена модели только на проверенную: subsystem_intent.yaml
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import secret_guard
@@ -91,13 +93,22 @@ def api_key(prov: str | None = None) -> str:
     return (_KEY_FILE.parent / profiles()[prov]["key_file"]).read_text().strip()
 
 
+class ModelNotServed(RuntimeError):
+    """Провайдер не отдаёт модель под этим именем: ответила другая модель или имя отвергнуто.
+    DeepSeek молча подменяет имя (замер 02.10: «claude-opus-5» → deepseek-v4-pro,
+    «deepseek-chat» → deepseek-v4-flash), а незнакомое отвергает кодом 400, не 404:
+    без этой проверки допуск записал бы вердикт чужой модели, а датчик отзыва не увидел бы ухода."""
+
+
 def is_model_not_found(exc: BaseException) -> bool:
     """«Модели нет у провайдера» у любого из SDK — для датчика отзыва моделей."""
+    if isinstance(exc, ModelNotServed):
+        return True
     code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
     return code == 404 or type(exc).__name__ == "NotFoundError"
 
 
-def _strings(x, out: list) -> None:
+def _strings(x, out: list, *, media_source=False) -> None:
     """Все строки исходящей структуры, кроме base64-данных медиа.
 
     До 2026-10-01 скан брал только system и блоки type=text: содержимое
@@ -111,16 +122,19 @@ def _strings(x, out: list) -> None:
     (hai_chat, cbcr_hypothesis)."""
     if isinstance(x, str):
         out.append(x)
-    elif isinstance(x, dict):
-        for k, v in x.items():
-            if k == "data" and x.get("type") == "base64":
+    elif isinstance(x, Mapping):
+        # httpx.Headers/QueryParams допустимы у SDK; multi_items сохраняет
+        # все значения повторяющихся параметров, которые items() схлопывает.
+        for k, v in x.multi_items() if hasattr(x, "multi_items") else x.items():
+            _strings(k, out)   # extra_body/headers могут нести секрет и в имени поля
+            if k == "data" and media_source and x.get("type") == "base64":
                 continue
-            _strings(v, out)
+            _strings(v, out, media_source=k == "source")
     elif isinstance(x, (list, tuple)):
         for v in x:
             _strings(v, out)
     elif hasattr(x, "model_dump"):
-        _strings(x.model_dump(), out)
+        _strings(x.model_dump(), out, media_source=media_source)
 
 
 def _texts(messages, system=None, tools=None) -> str:
@@ -193,22 +207,51 @@ def guard_outgoing(messages, system=None, tools=None) -> None:
                                 + ", ".join(hits) + _HOWTO)
 
 
+def _guard_kwargs(kw) -> None:
+    # Расширения SDK (extra_body/headers/query, metadata, …) тоже выходят наружу.
+    # Исключение медиа остаётся в общем _strings, второй сканер не нужен.
+    guard_outgoing({k: v for k, v in kw.items() if k not in ("model", "max_tokens")})
+
+
 class _GuardedMessages:
     def __init__(self, inner):
         self._inner = inner
 
     def create(self, **kw):
-        guard_outgoing(kw.get("messages"), kw.get("system"), kw.get("tools"))
+        _guard_kwargs(kw)
         return self._inner.create(**kw)
 
     def stream(self, **kw):
         # До 01.10 stream уходил через __getattr__ без гарда; вызывающих нет,
         # но «нет вызывающих» — не защита: первый же новый вызов прошёл бы мимо.
-        guard_outgoing(kw.get("messages"), kw.get("system"), kw.get("tools"))
+        _guard_kwargs(kw)
         return self._inner.stream(**kw)
 
-    def __getattr__(self, name):        # count_tokens/batches — без генерации текста ответа
-        return getattr(self._inner, name)
+    def count_tokens(self, **kw):
+        _guard_kwargs(kw)
+        return self._inner.count_tokens(**kw)
+
+    def __getattr__(self, name):
+        raise AttributeError(f"messages.{name}: нет защищённого выхода через гард; "
+                             "разрешены create, stream, count_tokens")
+
+
+class _GuardedModels:
+    """Сохраняет родной Page/AsyncPage; расширения запросов проходят тот же гард."""
+    def __init__(self, inner):
+        self._inner = inner
+
+    def list(self, *args, **kw):
+        guard_outgoing(args, kw)
+        return self._inner.list(*args, **kw)
+
+    def retrieve(self, *args, **kw):
+        guard_outgoing(args, kw)
+        return self._inner.retrieve(*args, **kw)
+
+    def __getattr__(self, name):
+        raise AttributeError(f"models.{name}: нет защищённого выхода через гард; "
+                             "разрешены list, retrieve")
 
 
 class _GuardedClient:
@@ -216,8 +259,22 @@ class _GuardedClient:
         self._inner = inner
         self.messages = _GuardedMessages(inner.messages)
 
+    @property
+    def models(self):
+        return _GuardedModels(self._inner.models)
+
+    def with_options(self, **kw):
+        # Ключи аутентификации — назначение клиента; пользовательские заголовки
+        # и query — ещё один путь исходящего текста, проверяем до клонирования.
+        _guard_kwargs({k: v for k, v in kw.items() if k not in ("api_key", "auth_token")})
+        return _GuardedClient(self._inner.with_options(**kw))
+
+    def close(self):
+        return self._inner.close()
+
     def __getattr__(self, name):
-        return getattr(self._inner, name)
+        raise AttributeError(f"client.{name}: нет защищённого выхода через гард; "
+                             "разрешены messages, models, with_options, close")
 
 
 class _ForeignModels:
@@ -281,8 +338,123 @@ class _ForeignClient:
         else:
             raise ValueError(f"провайдер {prov!r} не подключён к переводчику")
         self._sdk = sdk          # держим ссылку: клиент genai закрывается при сборке мусора
+        self._prov, self._async, self._listing = prov, async_, listing
         self.messages = _ForeignMessages(prov, sdk, async_)
         self.models = _ForeignModels(prov, listing)
+
+    def close(self):
+        if self._async:
+            async def _a():
+                if self._prov == "openai":
+                    await self._sdk.close()
+                    self._listing.close()
+                else:
+                    await self._sdk.aio.aclose()
+                    self._sdk.close()
+            return _a()
+        return self._sdk.close()
+
+    def with_options(self, **kw):
+        raise AttributeError(f"with_options: для {self._prov} нет защищённого перевода опций через гард")
+
+
+def _raise_if_not_served(model, e: Exception) -> None:
+    """400 «supported API model names are …» — имя отвергнуто, это «модели нет», а не сбой запроса."""
+    if getattr(e, "status_code", None) == 400 and "model name" in str(e):
+        raise ModelNotServed(f"{model!r}: {str(e)[:160]}") from e
+
+
+def _same_model(model, r):
+    got = getattr(r, "model", None)
+    if got is not None and got != model:
+        raise ModelNotServed(f"{model!r}: ответила {got!r}")
+    return r
+
+
+class _CompatMessages:
+    """Точка провайдера, совместимая с Anthropic Messages (DeepSeek, замер 02.10): перевод не
+    нужен. thinking — из профиля, если вызывающий не задал свой: без него DeepSeek открывает
+    ответ блоком рассуждения, и тот съедает max_tokens (замер 02.10)."""
+    def __init__(self, inner, prof):
+        self._inner, self._prof = inner, prof
+
+    def _kw(self, kw):
+        if "thinking" in self._prof and "thinking" not in kw:
+            return {**kw, "thinking": self._prof["thinking"]}
+        return kw
+
+    def create(self, **kw):
+        kw = self._kw(kw)
+        model = kw.get("model")
+        try:
+            r = self._inner.create(**kw)
+        except Exception as e:
+            _raise_if_not_served(model, e)
+            raise
+        if kw.get("stream"):
+            return r
+        if hasattr(r, "__await__"):
+            async def _a():
+                try:
+                    res = await r
+                except Exception as e:
+                    _raise_if_not_served(model, e)
+                    raise
+                return _same_model(model, res)
+            return _a()
+        return _same_model(model, r)
+
+    def stream(self, **kw):
+        return self._inner.stream(**self._kw(kw))
+
+    def count_tokens(self, **kw):
+        return self._inner.count_tokens(**kw)
+
+    def __getattr__(self, name):
+        raise AttributeError(f"messages.{name}: нет защищённого выхода через гард; "
+                             "разрешены create, stream, count_tokens")
+
+
+class _CompatModels:
+    """Список моделей — по models_url профиля: у совместимой точки /v1/models нет (404, замер 02.10)."""
+    def __init__(self, prov, async_=False):
+        self._prov, self._async = prov, async_
+
+    def _page(self, r, limit):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace as NS
+        r.raise_for_status()
+        out = [NS(id=m["id"], created_at=datetime.fromtimestamp(m.get("created") or 0, timezone.utc).isoformat())
+               for m in r.json().get("data", [])]
+        return out[:limit] if limit else out
+
+    def list(self, limit=100):
+        import httpx
+        url = profiles()[self._prov]["models_url"]
+        headers = {"Authorization": f"Bearer {api_key(self._prov)}"}
+        if self._async:
+            async def _a():
+                async with httpx.AsyncClient() as client:
+                    return self._page(await client.get(url, timeout=30, headers=headers), limit)
+            return _a()
+        return self._page(httpx.get(url, timeout=30, headers=headers), limit)
+
+
+class _CompatClient:
+    def __init__(self, prov, async_, sdk=None):
+        import anthropic
+        prof = profiles()[prov]
+        ctor = anthropic.AsyncAnthropic if async_ else anthropic.Anthropic
+        self._prov, self._async = prov, async_
+        self._sdk = sdk if sdk is not None else ctor(api_key=api_key(prov), base_url=prof["base_url"])
+        self.messages = _CompatMessages(self._sdk.messages, prof)
+        self.models = _CompatModels(prov, async_)
+
+    def with_options(self, **kw):
+        return _CompatClient(self._prov, self._async, self._sdk.with_options(**kw))
+
+    def close(self):
+        return self._sdk.close()
 
 
 def guarded_client(async_=False, prov: str | None = None):
@@ -301,6 +473,8 @@ def guarded_client(async_=False, prov: str | None = None):
     prov = prov or provider()
     if prov not in profiles():
         raise ValueError(f"провайдер {prov!r}: нет в methodology/llm_providers.json")
+    if profiles()[prov].get("transport") == "anthropic_compatible":
+        return _GuardedClient(_CompatClient(prov, async_))
     if prov != "anthropic":
         # Тот же гард по ВСЕМУ исходящему тексту стоит до перевода и транспорта.
         return _GuardedClient(_ForeignClient(prov, async_))

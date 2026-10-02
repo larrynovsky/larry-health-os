@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -157,3 +158,75 @@ def test_lab_recognizer_refuses_when_both_passes_resolve_to_one_model(monkeypatc
     monkeypatch.setattr(lr, "_render_pages", lambda *a, **k: pytest.fail("до рендера дойти не должно"))
     with pytest.raises(RuntimeError, match="одну модель"):
         lr.recognize(tmp_path / "x.pdf", "2026-10-01")
+
+
+# ── запасные из таблицы выпуска (доделки-2, 02.10) ───────────────────────────
+_TABLE = {"anthropic": {
+    "opus": {"claude-opus-5": {"passed": True, "date": "2026-10-02", "corpus": "c"},
+             "claude-opus-5-5": {"passed": False, "date": "2026-10-02", "corpus": "c"},
+             "claude-sonnet-x": {"passed": True, "date": "2026-10-02", "corpus": "c"}},
+    "sonnet": {"claude-sonnet-x": {"passed": True, "date": "2026-10-02", "corpus": "c"}}}}
+
+
+def _table(monkeypatch, provider="anthropic"):
+    monkeypatch.setattr(hai_core, "_admission_table", lambda: _TABLE)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", provider)
+
+
+def test_partner_without_own_admission_gets_the_owners_successor_at_the_end(monkeypatch):
+    """У партнёра model.<роль> нет (замер 02.10) — запасная из таблицы встаёт ПОСЛЕ модели по умолчанию."""
+    _cfg(monkeypatch, {})
+    _table(monkeypatch)
+    chain = hai_core.model_chain("opus")
+    assert chain[0] == hai_core.MODEL_DEFAULTS["opus"] and "claude-opus-5" in chain
+    assert "claude-opus-5-5" not in chain, "непрошедшая попала в цепочку"
+
+
+def test_owner_chain_is_unchanged_by_the_table(monkeypatch):
+    _cfg(monkeypatch, {"model.opus": ["claude-opus-5", "claude-opus-4-7"], "model.sonnet": ["claude-sonnet-x"]})
+    _table(monkeypatch)
+    assert hai_core.model_chain("opus") == ["claude-opus-5", "claude-opus-4-7"], "таблица сменила начало цепочки владельца"
+
+
+def test_table_never_makes_the_two_recognizer_passes_meet(monkeypatch):
+    """claude-sonnet-x допущена в обе роли таблицей — в opus не дописывается: она уже в цепочке sonnet."""
+    _cfg(monkeypatch, {"model.sonnet": ["claude-sonnet-x"]})
+    _table(monkeypatch)
+    assert not set(hai_core.model_chain("opus")) & set(hai_core.model_chain("sonnet"))
+
+
+@pytest.mark.parametrize("bases", [{}, {"model.opus": ["base-opus"], "model.sonnet": ["base-sonnet"]}],
+                         ids=["defaults", "explicit_bases"])
+def test_shared_release_only_model_is_excluded_from_both_chains(monkeypatch, tmp_path, bases):
+    """Ревью #4: X только в таблице обеих ролей — не запасная ни одного прохода."""
+    _cfg(monkeypatch, bases)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    table = tmp_path / "shared.json"
+    table.write_text(json.dumps({"anthropic": {
+        "opus": {"X": {"passed": True}}, "sonnet": {"X": {"passed": True}}}}), encoding="utf-8")
+    monkeypatch.setattr(hai_core, "_ADMISSION_TABLE", table)
+    chains = {r: hai_core.model_chain(r) for r in ("opus", "sonnet")}
+    assert all("X" not in c for c in chains.values()), f"таблица пересекла цепочки: {chains}"
+    assert not set(chains["opus"]) & set(chains["sonnet"])
+
+
+@pytest.mark.parametrize("reader", ["model_chain", "get_model"])
+@pytest.mark.parametrize("stored", [False, True], ids=["default", "stored_base"])
+def test_broken_release_json_preserves_base_or_default(monkeypatch, tmp_path, reader, stored):
+    """Ревью #5: реальный reader битого JSON не выводит из строя базовую модель."""
+    base = ["base-opus", "base-fallback"] if stored else [hai_core.MODEL_DEFAULTS["opus"]]
+    _cfg(monkeypatch, {"model.opus": base} if stored else {})
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    table = tmp_path / "broken.json"
+    monkeypatch.setattr(hai_core, "_ADMISSION_TABLE", table)
+    expected = base if reader == "model_chain" else base[0]
+    table.write_text("{}", encoding="utf-8")
+    assert getattr(hai_core, reader)("opus") == expected
+    table.write_text("{", encoding="utf-8")
+    assert getattr(hai_core, reader)("opus") == expected
+
+
+def test_foreign_provider_does_not_take_anthropic_successors(monkeypatch):
+    _cfg(monkeypatch, {"model.opus": ["gpt-x"]})
+    _table(monkeypatch, provider="openai")
+    assert hai_core.model_chain("opus") == ["gpt-x"]

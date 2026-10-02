@@ -90,7 +90,27 @@ def _available_models() -> set[str] | None:
 
 def model_chain(role: str) -> list[str]:
     """Цепочка допущенных моделей роли: system_config.model.<role> (строка или список)
-    > MODEL_DEFAULTS. Неизвестная роль → KeyError."""
+    > MODEL_DEFAULTS; на установке anthropic в КОНЕЦ дописываются модели, допущенные к роли
+    в таблице выпуска (раздел anthropic — допуск владельца на его бланках, 02.10). Так запасную
+    модель получают партнёр и установка с GitHub, у которых своего допуска нет. Начало цепочки
+    таблица не трогает; модель из цепочки второго прохода распознавателя не дописывается
+    (opus и sonnet не пересекаются — two_model_reconciled). Неизвестная роль → KeyError."""
+    base = base_chain(role)
+    if llm_client.provider() != "anthropic":
+        return base
+    other = {"opus": "sonnet", "sonnet": "opus"}.get(role)
+    table = _admission_table().get("anthropic") or {}
+    taken = set(base) | (set(base_chain(other)) if other else set())
+    if other:
+        taken.update(m for m, v in (table.get(other) or {}).items() if v.get("passed"))
+    extra = [m for m, v in (table.get(role) or {}).items()
+             if v.get("passed") and m not in taken]
+    return base + extra
+
+
+def base_chain(role: str) -> list[str]:
+    """Цепочка роли из базы этой установки (или модель по умолчанию) — без запасных таблицы
+    выпуска. Писать в базу допуск обязан её, а не model_chain, иначе таблица вросла бы в базу."""
     try:
         stored = db.get_config(f"model.{role}")
     except Exception as e:
@@ -124,14 +144,23 @@ class ModelNotAdmitted(RuntimeError):
 _ADMISSION_TABLE = Path(__file__).parent / "methodology" / "llm_admission_table.json"
 
 
-def admitted_models(prov: str, role: str) -> set[str]:
-    """Модели, прошедшие допуск к роли на провайдере (таблица выпуска)."""
+def _admission_table() -> dict:
     import json
     try:
-        t = json.loads(_ADMISSION_TABLE.read_text(encoding="utf-8"))
+        table = json.loads(_ADMISSION_TABLE.read_text(encoding="utf-8"))
+        if not isinstance(table, dict):
+            raise ValueError(f"ожидался объект JSON, получен {type(table).__name__}")
+        return table
     except FileNotFoundError:
-        return set()
-    return {m for m, v in (t.get(prov) or {}).get(role, {}).items() if v.get("passed")}
+        return {}
+    except ValueError as e:
+        log.error("Таблица допуска %s повреждена: %s — допущенных моделей таблицы нет", _ADMISSION_TABLE, e)
+        return {}
+
+
+def admitted_models(prov: str, role: str) -> set[str]:
+    """Модели, прошедшие допуск к роли на провайдере (таблица выпуска)."""
+    return {m for m, v in (_admission_table().get(prov) or {}).get(role, {}).items() if v.get("passed")}
 
 
 def get_model(role: str) -> str:

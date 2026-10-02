@@ -155,6 +155,27 @@ def _store_active_tz(name: str) -> None:
         log.warning("_store_active_tz(%s): %r", name, e)
 
 
+def _never_located() -> bool:
+    """Система ещё ни разу не знала, где человек: нет last-good пояса, дома и ни одного GPS.
+
+    Так выглядит каждая свежая установка до первой геопозиции — это не отказ резолвера, а
+    знакомство, которое ещё не дошло до места. До 02.10 здесь писался ERROR «BRIEF_TZ_FALLBACK»
+    и сбой в журнал на каждом старте нового человека; урок и how-to отправляют его искать
+    причины в bot_err.log, и первая строка там была ложной тревогой (BL-BRIEF-TZ-ERROR-1).
+    Если место хоть раз было известно, потеря пояса — настоящий сбой, и тревога остаётся.
+    Не прочли — считаем, что знали: громкая ложная тревога лучше тихой слепоты."""
+    try:
+        import config_db as _cfg
+        import location_signal as _ls
+        if _cfg.get_config(_ACTIVE_TZ_KEY):
+            return False
+        hlat, hlon, _ = _ls.home_anchor()
+        return hlat is None and hlon is None and _ls.latest() is None
+    except Exception as e:  # noqa: BLE001 — не знаем, было ли место → тревога (ветка ниже)
+        log.warning("_never_located: не прочитано (%r) — считаю, что место было известно", e)
+        return False
+
+
 async def _alert_tz_fallback(context: ContextTypes.DEFAULT_TYPE):
     """Громкий сенсор: свежий GPS-tz не получен, держим last-good (не молча-UTC)."""
     tzn = (context.job.data or {}).get("tz", "?")
@@ -169,6 +190,9 @@ def _apply_morning_schedule(app) -> str:
     tz, tz_name, ok = _resolve_brief_tz()
     if ok:
         _store_active_tz(tz_name)
+    elif _never_located():
+        log.info("бриф по домашнему поясу %s: геопозиции ещё не было (знакомство не дошло "
+                 "до места) — не сбой", tz_name)
     else:
         log.error("BRIEF_TZ_FALLBACK: свежий GPS-tz не получен — держу last-good %s", tz_name)
         try:

@@ -1,5 +1,5 @@
 {
- "_why": "Профили LLM-провайдеров (нить llm-provider, 2026-10-02). Данные, не код: ключ, хосты (их стережёт conftest и проверка ключа установщика), запас вывода на рассуждение (рассуждающие модели тратят лимит вывода на рассуждение — замер 01.10), судьба temperature (gpt-5.6 его не принимает), модели ролей по умолчанию — ПЕРВЫЕ кандидаты; работать модель начинает только после допуска (methodology/llm_admission_table.json).",
+ "_why": "Профили LLM-провайдеров (нить llm-provider, 2026-10-02). Данные, не код: ключ, хосты (их стережёт conftest и проверка ключа установщика), запас вывода на рассуждение (рассуждающие модели тратят лимит вывода на рассуждение — замер 01.10), судьба temperature (gpt-5.6 его не принимает), модели ролей по умолчанию — ПЕРВЫЕ кандидаты; работать модель начинает только после допуска (methodology/llm_admission_table.json). DeepSeek (02.10) — транспорт anthropic_compatible: тот же SDK anthropic на base_url провайдера, без переводчика; thinking выключен явно (иначе блок рассуждения съедает max_tokens — замер 02.10); список моделей — models_url, у совместимой точки /v1/models нет (404).",
  "anthropic": {
   "key_file": "anthropic_key",
   "hosts": [
@@ -35,6 +35,24 @@
    "sonnet": "gemini-3.8-flash",
    "haiku": "gemini-3.8-flash",
    "haiku_pinned": "gemini-3.8-flash"
+  }
+ },
+ "deepseek": {
+  "key_file": "deepseek_key",
+  "hosts": [
+   "api.deepseek.com"
+  ],
+  "models_url": "https://api.deepseek.com/models",
+  "base_url": "https://api.deepseek.com/anthropic",
+  "transport": "anthropic_compatible",
+  "thinking": {
+   "type": "disabled"
+  },
+  "role_defaults": {
+   "opus": "deepseek-v4-pro",
+   "sonnet": "deepseek-flash",
+   "haiku": "deepseek-flash",
+   "haiku_pinned": "deepseek-flash"
   }
  }
 }

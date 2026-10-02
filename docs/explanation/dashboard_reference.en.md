@@ -30,7 +30,7 @@ Reference document: facts without rationale. Rationale — `docs/explanation/das
 
 | Path | Template | Data source |
 |---|---|---|
-| `/` | `home.html` | Counts from 11 tables, weekday/today_meta, epigraph from `patient_profile.identity.epigraph` |
+| `/` | `home.html` | "Getting started": `getting_started.board()` — state of 17 capabilities from the tenant's data, catalog `methodology/getting_started.yaml` (since 2026-10-02); below it, folded counts from 11 tables; weekday/today_meta, epigraph from `patient_profile.identity.epigraph` |
 | `/profile` | `profile.html` | `patient_profile` grouped by `category` |
 | `/hypotheses` | `hypotheses.html` | `memory WHERE category='hypothesis'`, JSON payload in `value` |
 | `/protocols` | `protocols.html` | `protocols`, sorted `status DESC, created_at DESC` |
@@ -65,7 +65,7 @@ In the repo: `dashboard_static/tokens.css` (copy) + `dashboard_static/dashboard.
 | `/events` | `.timeline` (year on the left + dots of different colors) |
 | `/constitutions/{slug}` | `.narrative` (max 65ch, CSS drop cap through `::first-letter`) |
 | `/constitutions` | `.const-list` |
-| `/` | `ul.counts` |
+| `/` | `card` + `gs-*` (capability states), `dense gs-time`, folded `ul.counts` |
 
 ## Cache busting
 

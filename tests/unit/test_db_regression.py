@@ -87,3 +87,31 @@ def test_drop_without_full_snapshot_still_rings(tmp_path):
     snap = _db(tmp_path / "pre_later.db", 23)
     assert r.explained_by_snapshot({"events": 23}, {"events": 148}, [snap]) == {}
     assert r.explained_by_snapshot({"events": 23}, {"events": 148}, []) == {}
+
+
+def test_backups_are_the_current_tenants_own(tmp_path):
+    """Прогон партнёра судит СВОИ бэкапы, а не владельца (до 02.10: ~/health/backups для всех,
+    «daily_metrics 4053→95» у партнёра). И тег-префикс не путает health с health_partner."""
+    own = tmp_path / "health_partner" / "backups"
+    other = tmp_path / "health" / "backups"
+    own.mkdir(parents=True)
+    other.mkdir(parents=True)
+    mine = _db(own / "health_partner_2026-10-01.db", 5)
+    _db(other / "health_2026-10-01.db", 5)
+    _db(other / "health_partner_2026-10-01.db", 5)   # чужой файл в каталоге владельца
+    assert r._recent_backups(tmp_path / "health_partner") == [mine]
+    assert [Path(f).name for f in r._recent_backups(tmp_path / "health")] == ["health_2026-10-01.db"]
+
+
+def test_check_judges_against_the_current_tenants_backups(tmp_path, monkeypatch):
+    """Проводка: check() берёт каталог бэкапов от БД процесса, а не от домашнего ~/health."""
+    import types
+    root = tmp_path / "health_partner"
+    (root / "data").mkdir(parents=True)
+    (root / "backups").mkdir()
+    cur = _db(root / "data" / "health.db", 5)
+    _db(root / "backups" / "health_partner_2026-10-01.db", 100)
+    monkeypatch.setattr(r.infra_config, "is_primary", lambda *a, **k: True)
+    monkeypatch.setitem(sys.modules, "health_db", types.SimpleNamespace(DB_PATH=Path(cur)))
+    monkeypatch.setattr(r.Path, "home", staticmethod(lambda: tmp_path / "elsewhere"))
+    assert r.check() == ["events: 100→5 (−95%)"]

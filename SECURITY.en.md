@@ -1,4 +1,4 @@
-<!-- translation-of: SECURITY.md sha256:a79feef72437 -->
+<!-- translation-of: SECURITY.md sha256:367015318d15 -->
 **English** · [Русский](SECURITY.md)
 
 # SECURITY POLICY: Larry Health OS
@@ -259,6 +259,10 @@ Until 23.09, `/hae/ingest` read the token from the hard-coded path `~/.health_se
 ---
 
 ### SEC-51: Telegram bot token in process argv — conftest._no_real_importers trims the URL to its last segment (rsplit) before writing it to the attempts log (§19); deliver food_quarterly is silenced by a separate fixture so the secret does not reach the teardown assert
+
+---
+
+### SEC-52: The first-contact smoke test answered the onboarding home question with coordinates near the owner's home — replaced with neutral ones (Berlin, the time zone from the tutorial example). Caught by the pre-export read; the census dictionary did not see this form of writing.
 
 ---
 

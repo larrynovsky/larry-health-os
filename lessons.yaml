@@ -2971,3 +2971,122 @@ lessons:
   status: observation
   evidence: ['docs/handoff/finish-prep/2026-10-01-7a8e324.md']
   owner: владелец
+- id: C-132
+  date: '2026-10-02'
+  thread: first-contact
+  modules: [handlers/meta.py, bot/filters.py, google_calendar_fetcher.py]
+  event: 'Посторонний поставил систему по уроку и на первый /start получил «передал на починку». Первая строка /start писала номер чата в каталог ключей, а compose монтирует его :ro (517ed05, 30.09) — Errno 30 у КАЖДОЙ установки в Докере. Тот же класс в контейнере владельца: синхронизация календаря писала обновлённый токен туда же и с 30.09 падала каждый час (164 строки Errno 30), кэш календаря застыл на двое суток.'
+  cost: 'нерабочий первый контакт у всех посторонних с v0.1.0 по v0.1.3; двое суток устаревшего календаря у владельца'
+  cause: 'монтирование «только чтение» ввели, не пересчитав писателей каталога ключей; оба теста /start подменяли ровно падающую строку, урок в CI кончался на InvalidToken — путь дальше отказа Telegram не исполнялся нигде'
+  address: {kind: runtime, ref: scripts/first_contact_smoke.py}
+  subject: [secrets, test_stand, filesystem_icloud]
+  outcome: {kind: check, text: 'запись в каталог ключей убрана из /start, токен календаря пишется в данные тенанта; шаг «первый контакт» в tutorial.yml (смоук в образе с монтированием compose) — мутация «вернуть запись» красная Errno 30; тесты test_handlers_meta::test_cmd_start_works_with_read_only_secrets и test_calendar_token_readonly без подмен. Граница: смоук проходит /start, знакомство и /help, не все команды'}
+  status: adopted
+  change: 'git:f50653f'
+  adopted_on: '2026-10-02'
+  evidence: ['git:f50653f', 'git:19c7d89']
+  owner: владелец
+- id: C-133
+  date: '2026-10-02'
+  thread: first-contact
+  modules: [lessons.yaml]
+  event: 'Коммит с блоком ponytail последним абзацем отбит гейтом «нужна квитанция», хотя блок был в сообщении. Хук дописал трейлер Commit-Exposure, git счёл последний абзац трейлерами и склеил «ponytail:» со следующей строкой в одну.'
+  cost: 'два повтора коммита и разбор движка гейта (~5 мин)'
+  cause: 'блок квитанции по форме совпадает с трейлерами git (ключ: значение), а парсер ponytail ищет строку ровно «ponytail:»'
+  address: {kind: methodology_page, ref: ~/.ponytail/КВИТАНЦИЯ.md}
+  subject: [git_hooks]
+  outcome: {kind: rule, text: 'после блока ponytail — обычный абзац текста, трейлеры Co-Authored-By ниже него'}
+  status: observation
+  evidence: ['git:1f9b8b8']
+  owner: владелец
+- id: C-134
+  date: '2026-10-02'
+  thread: first-contact
+  modules: [scripts/first_contact_smoke.py, SECURITY.md]
+  event: 'Смоук отвечал на вопрос знакомства о доме координатами города владельца; перепись (pii_census) и гейт коммита это пропустили, нашёл читатель при вычитке перед выгрузкой. Затем doc_agent, описывая правку в SECURITY.md, процитировал те же координаты — и тогда словарь их поймал.'
+  cost: 'координаты дома владельца в двух коммитах рабочего репо (в открытый не уехали)'
+  cause: 'словарь знает координаты в форме «широта, долгота» через запятую, а в коде они стояли полями latitude/longitude словаря; описатель коммитов цитирует убираемое значение (и этот урок при первой записи — тоже, отбит гейтом)'
+  address: {kind: runtime, ref: pii_census.py}
+  subject: [pii]
+  outcome: {kind: rule, text: 'тестовые координаты/адреса — только нейтральные (пояс из примера урока); описание правки, убирающей значение, значение не цитирует'}
+  status: observation
+  evidence: ['git:6bd70cb', 'git:0aa71fd']
+  owner: владелец
+- id: C-135
+  date: '2026-10-02'
+  thread: first-contact
+  modules: [run_checks.sh, notify.py]
+  event: 'Проверка текста «владелец узнает из утренней сводки» для партнёра: его ночная проверка (нативная, на Studio) красная 4 дня подряд (29.09–02.10: рельса доставки, свежесть бэкапа, носитель проб), сбой пишется в журнал ~/health_scripts/logs/faults.jsonl, а цепочка владельца с 30.09 живёт в контейнере и читает только журнал в томе — партнёрских строк там 0.'
+  cost: 'четыре дня красной проверки партнёра, которую не видит никто; ложное обещание в тексте сбоя партнёру'
+  cause: 'переезд владельца в контейнер сменил дом журнала сбоев для его цепочки, а писатели вне контейнера (процессы партнёра) остались писать в старый дом'
+  address: {kind: runtime, ref: run_checks.sh}
+  subject: [message_delivery, tenant]
+  outcome: {kind: rule, text: 'переезд рантайма — пересчитать писателей каждого общего журнала по всем тенантам; долг BL-TENANT-FAULTS-PATH-1'}
+  status: observation
+  evidence: ['docs/handoff/first-contact/2026-10-02-ecac0ac.md']
+  owner: владелец
+- id: C-136
+  date: '2026-10-02'
+  thread: tenant-run-scope
+  modules: [secrets_paths.py, integrity_tests.py, db_regression.py]
+  event: 'Разбор трёх красных проверок партнёра: все три (рельса доставки, бэкап 52ч, проба красная) и ещё ~10 предупреждений судили НЕ партнёра, а копию владельца на хосте, замороженную переездом в контейнер 30.09 (метка ~/health/RUNTIME=container). Плисты владельца остались в LaunchAgents выгруженными, его logs/ в репозитории застыли, обходчик тенантов продолжал считать ~/health пациентом. Попутно: db_regression с первого дня сравнивал БД партнёра с бэкапами владельца (~/health/backups литералом) — «daily_metrics 4053→95».'
+  cost: 'ежедневная ложная тревога оператору с 30.09; три дня приоритет ночного ремонта тратился бы на неживое; переезд выглядел сломанным, будучи исправным'
+  cause: 'переезд рантайма оставил следы (плисты, logs/, каталог данных), а датчики узнают «что живо» по наличию файла, не по тому, где исполняется; метку переезда читали только shell-скрипты литералом'
+  address: {kind: runtime, ref: secrets_paths.owner_runs_elsewhere}
+  subject: [tenant, sensor_perimeter]
+  outcome: {kind: rule, text: 'метка переезда — один Python-дом (secrets_paths.moved_to_container); обходчик тенантов и датчики общих следов владельца спрашивают его; каталог бэкапов — от БД процесса, не от дома'}
+  status: observation
+  evidence: ['tests/unit/test_tenant_run_scope.py', 'tests/unit/test_db_regression.py']
+  owner: владелец
+- id: C-137
+  date: '2026-10-02'
+  thread: brief-tz-quiet
+  modules: [scripts/first_contact_smoke.py, jobs/scheduled.py]
+  event: 'Смоук первого контакта судил записи ERROR только с первого сообщения человека («сборка приложения — не первый контакт»). Каждая свежая установка писала при старте ERROR BRIEF_TZ_FALLBACK, а урок и how-to bot_fault отправляют новичка читать bot_err.log с первой строки — смоук этой строки не видел.'
+  cost: 'ложная первая строка журнала у каждого новичка с v0.1.0; оракул зелёный на дефекте, который видит человек'
+  cause: 'границу судимого выбрал автор оракула по своему представлению о «контакте», а не по тому, что читает получатель'
+  address: {kind: runtime, ref: scripts/first_contact_smoke.py}
+  subject: [test_stand, measurement_path]
+  outcome: {kind: check, text: 'смоук считает ERROR со сборки приложения; негативный контроль — в образе с отключённой правкой краснеет ровно на BRIEF_TZ_FALLBACK'}
+  status: observation
+  evidence: ['docs/handoff/first-contact/2026-10-02-c5470ed.md']
+  owner: владелец
+- id: C-138
+  date: '2026-10-02'
+  thread: llm-tails
+  modules: [lab_intake_watcher.py, lab_backfill.py, tests/unit/test_lab_intake_watcher.py]
+  event: 'Карточка «чтение анализов не допущено» в вотчере приёмника была мёртвой с рождения: run_backfill ловил любое исключение документа и превращал отказ допуска в «0 строк». Тест подменял run_backfill целиком и был зелёным. Нашла самопроверка через полчаса, независимо — ревью Codex.'
+  cost: 'один коммит мёртвой правки (c8d0149) и полный круг ревью; в прод не ушло'
+  cause: 'тест подменял СВОЙ слой между источником отказа и вотчером — тот самый, где отказ проглатывался; правило C-48 (путь от источника до записи) живёт в ритуале закрытия, а тест пишется при постройке, и на постройке его никто не спрашивает'
+  address: {kind: ritual, ref: letitbe}
+  subject: [test_stand, sensor_perimeter]
+  outcome: {kind: rule, text: 'в стратегии тестирования плана: для каждого нового сигнала — тест, где подставлен только внешний мир (модель), а все свои слои от источника до получателя настоящие'}
+  status: observation
+  evidence: ['git:7835b2b', 'git:c8d0149']
+  owner: владелец
+- id: C-139
+  date: '2026-10-02'
+  thread: llm-model-identity
+  modules: [llm_client.py, model_health_check.py, llm_admission.py]
+  event: 'Совместимая с Anthropic точка DeepSeek на чужое имя модели отвечает своей моделью без ошибки (claude-opus-5 → deepseek-v4-pro, deepseek-chat → deepseek-v4-flash), а незнакомое отвергает кодом 400, не 404. Датчик отзыва и допуск считали «ответила — значит модель есть». Нашло ревью Codex по документации, подтвердил живой вызов.'
+  cost: 'без проверки — вердикт допуска чужой модели под именем кандидата и немой датчик ухода модели у каждой установки DeepSeek'
+  cause: 'контракт «имя модели в запросе = модель ответа» был неявным: у Anthropic он держится, совместимые точки его не обещают, а ответ несёт поле model, которое никто не сверял'
+  address: {kind: runtime, ref: llm_client._same_model}
+  subject: [contract_change, llm_output]
+  outcome: {kind: check, text: 'ответ с model ≠ запрошенной и 400 «model names» — ModelNotServed (= модели нет); тест подмены, живой прогон sync+async'}
+  status: observation
+  evidence: ['git:0022db1']
+  owner: владелец
+- id: C-140
+  date: '2026-10-02'
+  thread: llm-provider
+  modules: [llm_admission.py, tests/unit/test_llm_admission.py]
+  event: 'Описывая замер в докстроке и превращая находку в тест, я перенёс в код значения с бланков владельца (показатель мочи двух перечитываний, пример ошибки допуска с именем страницы) в публичную зону. Перепись и гейт коммита пропустили; нашла вычитка диффа перед выпуском (Codex).'
+  cost: 'четыре места с медданными владельца в публичной зоне; в открытый репозиторий не ушли'
+  cause: 'находка из настоящих данных естественно цитируется как пример; перепись ловит имена и координаты, но число анализа без контекста неотличимо от синтетики — сторожа на этот класс нет, кроме вычитки'
+  address: {kind: ritual, ref: letitbe}
+  subject: [pii]
+  outcome: {kind: rule, text: 'пример из данных владельца в коде и тестах — только выдуманными значениями с пометкой «значения выдуманы»; тот же класс, что C-134'}
+  status: observation
+  evidence: ['git:ad306f3']
+  owner: владелец

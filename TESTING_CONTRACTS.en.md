@@ -306,12 +306,11 @@ correctness (§20, RST check≠test). The logic lives in the test; this is only 
 | boundary between the two lab-data houses is intact | `check_domain_boundary` | Boundary between the two lab-data houses is enforced (work B, 2026-08-01). |
 | every lab-row class has a house verdict | `check_lab_class_verdicts_complete` | Every class that ACTUALLY exists in the data has a human verdict. |
 
-### Threshold constants (42 constants, generated)
+### Threshold constants (41 constants, generated)
 
 | Constant | Value | Explanation |
 |---|---|---|
 | `DATA_FRESHNESS_HOURS` | 26 | oura/apple_health: conit C1 |
-| `DATA_FRESHNESS_DAYS` | 2 | same in days (backward compatibility) |
 | `MIN_DAYS_WITH_DATA` | 5 | data from the last 7 days must be >= N |
 | `GP_WEEKLY_MAX_AGE_DAYS` | 8 | GP weekly report is no older than N days |
 | `GP_MONTHLY_MAX_AGE_DAYS` | 35 | GP monthly report is no older than N days |

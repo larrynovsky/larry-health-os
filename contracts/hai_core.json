@@ -1,6 +1,7 @@
 {
   "module": "hai_core",
   "public": [
+    "base_chain",
     "get_client",
     "get_history",
     "get_model",

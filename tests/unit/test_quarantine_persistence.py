@@ -114,7 +114,6 @@ def test_rows_carry_age_and_resolution(conn):
 # Тесты бьют по ПУТИ: настоящий файл БД и настоящая блокировка SQLite, не подменённые
 # функции. R3/R4 показали цену обратного: проверка слоя проходит на сломанном пути.
 import importlib          # noqa: E402
-import threading          # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 adj = importlib.import_module("adjudicate_quarantine")
@@ -166,8 +165,16 @@ def test_transient_lock_is_survived_not_just_reported(dbfile, monkeypatch, capsy
     Ночной longitudinal держит запись секунды — это и есть штатный случай."""
     lock = sqlite3.connect(dbfile, check_same_thread=False)
     lock.execute("BEGIN EXCLUSIVE")
-    threading.Timer(0.15, lambda: (lock.rollback(), lock.close())).start()
-    rc = _run(monkeypatch, *_VERDICT)
+    # Замок снимается на ПЕРВОЙ паузе ретрая, а не по таймеру: Timer(0.15) проигрывал
+    # гонку суммарной паузе backoff под нагрузкой полного прогона (красный 02.10).
+    def _release_on_wait(_s):
+        if lock.in_transaction:
+            lock.rollback()
+    monkeypatch.setattr(adj.time, "sleep", _release_on_wait)
+    try:
+        rc = _run(monkeypatch, *_VERDICT)
+    finally:
+        lock.close()
     assert rc == adj.EXIT_OK, capsys.readouterr().err
     c = sqlite3.connect(dbfile)
     status, resolution = c.execute(

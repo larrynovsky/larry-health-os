@@ -13,10 +13,116 @@
 </div>
 {% endblock %}
 
+{# Карточка возможности: пять строк — что умеет · что нужно · состояние · квитанция · одно действие.
+   Состояние и тексты считает getting_started.board из данных при каждом открытии (§18). #}
+{% macro gs_chip(c) -%}
+  {%- if c.pending and c.state != 'broken' -%}
+    <span class="chip chip--action">{{ board.page['pending'] }}</span>
+  {%- elif c.optional and c.state == 'not' -%}
+    <span class="chip chip--outline">{{ board.page['optional'] }}</span>
+  {%- else -%}
+    <span class="chip gs-chip gs-chip--{{ c.state }}"><span class="gs-icon" aria-hidden="true">{{ c.icon }}</span>{{ c.label }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{# Главное действие и ссылка на инструкцию собираются в getting_started._primary — шаблон их только рисует. #}
+{% macro gs_primary(p) -%}
+  {%- if p -%}
+    {%- if p.kind == 'text' or not p.href -%}<span class="gs-do">{{ p.text }}</span>
+    {%- else -%}<a class="action-pill{% if p.kind == 'warning' %} action-pill--warning{% elif p.kind == 'ghost' %} action-pill--ghost{% endif %}" href="{{ p.href }}"{% if p.href.startswith('http') %} target="_blank" rel="noopener"{% endif %}>{{ p.text }}</a>
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro gs_secondary(c) -%}
+  {%- if c.secondary %}<a class="card-link" href="{{ c.secondary.href }}" target="_blank" rel="noopener">{{ c.secondary.text }}</a>{% endif -%}
+{%- endmacro %}
+
+{# Карточка возможности: что умеет · что нужно · состояние · квитанция · одно действие.
+   Состояние и тексты считает getting_started.board из данных при каждом открытии (§18). #}
+{% macro gs_card(c) -%}
+<article class="card {% if c.state == 'broken' %}card--warning{% elif c.pending %}card--action{% elif c.state == 'ok' %}card--active{% elif c.state == 'acc' %}card--action{% endif %}" data-cap="{{ c.id }}">
+  <div class="card-head">
+    <h4 class="card-title">{{ c.title }}</h4>
+    <span class="card-chips">{{ gs_chip(c) }}</span>
+  </div>
+  <p class="card-description">{{ c.benefit }}</p>
+  {# «Что нужно» — только там, где этого ещё нет или оно сломалось: у работающей карточки строка
+     «нужно: токен» читалась как невыполненное требование (холодное чтение 02.10). #}
+  {% if c.state in ('not', 'broken') %}<dl class="card-fields"><dt>{{ board.page['need'] }}</dt><dd>{{ c.need }}</dd></dl>{% endif %}
+  <p class="gs-status {% if c.state == 'broken' %}gs-status--broken{% endif %}">{{ c.status }}</p>
+  {% if c.progress is not none %}<div class="gs-bar" role="progressbar" aria-valuenow="{{ (c.progress * 100) | round | int }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ [c.progress * 100, 3] | max }}%"></i></div>{% endif %}
+  {% if c.receipt %}<span class="card-meta gs-receipt"><time>{{ c.receipt }}</time></span>{% endif %}
+  {% if c.note %}<div class="gs-note gs-note--{{ c.note.kind }}">{{ c.note.text }}</div>{% endif %}
+  {% if c.primary or c.secondary %}<div class="card-foot">{{ gs_primary(c.primary) }}{{ gs_secondary(c) }}</div>{% endif %}
+</article>
+{%- endmacro %}
+
 {% block content %}
 
-<div class="caption">сводка</div>
+{% if board %}
+<section class="gs-answer" aria-live="polite">
+  <div>
+    <p class="gs-answer-text">{{ board.answer }}</p>
+    <p class="gs-score">{{ board.score }}</p>
+    <p class="gs-legend">{% for k, s in board.states.items() %}<span><i aria-hidden="true">{{ s.icon }}</i>{{ s.legend }}</span>{% endfor %}<span><i aria-hidden="true">!</i>{{ board.page['legend.pending'] }}</span></p>
+  </div>
+  <div class="gs-next">
+    {% if board.next %}
+      {% set n = board.next %}
+      {{ gs_primary(n.primary) }}
+      <span class="gs-next-hint">{{ n.title }} · {{ n.status }}</span>
+    {% else %}
+      <span class="gs-next-hint">{{ board.page['next.none'] }}</span>
+    {% endif %}
+  </div>
+</section>
 
+{% set broken = board.caps | selectattr('state', 'equalto', 'broken') | list %}
+{% if broken %}
+<div class="caption">{{ board.page['first'] }}</div>
+<div class="gs-grid">{% for c in broken %}{{ gs_card(c) }}{% endfor %}</div>
+{% endif %}
+
+<div class="caption">{{ board.page['done'] }}</div>
+<p class="gs-done">{% for d in board.done %}<span>✓ {{ d }}</span>{% endfor %}</p>
+
+{% for g in board.groups %}
+<div class="caption">{{ g.title }}</div>
+{% set items = board.caps | selectattr('group', 'equalto', g.id) | rejectattr('state', 'equalto', 'broken') | list %}
+{% if g.id == 'time' %}
+<div class="gs-time-wrap">
+<table class="dense gs-time">
+  <thead><tr><th>{{ board.page['col.cap'] }}</th><th>{{ board.page['col.need'] }}</th><th>{{ board.page['col.state'] }}</th></tr></thead>
+  <tbody>
+  {% for c in items %}
+    <tr data-cap="{{ c.id }}">
+      <td><span class="gs-t-name">{{ c.title }}</span><span class="gs-t-sub">{{ c.sub }}</span></td>
+      <td class="gs-t-need">{{ c.need }}</td>
+      <td>{{ gs_chip(c) }}<div class="gs-t-status">{{ c.status }}</div>{% if c.pending and c.primary %}<div class="gs-row-action">{{ gs_primary(c.primary) }}</div>{% endif %}{% if c.progress is not none %}<div class="gs-bar"><i style="width: {{ [c.progress * 100, 3] | max }}%"></i></div>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="gs-grid">{% for c in items %}{{ gs_card(c) }}{% endfor %}</div>
+{% endif %}
+{% endfor %}
+
+<div class="caption">{{ board.page['privacy'] }}</div>
+<div class="gs-privacy">
+  <span>{{ board.page['privacy.db'] }}</span>
+  <span>{{ board.page['privacy.llm'] }}</span>
+  <span>{{ board.page['privacy.dash'] }}</span>
+</div>
+{% else %}
+<p class="gs-note gs-note--warning">{{ board_failed_text }}</p>
+{% endif %}
+
+<div class="caption">{{ board.page['legacy'] if board else 'сводка' }}</div>
+<details class="gs-legacy" {% if not board %}open{% endif %}>
+<summary>{{ board.page['legacy.summary'] if board else 'счётчики' }}</summary>
 <ul class="counts">
   <li><a href="/profile">Профиль</a><b>{{ counts.profile }} записей</b></li>
   <li><a href="/hypotheses">Гипотезы</a><b>{{ counts.hypotheses_open }}/{{ counts.hypotheses_all }} активных</b></li>
@@ -27,5 +133,6 @@
   <li><a href="/labs">Анализы</a><b>{{ counts.labs_tests }} тестов</b></li>
   <li><a href="/constitutions">Конституции</a><b>{{ counts.constitutions }} доменов</b></li>
 </ul>
+</details>
 
 {% endblock %}

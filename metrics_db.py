@@ -610,6 +610,12 @@ def render_all_metrics(days: int = 30, end: date | None = None) -> str:
 # импортёров, не клиническое число). Источник «есть», если за окно у него есть хоть одна строка.
 # Читатель — пакет специалистов («Источники данных»). Ручное поле medical.devices
 # может быть пустым при наличии измерений; наличие источника выводится из данных.
+# Свежесть прибора: последний день старше N дней — источник замолчал (conit C1, TESTING_CONTRACTS).
+# Дом числа здесь, рядом с провенансом источников: его читают ночной датчик (integrity_tests,
+# DATA_FRESHNESS_DAYS) и главная дашборда (getting_started). Перенесено 02.10.2026 из
+# integrity_tests, импорт которого исполняет весь монитор и поэтому недоступен читателям.
+SOURCE_STALE_DAYS = 2
+
 SOURCE_SIGNATURE: dict[str, tuple[str, ...]] = {
     "Oura": ("readiness", "sleep_score", "readiness_hrv_balance"),
     "Apple Health": ("exercise_min", "stand_min", "walking_speed_avg", "met_avg", "vo2max"),

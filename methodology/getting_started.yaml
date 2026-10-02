@@ -1,0 +1,276 @@
+# Каталог главной страницы дашборда «С чего начать» (нить getting-started, 02.10.2026).
+# ЕДИНСТВЕННЫЙ дом: какие возможности видит человек, что им дать, куда вести, на какие записи
+# реестра замысла (subsystem_intent.yaml) они опираются. Состояние каждой возможности считает
+# getting_started.py из данных при открытии страницы — здесь его нет и быть не должно (§18).
+# Тексты — по языкам ({ru, en}), читает i18n.pick. Пороги в тексты НЕ вписываются числом:
+# {need}/{left}/{n} подставляет судья из домов порогов.
+# Сторож: tests/unit/test_getting_started.py — у каждой возможности есть судья, каждый intent
+# существует в реестре, у каждой пользовательской записи реестра есть карточка или причина в skip_intent.
+
+groups:
+  - id: self
+    title: {ru: "расскажите о себе", en: "tell the system about yourself"}
+  - id: devices
+    title: {ru: "подключите приборы", en: "connect your devices"}
+  - id: time
+    title: {ru: "дайте время — это включается накоплением, а не кнопкой", en: "give it time — these switch on as data accumulates, not with a button"}
+
+capabilities:
+  - id: about
+    group: self
+    intent: [patient_answer_channel]
+    title: {ru: "Знакомство", en: "Introduction"}
+    benefit: {ru: "Имя, возраст, дом и время утреннего отчёта — от них считаются нормы и расписание.", en: "Name, age, home and morning report time — norms and the schedule are based on them."}
+    need: {ru: "Около 10 минут переписки с ботом", en: "About 10 minutes of chat with the bot"}
+    action: {ru: "Напишите боту /start", en: "Send /start to the bot"}
+    action_in_bot: true
+    howto: how-to/redo_onboarding.md
+    howto_label: {ru: "Как пройти заново", en: "How to redo it"}
+
+  - id: record
+    group: self
+    intent: [document_intake, problem_list_proposals]
+    title: {ru: "Медкарта", en: "Medical record"}
+    benefit: {ru: "Список проблем и лекарств, из которого исходят все отчёты.", en: "The list of problems and medications that every report starts from."}
+    need: {ru: "Заключения врачей и выписки за 3 года — PDF или фото файлом в бот", en: "Doctors' letters and discharge summaries for the last 3 years — PDF or photo, sent to the bot as a file"}
+    action: {ru: "Пришлите документы боту", en: "Send documents to the bot"}
+    action_in_bot: true
+    pending_action: {ru: "Разобрать предложения", en: "Review proposals"}
+    pending_href: /proposals
+    howto: how-to/send_large_file.md
+    howto_label: {ru: "Файл больше 20 МБ", en: "File over 20 MB"}
+
+  - id: labs
+    group: self
+    intent: [lab_recognizer, norm_from_documents, report_absence_claims]
+    title: {ru: "Анализы", en: "Lab results"}
+    benefit: {ru: "Значения с бланков, их динамика и предохранитель на опасные числа.", en: "Values from lab reports, their trends, and a safety net for dangerous numbers."}
+    need: {ru: "Бланки анализов за 3 года в бот; распознанное подтвердить здесь", en: "Lab reports for the last 3 years sent to the bot; confirm what was recognised here"}
+    action: {ru: "Пришлите бланки боту", en: "Send lab reports to the bot"}
+    action_in_bot: true
+    pending_action: {ru: "Проверить распознанное", en: "Check recognised values"}
+    pending_href: /labs
+    howto: how-to/lab_review_queue.md
+    howto_label: {ru: "Как проверить распознанное", en: "How to check recognised values"}
+
+  - id: genome
+    group: self
+    intent: [genome_effect_allele]
+    title: {ru: "Геном", en: "Genome"}
+    benefit: {ru: "Предрасположенности и реакция на лекарства; без него нет конституций.", en: "Predispositions and drug response; without it there are no constitutions."}
+    need: {ru: "Сырой файл 23andMe, AncestryDNA, MyHeritage, FTDNA, tellmeGen, LivingDNA или VCF — в бот", en: "Raw file from 23andMe, AncestryDNA, MyHeritage, FTDNA, tellmeGen, LivingDNA or a VCF — sent to the bot"}
+    action: {ru: "Пришлите файл боту", en: "Send the file to the bot"}
+    action_in_bot: true
+    open_href: /genome
+
+  - id: oura
+    group: devices
+    intent: [device_metrics_owner, morning_brief]
+    title: {ru: "Сон и восстановление", en: "Sleep and recovery"}
+    benefit: {ru: "Ночь, вариабельность пульса и активность — с кольца Oura.", en: "Night sleep, heart rate variability and activity — from an Oura ring."}
+    need: {ru: "Личный токен Oura — файлом oura_token в каталог ключей на этой машине. Не в чат", en: "An Oura personal token — as the file oura_token in the secrets directory on this machine. Not in the chat"}
+    action: {ru: "Как подключить Oura", en: "How to connect Oura"}
+    broken_action: {ru: "Заменить токен Oura", en: "Replace the Oura token"}
+    howto: how-to/connect_oura.md
+
+  - id: apple
+    group: devices
+    intent: [device_metrics_owner]
+    title: {ru: "Активность, пульс, вес", en: "Activity, heart rate, weight"}
+    benefit: {ru: "Шаги, пульс и вес из «Здоровья» iPhone, часов и весов.", en: "Steps, heart rate and weight from Health on iPhone, a watch and scales."}
+    need: {ru: "Приложение Health Auto Export на iPhone; на Маке — одна команда, она сама создаёт пароль для телефона", en: "The Health Auto Export app on the iPhone; on the Mac — one command that creates the phone's password itself"}
+    action: {ru: "Как подключить «Здоровье»", en: "How to connect Health"}
+    broken_action: {ru: "Проверить отправку с телефона", en: "Check sending from the phone"}
+    howto: how-to/connect_apple_health.md
+    note:
+      kind: warning
+      text: {ru: "Простой путь — по домашней Wi-Fi: в сеть выходит только приём данных, эта страница остаётся закрытой. Безопасный путь, который мы рекомендуем, — через частную сеть Tailscale: он шифрует отправку и работает в поездках. Оба описаны в инструкции.", en: "The simple path is over home Wi-Fi: only data intake reaches the network, this page stays closed. The safe path we recommend is the private Tailscale network: it encrypts sending and works when travelling. Both are in the guide."}
+
+  - id: place
+    group: devices
+    intent: [morning_brief]
+    title: {ru: "Среда и поездки", en: "Environment and travel"}
+    benefit: {ru: "Жара и погода там, где вы сейчас; тропы на выходные рядом с домом.", en: "Heat and weather where you are now; trails near home for the weekend."}
+    need: {ru: "Дом — из знакомства. Координаты в поездках телефон умеет присылать, но инструкции для этого пока нет", en: "Home comes from the introduction. The phone can send coordinates when travelling, but there are no instructions for it yet"}
+    action: {ru: "Пройдите знакомство в боте", en: "Complete the introduction in the bot"}
+    action_in_bot: true
+
+  - id: calendar
+    group: devices
+    optional: true
+    intent: [morning_brief]
+    title: {ru: "Календарь поездок", en: "Travel calendar"}
+    benefit: {ru: "Карточка за день до поездки из Google Calendar. Необязательно.", en: "A card the day before a trip, from Google Calendar. Optional."}
+    need: {ru: "Токен Google Calendar в каталоге ключей. Как получить его для установки в Докере, пока не описано", en: "A Google Calendar token in the secrets directory. How to get one for a Docker installation is not described yet"}
+
+  - id: brief
+    group: time
+    intent: [morning_brief, proactivity]
+    title: {ru: "Утренний отчёт", en: "Morning report"}
+    sub: {ru: "и еженедельный, месячный разбор", en: "plus the weekly and monthly review"}
+    need: {ru: "Знакомство; содержание растёт с каждым источником", en: "The introduction; the content grows with every source"}
+
+  - id: alerts
+    group: time
+    intent: [proactivity, deterministic_norm_source]
+    title: {ru: "Тревоги по тренду", en: "Trend alerts"}
+    sub: {ru: "не по одной плохой ночи, а по серии", en: "not after one bad night, but after a run of them"}
+    need: {ru: "Данные прибора; личные пороги — от {need} дней", en: "Device data; personal thresholds from {need} days"}
+
+  - id: links
+    group: time
+    intent: [validation_gate]
+    title: {ru: "Связи между показателями", en: "Links between measures"}
+    sub: {ru: "прошедшие статистический фильтр", en: "that passed the statistical filter"}
+    need: {ru: "Два показателя с общими днями: от {need} дней", en: "Two measures with shared days: {need} days or more"}
+
+  - id: hyp
+    group: time
+    intent: [hypothesis_experiment, consilium]
+    title: {ru: "Гипотезы о причинах", en: "Hypotheses about causes"}
+    sub: {ru: "/hypotheses", en: "/hypotheses"}
+    need: {ru: "Недели данных прибора и медкарта", en: "Weeks of device data and a medical record"}
+
+  - id: consult
+    group: time
+    intent: [consilium, llm_exit]
+    title: {ru: "Консилиум по вопросу", en: "Panel on your question"}
+    sub: {ru: "/consult · около 2 минут", en: "/consult · about 2 minutes"}
+    need: {ru: "Ключ модели (вводится при установке); чем больше данных, тем предметнее", en: "A model key (entered at installation); the more data, the more specific"}
+
+  - id: doctor
+    group: time
+    intent: [doctor_in_loop]
+    title: {ru: "Сводка к врачу", en: "Summary for your doctor"}
+    sub: {ru: "/visit · ответ врача меняет гипотезы", en: "/visit · the doctor's answer updates hypotheses"}
+    need: {ru: "Медкарта и визит", en: "A medical record and a visit"}
+
+  - id: questions
+    group: time
+    intent: [patient_answer_channel]
+    title: {ru: "Вопросы системы", en: "Questions from the system"}
+    sub: {ru: "/tasks · ответ текстом идёт врачу-модели", en: "/tasks · a text answer goes to the doctor model"}
+    need: {ru: "Разговоры и документы", en: "Conversations and documents"}
+    pending_action: {ru: "Как ответить", en: "How to answer"}
+    howto: how-to/answer_a_question.md
+    howto_label: {ru: "Как ответить", en: "How to answer"}
+
+  - id: const
+    group: time
+    intent: [constitutions]
+    title: {ru: "Конституции", en: "Constitutions"}
+    sub: {ru: "правила вашего организма по доменам", en: "rules of your own body, by domain"}
+    need: {ru: "Геном обязателен; долгосрочная часть — от {need} дней истории", en: "A genome is required; the long-term part needs {need} days of history"}
+
+  - id: food
+    group: time
+    intent: [generated_food_rules, morning_brief]
+    title: {ru: "Пищевой профиль", en: "Food profile"}
+    sub: {ru: "и продукт дня в отчёте", en: "plus a product of the day in the report"}
+    need: {ru: "Медкарта, геном или рост с весом", en: "A medical record, a genome, or height and weight"}
+
+# Записи реестра, у которых нет карточки, — с причиной. Тест требует: каждая запись реестра
+# либо упомянута в intent какой-то возможности, либо стоит здесь.
+skip_intent:
+  data_ingestion: "устройство хранения, а не возможность; видна через карточки источников"
+  memory_temporal_axis: "свойство памяти бота, человеку нечего дать"
+  self_monitoring: "система стережёт себя сама; поломки видны красными карточками"
+  multitenancy: "второй человек — отдельная установка дашборда со своей главной"
+  telegram_bot: "бот — канал, через который работают все карточки"
+  dashboard: "сама эта страница"
+  night_decision_loop: "решения владельцу приходят звонком в боте"
+  project_context: "кухня разработки"
+  disposability_gate: "кухня разработки"
+  intent_receipts: "кухня разработки"
+  log_rotation: "кухня разработки"
+  agent_coordination: "кухня разработки"
+  code_backup: "кухня разработки"
+  night_test_triage: "кухня разработки"
+  public_zone: "кухня разработки"
+  install_path: "установка уже пройдена, раз страница открыта"
+
+# Подписи состояний: значок + слово, цвет задаёт шаблон. Пять — не больше (Carbon).
+states:
+  not:    {icon: "○", label: {ru: "не начато", en: "not started"}, legend: {ru: "не начато — ждёт вашего шага", en: "not started — waiting for you"}}
+  wait:   {icon: "◐", label: {ru: "ждёт первых данных", en: "waiting for first data"}, legend: {ru: "подключено, ждёт первых данных", en: "connected, waiting for first data"}}
+  acc:    {icon: "◔", label: {ru: "накапливает", en: "accumulating"}, legend: {ru: "накапливает — нужно время", en: "accumulating — needs time"}}
+  ok:     {icon: "●", label: {ru: "работает", en: "working"}, legend: {ru: "работает", en: "working"}}
+  broken: {icon: "▲", label: {ru: "данные не приходят", en: "data stopped"}, legend: {ru: "было, перестало приходить", en: "was arriving, stopped"}}
+
+# Тексты состояний. {n}, {need}, {date}, {left}, {age} подставляет судья.
+texts:
+  about.done:        {ru: "Пройдено", en: "Done"}
+  about.started:     {ru: "Начато, не закончено — продолжить можно той же командой", en: "Started, not finished — the same command continues it"}
+  about.none:        {ru: "Бот ждёт /start", en: "The bot is waiting for /start"}
+  record.ok:         {ru: "Проблем в медкарте: {n}", en: "Problems in the record: {n}"}
+  record.pending:    {ru: "Ждут вашего «Применить»: {n}", en: "Waiting for your “Apply”: {n}"}
+  record.none:       {ru: "Документов нет", en: "No documents yet"}
+  labs.ok:           {ru: "Значений анализов в базе: {n}", en: "Lab values in the database: {n}"}
+  labs.pending:      {ru: "Значений ждут проверки: {n}", en: "Values waiting for review: {n}"}
+  labs.none:         {ru: "Бланков нет", en: "No lab reports yet"}
+  genome.ok:         {ru: "Загружен: {n} вариантов", en: "Loaded: {n} variants"}
+  genome.none:       {ru: "Файл генома не присылали", en: "No genome file yet"}
+  device.none:       {ru: "Данных ещё не было", en: "No data yet"}
+  device.wait:       {ru: "Токен есть, ждём первых данных", en: "Token in place, waiting for first data"}
+  device.acc:        {ru: "{n} из {need} дней — тогда появится личная норма", en: "{n} of {need} days — then your personal norm appears"}
+  device.ok:         {ru: "Личная норма посчитана", en: "Personal norm calculated"}
+  device.broken:     {ru: "Дней без данных: {age}. Чаще всего токен отозван или отправка выключена", en: "No data for {age} days. Most often the token was revoked or sending is off"}
+  place.ok:          {ru: "Дом записан", en: "Home recorded"}
+  place.none:        {ru: "Дом появится после знакомства", en: "Home appears after the introduction"}
+  calendar.ok:       {ru: "Подключено", en: "Connected"}
+  calendar.wait:     {ru: "Токен есть, календарь ещё не загружался", en: "Token in place, calendar not loaded yet"}
+  calendar.broken:   {ru: "Календарь не обновлялся {age} ч", en: "Calendar not refreshed for {age} hours"}
+  calendar.none:     {ru: "Не подключено (необязательно)", en: "Not connected (optional)"}
+  brief.ok:          {ru: "Последний: {date}", en: "Latest: {date}"}
+  brief.wait:        {ru: "Первый — через пару минут после знакомства", en: "The first one arrives a few minutes after the introduction"}
+  alerts.wait:       {ru: "Нужен прибор", en: "Needs a device"}
+  alerts.acc:        {ru: "{n} из {need} дней — пока действуют стартовые пороги, потом пороги станут вашими", en: "{n} of {need} days — starting thresholds apply until then, then they become your own"}
+  alerts.ok:         {ru: "Пороги посчитаны по вашим данным", en: "Thresholds calculated from your data"}
+  links.wait:        {ru: "Нужен прибор", en: "Needs a device"}
+  links.acc:         {ru: "{n} из {need} дней · готово ~{date}", en: "{n} of {need} days · ready around {date}"}
+  links.ok:          {ru: "Истории достаточно для проверки связей", en: "Enough history to test links"}
+  hyp.ok:            {ru: "Гипотез: {n}", en: "Hypotheses: {n}"}
+  hyp.wait:          {ru: "Ближайший консилиум — {date}; гипотезы появляются, когда накоплено несколько недель данных прибора", en: "Next panel — {date}; hypotheses appear once several weeks of device data have accumulated"}
+  consult.ok:        {ru: "Доступен сейчас", en: "Available now"}
+  consult.none:      {ru: "Нет ключа модели", en: "No model key"}
+  doctor.ok:         {ru: "/visit готов", en: "/visit is ready"}
+  doctor.wait:       {ru: "Сводка будет пустой, пока нет медкарты", en: "The summary is empty until there is a medical record"}
+  questions.ok:      {ru: "Открытых вопросов нет", en: "No open questions"}
+  questions.pending: {ru: "Вопросов ждут вашего ответа: {n}. Ответ — текстом, ответом (реплаем) на сообщение-вопрос в боте; список — /tasks", en: "Questions waiting for your answer: {n}. Answer with text, as a reply to the question message in the bot; the list is /tasks"}
+  questions.wait:    {ru: "Появятся после знакомства и документов", en: "They appear after the introduction and documents"}
+  const.ok:          {ru: "Доменов: {n}", en: "Domains: {n}"}
+  const.acc:         {ru: "Доменов: {n} · история {days} из {need} дней", en: "Domains: {n} · history {days} of {need} days"}
+  const.wait:        {ru: "Геном есть — соберутся в ближайшее воскресенье", en: "Genome in place — they are built next Sunday"}
+  const.none:        {ru: "Без генома не строятся", en: "Not built without a genome"}
+  food.ok:           {ru: "Документ приходит в начале каждого квартала", en: "The document arrives at the start of each quarter"}
+  food.none:         {ru: "Нужны медкарта, геном или рост с весом", en: "Needs a medical record, a genome, or height and weight"}
+
+# Тексты самой страницы. {ok}/{total}/{title} подставляет getting_started.board.
+page:
+  answer.count:   {ru: "Работают {ok} из {total} возможностей.", en: "{ok} of {total} capabilities are working."}
+  answer.idle:    {ru: "Не работает: {names}.", en: "Not working yet: {names}."}
+  answer.pending: {ru: "Ждут вас: {names}.", en: "Waiting for you: {names}."}
+  answer.broken:  {ru: "{title}: данные не приходят. Остальное работает как раньше.", en: "{title}: data has stopped arriving. Everything else works as before."}
+  score:          {ru: "работает {ok} · ждёт вас {pending} · накапливает {acc} · ждёт первых данных {wait} · не начато {not} · необязательных {optional}", en: "working {ok} · waiting for you {pending} · accumulating {acc} · waiting for first data {wait} · not started {not} · optional {optional}"}
+  legend.pending: {ru: "ждёт вас — работает, но нужно ваше решение или ответ", en: "waiting for you — working, but needs your decision or answer"}
+  score.broken:   {ru: " · сломано {broken}", en: " · broken {broken}"}
+  next.none:      {ru: "Всё подключено. Дальше система работает сама.", en: "Everything is connected. From here the system runs by itself."}
+  first:          {ru: "сначала это", en: "this first"}
+  done:           {ru: "уже сделано", en: "already done"}
+  done.install:   {ru: "Установка", en: "Installation"}
+  done.key:       {ru: "Ключ модели", en: "Model key"}
+  done.about:     {ru: "Знакомство", en: "Introduction"}
+  need:           {ru: "нужно", en: "needs"}
+  pending:        {ru: "ждёт вас", en: "waiting for you"}
+  optional:       {ru: "необязательно", en: "optional"}
+  open:           {ru: "Открыть", en: "Open"}
+  col.cap:        {ru: "возможность", en: "capability"}
+  col.need:       {ru: "что ей нужно", en: "what it needs"}
+  col.state:      {ru: "состояние", en: "state"}
+  privacy:        {ru: "что и куда уходит", en: "what goes where"}
+  privacy.db:     {ru: "База лежит на этой машине. Наружу она не уходит.", en: "The database stays on this machine. It does not leave it."}
+  privacy.llm:    {ru: "Тексты, снимки документов и вопросы уходят поставщику модели — по умолчанию Anthropic (ключ, введённый при установке). Так пишутся отчёты и распознаются бланки.", en: "Texts, document images and questions go to the model provider — Anthropic by default (the key entered at installation). That is how reports are written and lab reports recognised."}
+  privacy.dash:   {ru: "У этой страницы нет пароля. Поэтому она открывается только на этой машине и на устройствах вашей частной сети Tailscale — в интернет её не выставляйте.", en: "This page has no password. So it opens only on this machine and on devices in your private Tailscale network — do not expose it to the internet."}
+  legacy:         {ru: "разделы", en: "sections"}
+  legacy.summary: {ru: "сколько записей в каждом разделе", en: "how many records each section holds"}
+  howto:          {ru: "Инструкция", en: "Instructions"}

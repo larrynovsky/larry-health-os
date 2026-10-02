@@ -149,6 +149,29 @@ class FaultRoutingTests(unittest.TestCase):
                                            "tenant": "invented", "where": "worker", "text": "old"}) + "\n")
         self.assertEqual(self.integrity(), ({"groups": 0, "faults": 0}, []))
 
+    def test_integrity_reads_the_host_journal_too(self):
+        """Сбои процессов хоста (партнёр, деплой) — в журнале хоста; контейнер владельца читает и его.
+        Без этого сбои партнёра 29.09–02.10 не видел никто (нить partner-faults, урок C-135)."""
+        self.journal.parent.mkdir(parents=True, exist_ok=True)
+        host = self.journal.parent.parent / "host_logs" / "faults.jsonl"
+        host.parent.mkdir()
+        host.write_text(json.dumps({"ts": "2000-01-04T11:00:00+00:00", "tenant": "invented-partner",
+                                    "where": "run_checks", "text": "tenant integrity failed"}) + "\n")
+        with patch.dict(os.environ, HEALTH_FAULTS_EXTRA=str(host)):
+            result, warnings = self.integrity()
+        self.assertEqual(result, {"groups": 1, "faults": 1})
+        self.assertEqual(warnings, [("сбой: run_checks",
+                                     "1 раз за сутки у invented-partner; последний: tenant integrity failed")])
+        with patch.dict(os.environ, HEALTH_FAULTS_EXTRA=""):
+            self.assertEqual(self.integrity(), ({"groups": 0, "faults": 0}, []))   # без него — не видно
+
+    def test_integrity_unmounted_host_journal_is_a_finding(self):
+        missing = self.journal.parent.parent / "not_mounted" / "faults.jsonl"
+        with patch.dict(os.environ, HEALTH_FAULTS_EXTRA=str(missing)):
+            _, warnings = self.integrity()
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("не смонтирован", warnings[0][1])
+
     def test_integrity_unreadable_or_corrupt_journal_warns(self):
         self.journal.mkdir(parents=True, exist_ok=True)
         _, warnings = self.integrity()

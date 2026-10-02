@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:69102c3a5f35 -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:195c18bfec7f -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](first_install.md)
@@ -138,7 +138,7 @@ docker compose up -d
 docker compose ps
 ```
 
-The first start downloads the image — a few minutes, with download lines scrolling on screen. Four lines are expected — `bot`, `cron`, `dashboard`, `lab-intake` — with STATUS `Up …`. For the first few seconds `cron` may show `health: starting`: it is creating an empty database while the others wait for it. The database and logs live in Docker volumes: updating the image does not affect them.
+The first start downloads the image — a few minutes, with download lines scrolling on screen. Five lines are expected — `bot`, `cron`, `dashboard`, `ingest`, `lab-intake` — with STATUS `Up …`. For the first few seconds `cron` may show `health: starting`: it is creating an empty database while the others wait for it. The database and logs live in Docker volumes: updating the image does not affect them.
 
 ## 6. Verify that everything is alive
 

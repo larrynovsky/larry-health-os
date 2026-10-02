@@ -35,7 +35,7 @@ INSTALL_PROVENANCE = re.compile(r"<!-- install-provenance: (sha256:[0-9a-f]{12})
 # Необязательные интеграции читают файлы в разных модулях (llm_client, reminders_backend,
 # google_calendar_fetcher, import_oura). Общего реестра необязательных ключей нет:
 # здесь один список для установочных страниц, не перечень всех секретов владельца.
-INSTALL_OPTIONAL_SECRETS = ("anthropic_key", "caldav.json", "gemini_key", "google_calendar_account",
+INSTALL_OPTIONAL_SECRETS = ("anthropic_key", "caldav.json", "deepseek_key", "gemini_key", "google_calendar_account",
                             "google_calendar_token.json", "openai_key", "oura_token")
 
 # шаблон → место в репо (.tmpl — подстановка {{КЛЮЧ}} значениями установки)
@@ -374,6 +374,18 @@ def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_
     if "dashboard" in services:
         services["dashboard"]["environment"]["DASHBOARD_HOST"] = "0.0.0.0"
         services["dashboard"]["ports"] = ["127.0.0.1:8001:8001"]   # только loopback хоста
+    if "dashboard" in services:
+        # Приём с телефона (ingest_lan.py, hae-lan 02.10): только запись под токеном, чтения нет.
+        # Служба только контейнерная — дом у неё один, здесь: шаблона launchd нет, у нативной
+        # установки телефон шлёт на дашборд через Tailscale (C-74: у агента launchd четыре дома).
+        # В домашнюю Wi-Fi порт выходит, только если человек сам попросил: install.sh --lan-ingest
+        # пишет в .env HEALTH_INGEST_BIND=0.0.0.0. По умолчанию — loopback, как дашборд.
+        services["ingest"] = {**services["dashboard"],
+                              "environment": {"HEALTH_SERVICE_LABEL": "com.larry.health.ingest",
+                                              "INGEST_HOST": "0.0.0.0"},
+                              "command": ["sh", "-c", f"env HEALTH_DATA_DIR={values['DATA']} python3 /app/ingest_lan.py"
+                                          " >> /app/logs/ingest.out.log 2>> /app/logs/ingest.err.log"],
+                              "ports": ["${HEALTH_INGEST_BIND:-127.0.0.1}:8011:8011"]}
     return {
         "crontab": head + "\n".join(cron) + "\n",
         "at_start.sh": head + "".join(f"{c} &\n" for c in at_start) + "wait\n",
@@ -477,6 +489,9 @@ RADICALE_VERSION = "3.8.1"   # та же, что у пробы этапа 3 (Mac
 OWNER_BACKUPS_REL = "container_backups/health"   # не «health*»: иначе ~/health*-сторожа сочли бы его тенантом
 
 
+HOST_LOGS = "/app/host_logs"   # журналы хоста в контейнере владельца (только чтение)
+
+
 def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> dict[str, str]:
     """Настройки контейнера ВЛАДЕЛЬЦА на Studio (волна Б, этап 11): compose.override.yaml и infra.yaml
     контейнера. Не для посторонних — у них слоя владельца нет. Что и почему (замеры этапа 9):
@@ -500,10 +515,14 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> 
             f"{home}/health_reference:{DOCKER_VALUES['HOME']}/health_reference:ro",
             f"{home}/.health_reference:{DOCKER_VALUES['HOME']}/.health_reference:ro",
             f"{home}/.health_secrets:{DOCKER_VALUES['SECRETS']}:ro",
+            # журнал сбоев хоста (бот и проверка партнёра, деплой) — только чтение; читает его ночная
+            # проверка через HEALTH_FAULTS_EXTRA (нить partner-faults, 02.10: с 30.09 его не читал никто)
+            f"{repo}/logs:{HOST_LOGS}:ro",
             # единственный пишущий том хоста: бэкапы базы — вне ВМ Colima, где лежит сама база
             # (удаление профиля или сбой образа диска не уносят и базу, и её бэкапы разом, 30.09)
             f"{home}/{OWNER_BACKUPS_REL}:{DOCKER_VALUES['DATA']}/backups"]
     services = {name: {"hostname": primary_host, "volumes": list(vols)} for name in base}
+    services["cron"]["environment"] = {"HEALTH_FAULTS_EXTRA": f"{HOST_LOGS}/faults.jsonl"}
     services["caldav"] = {
         "image": "python:3.11-slim", "restart": "unless-stopped",
         "command": ["sh", "-c", f'pip install -q "radicale=={RADICALE_VERSION}" && exec python -m radicale --config /caldav/config'],

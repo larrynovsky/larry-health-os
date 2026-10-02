@@ -1,48 +1,45 @@
-<!-- translation-of: docs/explanation/dashboard.md sha256:5eec149790ba -->
+<!-- translation-of: docs/explanation/dashboard.md sha256:80390d16787e -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](dashboard.md)
 
-# Dashboard: a read-only view into the DB from outside the tailnet perimeter — why a second entry point exists
+# Dashboard: a read-only window into the DB from outside the tailnet perimeter — how it works and why
 
 ## What changed
 
-- **Intent revised:** the subtitle changed from "a look at how it works" to "why a second entry point exists" — the frame shifted: the page now explains the dashboard through the motivation for its existence rather than through a description of its internals.
-- **write_guard_primary_only — wording clarified:** what changed is how the split-brain protection mechanism is described and exactly what is blocked when the process starts on a non-primary machine. The direction of the clarification was not determined programmatically.
+- **Added invariant `lan_ingest_write_only` (status: holds):** it is established that the LAN data-ingestion process operates write-only and serves no pages — it rejects browser requests. This is the boundary within which the claim is proven, no wider.
 
-**Updated:** 2026-09-26
-
-**Updated:** 2026-09-26
+**Updated:** 2026-10-02
 
 
 ## Why it exists
 
-When an entire medical history lives in a single database, a simple question eventually arises: how do you look at it without opening the primary tool that carries full write access?
+The system has one place where everything is stored — a database with health history. But looking at the raw database is inconvenient and unsafe: something can be accidentally broken, data from different places will start to diverge, and it becomes unclear what to trust.
 
-The dashboard is exactly that second entry point. Not a replacement for the main editor, but a read-only view: a convenient way to see health status at any moment, from any device on the home network. It makes no claim to being the primary interface — it reads what is already there and presents it in a comprehensible form.
-
-There is a second reason as well. If a viewing tool is allowed to write anywhere and at any time, it can silently corrupt data — especially when several devices are synchronising through the cloud. The dashboard is designed to prevent that from happening.
+The dashboard solves exactly one problem: to provide a convenient way to *see* what is already in the database — and occasionally correct an individual record right here, without going anywhere else. It does not try to become a second source of truth. It is a window into the single source that already exists.
 
 ## What it does, in plain terms
 
-The dashboard reads the same database that the primary system maintains. Not a copy, not its own version — the one and only instance. As a result, what you see on screen always matches what is actually there: not yesterday's snapshot, but a live state.
+**Reads from one database, writes to the same database.** The dashboard keeps no separate copy of state. When you open a page — it goes to the database, fetches from there, and displays it. When you edit something — it writes to the same place, through the same shared layer. This is fundamental: if the dashboard had its own copy, sooner or later it would diverge from the original, and it would become unclear which of the two versions is correct.
 
-Beyond reading, the dashboard can make targeted edits — for example, correcting a record directly in the interface. Those edits go through the same shared database access layer and leave a trace in the log.
+**The main page computes, it does not remember.** The "Getting Started" section, every time the page is opened, looks into the database and keys and recomputes the current state of each system capability. It does not store a flag "this section is configured". If data stops arriving — the page will see this on its own, because the source goes silent. If there is not enough data yet — the page will say so, because it looks at what is actually there.
 
-There is one important characteristic in the way it is built: the dashboard will not start in write mode if it finds itself on a non-primary machine. This is intentional. If it could write from any device while data is being synchronised through the cloud, two devices could begin making contradictory edits independently of each other — and the database would cease to be a single source of truth. To rule out that situation, the dashboard checks at startup where it is running, and if it is not the primary machine it stops immediately, not silently.
+**Does not start in write mode where it should not.** The system is designed so that the real, "primary" copy of the database lives on one device. If the dashboard were to be started somewhere else and began writing — the data would diverge through synchronisation, and the resulting confusion would be difficult to escape. Therefore the dashboard is structured so that if it is not where it is supposed to be — it stops immediately at startup, without waiting for something to go wrong.
 
-The dashboard is accessible only from the private home network built on tailscale. It does not face the internet and is not reachable at a public address. The network perimeter takes the place of a password.
+**Accessible only inside the private network.** The dashboard does not expose itself to the open internet. It listens only inside a closed network (tailnet) — something like a personal VPN for its own devices. It has no public address. This is the perimeter boundary: not a password on a page, but the network itself.
 
-## Honest things to say about its limits
+**There is a separate process for receiving data from the phone.** When the phone sends data over the home network — this does not go through the dashboard, but through a separate process on a separate port. It accepts only data and serves no pages. It rejects browser requests. This separation is intentional: the read tool and the write tool live apart and do not interfere with each other.
 
-This needs to be stated plainly, without softening.
+**Lab result review is a special case.** There is one sanctioned path where the dashboard behaves somewhat differently: a reviewer reads data from a temporary intermediate store and, upon approval, moves it into the primary database. This is a deliberate agreement, not an accidental exception to the rules.
 
-**The dashboard has no authentication.** Anyone who is inside the same tailscale mesh can access it — without a username or password. For a household network where all devices are known and trusted, this is a deliberate decision. But applied to medical data it is an assumption, not a guarantee: whoever gets into the mesh sees everything. This question remains open; it is not resolved.
+## What to honestly say about its limits
 
-This is not a technical oversight that was forgotten — it is an accepted risk. But calling it protection would be dishonest.
+**The dashboard has no authentication — and this is an incompleteness that matters to understand.** The perimeter is the closed network itself: the dashboard listens only on an address inside the tailnet, with no public access. For family use this is a deliberate decision. But for medical data this is an assumption, not a guarantee. This means literally: whoever has found themselves inside this network sees everything, with no additional identity verification. This question remains open. The network perimeter should not be treated as adequate protection for medical data.
 
-The split-brain protection — the "stop on startup if not on the primary machine" mechanism described above — works and holds. The single database as the sole source of truth also holds. But "holds" and "verified under all conceivable conditions" are different claims, and the second one is not made here.
+**LAN data ingestion runs without encryption.** Inside the home Wi-Fi, data from the phone is transmitted in the clear. And if the phone attempts to send data with the same address outside the home — that will also be without encryption. This is stated explicitly, as an accepted risk, not as an unnoticed gap.
 
 ## Where this lives in the system
 
-The dashboard lives in `dashboard.py`. The intentions and boundaries of the subsystem are described in `subsystem_intent.yaml` — the invariants are recorded there as well, including the open question around authentication. This is not a third-party service or a standalone application: logically the dashboard is part of the same system, simply with a different role and a different access mode.
+The core dashboard logic lives in `dashboard.py`. The subsystem's intent — what it does and why — is described in `subsystem_intent.yaml`. The main page with its computed capability state relies on `getting_started.board` and the `methodology/getting_started.yaml` catalogue, which must cover every entry in the capability registry — or explicitly name the reason why a given capability is omitted.
+
+The dashboard is not the centre of the system and not its brain. It is secondary by design: it reads what already exists, presents it in a convenient form, and is strict about not becoming a source of confusion where confusion is unacceptable.

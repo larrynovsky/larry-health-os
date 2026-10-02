@@ -53,8 +53,10 @@ def test_watcher_uses_the_operator_channel():
     from pathlib import Path
     src = Path(__file__).resolve().parents[2] / "lab_intake_watcher.py"
     text = src.read_text(encoding="utf-8")
-    assert text.count("notify.notify_operator(") == 1
-    assert text.count("notify.fault(") == 2
+    # 02.10 (нить llm-tails): +1 служебный — «чтение анализов не допущено у поставщика установки»,
+    # +1 сбой — «человек не получил это сообщение».
+    assert text.count("notify.notify_operator(") == 2
+    assert text.count("notify.fault(") == 3
     assert "notify.notify(" not in text
 
 

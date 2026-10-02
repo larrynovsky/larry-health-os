@@ -1,28 +1,6 @@
 {
  "_why": "Таблица допуска моделей чужих провайдеров к ролям — выпускаемые данные. Пишет llm_admission (--provider X --table), руками не правится. Пустая роль = функция на этом провайдере не работает (политика по умолчанию 2026-10-02).",
  "openai": {
-  "opus": {
-   "gpt-5.6-sol": {
-    "passed": false,
-    "date": "2026-10-02",
-    "corpus": "2026-10-02.2",
-    "model_ids": [
-     "gpt-5.6-sol"
-    ],
-    "suites": {
-     "lab_vision_p1": {
-      "items": 3,
-      "errors": [
-       "lab_hard.jpg: WBC: лишняя строка 7.15",
-       "lab_hard.jpg: HGB: лишняя строка 13.8",
-       "lab_hard.jpg: MCH: лишняя строка 30.4",
-       "lab_hard.jpg: MCHC: лишняя строка 34.1",
-       "lab_hard.jpg: PLT: лишняя строка 262"
-      ]
-     }
-    }
-   }
-  },
   "sonnet": {
    "gpt-5.6-terra": {
     "passed": false,
@@ -90,6 +68,107 @@
     "suites": {
      "lab_vision_p1": {
       "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  }
+ },
+ "anthropic": {
+  "opus": {
+   "claude-opus-5": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.3"
+   },
+   "claude-opus-5-5": {
+    "passed": false,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.3"
+   }
+  },
+  "sonnet": {
+   "claude-sonnet-5-5": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.3"
+   }
+  }
+ },
+ "deepseek": {
+  "opus": {
+   "deepseek-v4-pro": {
+    "passed": false,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "deepseek-v4-pro"
+    ],
+    "suites": {
+     "lab_vision_p1": {
+      "items": 1,
+      "errors": [
+       "lab_clean.jpg: WBC: 5.2 вместо 6.82",
+       "lab_clean.jpg: RBC: 4.6 вместо 4.71",
+       "lab_clean.jpg: HGB: 13.8 вместо 141",
+       "lab_clean.jpg: HCT: 41.5 вместо 41.8",
+       "lab_clean.jpg: MCV: 90.2 вместо 88.7"
+      ]
+     }
+    }
+   }
+  },
+  "sonnet": {
+   "deepseek-flash": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "deepseek-flash"
+    ],
+    "suites": {
+     "lab_vision_p2": {
+      "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  },
+  "haiku": {
+   "deepseek-flash": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "deepseek-flash"
+    ],
+    "suites": {
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  },
+  "haiku_pinned": {
+   "deepseek-flash": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "deepseek-flash"
+    ],
+    "suites": {
+     "treatment": {
+      "items": 2,
       "errors": []
      },
      "text": {

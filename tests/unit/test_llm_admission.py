@@ -86,7 +86,7 @@ def test_candidates_skip_chain_members_and_judged():
 
 
 @pytest.fixture
-def store(monkeypatch):
+def store(monkeypatch, tmp_path):
     import hai_core
     import health_db
     st: dict = {}
@@ -96,6 +96,9 @@ def store(monkeypatch):
                         st.__setitem__(k, value_json if value_json is not None else
                                        value_num if value_num is not None else value_text))
     monkeypatch.setattr(hai_core.db, "get_config", lambda k, d=None, **kw: st.get(k, d))
+    table = tmp_path / "admission.json"
+    table.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(hai_core, "_ADMISSION_TABLE", table)
     return st
 
 
@@ -107,6 +110,22 @@ def test_admit_appends_to_end_and_keeps_two_passes_apart(store):
         la.admit_to_chain("sonnet", "claude-opus-5-5")
 
 
+def test_admit_persists_only_base_chain_with_nonempty_release_table(store, monkeypatch):
+    """Ревью #7: уже зелёный на 06edf2d; base_chain→model_chain обязан его покраснить."""
+    import hai_core
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    store["model.opus"] = ["base-opus"]
+    store["model.sonnet"] = ["base-sonnet"]
+    hai_core._ADMISSION_TABLE.write_text(json.dumps({"anthropic": {
+        "opus": {"table-only": {"passed": True}},
+        "sonnet": {"other-table-only": {"passed": True}}}}), encoding="utf-8")
+    assert hai_core.model_chain("opus") == ["base-opus", "table-only"]
+    expected = ["base-opus", "newly-judged"]
+    assert la.admit_to_chain("opus", "newly-judged") == expected
+    assert store["model.opus"] == expected, "запасная таблицы вросла в базу"
+    assert hai_core.model_chain("opus") == expected + ["table-only"]
+
+
 # ── бюджет ───────────────────────────────────────────────────────────────────
 def test_ledger_reserves_before_call_and_refuses_over_cap(store):
     led = la.Ledger({"usd_month": 1, "price_ceiling_per_mtok": {"in": 15, "out": 75}}, NOW)
@@ -115,6 +134,38 @@ def test_ledger_reserves_before_call_and_refuses_over_cap(store):
     with pytest.raises(la.BudgetExhausted):
         led.reserve(1000, 8000)              # ещё 0.615 — не помещается в 1 $
     assert store["llm.admission.spend.2026-10"] == pytest.approx(0.615)
+
+
+def test_ledger_charges_cache_tokens_at_input_ceiling(store):
+    led = la.Ledger({"usd_month": 1, "price_ceiling_per_mtok": {"in": 15, "out": 75}}, NOW)
+    assert led.charge(1000, 100, cache_read_input_tokens=20000,
+                      cache_creation_input_tokens=30000) == pytest.approx(0.7725)
+    assert store["llm.admission.spend.2026-10"] == pytest.approx(0.7725)
+    with pytest.raises(la.BudgetExhausted):
+        led.reserve(20000, 0)
+
+
+@pytest.mark.parametrize("cache", [{}, {"cache_read_input_tokens": None, "cache_creation_input_tokens": None},
+    {"cache_read_input_tokens": 20000}, {"cache_creation_input_tokens": 30000},
+    {"cache_read_input_tokens": 20000, "cache_creation_input_tokens": 30000}])
+def test_call_records_cached_usage_and_limits_next_call(store, cache):
+    from types import SimpleNamespace as NS
+    led = la.Ledger({"usd_month": 0.1, "price_ceiling_per_mtok": {"in": 15, "out": 75}}, NOW)
+    calls = []
+    def create(**kw):
+        calls.append(kw)
+        return NS(model="m", content=[NS(type="text", text="ok")],
+                  usage=NS(input_tokens=1000, output_tokens=100, **cache))
+    client = NS(messages=NS(create=create))
+    kw = dict(prompt="q", image=None, system=None, max_tokens=1, temperature=None, ledger=led)
+    assert la._call(client, "m", **kw) == ("ok", "m")
+    expected = ((1000 + sum(v or 0 for v in cache.values())) * 15 + 100 * 75) / 1e6
+    assert led.used == pytest.approx(expected)
+    assert store["llm.admission.spend.2026-10"] == pytest.approx(round(expected, 4))
+    if any(cache.values()):
+        with pytest.raises(la.BudgetExhausted):
+            la._call(client, "m", **kw)
+        assert len(calls) == 1, "cache-токены не остановили следующий платный вызов"
 
 
 def test_no_budget_spends_nothing(store):
@@ -159,7 +210,7 @@ class _FakeClient:
             for it in CORPUS["lab_vision"]:
                 import base64
                 if base64.standard_b64encode((la.CORPUS_DIR / it["image"]).read_bytes()).decode() == data:
-                    return _Msg(json.dumps({"tests": it["gold"]}), model)
+                    return _Msg(json.dumps({"tests": [dict(g, date=it["date"]) for g in it["gold"]]}), model)
         if prompt.startswith("ДОКУМЕНТ:"):
             exp = CORPUS["treatment"]["expected"]
             return _Msg(json.dumps([dict(agents=e["agents"], cycles_completed=e["cycles"], status=e["status"])
@@ -186,7 +237,8 @@ def test_end_to_end_pass_lands_in_chain_and_fail_does_not(store, monkeypatch):
     assert store["llm.admission.claude-opus-5-5"]["roles"]["opus"]["passed"] is True
     assert 0 < store["llm.admission.spend.2026-10"] < 10
 
-    store2 = {k: v for k, v in store.items() if not k.startswith("llm.admission.claude")}
+    store2 = {k: v for k, v in store.items()
+              if not k.startswith(("llm.admission.claude", "llm.admission.suite."))}
     store.clear(); store.update(store2)
     store["model.opus"] = ["claude-opus-4-7"]
     store["model.sonnet"] = ["claude-sonnet-4-6"]
@@ -291,6 +343,8 @@ def test_provider_admission_writes_table_not_chains(store, monkeypatch, tmp_path
     assert la.run_provider_admission("openai", dry_run=True, now=NOW, table_file=table)["candidates"] == []
 
     table.write_text('{"_why": "x"}')
+    for k in [k for k in store if k.startswith("llm.admission.suite.")]:
+        del store[k]                      # другая «модель» под тем же именем — без готовых наборов
     la.run_provider_admission("openai", client=_TerraLike(LISTED), now=NOW, table_file=table)
     t = json.loads(table.read_text())
     assert t["openai"]["opus"][rd["opus"]]["passed"] is False, "число мимо на жёстком бланке не поймано"
@@ -324,3 +378,345 @@ def test_reference_shows_a_failed_role_with_its_reason():
     md = la.admission_reference_md(t)
     row = next(line for line in md.splitlines() if line.startswith("| sonnet") and rd["sonnet"] in line)
     assert "| нет |" in row and "MCH" in row
+
+
+# ── исправления после первого живого допуска (02.10) ────────────────────────
+def test_dated_previous_column_is_not_an_extra_row():
+    """Жёсткий бланк печатает «Önceki (12.03.2026)». claude-opus-5-5 отдал эти значения отдельными
+    строками с датой 12.03 — честная история, а не лишний текущий результат. Та же строка без даты
+    или с датой текущих — ошибка: легла бы в базу как сегодняшняя."""
+    page = CORPUS["lab_vision"][2]
+    gold = page["gold"]
+    cur = [dict(g, date=page["date"]) for g in gold]
+    prev = [dict(g, date=page["history"]["date"]) for g in page["history"]["gold"]]
+    kw = dict(complete=True, page_date=page["date"], history=page["history"])
+    assert la.judge_lab(json.dumps({"tests": cur + prev}), gold, **kw) == []
+    same_day = [dict(r, date="2026-09-15") for r in prev]
+    assert len(la.judge_lab(json.dumps({"tests": cur + same_day}), gold, **kw)) == len(gold)
+    undated = [{k: v for k, v in r.items() if k != "date"} for r in prev]
+    assert len(la.judge_lab(json.dumps({"tests": cur + undated}), gold, **kw)) == len(gold)
+
+
+@pytest.mark.parametrize("fault", ["current_with_past_date", "invented_history", "all_1900"])
+def test_admission_rejects_wrong_lab_dates_and_invented_history(store, monkeypatch, fault):
+    """Ревью #1: правильное число с неверной датой и выдуманная история не получают допуск."""
+    import base64
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    hard = CORPUS["lab_vision"][2]
+    hard_image = base64.standard_b64encode((la.CORPUS_DIR / hard["image"]).read_bytes()).decode()
+    assert all(p["date"] == "2026-09-15" for p in CORPUS["lab_vision"])
+    assert hard["history"]["date"] == "2026-03-12"
+
+    class WrongDate(_FakeClient):
+        def create(self, model, messages, **kw):
+            r = super().create(model, messages, **kw)
+            obj = json.loads(r.content[0].text)
+            if isinstance(obj, dict) and obj.get("tests"):
+                rows = obj["tests"]
+                if fault == "all_1900":
+                    for row in rows:
+                        row["date"] = "1900-01-01"
+                elif messages[0]["content"][0]["source"]["data"] == hard_image:
+                    wbc = next(row for row in rows if row["canonical_name"] == "WBC")
+                    assert wbc["value"] == 6.82
+                    if fault == "current_with_past_date":
+                        wbc["date"] = hard["history"]["date"]
+                    else:
+                        invented = 8.1234
+                        assert all(g["value"] != invented for g in hard["history"]["gold"])
+                        rows.append(dict(wbc, value=invented, date=hard["history"]["date"]))
+                r.content[0].text = json.dumps(obj)
+            return r
+
+    model = LISTED[0]["id"]
+    rep = la.run_admission(force=True, client=WrongDate(LISTED[:3]), now=NOW)
+    verdict = store[f"llm.admission.{model}"]["roles"]["opus"]
+    assert rep["results"] and not verdict["passed"], f"{fault}: модель допущена вопреки ошибке"
+    assert model not in store.get("model.opus", [])
+
+
+def test_gold_keeps_only_the_latest_reread():
+    """Две promoted-строки одного показателя (перечитывание без оператора и позднее с «<») —
+    эталон берёт позднюю; иначе требовал бы две строки, и верное чтение «< N» получало «пропущен».
+    Значения выдуманы (публичный репозиторий)."""
+    rows = [{"id": 101, "canonical_name": "Urine_Urobilinogen", "value": 20.0, "value_op": None},
+            {"id": 102, "canonical_name": "Urine_Urobilinogen", "value": 20.0, "value_op": "<"},
+            {"id": 7000, "canonical_name": "Urine_pH", "value": 6.0, "value_op": None},
+            {"id": 7001, "canonical_name": None, "value": 1.0, "value_op": None}]
+    gold = la.gold_from_promoted(rows)
+    assert gold == [{"canonical_name": "Urine_Urobilinogen", "value": 20.0, "value_op": "<"},
+                    {"canonical_name": "Urine_pH", "value": 6.0, "value_op": None}]
+    assert la.judge_lab(json.dumps({"tests": [{"canonical_name": "Urine_Urobilinogen", "value": 20, "value_op": "<"},
+                                              {"canonical_name": "Urine_pH", "value": 6}]}), gold) == []
+
+
+def test_role_not_started_when_money_would_run_out_mid_role(store, monkeypatch):
+    """Прерванный стоп-краном прогон тратит без вердикта (02.10: 4-й кандидат). Роль не начинается,
+    если остаток ниже порога политики."""
+    store["llm.admission.budget"] = {"usd_month": 10, "price_ceiling_per_mtok": {"in": 15, "out": 75}}
+    store["llm.admission.spend.2026-10"] = 8.5
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    store["model.opus"] = ["claude-opus-4-7"]
+    store["model.sonnet"] = ["claude-sonnet-4-6"]
+    client = _FakeClient(LISTED[:5])
+    rep = la.run_admission(force=True, client=client, now=NOW)
+    assert client.calls == [] and "не хватит" in rep["stopped"]
+
+
+# ── доделки-2 (02.10): обрыв без повторной оплаты, псевдонимы, таблица выпуска ──
+class _VisionCounter(_FakeClient):
+    def create(self, model, messages, **kw):
+        if messages[0]["content"][0]["type"] == "image":
+            self.vision = getattr(self, "vision", 0) + 1
+        return super().create(model, messages, **kw)
+
+
+def test_rerun_after_a_killed_run_does_not_pay_again(store, monkeypatch):
+    """Прогон оборвали после набора зрения (02.10 — деплой чужой нити) — перезапуск берёт готовый
+    набор из базы и за зрение не платит; текст — платит, его не было."""
+    _budget(store)
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    store["model.opus"] = ["claude-opus-4-7"]
+    store["model.sonnet"] = ["claude-sonnet-4-6"]
+    real = la.run_suite
+
+    def dies_on_text(client, model, suite, *a, **kw):
+        if suite == "text":
+            raise KeyboardInterrupt("деплой пересоздал контейнер")
+        return real(client, model, suite, *a, **kw)
+    monkeypatch.setattr(la, "run_suite", dies_on_text)
+    first = _VisionCounter(LISTED[:5])
+    with pytest.raises(KeyboardInterrupt):
+        la.run_admission(force=True, client=first, now=NOW)
+    assert first.vision > 0
+    monkeypatch.setattr(la, "run_suite", real)
+    second = _VisionCounter(LISTED[:5])
+    la.run_admission(force=True, client=second, now=NOW)
+    # первый кандидат: зрение оплачено в первом прогоне, во втором — из базы; второй кандидат
+    # платит за своё зрение впервые. Без кэша второй прогон заплатил бы за зрение дважды.
+    assert second.vision == first.vision
+
+
+@pytest.mark.parametrize("change", ["gold", "image", "cache_date"])
+def test_suite_cache_tracks_real_inputs_and_original_measurement_date(store, monkeypatch, tmp_path, change):
+    """Ревью #2: меняем только приватный вход; run_suite и кэш остаются настоящими."""
+    import base64
+    _budget(store)
+    image = tmp_path / "private-page.jpg"
+    image.write_bytes(b"private-page-v1")
+    gold = [{"canonical_name": "WBC", "value": 1.25, "value_op": None}]
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [{
+        "image_bytes": image.read_bytes(), "gold": gold, "key": image.name, "real": True}])
+
+    class ReadsPage(_FakeClient):
+        def __init__(self):
+            super().__init__([])
+            self.private_calls = []
+
+        def create(self, model, messages, **kw):
+            content = messages[0]["content"]
+            if content[0]["type"] == "image":
+                data = base64.b64decode(content[0]["source"]["data"])
+                if data.startswith(b"private-page-"):
+                    self.private_calls.append(data)
+                    return _Msg(json.dumps({"tests": [{"canonical_name": "WBC", "value": 1.25}]}), model)
+            return super().create(model, messages, **kw)
+
+    model, client = "claude-opus-cache-fixture", ReadsPage()
+    first = la._judge_role(client, model, "opus", CORPUS,
+                          la.Ledger(store["llm.admission.budget"], NOW), "anthropic", {})
+    assert la._role_passed(first, CORPUS["policy"]["role_suites"]["opus"])
+    initial_calls = len(client.private_calls)
+    assert initial_calls > 0
+    key = la._suite_key(model, "lab_vision_p1")
+    measured = store[key]["date"]
+    version = CORPUS["version"]
+    if change == "gold":
+        gold[0]["value"] = 2.5
+        fresh = la.run_suite(ReadsPage(), model, "lab_vision_p1", CORPUS,
+                             la.Ledger(store["llm.admission.budget"], NOW), "anthropic")
+        assert fresh["errors"], "свежий оракул должен обнаружить исправленное значение"
+    elif change == "image":
+        image.write_bytes(b"private-page-v2")
+    second = la._judge_role(client, model, "opus", CORPUS,
+                           la.Ledger(store["llm.admission.budget"], NOW + timedelta(days=6)), "anthropic", {})
+    assert CORPUS["version"] == version
+    if change == "cache_date":
+        assert len(client.private_calls) == initial_calls, "неизменный набор не переиспользован"
+        assert store[key]["date"] == measured, "переиспользование омолодило дату замера"
+    else:
+        assert len(client.private_calls) > initial_calls, f"изменился {change}, но приватную страницу не проверили"
+        if change == "gold":
+            assert second["lab_vision_p1"]["errors"], "модель не проверена по исправленному эталону"
+        else:
+            assert b"private-page-v2" in client.private_calls
+
+
+def test_anthropic_suite_cache_cannot_publish_private_errors_for_another_provider(store, monkeypatch, tmp_path):
+    """Ревью #3: одинаковый id у двух провайдеров; ошибка владельца не переезжает в выпуск."""
+    import base64
+    import copy
+    import llm_client
+    _budget(store)
+    model = "same-model-id"
+    private_value = 23.4567   # вымышленное значение, не данные владельца
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [{
+        "image_bytes": b"private-page", "key": "private-page.jpg", "real": True,
+        "gold": [{"canonical_name": "WBC", "value": private_value, "value_op": None}]}])
+
+    class OwnerMismatch(_FakeClient):
+        def create(self, model, messages, **kw):
+            content = messages[0]["content"]
+            if content[0]["type"] == "image" and base64.b64decode(content[0]["source"]["data"]) == b"private-page":
+                return _Msg(json.dumps({"tests": [{"canonical_name": "WBC", "value": 1.25}]}), model)
+            return super().create(model, messages, **kw)
+
+    owner = la._judge_role(OwnerMismatch([]), model, "opus", CORPUS,
+                          la.Ledger(store["llm.admission.budget"], NOW), "anthropic", {})
+    assert any(str(private_value) in e for e in owner["lab_vision_p1"]["errors"])
+    profiles = copy.deepcopy(llm_client.profiles())
+    profiles["openai"]["role_defaults"] = {"opus": model}
+    monkeypatch.setattr(llm_client, "profiles", lambda: profiles)
+    monkeypatch.setattr(la, "owner_real_pages", lambda: pytest.fail("приватные страницы ушли чужому провайдеру"))
+    table = tmp_path / "public.json"
+    table.write_text("{}", encoding="utf-8")
+    foreign = _FakeClient([])
+    la.run_provider_admission("openai", client=foreign, now=NOW, table_file=table)
+    public = table.read_text(encoding="utf-8")
+    ref = la.admission_reference_md(json.loads(public))
+    verdict = json.loads(public)["openai"]["opus"][model]
+    assert verdict["passed"] and foreign.calls and str(private_value) not in public + ref, (
+        "чужой допуск использовал приватный кэш вместо собственного прогона")
+
+
+def test_alias_in_chain_is_not_a_candidate_for_itself(store):
+    """claude-haiku-4-5 в цепочке = claude-haiku-4-5-20251001 в списке (models.retrieve, 02.10)."""
+    class C(_FakeClient):
+        def retrieve(self, mid):
+            return type("M", (), {"id": {"claude-haiku-4-5": "claude-haiku-4-5-20251001"}.get(mid, mid)})()
+    listed = [{"id": "claude-haiku-4-5-20251001", "created_at": "2025-10-15"}]
+    _budget(store)
+    store["model.haiku"] = ["claude-haiku-4-5"]
+    rep = la.run_admission(force=True, dry_run=True, client=C(listed), now=NOW)
+    assert all(m != "claude-haiku-4-5-20251001" for m, _ in rep["candidates"])
+    rep = la.run_admission(force=True, dry_run=True, client=_FakeClient(listed), now=NOW)
+    assert all(m != "claude-haiku-4-5-20251001" for m, _ in rep["candidates"]), \
+        "без retrieve датированный снимок псевдонима из цепочки — тоже не кандидат (ревью 02.10, #6)"
+
+
+@pytest.mark.parametrize("fault", ["retrieve_raises", "wrong_family"])
+def test_canonicalization_failure_does_not_turn_chain_members_into_candidates(store, monkeypatch, fault):
+    """Ревью #6: ошибка metadata API не теряет уже используемую модель."""
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    if fault == "retrieve_raises":
+        original, listed_id = "claude-haiku-4-5", "claude-haiku-4-5-20251001"
+        store["model.haiku"] = [original]
+        listed = [{"id": listed_id, "created_at": "2025-10-15"}]
+    else:
+        original = listed_id = LISTED[0]["id"]
+        store["model.opus"] = ["claude-opus-4-7", original]
+        listed = LISTED[:3]
+
+    class C(_FakeClient):
+        def retrieve(self, mid):
+            if mid == original:
+                if fault == "retrieve_raises":
+                    raise RuntimeError("metadata API temporarily unavailable")
+                return type("M", (), {"id": "claude-sonnet-wrong-family"})()
+            return type("M", (), {"id": mid})()
+
+    client = C(listed)
+    rep = la.run_admission(force=True, dry_run=True, client=client, now=NOW)
+    assert all(m != listed_id for m, role in rep["candidates"]), (
+        f"{fault}: уже используемая модель стала кандидатом: {rep['candidates']}")
+    assert client.calls == []
+
+
+def test_export_carries_no_values_from_owner_pages():
+    v = {"claude-opus-5-5": {"roles": {"opus": {"passed": False, "date": "2026-10-02", "corpus": "c",
+                                                "suites": {"lab_vision_p1": {"errors": ["page-1.jpg: ALT: 31 вместо 13"]}}}}},
+         "claude-opus-5": {"roles": {"opus": {"passed": True, "date": "2026-10-02", "corpus": "c", "suites": {}}}},
+         "claude-sonnet-5": {"model": "claude-sonnet-5", "roles": {}, "withdrawn": {"why": "x"}}}
+    out = la.export_anthropic_verdicts(v)
+    assert out == {"opus": {"claude-opus-5": {"passed": True, "date": "2026-10-02", "corpus": "c"},
+                            "claude-opus-5-5": {"passed": False, "date": "2026-10-02", "corpus": "c"}}}
+    assert "31 вместо" not in json.dumps(out) and "ALT" not in json.dumps(out)
+
+
+def test_release_table_has_no_owner_values():
+    """Таблица выпуска уходит в публичный репозиторий: в разделе anthropic — только три поля."""
+    t = json.loads(la._TABLE_FILE.read_text(encoding="utf-8"))
+    for role, models in (t.get("anthropic") or {}).items():
+        for m, v in models.items():
+            assert set(v) == {"passed", "date", "corpus"}, (role, m, v)
+
+
+# ── второе ревью (02.10, Codex D): даты как в бою, история с оператором, версии ──
+_HARD = CORPUS["lab_vision"][2]
+
+
+def _kw():
+    return dict(complete=True, page_date=_HARD["date"], history=_HARD["history"])
+
+
+def test_undated_current_rows_take_the_page_date_the_recognizer_would_take():
+    """Все текущие без даты + одна историческая с датой: в бою (lab_recognizer.recognize) строки без
+    даты получают самую частую дату страницы — 12.03. Судья обязан увидеть это как чужую дату."""
+    cur = [dict(g) for g in _HARD["gold"]]
+    one_past = [dict(_HARD["history"]["gold"][0], date=_HARD["history"]["date"])]
+    errs = la.judge_lab(json.dumps({"tests": cur + one_past}), _HARD["gold"], **_kw())
+    assert any("дата 2026-03-12 вместо 2026-09-15" in e for e in errs)
+    assert la.judge_lab(json.dumps({"tests": cur}), _HARD["gold"], **_kw()) == [], "без дат вовсе — дата документа"
+
+
+def test_same_value_in_current_and_past_column_is_not_an_error():
+    gold = [{"canonical_name": "WBC", "value": 6.82}]
+    hist = {"date": "2026-03-12", "gold": [{"canonical_name": "WBC", "value": 6.82}]}
+    rows = [{"canonical_name": "WBC", "value": 6.82, "date": "2026-03-12"},
+            {"canonical_name": "WBC", "value": 6.82, "date": "2026-09-15"}]
+    assert la.judge_lab(json.dumps({"tests": rows}), gold, complete=True, page_date="2026-09-15",
+                        history=hist) == []
+
+
+def test_past_value_with_invented_operator_is_an_error():
+    cur = [dict(g, date=_HARD["date"]) for g in _HARD["gold"]]
+    past = [dict(h, date=_HARD["history"]["date"]) for h in _HARD["history"]["gold"]]
+    past[0]["value_op"] = "<"
+    errs = la.judge_lab(json.dumps({"tests": cur + past}), _HARD["gold"], **_kw())
+    assert len(errs) == 1 and "лишняя строка <" in errs[0]
+
+
+def test_gold_keeps_rereads_of_different_dates_apart():
+    rows = [{"id": 1, "canonical_name": "WBC", "value": 6.82, "value_op": None, "date": "2026-03-12"},
+            {"id": 2, "canonical_name": "WBC", "value": 6.82, "value_op": None, "date": "2026-09-15"}]
+    assert len(la.gold_from_promoted(rows)) == 2
+
+
+def test_canonical_id_accepts_only_a_dated_snapshot_of_the_same_name():
+    class C:
+        def __init__(self, rid):
+            self.models = self
+            self.rid = rid
+
+        def retrieve(self, mid):
+            return type("M", (), {"id": self.rid})()
+    assert la._canonical_id(C("claude-haiku-4-5-20251001"), "claude-haiku-4-5") == "claude-haiku-4-5-20251001"
+    assert la._canonical_id(C("claude-opus-4-5"), "claude-opus-4") == "claude-opus-4", "соседняя версия — не псевдоним"
+
+
+def test_snapshot_rule_does_not_swallow_a_newer_version():
+    listed = [{"id": "claude-opus-4-5", "created_at": "2026-02-01"},
+              {"id": "claude-opus-4", "created_at": "2025-05-01"}]
+    got = la.admission_candidates(listed, {"opus": ["claude-opus-4"]}, {}, {"claude-opus": ["opus"]})
+    assert ("claude-opus-4-5", "opus") in got
+
+
+def test_fingerprint_changes_with_policy(monkeypatch):
+    import copy
+    a = la._suite_fingerprint("text", CORPUS, "anthropic")
+    c2 = copy.deepcopy(CORPUS)
+    c2["policy"]["reps"]["text"] += 1
+    assert la._suite_fingerprint("text", c2, "anthropic") != a

@@ -53,7 +53,7 @@ def test_facts_без_окружения_и_значений_пояса(monkeypa
     monkeypatch.setenv("HEALTH_TZ", "Pacific/Auckland")
     monkeypatch.setenv("HEALTH_DATA_DIR", "/Users/foreign/health")
     assert install.install_facts("Europe/Berlin") == facts == install.install_facts()
-    assert [s["name"] for s in facts["services"]] == ["bot", "cron", "dashboard", "lab-intake"]
+    assert [s["name"] for s in facts["services"]] == ["bot", "cron", "dashboard", "ingest", "lab-intake"]
     assert facts["secrets"]["required"] == ["telegram_chat_id", "telegram_token"]
     assert "anthropic_key" in facts["secrets"]["optional"]
     assert facts["ocr_langs"] == "eng rus"
@@ -162,6 +162,11 @@ def test_порты_только_на_loopback_секреты_только_чт�
     compose = yaml.safe_load(install.render_docker("Europe/Berlin")["compose.yaml"])
     for name, s in compose["services"].items():
         for p in s.get("ports", []):
+            if name == "ingest":
+                # Приём с телефона (hae-lan, 02.10): в Wi-Fi — только по явному --lan-ingest,
+                # по умолчанию loopback; сам процесс несёт только запись под токеном.
+                assert p == "${HEALTH_INGEST_BIND:-127.0.0.1}:8011:8011", p
+                continue
             assert p.startswith("127.0.0.1:"), (name, p)
         sec = [v for v in s["volumes"] if v.split(":")[-2 if v.endswith(":ro") else -1]
                .endswith(".health_secrets")]
@@ -240,6 +245,8 @@ def test_override_владельца_имя_машины_слой_только_�
         # веса PGS (30.09 07:50: без них FAIL монитора «PGS reference-БД отсутствует»)
         assert f"/Users/o/.health_reference:{install.DOCKER_VALUES['HOME']}/.health_reference:ro" in vols
         assert "ports" not in s                                        # порты — только из базового рендера
+        assert f"{repo}/logs:{install.HOST_LOGS}:ro" in vols            # журнал сбоев хоста (partner-faults)
+    assert svc["cron"]["environment"] == {"HEALTH_FAULTS_EXTRA": f"{install.HOST_LOGS}/faults.jsonl"}
     assert svc["caldav"]["ports"] == ["127.0.0.1:5232:5232"]           # наружу — только tailscale serve
     assert f"radicale=={install.RADICALE_VERSION}" in svc["caldav"]["command"][-1]
 

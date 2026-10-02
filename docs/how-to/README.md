@@ -36,13 +36,14 @@
 - [Прислать боту большой файл](send_large_file.md)
 - [Подключить кольцо Oura](connect_oura.md)
 - [Подключить «Здоровье» iPhone и Apple Watch](connect_apple_health.md)
+  (безопасный путь через Tailscale — [отдельно](connect_apple_health_tailscale.md))
 
 ## 2. Вы обслуживаете свою установку
 
 Нужен терминал на машине, где стоит система. Команды — по правилу выше.
 
 - Установка и обновление: [поставить систему в Докере, своей сборкой](install_docker.md) ·
-  [с ключом OpenAI или Gemini](llm_provider.md)
+  [с ключом OpenAI, Gemini или DeepSeek](llm_provider.md)
 - Бот ответил «Не получилось ответить: сбой внутри системы…» с кодом: [найти причину по коду](bot_fault.md)
 - Ответить на звонки системы: [ночной звонок](night_cycle_respond.md) ·
   [эскалация «человек столкнулся с проблемой»](service_trouble_alert.md) ·

@@ -96,7 +96,10 @@ class Ledger:
             raise BudgetExhausted(f"нужно до {cost:.2f} $, осталось {self.cap - self.used:.2f} $")
         return cost
 
-    def charge(self, tin: int, tout: int) -> float:
+    def charge(self, tin: int, tout: int, *, cache_read_input_tokens: int = 0,
+               cache_creation_input_tokens: int = 0) -> float:
+        # Cache — оплачиваемый вход; потолок входа консервативнее скидки на чтение.
+        tin += (cache_read_input_tokens or 0) + (cache_creation_input_tokens or 0)
         cost = (tin * self.p_in + tout * self.p_out) / 1e6
         self.used += cost
         _put(_month_key(self.now), value_num=round(self.used, 4))
@@ -121,19 +124,27 @@ def owner_real_pages() -> list[dict]:
     for it in json.loads(man.read_text(encoding="utf-8")):
         with db.get_conn() as conn:
             rows = conn.execute(
-                "SELECT canonical_name, value, value_op FROM lab_results_staging "
+                "SELECT id, canonical_name, value, value_op, date FROM lab_results_staging "
                 "WHERE review_status='promoted' AND source_file LIKE ? AND page=?",
                 (it["source_like"], it["page"])).fetchall()
-        seen, gold = set(), []
-        for r in rows:
-            k = (r["canonical_name"], r["value"], r["value_op"])
-            if r["canonical_name"] and r["value"] is not None and k not in seen:
-                seen.add(k)
-                gold.append({"canonical_name": k[0], "value": k[1], "value_op": k[2]})
+        gold = gold_from_promoted([dict(r) for r in rows])
         img = base / it["image"]
         if gold and img.exists():
             out.append({"image_bytes": img.read_bytes(), "gold": gold, "key": it["image"], "real": True})
     return out
+
+
+def gold_from_promoted(rows: list[dict]) -> list[dict]:
+    """Эталон страницы из promoted-строк: перечитывания одного показателя схлопываются в
+    ПОЗДНЕЕ (больший id). Замер 02.10: один показатель мочи был promoted дважды — числом и тем же
+    числом с оператором «<» (два перечитывания); эталон требовал двух строк, и модель, верно
+    прочитавшая одну строку с «<», получала «пропущен»."""
+    last: dict = {}
+    for r in sorted(rows, key=lambda r: r["id"]):
+        if r["canonical_name"] and r["value"] is not None:
+            last[(r["canonical_name"], float(r["value"]), r.get("date"))] = r
+    return [{"canonical_name": r["canonical_name"], "value": r["value"], "value_op": r["value_op"],
+             **({"date": r["date"]} if r.get("date") else {})} for r in last.values()]
 
 
 # ── разбор ответов (точный эталон) ───────────────────────────────────────────
@@ -156,24 +167,42 @@ def _eq(a, b) -> bool:
         return False
 
 
-def judge_lab(text: str, gold: list[dict], complete: bool = False) -> list[str]:
-    """Ошибки чтения бланка: пропуск аналита или неточное значение/оператор.
-    complete=True — эталон полный по построению (синтетика): лишняя строка тоже ошибка
-    (замер 01.10: gpt-5.6-sol вернул каждую строку жёсткого бланка дважды — 32 вместо 16).
+def judge_lab(text: str, gold: list[dict], complete: bool = False, page_date: str | None = None,
+              history: dict | None = None) -> list[str]:
+    """Ошибки чтения бланка: пропуск аналита, неточное значение/оператор, чужая дата.
+    Дата судится так, как её поставит распознаватель в бою (lab_recognizer.recognize): у строки
+    без даты — самая частая дата этой страницы в ответе, нет ни одной — дата документа (page_date).
+    Ревью 02.10: «все текущие без даты + одна историческая с датой» в бою легли бы датой истории,
+    а судья, верящий «распознаватель поставит дату страницы», пропускал это.
+    Совпадение с эталоном ищется сначала с той же датой (одно значение в текущей и прошлой
+    колонке — не ошибка), затем любое.
+    complete=True — эталон полный (синтетика): лишняя строка допустима, ТОЛЬКО если это значение
+    прошлой колонки (history: {date, gold}) с её датой и без выдуманного оператора.
     У настоящих страниц эталон — promoted-строки, владелец мог часть отклонить: лишнее не судим."""
     obj = _json(text)
     if not isinstance(obj, dict):
         return ["ответ не JSON"]
+    rows = [r for r in obj.get("tests") or [] if isinstance(r, dict)]
+    read = [str(r.get("date")).strip() for r in rows if str(r.get("date") or "").strip()]
+    page_read = max(set(read), key=read.count) if read else None
+
+    def eff(r):
+        return str(r.get("date") or "").strip() or page_read or page_date
+
     pool: dict = {}
-    for r in obj.get("tests") or []:
+    for r in rows:
         pool.setdefault(r.get("canonical_name"), []).append(r)
     errs = []
     for g in gold:
+        want = g.get("date") or page_date
         cands = pool.get(g["canonical_name"]) or []
-        hit = next((c for c in cands if _eq(c.get("value"), g["value"])
-                    and (c.get("value_op") or None) == (g.get("value_op") or None)), None)
+        same = [c for c in cands if _eq(c.get("value"), g["value"])
+                and (c.get("value_op") or None) == (g.get("value_op") or None)]
+        hit = next((c for c in same if not want or eff(c) == str(want)), None) or (same[0] if same else None)
         if hit:
             cands.remove(hit)
+            if want and eff(hit) and eff(hit) != str(want):
+                errs.append(f"{g['canonical_name']}: дата {eff(hit)} вместо {want}")
         elif cands:
             c = cands.pop(0)
             errs.append(f"{g['canonical_name']}: {c.get('value_op') or ''}{c.get('value')} вместо "
@@ -181,8 +210,16 @@ def judge_lab(text: str, gold: list[dict], complete: bool = False) -> list[str]:
         else:
             errs.append(f"{g['canonical_name']}: пропущен")
     if complete:
-        errs += [f"{name}: лишняя строка {c.get('value_op') or ''}{c.get('value')}"
-                 for name, rest in pool.items() for c in rest]
+        past = [dict(h) for h in ((history or {}).get("gold") or [])]
+        for name, rest in pool.items():
+            for c in rest:
+                h = next((h for h in past if h["canonical_name"] == name and _eq(c.get("value"), h["value"])
+                          and (c.get("value_op") or None) == (h.get("value_op") or None)), None)
+                if h and history and eff(c) == str(history["date"]):
+                    past.remove(h)
+                    continue
+                errs.append(f"{name}: лишняя строка {c.get('value_op') or ''}{c.get('value')} "
+                            f"(дата {eff(c) or '—'})")
     return errs
 
 
@@ -255,7 +292,9 @@ def _call(client, model: str, *, prompt: str, image: bytes | None, system: str |
     if temperature is not None:
         kw["temperature"] = temperature
     r = client.messages.create(**kw)
-    ledger.charge(r.usage.input_tokens, r.usage.output_tokens)
+    ledger.charge(r.usage.input_tokens, r.usage.output_tokens,
+                  cache_read_input_tokens=getattr(r.usage, "cache_read_input_tokens", 0),
+                  cache_creation_input_tokens=getattr(r.usage, "cache_creation_input_tokens", 0))
     text = "".join(getattr(b, "text", "") for b in r.content if getattr(b, "type", "") == "text")
     return text, str(getattr(r, "model", model))
 
@@ -275,13 +314,15 @@ def run_suite(client, model: str, suite: str, corpus: dict, ledger: Ledger, prov
         import lab_recognizer as lr
         p1, p2 = lr.recognition_prompts()
         prompt = p1 if suite.endswith("p1") else p2
-        pages = [{"image_bytes": (CORPUS_DIR / it["image"]).read_bytes(), "gold": it["gold"], "key": it["image"]}
-                 for it in corpus["lab_vision"]]
+        pages = [{"image_bytes": (CORPUS_DIR / it["image"]).read_bytes(), "gold": it["gold"], "key": it["image"],
+                  "date": it.get("date"), "history": it.get("history")} for it in corpus["lab_vision"]]
         if provider == "anthropic":   # настоящие бланки — только тому, кому они и так уходят
             pages += owner_real_pages()
         for p in pages:
             jobs += [(prompt, p["image_bytes"], None, None,
-                      lambda t, p=p: [f"{p['key']}: {e}" for e in judge_lab(t, p["gold"], complete=not p.get("real"))])
+                      lambda t, p=p: [f"{p['key']}: {e}" for e in judge_lab(
+                          t, p["gold"], complete=not p.get("real"), page_date=p.get("date"),
+                          history=p.get("history"))])
                      ] * REPS[suite]
     elif suite == "treatment":
         import treatment_extractor as te
@@ -306,6 +347,17 @@ def run_suite(client, model: str, suite: str, corpus: dict, ledger: Ledger, prov
     return {"items": n, "errors": errors, "model_ids": sorted(ids), "stopped_early": bool(errors) and n < len(jobs)}
 
 
+def _canonical_id(client, model: str) -> str:
+    """Псевдоним → датированный id (claude-haiku-4-5 → claude-haiku-4-5-20251001, замер 02.10
+    models.retrieve). Без этого снимок модели из цепочки шёл кандидатом сам за себя."""
+    try:
+        rid = str(client.models.retrieve(model).id)
+    except Exception:
+        return model
+    # только раскрытие псевдонима в датированный снимок того же имени; иное — не доверяем
+    return rid if rid == model or re.fullmatch(re.escape(model) + r"-20\d{6}", rid) else model
+
+
 def admission_candidates(listed: list[dict], chains: dict[str, list[str]], verdicts: dict,
                family_roles: dict[str, list[str]]) -> list[tuple[str, str]]:
     """[(model, role)] — новее основной модели семейства, не в цепочке, без вердикта по роли.
@@ -321,7 +373,8 @@ def admission_candidates(listed: list[dict], chains: dict[str, list[str]], verdi
         for role in family_roles[fam]:
             chain = chains.get(role) or []
             primary_created = created.get(chain[0], "") if chain else ""
-            if mid in chain or (verdicts.get(mid) or {}).get("roles", {}).get(role):
+            snapshot_of_member = any(re.fullmatch(re.escape(c) + r"-20\d{6}", mid) for c in chain)
+            if mid in chain or snapshot_of_member or (verdicts.get(mid) or {}).get("roles", {}).get(role):
                 continue
             if primary_created and (m.get("created_at") or "") <= primary_created:
                 continue
@@ -332,7 +385,7 @@ def admission_candidates(listed: list[dict], chains: dict[str, list[str]], verdi
 def admit_to_chain(role: str, model: str) -> list[str]:
     """Дописать модель в КОНЕЦ цепочки роли; цепочки opus/sonnet не пересекаются."""
     import hai_core
-    chain = hai_core.model_chain(role)
+    chain = hai_core.base_chain(role)
     if model in chain:
         return chain
     other = {"opus": "sonnet", "sonnet": "opus"}.get(role)
@@ -350,11 +403,68 @@ def _judge_role(client, model: str, role: str, corpus: dict, ledger: Ledger, pro
     suites = {}
     for s in corpus["policy"]["role_suites"][role]:
         if (model, s) not in cache:
-            cache[(model, s)] = run_suite(client, model, s, corpus, ledger, provider)
+            key, fp = _suite_key(model, s, provider), _suite_fingerprint(s, corpus, provider)
+            stored = _stored_suite(key, fp, ledger.now)
+            if stored is None:
+                stored = run_suite(client, model, s, corpus, ledger, provider)
+                _put(key, value_json=dict(stored, corpus=corpus["version"], fingerprint=fp,
+                                          date=f"{ledger.now:%Y-%m-%d}"))
+            cache[(model, s)] = stored
         suites[s] = cache[(model, s)]
         if suites[s]["errors"]:
             break
     return suites
+
+
+def _suite_key(model: str, suite: str, provider: str = "anthropic") -> str:
+    """Ключ готового набора. Провайдер в ключе: результат anthropic несёт ошибки с бланков
+    владельца и не должен попасть в допуск чужого провайдера с тем же id (ревью 02.10)."""
+    return f"llm.admission.suite.{provider}.{model}.{suite}"
+
+
+def _suite_fingerprint(suite: str, corpus: dict, provider: str) -> str:
+    """Отпечаток входов набора: картинки, эталоны (включая настоящие страницы), промпты.
+    Корпус той же версии с изменившимся эталоном владельца — другой отпечаток, кэш не годится."""
+    import hashlib
+    h = hashlib.sha256()
+    h.update(f"{corpus['version']}|{suite}|{provider}".encode())
+    h.update(json.dumps(corpus["policy"], ensure_ascii=False, sort_keys=True).encode())
+    import llm_client
+    h.update(json.dumps(llm_client.profiles().get(provider), ensure_ascii=False, sort_keys=True).encode())
+    h.update(Path(__file__).read_bytes())   # судьи и прогон — в этом файле; правка кода = новый замер
+    if suite.startswith("lab_vision"):
+        import lab_recognizer as lr
+        h.update("\x00".join(lr.recognition_prompts()).encode())
+        pages = [dict(it, image_bytes=(CORPUS_DIR / it["image"]).read_bytes()) for it in corpus["lab_vision"]]
+        if provider == "anthropic":
+            pages += owner_real_pages()
+        for p in pages:
+            h.update(hashlib.sha256(p["image_bytes"]).digest())
+            h.update(json.dumps({k: p.get(k) for k in ("gold", "date", "history")},
+                                ensure_ascii=False, sort_keys=True, default=str).encode())
+    elif suite == "treatment":
+        import treatment_extractor as te
+        h.update(json.dumps(corpus["treatment"], ensure_ascii=False, sort_keys=True).encode())
+        h.update(te.EXTRACTION_PROMPT.encode())
+    elif suite == "text":
+        from epistemic_skill import loader
+        h.update(json.dumps(corpus["text"], ensure_ascii=False, sort_keys=True).encode())
+        h.update(loader.load_skill().text.encode())
+    return h.hexdigest()
+
+
+def _stored_suite(key: str, fingerprint: str, now: datetime) -> dict | None:
+    """Готовый результат набора с теми же входами, не старше недели от ЗАМЕРА — прогон, оборванный
+    деплоем (02.10: ~1 $ без вердикта), при перезапуске не платит за него снова."""
+    v = _cfg(key)
+    if not isinstance(v, dict) or v.get("fingerprint") != fingerprint:
+        return None
+    try:
+        if now.date() - datetime.fromisoformat(v["date"]).date() > _WEEK:
+            return None
+    except (KeyError, ValueError):
+        return None
+    return {k: v[k] for k in ("items", "errors", "model_ids", "stopped_early") if k in v}
 
 
 def _role_passed(suites: dict, required: list[str]) -> bool:
@@ -379,7 +489,7 @@ def run_admission(force: bool = False, dry_run: bool = False, notify: bool = Fal
     listed = [{"id": m.id, "created_at": str(getattr(m, "created_at", ""))} for m in client.models.list(limit=100)]
     corpus = load_admission_corpus()
     pol = corpus["policy"]
-    chains = {r: hai_core.model_chain(r) for r in pol["role_suites"]}
+    chains = {r: [_canonical_id(client, m) for m in hai_core.model_chain(r)] for r in pol["role_suites"]}
     verdicts = {}
     for m in listed:
         v = _cfg(f"llm.admission.{m['id']}")
@@ -391,6 +501,10 @@ def run_admission(force: bool = False, dry_run: bool = False, notify: bool = Fal
         return report
     ledger, cache = Ledger(b, now), {}
     for model, role in todo:
+        if ledger.cap - ledger.used < float(pol.get("min_usd_to_start_role", 0)):
+            report["stopped"] = (f"на роль целиком не хватит: осталось {ledger.cap - ledger.used:.2f} $, "
+                                 f"порог {pol['min_usd_to_start_role']} $ — прерванный прогон тратит без вердикта")
+            break
         try:
             suites = _judge_role(client, model, role, corpus, ledger, provider, cache)
         except BudgetExhausted as e:
@@ -446,6 +560,10 @@ def run_provider_admission(provider: str, force: bool = False, dry_run: bool = F
     client = client or llm_client.guarded_client(prov=provider)
     ledger, cache = Ledger(b, now), {}
     for model, role in todo:
+        if ledger.cap - ledger.used < float(pol.get("min_usd_to_start_role", 0)):
+            report["stopped"] = (f"на роль целиком не хватит: осталось {ledger.cap - ledger.used:.2f} $, "
+                                 f"порог {pol['min_usd_to_start_role']} $ — прерванный прогон тратит без вердикта")
+            break
         try:
             suites = _judge_role(client, model, role, corpus, ledger, provider, cache)
         except BudgetExhausted as e:
@@ -461,6 +579,39 @@ def run_provider_admission(provider: str, force: bool = False, dry_run: bool = F
                                   "errors": sum(len(s["errors"]) for s in suites.values())})
     report["spent_month_usd"] = round(ledger.used, 2)
     return report
+
+
+def export_anthropic_verdicts(verdicts: dict) -> dict:
+    """Раздел anthropic таблицы выпуска из вердиктов владельца: только passed/date/corpus.
+    Ошибки НЕ переносятся — в них значения с бланков владельца («<показатель>: <прочитано> вместо <на бланке>»),
+    а таблица уходит в публичный репозиторий. Отозванные вердикты (roles={}) не переносятся."""
+    out: dict = {}
+    for model in sorted(verdicts):
+        for role, r in sorted(((verdicts[model] or {}).get("roles") or {}).items()):
+            out.setdefault(role, {})[model] = {"passed": bool(r["passed"]), "date": r["date"],
+                                               "corpus": r["corpus"]}
+    return out
+
+
+def owner_verdicts() -> dict:
+    import health_db as db
+    with db.get_conn() as conn:
+        rows = conn.execute("SELECT key, value_json FROM system_config WHERE key LIKE 'llm.admission.claude-%'"
+                            ).fetchall()
+    return {r["key"].removeprefix("llm.admission."): json.loads(r["value_json"]) for r in rows if r["value_json"]}
+
+
+def table_drift(table_file: Path | None = None) -> list[str]:
+    """Чем раздел anthropic таблицы выпуска отстал от допуска владельца (пусто — не отстал)."""
+    want = export_anthropic_verdicts(owner_verdicts())
+    have = json.loads((table_file or _TABLE_FILE).read_text(encoding="utf-8")).get("anthropic") or {}
+    out = []
+    for role in sorted(set(want) | set(have)):
+        for model in sorted(set(want.get(role, {})) | set(have.get(role, {}))):
+            w, h = want.get(role, {}).get(model), have.get(role, {}).get(model)
+            if (w or {}).get("passed") != (h or {}).get("passed"):
+                out.append(f"{role}/{model}: в базе {w and w['passed']}, в таблице {h and h['passed']}")
+    return out
 
 
 _ROLE_DOC = {"opus": ("анализы по фото (проход 1), консилиум", "lab photos (pass 1), consilium"),
@@ -537,6 +688,8 @@ if __name__ == "__main__":
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--notify", action="store_true")
     ap.add_argument("--set-budget", type=float, metavar="USD_MONTH")
+    ap.add_argument("--export-anthropic", action="store_true",
+                    help="раздел anthropic таблицы выпуска из вердиктов владельца (stdout, JSON)")
     ap.add_argument("--reference", action="store_true", help="пересобрать docs/reference/llm_providers(.en).md из таблицы")
     ap.add_argument("--provider", help="чужой провайдер: допуск role_defaults профиля в таблицу выпуска")
     ap.add_argument("--price-ceiling", type=float, nargs=2, metavar=("IN", "OUT"),
@@ -548,6 +701,16 @@ if __name__ == "__main__":
         set_admission_budget(a.set_budget, *a.price_ceiling)
         print("бюджет допуска:", admission_budget())
         sys.exit(0)
+    if a.export_anthropic:
+        print(json.dumps(export_anthropic_verdicts(owner_verdicts()), ensure_ascii=False, indent=1))
+        sys.exit(0)
+    if a.weekly:
+        drift = table_drift()
+        if drift:   # таблицу выпуска правит сессия на MacBook, контейнер её только читает
+            import notify
+            notify.fault("llm_admission: таблица выпуска отстала от допуска владельца — "
+                         "llm_admission.py --export-anthropic → methodology/llm_admission_table.json: "
+                         + "; ".join(drift), person_key=None)
     if a.reference:
         import doc_translation as dt
         t = json.loads(_TABLE_FILE.read_text(encoding="utf-8"))

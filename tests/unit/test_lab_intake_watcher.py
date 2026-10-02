@@ -99,6 +99,68 @@ def test_process_once_failed_marker_no_retry(env, monkeypatch):
     assert not calls
 
 
+def test_unadmitted_lab_reading_is_told_in_words_and_resumes(env, monkeypatch):
+    """02.10, решение владельца «А»: у DeepSeek чтение анализов не допущено. Документ пришёл —
+    его отправитель слышит предел словами (не журнал сбоев, не тишина); документ ждёт и
+    разбирается сам, когда чтение станет допущено. Настоящий run_backfill: ревью 02.10 нашло,
+    что он глотал отказ, и карточка была мёртвой."""
+    import hai_core
+    hdb, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    doc = inbox / "lab.pdf"; doc.write_text("b"); _age(doc, 999)
+    told, faults, ops = [], [], []
+
+    def refuse(*a, **k):
+        raise hai_core.ModelNotAdmitted("deepseek: модель 'deepseek-v4-pro' роли 'opus' не прошла допуск")
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize", refuse)
+    monkeypatch.setattr(w.notify, "notify_operator", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: ops.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append(a))
+    monkeypatch.setattr(w, "_lab_reading_admitted", lambda: False)
+    w.process_once()
+    w.process_once()                                   # ждёт, не повторяет и не шумит
+    assert (inbox / "lab.pdf.notadmitted").exists()
+    assert not (inbox / "lab.pdf.failed").exists() and not (inbox / "lab.pdf.norows").exists()
+    assert len(told) == 1 and "поставщиком моделей" in told[0]
+    assert not faults and not ops, "предел установки — не сбой; канал служебный (01.08)"
+
+    seen = []
+    monkeypatch.setattr(w, "_lab_reading_admitted", lambda: True)
+    monkeypatch.setattr(w.lab_backfill, "run_backfill",
+                        lambda *a, **k: seen.append(a) or {"rows": 3, "pending": 0})
+    monkeypatch.setattr(w.notify, "weekly", lambda *a, **k: None)
+    w.process_once()
+    assert seen and not (inbox / "lab.pdf.notadmitted").exists(), "допуск появился — разобран сам"
+
+
+def test_unadmitted_unreached_person_leaves_a_fault(env, monkeypatch):
+    """Ревью 02.10: Telegram и резерв молчат — маркер стоит, человек не узнал, журнал пуст."""
+    import hai_core
+    hdb, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    doc = inbox / "lab3.pdf"; doc.write_text("b"); _age(doc, 999)
+    faults = []
+    monkeypatch.setattr(w.lab_backfill, "run_backfill",
+                        lambda *a, **k: (_ for _ in ()).throw(hai_core.ModelNotAdmitted("x")))
+    monkeypatch.setattr(w.notify, "notify_operator", lambda msg, **k: "none")
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append(a))
+    w.process_once()
+    assert (inbox / "lab3.pdf.notadmitted").exists() and len(faults) == 1
+
+
+def test_other_recognition_failure_stays_a_fault(env, monkeypatch):
+    hdb, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    other = inbox / "other.pdf"; other.write_text("b"); _age(other, 999)
+    told, faults = [], []
+    monkeypatch.setattr(w.lab_backfill, "run_backfill",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(w.notify, "notify_operator", lambda msg, **k: told.append(msg))
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append(a))
+    w.process_once()
+    assert (inbox / "other.pdf.failed").exists() and faults and not told
+
+
 # ── 2026-07-28: сигнал расхождения «принят как таблица, распознано 0 строк» ────
 
 def test_zero_rows_is_discrepancy_not_success(env, monkeypatch):

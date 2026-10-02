@@ -88,6 +88,41 @@ DEV_CLONE_MARKERS = ("staging", "_dev", "_test", "_clone", "_bak")
 TENANT_DB_REL = Path("data", "health.db")
 
 
+# Метка переезда (нить docker-install, 30.09): файл RUNTIME в корне тенанта со словом container
+# значит «живой стор — в томе контейнера, нативная копия заморожена». Пишет её переезд; читают
+# backup_studio.sh, деплой-хук, test_on_studio.sh и night_repair (shell/литералом). Здесь — дом
+# для Python-читателей (нить tenant-run-scope, 02.10).
+RUNTIME_MARK = "RUNTIME"
+
+
+def moved_to_container(root) -> bool:
+    """Корень тенанта переехал в контейнер: его нативная копия — замороженный снимок, не пациент."""
+    mark = Path(root) / RUNTIME_MARK
+    return mark.is_file() and mark.read_text(encoding="utf-8").strip() == "container"
+
+
+def owner_runs_elsewhere() -> bool:
+    """Этот процесс — прогон ЧУЖОГО тенанта на хосте, а владелец переехал в контейнер.
+
+    Тогда артефакты владельца в logs/ репозитория и его плисты в LaunchAgents — следы
+    до переезда: триаж, ночной цикл, колокол, ночные тесты и пробы живут и судятся в
+    контейнере. Прогон тенанта, судящий их здесь, видит только заморожённое и шлёт
+    оператору ложную тревогу (замер 02.10: 3 FAIL и ~10 WARN у партнёра — все про
+    застывшую копию владельца). В контейнере и в прогоне на данных владельца — False."""
+    return (os.environ.get("HEALTH_RUNTIME") != "container" and not is_owner_data()
+            and moved_to_container(owner_root()))
+
+
+OWNER_ROOT_ENV = "HEALTH_OWNER_ROOT"
+
+
+def owner_root() -> Path:
+    """Корень данных владельца на этой машине: ~/health. Env — шов тестов: набор на Studio
+    гоняется на машине, где настоящий ~/health переехал, и без шва любой тест на чужом
+    тенанте молча видел бы «владелец в контейнере» (первый полный прогон 02.10: 7 красных)."""
+    return Path(os.environ.get(OWNER_ROOT_ENV) or Path.home() / "health")
+
+
 def tenant_db_paths(current: "Path | None" = None) -> list:
     """Пути health.db РЕАЛЬНЫХ пациентов-тенантов (~/health*/data/health.db) минус дев/стейджинг-
     клоны (DEV_CLONE_MARKERS). Дом предиката «кто тенант» — здесь, рядом с маркерами (перенос из
@@ -103,6 +138,8 @@ def tenant_db_paths(current: "Path | None" = None) -> list:
         name = p.parent.parent.name  # ~/health_X/data/health.db → health_X
         if any(m in name for m in DEV_CLONE_MARKERS):
             continue
+        if moved_to_container(p.parent.parent):
+            continue        # заморожённая копия переехавшего тенанта — его судит контейнер
         paths.add(p.resolve())
     return sorted(paths)
 
@@ -278,6 +315,7 @@ SECRET_SCOPE: dict[str, str] = {
     # 02.10, llm-provider: ключ другого поставщика моделей (HEALTH_LLM_PROVIDER), тот же класс
     "openai_key": "owner",
     "gemini_key": "owner",
+    "deepseek_key": "owner",
     "aqicn_token": "owner",         # общий погодный источник, не персональный
     "healthcheck_url": "owner",     # dead-man боевого монитора
     "sync_token": "owner",          # bot → Studio FastAPI

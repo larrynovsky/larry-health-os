@@ -400,6 +400,19 @@
     "_time_inject",
     "pgs_reference"
   ],
+  "getting_started": [
+    "_time_inject",
+    "brief_gate",
+    "food_quarterly",
+    "generate_constitutions",
+    "google_calendar_fetcher",
+    "health_db",
+    "i18n",
+    "metrics_db",
+    "release_notice",
+    "secrets_paths",
+    "signal_family"
+  ],
   "google_calendar_fetcher": [
     "_time_inject",
     "infra_config",
@@ -660,6 +673,10 @@
     "import_status_db",
     "notify"
   ],
+  "ingest_lan": [
+    "daemon_liveness",
+    "infra_config"
+  ],
   "integrity_tests": [
     "_time_inject",
     "agent_reports_db",
@@ -722,6 +739,7 @@
   ],
   "lab_backfill": [
     "_time_inject",
+    "hai_core",
     "health_db",
     "infra_config",
     "lab_oracles",
@@ -755,6 +773,7 @@
     "_time_inject",
     "daemon_liveness",
     "genome_intake",
+    "hai_core",
     "health_db",
     "i18n",
     "import_all",
@@ -984,6 +1003,7 @@
     "owner_gate"
   ],
   "night_repair": [
+    "finding_identity",
     "infra_config",
     "notify",
     "secrets_paths"

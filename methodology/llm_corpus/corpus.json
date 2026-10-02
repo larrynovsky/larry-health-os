@@ -1,5 +1,5 @@
 {
- "version": "2026-10-02.2",
+ "version": "2026-10-02.4",
  "_why": "Корпус допуска моделей (нить llm-provider). Синтетика с точным эталоном — едет в публичную зону; настоящие бланки владельца живут отдельно, в каталоге данных (llm_corpus/real), и уходят только провайдеру, которому документы уже уходят в работе.",
  "lab_vision": [
   {
@@ -132,7 +132,8 @@
      "ref_high": 5,
      "doc_flag": null
     }
-   ]
+   ],
+   "date": "2026-09-15"
   },
   {
    "image": "lab_photo.jpg",
@@ -264,7 +265,8 @@
      "ref_high": 5,
      "doc_flag": null
     }
-   ]
+   ],
+   "date": "2026-09-15"
   },
   {
    "image": "lab_hard.jpg",
@@ -382,7 +384,77 @@
      "ref_high": 5,
      "doc_flag": null
     }
-   ]
+   ],
+   "date": "2026-09-15",
+   "history": {
+    "date": "2026-03-12",
+    "gold": [
+     {
+      "canonical_name": "WBC",
+      "value": 7.15
+     },
+     {
+      "canonical_name": "HGB",
+      "value": 13.8
+     },
+     {
+      "canonical_name": "MCH",
+      "value": 30.4
+     },
+     {
+      "canonical_name": "MCHC",
+      "value": 34.1
+     },
+     {
+      "canonical_name": "PLT",
+      "value": 262
+     },
+     {
+      "canonical_name": "Glucose",
+      "value": 96
+     },
+     {
+      "canonical_name": "Creatinine",
+      "value": 0.88
+     },
+     {
+      "canonical_name": "Potassium",
+      "value": 4.2
+     },
+     {
+      "canonical_name": "ALT",
+      "value": 38
+     },
+     {
+      "canonical_name": "Iron",
+      "value": 61
+     },
+     {
+      "canonical_name": "Ferritin",
+      "value": 18.9
+     },
+     {
+      "canonical_name": "Vitamin_B12",
+      "value": 385
+     },
+     {
+      "canonical_name": "TSH",
+      "value": 1.98
+     },
+     {
+      "canonical_name": "HbA1c",
+      "value": 5.7
+     },
+     {
+      "canonical_name": "Vitamin_D",
+      "value": 22.1
+     },
+     {
+      "canonical_name": "CRP",
+      "value": 1.2
+     }
+    ]
+   }
   }
  ],
  "treatment": {
@@ -526,6 +598,8 @@
    "treatment": 700,
    "text": 600
   },
-  "pass_rule": "ни одной ошибки по точному эталону ни в одном повторе ни одного набора роли"
+  "pass_rule": "ни одной ошибки по точному эталону ни в одном повторе ни одного набора роли",
+  "min_usd_to_start_role": 2.0,
+  "_why_min_usd": "Прогон, остановленный стоп-краном посреди роли, тратит без вердикта. Порог — по первому живому допуску 02.10: три роли с зрением обошлись в 5.5 $ по пессимистичному тарифу, около 1.8 $ на роль."
  }
 }

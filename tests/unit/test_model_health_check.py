@@ -20,6 +20,21 @@ class _Client:
         self.messages = _Msgs(bad)
 
 
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _chains_from_code_defaults(monkeypatch):
+    """Датчик судится на цепочках по умолчанию, а не на данных тенанта: 02.10 владелец перевёл
+    основные модели на claude-opus-5/claude-sonnet-5-5, и снимок его базы на стенде сделал
+    test_one_retired_detected зелёным переключением вместо отказа (C-75: тест зависел от данных)."""
+    import hai_core
+    real = hai_core.db.get_config
+    monkeypatch.setattr(hai_core.db, "get_config",
+                        lambda k, d=None, **kw: d if str(k).startswith("model.") else real(k, d, **kw))
+    monkeypatch.setattr(hai_core, "_admission_table", lambda: {})
+
+
 def test_all_ok():
     r = mh.run_check(notify=False, client=_Client(bad=set()))
     assert all(v["ok"] for v in r.values()), r

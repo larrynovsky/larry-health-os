@@ -382,6 +382,11 @@ def run_backfill(run_id: str, max_docs: int | None = None,
             log.info(f"{source_file}: {n} rows, {review}, oracle={verdict['count']}, "
                      f"disagree={res['stats']['disagreements']}")
         except Exception as e:
+            # Роль чтения анализов не допущена у поставщика установки — предел установки, а не
+            # сбой документа: проглоченный, он выглядел бы для приёмника как «0 строк» (замер 02.10).
+            import hai_core
+            if isinstance(e, hai_core.ModelNotAdmitted):
+                raise
             summary["errors"] += 1
             log.error(f"ERROR {source_file}: {e}")
     return summary

@@ -58,8 +58,18 @@ def home(request: Request):
     except (sqlite3.Error, KeyError, IndexError):
         epigraph = None
 
+    try:
+        import getting_started
+        board = getting_started.board(lang=lang)
+    except Exception:   # страница счётчиков жива и без доски; сбой — громко в журнал и на экран
+        import logging
+        logging.getLogger("dashboard.home").exception("getting_started.board упал")
+        board = None
+
     return templates.TemplateResponse(request, "home.html", {
         "request": request,
+        "board": board,
+        "board_failed_text": i18n.t("dashboard.home.board_failed", lang) if board is None else "",
         "counts": counts,
         "weekday_name": weekday_name,
         "today_meta": today_meta,

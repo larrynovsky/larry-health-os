@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.300 | **Дата:** 2026-10-02
+**Версия:** 15.317 | **Дата:** 2026-10-02
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -620,6 +620,7 @@ hai_core.py
   get_client()
   pick_from_chain(chain, available) — Первая модель цепочки, доступная по снимку; снимка нет — первая м
   model_chain(role) — Цепочка допущенных моделей роли: system_config.model.<role> (стро
+  base_chain(role) — Цепочка роли из базы этой установки (или модель по умолчанию) — б
   default_model(role) — Модель роли по умолчанию: у anthropic — MODEL_DEFAULTS, у чужого 
   class ModelNotAdmitted
   admitted_models(prov, role) — Модели, прошедшие допуск к роли на провайдере (таблица выпуска).
@@ -1149,11 +1150,12 @@ assessment_dialog            → _fmt_helpers, _time_inject, assessment_importer
 consult_prep                 → _time_inject, config_db, genome_context, hai_core, hai_hypotheses, health_db, i18n, infra_config, labs_db, llm_client, notify, patient_context, treatment_summary
 generate_constitutions       → _time_inject, belief_contract, config_db, correlation_gate, doc_translation, hai_core, health_db, i18n, infra_config, labs_db, llm_client, profile_reconciler, secrets_paths
 gp_context                   → _fmt_helpers, _time_inject, belief_contract, clinical_kb, correlation_gate, ecg_db, genome_context, health_db, i18n, lab_canon, labs_db, lifestyle_agents, patient_context
+lab_intake_watcher           → _time_inject, daemon_liveness, genome_intake, hai_core, health_db, i18n, import_all, import_medical_events, infra_config, lab_backfill, link_fetch, notify, plist_env_liveness
 brief_pipeline               → _time_inject, brief_cards, brief_gate, calendar_client, env_context, food_profile, genome_context, health_ai, health_db, location_signal, safety_net, trails
 import_medical_events        → config_db, hai_core, health_db, i18n, infra_config, lab_schedule_extractor, link_fetch, llm_client, notify, problems_db, treatment_db, treatment_extractor
-lab_intake_watcher           → _time_inject, daemon_liveness, genome_intake, health_db, i18n, import_all, import_medical_events, infra_config, lab_backfill, link_fetch, notify, plist_env_liveness
 longitudinal_analysis        → _time_inject, belief_contract, correlation_gate, git_facts, health_db, i18n, lab_canon, metrics_db, notify, quarantine_db, secrets_paths, signal_family
 night_cycle                  → _fmt_helpers, _time_inject, agent_reports_db, finding_identity, i18n, morning_test_summary, night_investigator, notify, owner_gate, owner_nag, parked_decisions, weekly_digest
+getting_started              → _time_inject, brief_gate, food_quarterly, generate_constitutions, google_calendar_fetcher, health_db, i18n, metrics_db, release_notice, secrets_paths, signal_family
 hai_context                  → _fmt_helpers, _time_inject, calendar_client, genome_context, gp_context, health_db, lab_canon, labs_db, lifestyle_agents, metrics_db, patient_context
 hypothesis_consilium_eval    → _time_inject, consilium_roster, hai_core, health_db, i18n, lab_canon, labs_db, lifestyle_agents, llm_client, patient_context, wellally_consult
 wellally_consult             → _fmt_helpers, _time_inject, consilium_roster, genome_context, hai_core, health_db, labs_db, lifestyle_agents, llm_client, patient_context, treatment_summary
@@ -1167,12 +1169,12 @@ weekly_digest                → _time_inject, config_db, diagnosis_guard, hai_c
 genome_pipeline              → backfill_effect_alleles, fix_palindromic_het, generate_constitutions, genome_annotator, genome_parser, health_db, profile_reconciler, prs_pipeline
 hai_chat                     → _time_inject, config_db, gp_context, hai_context, hai_core, hai_reports, health_db, memory_facts_db
 hai_hypotheses               → _time_inject, cbcr_hypothesis, gp_context, hai_core, health_db, i18n, patient_context, secrets_paths
+lab_backfill                 → _time_inject, hai_core, health_db, infra_config, lab_oracles, lab_recognizer, lab_specimen, labs_db
 llm_admission                → doc_translation, hai_core, health_db, i18n, lab_recognizer, llm_client, notify, treatment_extractor
 checkin_agent                → _time_inject, gp_context, hai_core, health_db, llm_client, patient_context, region_pack
 genome_intake                → config_db, genome_pipeline, health_db, i18n, infra_config, link_fetch, notify
 hai_core                     → _time_inject, calendar_client, health_db, i18n, llm_client, patient_context, region_pack
 import_all                   → _time_inject, config_db, health_db, hypothesis_lab_linker, import_coordinator, infra_config, lab_intake_watcher
-lab_backfill                 → _time_inject, health_db, infra_config, lab_oracles, lab_recognizer, lab_specimen, labs_db
 lifestyle_agents             → consilium_roster, genome_context, gp_context, hai_core, health_db, patient_context, promethease_context
 literature_curator           → _time_inject, cbcr_hypothesis, hai_core, hai_hypotheses, health_db, hypothesis_semantic_check, i18n
 owner_nag                    → _fmt_helpers, _time_inject, i18n, notify, parked_decisions, plist_env_liveness, region_pack
@@ -1208,6 +1210,7 @@ lab_specialized              → health_db, lab_canon, lab_promote, labs_db
 location_signal              → _time_inject, config_db, health_db, memory_facts_db
 monthly_api_report           → _time_inject, i18n, model_health_check, notify
 night_investigator           → hai_core, i18n, llm_client, owner_gate
+night_repair                 → finding_identity, infra_config, notify, secrets_paths
 notify                       → _time_inject, i18n, release_notice, secrets_paths
 oura_freshness_check         → health_db, i18n, notify, secrets_paths
 pgs_discovery                → genome_weights, health_db, pgs_reference, prs_pipeline
@@ -1240,7 +1243,6 @@ lab_staging_summary          → health_db, lab_canon, labs_db
 lab_triage                   → health_db, lab_canon, lab_oracles
 link_fetch                   → genome_intake, i18n, notify
 memory_facts_db              → beliefs, health_db, memory_salience
-night_repair                 → infra_config, notify, secrets_paths
 profile_db                   → _time_inject, health_db, treatment_summary
 reminders_backend            → _time_inject, config_db, secrets_paths
 smoke_tests                  → gp_agent, health_ai, health_db
@@ -1270,6 +1272,7 @@ genome_weights               → _time_inject, pgs_reference
 hae_db                       → _time_inject, health_db
 import_coordinator           → config_db, health_db
 import_hr_activity           → health_db, import_apple_health
+ingest_lan                   → daemon_liveness, infra_config
 lab_recognizer               → hai_core, lab_canon
 llm_client                   → llm_translate, secret_guard
 log_rotate                   → hae_checker, secrets_paths
@@ -1595,6 +1598,10 @@ XFAIL — известные баги, документированы как `pa
 ## ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ
 
 <!-- GEN:ARCH_LOG:START -->
+- `2026-10-02` — новый модуль `ingest_lan` (зависит от: daemon_liveness, infra_config)
+- `2026-10-02` — `lab_backfill` + зависимость: hai_core; `lab_intake_watcher` + зависимость: hai_core
+- `2026-10-02` — `night_repair` + зависимость: finding_identity
+- `2026-10-02` — новый модуль `getting_started` (зависит от: _time_inject, brief_gate, food_quarterly, generate_constitutions, google_calendar_fetcher, health_db, i18n, metrics_db, release_notice, secrets_paths, signal_family)
 - `2026-10-02` — `night_repair` + зависимость: notify; `notify` + зависимость: release_notice
 - `2026-10-02` — `llm_admission` + зависимость: doc_translation, llm_client
 - `2026-10-02` — новый модуль `llm_admission` (зависит от: hai_core, health_db, i18n, lab_recognizer, notify, treatment_extractor); `llm_client` + зависимость: llm_translate; `model_health_check` + зависимость: llm_client

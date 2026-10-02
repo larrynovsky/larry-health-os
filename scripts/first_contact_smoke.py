@@ -118,11 +118,13 @@ async def walk(chat_id: int) -> tuple[list[str], list]:
         return real_fault(tech, *a, **kw)
 
     notify.fault = fault
-    app = build_app("123456:first-contact-smoke", request=FakeTelegram(sent))
-    await app.initialize()
-    # ERROR считаются с первого сообщения человека: сборка приложения — не первый контакт.
+    # ERROR считаются со СБОРКИ приложения (с 02.10, BL-BRIEF-TZ-ERROR-1): журнал бота человек
+    # читает с первой строки, и строки старта — это его первый контакт с журналом. До 02.10
+    # сборка не судилась, и ложный ERROR о поясе у каждого новичка проходил мимо смоука.
     errors = _Errors(problems)
     logging.getLogger().addHandler(errors)
+    app = build_app("123456:first-contact-smoke", request=FakeTelegram(sent))
+    await app.initialize()
     bot, uid = app.bot, [0]
 
     user = {"id": chat_id, "is_bot": False, "first_name": "Smoke"}

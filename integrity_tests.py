@@ -48,7 +48,7 @@ from _time_inject import get_today, get_now, get_utcnow
 
 # ── Конфиг порогов (источник: TESTING_CONTRACTS.md) ──────────────────────────
 DATA_FRESHNESS_HOURS      = 26   # oura/apple_health: conit C1
-DATA_FRESHNESS_DAYS       = 2    # то же в днях (обратная совместимость)
+from metrics_db import SOURCE_STALE_DAYS as DATA_FRESHNESS_DAYS  # то же в днях; дом — metrics_db (02.10)
 MIN_DAYS_WITH_DATA        = 5    # из последних 7 дней должно быть данных >= N
 GP_WEEKLY_MAX_AGE_DAYS    = 8    # GP weekly report не старше N дней
 GP_MONTHLY_MAX_AGE_DAYS   = 35   # GP monthly report не старше N дней
@@ -81,6 +81,11 @@ _code_failures: list[tuple[str, str]] = []
 # Теперь critical помечает: прогон идёт до конца, список уезжает в JSON, а потребитель
 # (утренний бриф) сам решает, что делать со свежим вердиктом.
 _critical: list[tuple[str, str]] = []
+# Метка находки → имя датчика, который её выдал (нить repair-order, 02.10). По имени датчика ночной
+# ремонт берёт из project_context/integrity_sensors.json, кого задевает поломка (человек / данные /
+# система), и решает, что чинить первым. Метка одна на находку — так её зовёт и ночной цикл.
+_sensor_of: dict[str, str] = {}
+_current_sensor = ""
 WARN_ONLY   = "--warn-only" in sys.argv
 JSON_OUTPUT = "--json"      in sys.argv
 
@@ -89,7 +94,8 @@ def check(label: str, fn, critical: bool = False, repo_only: bool = False):
     """repo_only (docker-install, этап 6): предмет проверки — РЕПОЗИТОРИЙ (git, хуки, приватная
     зона), а не работающая система. В контейнере его нет по построению (.dockerignore): там
     проверка говорит «не судимо» вслух, а судит её прогон в мастерской (run_checks на MacBook)."""
-    global PASS, FAIL
+    global PASS, FAIL, _current_sensor
+    _current_sensor = getattr(fn, "__name__", "")
     if repo_only:
         import plist_env_liveness
         if plist_env_liveness.in_container():
@@ -108,6 +114,7 @@ def check(label: str, fn, critical: bool = False, repo_only: bool = False):
             print(f"  ❌ {label}: {e}")
         FAIL += 1
         _failures.append((label, str(e)))
+        _sensor_of[label] = _current_sensor
         if critical:
             _critical.append((label, str(e)))
         return None
@@ -116,6 +123,7 @@ def check(label: str, fn, critical: bool = False, repo_only: bool = False):
             print(f"  ❌ {label}: {type(e).__name__}: {e}")
         FAIL += 1
         _failures.append((label, f"{type(e).__name__}: {e}"))
+        _sensor_of[label] = _current_sensor
         # НЕ-AssertionError = ошибка КОДА (не данных) → отдельный список для pre-commit-стража.
         _code_failures.append((label, f"{type(e).__name__}: {e}"))
         if critical:
@@ -127,6 +135,8 @@ def warn(label: str, detail: str = ""):
     global WARN
     WARN += 1
     _warnings.append((label, detail))
+    if _current_sensor:
+        _sensor_of.setdefault(label, _current_sensor)
     if not JSON_OUTPUT:
         print(f"  ⚠️  {label}: {detail}")
 
@@ -4069,6 +4079,21 @@ def _tenant_db_paths(include_current: bool = True) -> list:
     return _sp.tenant_db_paths(current=Path(db.DB_PATH) if include_current else None)
 
 
+def _owner_judged_in_container(what: str):
+    """Причина пропуска для датчиков ОБЩИХ следов владельца (logs/ репозитория, его плисты),
+    если этот прогон — чужого тенанта на хосте, а владелец переехал в контейнер; иначе None.
+
+    Замер 02.10 (нить tenant-run-scope): после переезда владельца 30.09 единственным судьёй
+    этих следов на хосте остался ночной прогон партнёра — и он каждое утро слал оператору
+    «рельса доставки мертва», «проба красная», «ночной цикл/колокол/ночные тесты молчат»
+    про копию, которую никто больше не пишет. Живые следы владельца судит монитор в
+    контейнере. Предикат — secrets_paths.owner_runs_elsewhere (там же метка RUNTIME)."""
+    import secrets_paths as _sp
+    if _sp.owner_runs_elsewhere():
+        return f"{what}: владелец в контейнере — судится там, здесь его следы заморожены"
+    return None
+
+
 def _absent_table(exc) -> bool:
     """Единственная законная тишина per-tenant чтения — у тенанта НЕТ этой таблицы (A5, 22.09).
 
@@ -6006,6 +6031,8 @@ def check_triage_delivery_liveness(base=None, now=None):
     квитанцию пишет каждый прогон ПЕРЕД маркером, поэтому она же и есть сигнал живости;
     маркер остался тем, чем всегда был по сути, — защёлкой идемпотентности в run_triage,
     и судьёй быть перестал. Два дома одного факта — §15/§18."""
+    if base is None and (skip := _owner_judged_in_container("рельса доставки")):
+        return skip
     root = Path(base) if base else Path(__file__).resolve().parent
     logs = root / "logs"
     jpath = logs / "integrity_latest.json"
@@ -7289,40 +7316,51 @@ def check_fault_journal():
 
     По одной находке на (тенант, место) за 24 часа; артефакт integrity читает
     night_cycle. Повреждённая строка не скрывает остальные записи журнала.
+
+    Журналов может быть несколько (нить partner-faults, 02.10, решение владельца «вариант а»):
+    у владельца в контейнере свой журнал в томе, а процессы на хосте (бот и проверка партнёра,
+    деплой) пишут в журнал хоста — он смонтирован только для чтения и назван в
+    HEALTH_FAULTS_EXTRA (через «:»). Без него сбои партнёра с 30.09 не видел никто (урок C-135).
+    Названный, но не смонтированный журнал — находка, а не тишина: иначе слепота вернулась бы молча.
     """
     import fcntl
     import os
     from datetime import datetime, timedelta
 
-    path = Path(os.environ.get("HEALTH_FAULTS_JOURNAL") or
-                Path(__file__).resolve().parent / "logs" / "faults.jsonl")
+    primary = Path(os.environ.get("HEALTH_FAULTS_JOURNAL") or
+                   Path(__file__).resolve().parent / "logs" / "faults.jsonl")
+    extra = [Path(p) for p in (os.environ.get("HEALTH_FAULTS_EXTRA") or "").split(":") if p]
     now = get_now().astimezone()
     groups = {}
     invalid = 0
-    if not path.exists():   # журнала нет — сбоев не записано (свежая установка): это ответ, не отказ
-        return {"groups": 0, "faults": 0}
-    try:
-        with path.open(encoding="utf-8") as journal:
-            fcntl.flock(journal, fcntl.LOCK_SH)
-            for line in journal:
-                try:
-                    record = json.loads(line)
-                    if not isinstance(record, dict) or not all(
-                            isinstance(record.get(k), str) for k in ("ts", "tenant", "where", "text")):
-                        raise ValueError("неверные поля записи")
-                    ts = datetime.fromisoformat(record["ts"]).astimezone()
-                    if not now - timedelta(hours=24) <= ts <= now:
-                        continue
-                    key = (record["tenant"], record["where"])
-                    n, latest, text = groups.get(key, (0, ts, record["text"]))
-                    groups[key] = (n + 1, max(ts, latest), record["text"] if ts >= latest else text)
-                except (ValueError, TypeError, OverflowError) as exc:
-                    invalid += 1   # итог — warn после цикла; строка — в лог прогона сразу
-                    print(f"  журнал сбоев: битая строка пропущена ({type(exc).__name__})")
-    except (OSError, UnicodeError) as exc:
-        warn("Журнал сбоев не читается", f"{path}: {exc}")
+    for path in [primary, *extra]:
+        if path in extra and not path.parent.is_dir():
+            warn("Журнал сбоев не читается", f"{path}: каталог не смонтирован — сбои хоста не видны")
+            continue
+        if not path.exists():   # журнала нет — сбоев не записано (свежая установка): это ответ, не отказ
+            continue
+        try:
+            with path.open(encoding="utf-8") as journal:
+                fcntl.flock(journal, fcntl.LOCK_SH)
+                for line in journal:
+                    try:
+                        record = json.loads(line)
+                        if not isinstance(record, dict) or not all(
+                                isinstance(record.get(k), str) for k in ("ts", "tenant", "where", "text")):
+                            raise ValueError("неверные поля записи")
+                        ts = datetime.fromisoformat(record["ts"]).astimezone()
+                        if not now - timedelta(hours=24) <= ts <= now:
+                            continue
+                        key = (record["tenant"], record["where"])
+                        n, latest, text = groups.get(key, (0, ts, record["text"]))
+                        groups[key] = (n + 1, max(ts, latest), record["text"] if ts >= latest else text)
+                    except (ValueError, TypeError, OverflowError) as exc:
+                        invalid += 1   # итог — warn после цикла; строка — в лог прогона сразу
+                        print(f"  журнал сбоев: битая строка пропущена ({type(exc).__name__})")
+        except (OSError, UnicodeError) as exc:
+            warn("Журнал сбоев не читается", f"{path}: {exc}")
     if invalid:
-        warn("Журнал сбоев не читается", f"{path}: повреждённых строк: {invalid}")
+        warn("Журнал сбоев не читается", f"{primary}: повреждённых строк: {invalid}")
     for (tenant, where), (n, _, text) in groups.items():
         warn(f"сбой: {where}", f"{n} раз за сутки у {tenant}; последний: {text[:200]}")
     return {"groups": len(groups), "faults": sum(g[0] for g in groups.values())}
@@ -8299,7 +8337,11 @@ def check_lab_intake_pulse():
     if not infra_config.is_primary():
         return None
     import lab_intake_watcher
-    jobs = lab_intake_watcher.intake_jobs()
+    import secrets_paths as _sp
+    # Плист переехавшего тенанта остался в LaunchAgents, но не загружен: его вход принимает
+    # контейнер, а здесь пульс заморожен (замер 02.10: «вход молчит 2959м» у владельца).
+    jobs = [(lb, hb) for lb, hb in lab_intake_watcher.intake_jobs()
+            if not any(_sp.moved_to_container(r) for r in hb.parents)]
     if not jobs:
         warn("вход: вотчер не установлен ни у одного тенанта",
              "в LaunchAgents нет джобы, исполняющей lab_intake_watcher.py")
@@ -8982,6 +9024,8 @@ def check_probe_liveness():
     _root_name = Path(_ir.ROOT).name
     if any(m in _root_name for m in _DEV_CLONE_MARKERS):
         return f"клон {_root_name} — носитель проб живёт только в каноническом репозитории"
+    if skip := _owner_judged_in_container("носитель проб"):
+        return skip
 
     data = _ir.probe_verdicts()
     assert "broken" not in data, (
@@ -9163,6 +9207,8 @@ def check_nightly_suite_liveness(rows=None, now=None, la_dir=None, host=None):
     import socket
     if not infra_config.is_primary(host or None):
         return None  # ночная задача живёт только на Studio
+    if rows is None and (skip := _owner_judged_in_container("ночной прогон тестов")):
+        return skip
     import morning_test_summary as _mts
     if rows is None:
         import agent_reports_db
@@ -9216,6 +9262,8 @@ def check_night_cycle_liveness():
     import json as _json
     if _is_dev_clone(Path(__file__).parent):
         return f"клон — logs не синхронизируются, пропуск"
+    if skip := _owner_judged_in_container("ночной цикл"):
+        return skip
     p = _nc_receipt_path()
     if not p.exists():
         warn("ночной цикл: отметки о прогоне нет",
@@ -9244,6 +9292,8 @@ def check_doorbell_liveness():
     import json as _json
     if _is_dev_clone(Path(__file__).parent):
         return "клон — пропуск"
+    if skip := _owner_judged_in_container("колокол"):
+        return skip
     p = _nag_receipt_path()
     if not p.exists():
         warn("колокол: отметки о прогоне нет", f"{p} отсутствует — owner_nag ни разу?")
@@ -9438,6 +9488,7 @@ if JSON_OUTPUT:
         "code_failures": _code_failures,   # подмножество: ошибки КОДА, не данных (см. check())
         "critical": _critical,             # подмножество: датчики с critical=True (см. check())
         "warnings": _warnings,
+        "sensor_of": _sensor_of,           # метка находки → датчик (порядок ночного ремонта)
         "date": str(today),
         # C-19 (нить validation-gate-repair, 2026-08-12): чьи ДАННЫЕ судил прогон.
         # БД = тенант (принцип health_db: tenant_id не хранится); артефакт один на

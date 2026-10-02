@@ -29,7 +29,7 @@ Reference-документ: факты без обоснований. Обосн
 
 | Path | Шаблон | Источник данных |
 |---|---|---|
-| `/` | `home.html` | counts из 11 таблиц, weekday/today_meta, epigraph из `patient_profile.identity.epigraph` |
+| `/` | `home.html` | «С чего начать»: `getting_started.board()` — состояние 17 возможностей из данных тенанта, каталог `methodology/getting_started.yaml` (с 02.10.2026); ниже свёрнуты counts из 11 таблиц; weekday/today_meta, epigraph из `patient_profile.identity.epigraph` |
 | `/profile` | `profile.html` | `patient_profile` сгруппирован по `category` |
 | `/hypotheses` | `hypotheses.html` | `memory WHERE category='hypothesis'`, JSON-payload в `value` |
 | `/protocols` | `protocols.html` | `protocols`, sorted `status DESC, created_at DESC` |
@@ -64,7 +64,7 @@ Reference-документ: факты без обоснований. Обосн
 | `/events` | `.timeline` (год слева + точки разных цветов) |
 | `/constitutions/{slug}` | `.narrative` (max 65ch, CSS-dropcap через `::first-letter`) |
 | `/constitutions` | `.const-list` |
-| `/` | `ul.counts` |
+| `/` | `card` + `gs-*` (состояния возможностей), `dense gs-time`, свёрнутый `ul.counts` |
 
 ## Cache-bust
 

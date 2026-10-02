@@ -1,6 +1,8 @@
 # Interface strings — English. Reader: i18n.py. Same keys as ru.yaml (completeness test).
 
 common.button.skip: "Skip"
+person.llm.role_not_admitted: "This feature is currently unavailable: it hasn't passed the checks with your model provider. Retrying the request won't help."
+person.lab.not_admitted: "About your health, not urgent. A lab document arrived, but numbers cannot be read from it now: lab reading has not passed the checks with your model provider, and lab results are not trusted to an unchecked model. The document is kept and will be processed automatically once reading becomes available — for example, after switching to an Anthropic key."
 
 onboarding.button.send_location: "📍 Send location"
 onboarding.button.confirm_known: "Correct: {known}"
@@ -557,6 +559,7 @@ triage.ask.period: "The observation period “{names}” has ended. What did you
 triage.ask.reason: "question from the morning review"
 triage.ask.labs_due: "It is time to update your lab tests{last}. When do you plan to take them?"
 model.answer_language: "LANGUAGE OF THE ANSWER: the person reads English. Write every sentence the person will read in English. This overrides every instruction above that asks for Russian or forbids English. Keep JSON keys, enum values, rsIDs, gene names, units and control tokens (for example [CHECKIN_COMPLETE]) exactly as specified above. Text you quote or extract from the person's own documents stays in its original language."
+dashboard.home.board_failed: "Could not compute capability states — details are in the dashboard log."
 dashboard.constitution.heading: "# Constitution: {title}"
 dashboard.constitution.changed_heading: "## What changed"
 dashboard.constitution.title.sleep: "Sleep"

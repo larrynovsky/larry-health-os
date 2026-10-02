@@ -21,7 +21,10 @@ import sqlite3
 from pathlib import Path
 
 log = logging.getLogger(__name__)
-BACKUP_DIR = Path.home() / "health/backups"
+# Бэкапы ЭТОГО тенанта: <корень>/backups/<тег>_ДАТА.db — та же раскладка, что пишет
+# backup_studio.sh и судит scan_backup_staleness. До 02.10 тут стоял ~/health/backups:
+# прогон партнёра сравнивал СВОЮ базу с бэкапами владельца и докладывал «daily_metrics
+# 4053→95 (−98%)» — чужой пик против своего канона (нить tenant-run-scope).
 DROP_THRESHOLD = 0.5    # падение >50% против пика
 MIN_ROWS = 3            # игнор крошечных таблиц (шум)
 LOOKBACK_BACKUPS = 3    # пик по последним N daily-бэкапам
@@ -38,7 +41,8 @@ EXCLUDE = {
     "hypothesis_outcomes",   # производный трекинг исходов
 }
 
-_DATED = re.compile(r"health_\d{4}-\d{2}-\d{2}\.db$")
+def _dated(tag: str) -> "re.Pattern":
+    return re.compile(rf"(^|/){re.escape(tag)}_\d{{4}}-\d{{2}}-\d{{2}}\.db$")
 
 
 def _excluded(t: str) -> bool:
@@ -82,9 +86,11 @@ def find_regressions(current: dict, backup_peak: dict,
     return out
 
 
-def _recent_backups(n: int = LOOKBACK_BACKUPS) -> list[str]:
-    files = [f for f in glob.glob(str(BACKUP_DIR / "health_*.db"))
-             if _DATED.search(f) and Path(f).stat().st_size > 0]
+def _recent_backups(root: Path, n: int = LOOKBACK_BACKUPS) -> list[str]:
+    """Последние n датированных бэкапов тенанта с корнем root (непустые)."""
+    dated = _dated(root.name)
+    files = [f for f in glob.glob(str(root / "backups" / f"{glob.escape(root.name)}_*.db"))
+             if dated.search(f) and Path(f).stat().st_size > 0]
     return sorted(files)[-n:]
 
 
@@ -94,7 +100,8 @@ def check() -> list[str]:
     if not infra_config.is_primary():
         return []
     import health_db as db
-    backups = _recent_backups()
+    root = Path(db.DB_PATH).resolve().parent.parent
+    backups = _recent_backups(root)
     if not backups:
         return []
     current = _counts(db.DB_PATH)
@@ -105,7 +112,7 @@ def check() -> list[str]:
     drops = find_regressions(current, peak)
     if not drops:
         return drops
-    explained = explained_by_snapshot(current, peak, _preop_snapshots(backups[0]))
+    explained = explained_by_snapshot(current, peak, _preop_snapshots(backups[0], root.name))
     for t, snap in explained.items():
         log.info("убыль %s объяснена: данные сохранены в pre-op снимке %s", t, snap)
     return [d for d in drops if d.split(":", 1)[0] not in explained]
@@ -118,13 +125,14 @@ def check() -> list[str]:
 # что строки сохранены до убыли и восстановимы. Граница честно: «сохранено» ≠ «убыль была
 # задумана» — ошибочное удаление после чужого снимка тоже замолчит; восстановимость при этом есть.
 
-def _preop_snapshots(oldest_backup: str) -> list[str]:
-    """Недатированные sqlite-снимки в BACKUP_DIR новее самого старого бэкапа окна."""
+def _preop_snapshots(oldest_backup: str, tag: str) -> list[str]:
+    """Недатированные sqlite-снимки в каталоге бэкапов новее самого старого бэкапа окна."""
     since = Path(oldest_backup).stat().st_mtime
+    dated = _dated(tag)
     out = []
-    for f in BACKUP_DIR.iterdir():
+    for f in Path(oldest_backup).parent.iterdir():
         if (f.is_file() and ".db" in f.name and not f.name.endswith(("-shm", "-wal"))
-                and not _DATED.search(f.name) and f.stat().st_size > 0
+                and not dated.search(f.name) and f.stat().st_size > 0
                 and f.stat().st_mtime > since):
             out.append(str(f))
     return sorted(out)

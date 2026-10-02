@@ -255,3 +255,31 @@ def test_reschedule_first_pulse_survives_deploy_restarts():
     коммитами → ложный «партнёр молчит >26ч»). Первый запуск — минуты, не часы."""
     assert scheduled._RESCHED_FIRST_S <= 600
     assert scheduled._RESCHED_FIRST_S < scheduled._RESCHED_INTERVAL_S
+
+
+def test_fresh_install_without_any_location_is_not_a_fault(monkeypatch, caplog):
+    """BL-BRIEF-TZ-ERROR-1: новый человек до первой геопозиции — не сбой. Ни ERROR в журнале
+    бота, ни тревоги: урок отправляет его читать bot_err.log, и ложная первая строка там учит
+    не верить журналу."""
+    import logging
+    monkeypatch.setattr(location_signal, "tenant_timezone", lambda: "UTC")
+    monkeypatch.setattr(location_signal, "home_anchor", lambda: (None, None, 50.0))
+    monkeypatch.setattr(location_signal, "latest", lambda: None)
+    monkeypatch.setattr(config_db, "get_config", lambda k, d=None: d)
+    app = _FakeApp()
+    with caplog.at_level(logging.INFO):
+        scheduled._apply_morning_schedule(app)
+    assert "tz_fallback_alert" not in [n for n, _ in app.job_queue.once]
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert app.job_queue.daily[-1][0] == "morning_report"   # бриф всё равно поставлен
+
+
+def test_known_place_lost_still_raises(monkeypatch):
+    """Место было (GPS-сигнал в базе), пояс не вывелся — это сбой, тревога остаётся."""
+    monkeypatch.setattr(location_signal, "tenant_timezone", lambda: "UTC")
+    monkeypatch.setattr(location_signal, "home_anchor", lambda: (None, None, 50.0))
+    monkeypatch.setattr(location_signal, "latest", lambda: {"lat": 1.0, "lon": 2.0})
+    monkeypatch.setattr(config_db, "get_config", lambda k, d=None: d)
+    app = _FakeApp()
+    scheduled._apply_morning_schedule(app)
+    assert "tz_fallback_alert" in [n for n, _ in app.job_queue.once]

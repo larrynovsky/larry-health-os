@@ -547,9 +547,22 @@ if ! bash "$MAIN_TREE/scripts/arch_regen.sh" "$MAIN_TREE" "$SLUG" 9>&-; then
     echo "⚠️  карта проекта не пересобрана — logs/arch_regen.log; датчик карты это увидит" >&2
 fi
 
+# Прогон мог оставить новые правки: слияние забрало только коммиты.
+# Ошибка status тоже запрещает уборку. Успех слияния и деплоя не отменяем.
+if ! TREE_STATUS="$(git -C "$TREE" status --porcelain --untracked-files=all)"; then
+    echo "⚠️  слияние и деплой прошли; статус дерева $TREE не проверен — дерево НЕ убираю" >&2
+    exit 0
+fi
+if [[ -n "$TREE_STATUS" ]]; then
+    echo "⚠️  слияние и деплой прошли; в дереве нити есть незакоммиченное — дерево НЕ убираю:" >&2
+    printf '%s\n' "$TREE_STATUS" >&2
+    echo "   закоммить в нити или удали руками: $TREE" >&2
+    exit 0
+fi
+
 echo "▶ убираю дерево нити"
+# Без --force: git откажет и при правке между status и remove.
 git -C "$MAIN_TREE" worktree remove "$TREE" 2>/dev/null || \
-    git -C "$MAIN_TREE" worktree remove --force "$TREE" 2>/dev/null || \
     echo "⚠️  дерево $TREE не убралось — удали вручную" >&2
 git -C "$MAIN_TREE" branch -d "$BRANCH" 2>/dev/null || \
     echo "⚠️  ветка $BRANCH не удалилась (не слита?) — оставляю" >&2

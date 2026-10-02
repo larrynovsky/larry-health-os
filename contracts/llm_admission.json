@@ -5,21 +5,26 @@
     "admission_candidates",
     "admission_reference_md",
     "admit_to_chain",
+    "export_anthropic_verdicts",
+    "gold_from_promoted",
     "judge_lab",
     "judge_text",
     "judge_treatment",
     "load_admission_corpus",
     "month_spent",
     "owner_real_pages",
+    "owner_verdicts",
     "run_admission",
     "run_provider_admission",
     "run_suite",
-    "set_admission_budget"
+    "set_admission_budget",
+    "table_drift"
   ],
   "depends_on": [
     {
       "module": "hai_core",
       "uses": [
+        "base_chain",
         "get_client",
         "model_chain"
       ],
@@ -100,7 +105,7 @@
       "D2": "входы — run_admission() (цепочки владельца) и run_provider_admission() (таблица выпуска чужого провайдера); остальные публичные — судьи, шаги и рендер справочника; политика — данные corpus.json",
       "D3": "hai_core.get_client/model_chain, health_db config, lab_recognizer.recognition_prompts — публичные; чужих приватных не трогает",
       "D4": "~430 строк: судьи трёх наборов + бюджет + прогон; разбиение по наборам возможно, пока не окупается",
-      "D5": "tests/unit/test_llm_admission.py — 25 тестов; мутации (запись в начало цепочки, настоящие бланки чужому, снятый стоп-кран, резерв без запаса на рассуждение, снятый ранний стоп, лишние строки синтетики не судятся, допуск непрошедшей) краснеют",
+      "D5": "tests/unit/test_llm_admission.py — 28 тестов; мутации (запись в начало цепочки, настоящие бланки чужому, снятый стоп-кран, резерв без запаса на рассуждение, снятый ранний стоп, датированная история не отличается от лишней текущей строки, эталон с двумя перечтениями, роль начата без денег на неё целиком, допуск непрошедшей) краснеют",
       "D6": "общий инвариант с lab_recognizer (two_model_reconciled) — admit не кладёт модель в обе цепочки opus/sonnet, распознаватель отказывает при совпадении"
     },
     "rationale": "Переписывается с нуля по corpus.json (политика и эталоны) и тестам; состояние — в system_config, у модуля своего нет.",

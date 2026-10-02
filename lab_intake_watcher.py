@@ -271,6 +271,11 @@ def process_once() -> int:
             continue
         if f.with_suffix(f.suffix + ".norows").exists():
             continue
+        na = f.with_suffix(f.suffix + ".notadmitted")
+        if na.exists():
+            if not _lab_reading_admitted():
+                continue
+            na.unlink(missing_ok=True)   # чтение анализов стало допущено (сменили ключ или модель) — разбираем сами
         if f.name in done:
             continue
         if not _stable(f):
@@ -318,11 +323,37 @@ def process_once() -> int:
                 notify.weekly(i18n.t("owner.weekly.intake"))
             n += 1
         except Exception as e:
+            # Установка поставщика без допуска чтения анализов (DeepSeek, решение владельца
+            # 02.10, «А»): не сбой, а предел. Не журнал сбоев (его человек не видит, а ночной
+            # ремонт чинить тут нечего) и не .failed (он навсегда): свой маркер, который снимается,
+            # когда чтение станет допущено. Канал — служебный (решение владельца 01.08, сторож
+            # test_watcher_uses_the_operator_channel): поставщик — на всю установку, отказ бывает
+            # только на установке не-anthropic, а там оператор и есть тот, кто прислал документ.
+            import hai_core
+            if isinstance(e, hai_core.ModelNotAdmitted):
+                import i18n
+                f.with_suffix(f.suffix + ".notadmitted").write_text(str(e)[:500])
+                log.warning(f"[{tenant}] чтение анализов не допущено: {f.name} ждёт допуска")
+                if notify.notify_operator(i18n.t("person.lab.not_admitted")) == "none":
+                    notify.fault("lab_intake_watcher: lab reading not admitted; person not reached",
+                                 person_key=None)
+                continue
             log.error(f"[{tenant}] recognize failed {f.name}: {e}", exc_info=True)
             f.with_suffix(f.suffix + ".failed").write_text(str(e)[:500])
             notify.fault(f"lab_intake_watcher: recognition failed ({type(e).__name__}); retry stopped",
                          person_key=None)
     return n
+
+
+def _lab_reading_admitted() -> bool:
+    """Обе роли чтения анализов (два прохода) допущены у поставщика установки."""
+    import hai_core
+    try:
+        hai_core.get_model("opus")
+        hai_core.get_model("sonnet")
+        return True
+    except hai_core.ModelNotAdmitted:
+        return False
 
 
 def main() -> None:

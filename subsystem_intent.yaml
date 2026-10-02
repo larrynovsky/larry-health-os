@@ -1293,6 +1293,15 @@
       warm_guard:
         absent: ["дашборд защищён аутентификацией", "доступ ограничен паролем", "данные под замком"]
         absent_en: ["dashboard is protected by authentication", "access is password-protected", "data are locked"]
+    - id: lan_ingest_write_only
+      claim: "Приём с телефона по домашней Wi-Fi (ingest_lan.py, решение владельца 02.10.2026: простой путь по умолчанию в инструкции, Tailscale рекомендован как безопасный) — отдельный процесс на порту 8011 только с маршрутами записи под токеном (/hae/ingest, /hae/ecg, /location/ingest): страниц дашборда нет, браузерные запросы (Origin, Sec-Fetch-Site) отвергаются. В установке в Докере порт по умолчанию на loopback; в Wi-Fi — только по install.sh --lan-ingest. Разделение по порту, а не по адресу клиента (за пробросом Colima адрес не виден). Принятый риск: http без шифрования внутри Wi-Fi и отправка вне дома на тот же адрес — названы в инструкции. Сторож — tests/unit/test_ingest_lan.py (подключить views или снять фильтр браузеров — красные)."
+      status: holds
+    - id: home_states_from_data
+      claim: "Главная («С чего начать», 02.10.2026) показывает состояние каждой возможности, вычисленное из базы и ключей тенанта при каждом открытии (getting_started.board), а не хранимое флагом: источник, молчащий дольше metrics_db.SOURCE_STALE_DAYS, — «данные не приходят»; пороги накопления — из их домов (BAND_MIN_OBS, signal_family.MIN_OVERLAP_DAYS, горизонт конституций); секрет — только факт наличия файла. Каталог возможностей (methodology/getting_started.yaml) покрывает каждую запись реестра либо называет причину пропуска. Сторож — tests/unit/test_getting_started.py (мутации свежести и порядка следующего шага красные)."
+      status: holds
+      check:
+        file: getting_started.py
+        present: ["SOURCE_STALE_DAYS", "BAND_MIN_OBS", "MIN_OVERLAP_DAYS", "def board"]
   sentinel: tests/consistency/test_intent_validation_gate.py
   last_reconciled: "2026-07-18"
 
@@ -2747,10 +2756,11 @@
         present: ["_run_of(\"tutorial.yml\", commit=head)", "не зелёный"]
     - id: first_contact_executes
       claim: "Человек проходит первый контакт так, как его получит бот: в CI (шаг «первый контакт» tutorial.yml, на свежей базе урока) scripts/first_contact_smoke.py в контейнере бота с его монтированием (ключи — только чтение) гонит /start, всё знакомство и /help через bot.main.build_app — те же обработчики, фильтр владельца и обработчик ошибок; поддельный только сетевой слой Telegram. Красный: необработанная ошибка, любой notify.fault, запись ERROR, знакомство не кончилось или не записало имя, профиль уже заполнен (стенд не чистый). Красный шаг — красный tutorial.yml — тега нет."
-      status: open
-      closes_when: "шаг «первый контакт» зелёный в tutorial.yml открытого репозитория на коммите выпуска, и мутация «/start пишет номер чата в каталог ключей» в образе красная (Errno 30) — квитанция в записке нити first-contact"
-      closes_when_by: owner
-      # Критерий утверждён владельцем 2026-10-02 («Согласен», нить first-contact): закрытие по нему механическое.
+      status: holds
+      # holds 2026-10-02 по критерию, утверждённому владельцем («Согласен»): шаг «первый контакт» зелёный
+      # в tutorial.yml открытого репо на коммите выпуска v0.1.4 (Export of 42e3792, run 36977969421);
+      # мутация «/start пишет номер чата» в образе — красный Errno 30 (02.10,
+      # снимок нити first-contact). Анонимная загрузка образа v0.1.4 из ghcr — 200.
       limits:
         - "Telegram подделан: длину сообщений, разметку, гонки кнопок, доставку на телефон проверка не видит."
         - "Ответы знакомства — один путь (первая кнопка, типовой текст): ветки «пропустить», «вопрос посреди знакомства» и повтор /about не проходятся."
@@ -2769,3 +2779,91 @@
         present: ["github.repository == 'larrynovsky/larry-health-os'", "tags: [\"v*\"]"]
   sentinel: tests/unit/test_tutorial_run.py
   last_reconciled: "2026-09-30"
+
+- id: llm_exit
+  title: "Выход к модели: один гард, один переводчик, смена модели — только на проверенную"
+  intent: >
+    Все 75 мест вызова модели говорят форматом Anthropic Messages и уходят через один выход —
+    llm_client.guarded_client. Поломки здесь тихие по природе. Поставщик отключает модель — и
+    анализы перестают распознаваться в день отключения, а узнаёт об этом человек. Модель
+    подменили запасной без проверки — ответы продолжают приходить, правдоподобные и неверные
+    (замер 01.10: gpt-5.6-terra три раза из трёх прочла MCH как 29.3 вместо 29.9). Переводчик
+    на чужого поставщика прочитал обрезанный ответ как законченный — JSON задач потерян без
+    ошибки. Допуск рассуждающей модели посчитал деньги после вызова — бюджет владельца
+    перепрыгнут одним запросом. Решения владельца 01.10: «сама с уведомлением» (переключение
+    без человека, но только по цепочке допущенных и с карточкой), «вариант а» (один наш
+    переводчик на выходе, а не посредник вроде LiteLLM — швы перевода под нашими тестами),
+    лимит 10 $ в месяц на допуск, собственные бланки владельца в автоматическом допуске уходят
+    только в Anthropic. Чужой поставщик установки (HEALTH_LLM_PROVIDER) получает только роли,
+    чьи модели прошли допуск на синтетике; остальное отказывает громко.
+  explanation: docs/explanation/model_choice.md
+  code_anchors:
+    - llm_client.py::guarded_client
+    - llm_translate.py::from_openai
+    - llm_translate.py::from_gemini
+    - hai_core.py::get_model
+    - hai_core.py::pick_from_chain
+    - llm_admission.py::admit_to_chain
+    - llm_admission.py::run_provider_admission
+    - model_health_check.py::check_models
+  invariants:
+    - id: guard_before_translation
+      claim: "Гард секретов проверяет ВЕСЬ исходящий текст до перевода и транспорта — у Anthropic и у чужого поставщика одинаково: чужой клиент оборачивается тем же _GuardedClient. Иначе ветка переводчика стала бы путём в обход гарда."
+      status: holds
+      check:
+        file: llm_client.py
+        present: ["_GuardedClient(_ForeignClient(prov, async_))"]
+    - id: truncation_is_not_the_end
+      claim: "Обрезка по лимиту у чужого поставщика переводится в stop_reason=max_tokens, а не end_turn: читатели (C-83) отличают обрезанный JSON от полного только по нему. Держат мутационные тесты на записанных ответах настоящих API (tests/unit/test_llm_translate.py)."
+      status: holds
+      check:
+        file: llm_translate.py
+        present: ['stop = "max_tokens"', '"MAX_TOKENS": "max_tokens"']
+    - id: switch_only_to_admitted
+      claim: "Сама система меняет модель роли только на следующую в цепочке model.<роль>, а в цепочку модель попадает только через допуск, и только в КОНЕЦ: первая модель — решение владельца. Цепочки opus и sonnet не пересекаются — иначе два прохода распознавателя сошлись бы на одной модели."
+      status: holds
+      check:
+        file: llm_admission.py
+        present: ["chain = chain + [model]", "два прохода распознавателя сошлись бы"]
+    - id: owner_documents_only_to_anthropic
+      claim: "Собственные бланки владельца участвуют в допуске только у Anthropic — туда они и так уходят в работе; чужому поставщику допуск показывает только синтетику. Правило в коде и под тестом (test_real_owner_pages_go_only_to_anthropic, test_provider_admission_writes_table_not_chains)."
+      status: holds
+      check:
+        file: llm_admission.py
+        present: ['if provider == "anthropic":   # настоящие бланки']
+    - id: budget_before_call
+      claim: "Допуск резервирует деньги ДО вызова по лимиту ответа (у чужого поставщика — плюс запас на рассуждение из профиля) и пессимистичному тарифу; не помещается — стоп с причиной, а не перерасход."
+      status: holds
+      check:
+        file: llm_admission.py
+        present: ["ledger.reserve(est_in, max_tokens + reserve_extra)"]
+    - id: unadmitted_foreign_role_refuses
+      claim: "На установке чужого поставщика модель роли, не прошедшая допуск (methodology/llm_admission_table.json), не отвечает: hai_core.get_model бросает ModelNotAdmitted. Это политика по умолчанию, принятая без ответа владельца на вопрос о политике (02.10)."
+      status: holds
+      check:
+        file: hai_core.py
+        present: ["raise ModelNotAdmitted", "admitted_models(prov, role)"]
+    - id: answered_by_named_model
+      claim: "У поставщика с совместимой точкой (DeepSeek) ответ другой моделью, чем названа в запросе, — это «модели нет», а не успех: точка молча обслуживает чужое имя своей моделью (замер 02.10: claude-opus-5 → deepseek-v4-pro), а совсем незнакомое отвергает кодом 400 — оба случая дают ModelNotServed. Без этого допуск записал бы вердикт чужой модели, а датчик отзыва не увидел бы её ухода. Граница: проверяется обычный create (sync и async); stream не проверяется — вызывающих stream в коде нет; у Anthropic, OpenAI и Gemini подмены имени не замечено, сравнения там нет. Держит test_deepseek_substituted_or_rejected_model_is_not_found; check ниже — только наличие текста, смысл держит тест."
+      status: holds
+      check:
+        file: llm_client.py
+        present: ["return _same_model(model, r)", "class ModelNotServed"]
+    - id: two_readers_two_models
+      claim: "Фото анализов читают две разные модели (opus, затем sonnet). Модели по умолчанию разные у каждого поставщика (anthropic — MODEL_DEFAULTS, остальные — role_defaults профиля; сторож tests/consistency/test_llm_profiles_two_readers.py), а при одной модели на оба прохода из любого источника, включая базу тенанта, распознаватель отказывает сам (lab_recognizer, test_model_chain). Поставщик без второй модели, читающей картинки, остаётся без распознавания фото, а не с одной моделью на оба прохода (решение владельца 02.10, вариант А, DeepSeek). check ниже — только наличие текста, смысл держат тесты."
+      status: holds
+      check:
+        file: tests/consistency/test_llm_profiles_two_readers.py
+        present: ['rd["opus"] != rd["sonnet"]']
+    - id: partner_has_no_admission
+      claim: "Запасные модели, допущенные на бланках владельца, видит каждая установка anthropic, где своего допуска нет (партнёр, установка с GitHub): model_chain дописывает их из раздела anthropic таблицы выпуска в КОНЕЦ цепочки базы, не дописывая модель из цепочки второго прохода. В таблицу из вердиктов идут только passed/date/corpus — ошибки несут значения бланков владельца. Отставание таблицы от базы владельца — запись в журнал сбоев при еженедельном ходе допуска (table_drift)."
+      status: holds
+      verified_at: "2026-10-02"
+      verified_on: "studio"
+      check:
+        file: hai_core.py
+        present: ['table = _admission_table().get("anthropic") or {}', "return base + extra"]
+      limits:
+        - "Подтверждение: замер 02.10 ~11:05 после деплоя 0045cd9: партнёр opus ['claude-opus-4-7', 'claude-opus-5'], sonnet ['claude-sonnet-4-6', 'claude-sonnet-5-5']; test_release_table_has_no_owner_values зелёный в полном прогоне; критерий утверждён владельцем 02.10 11:33."
+        - "Таблицу выпуска пишет сессия на MacBook (llm_admission.py --export-anthropic), контейнер её только читает: между допуском у владельца и выпуском — задержка до следующего закрытия нити. Датчик отставания называет её, но не закрывает."
+  last_reconciled: "2026-10-02"

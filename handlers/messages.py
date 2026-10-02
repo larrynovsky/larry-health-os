@@ -28,6 +28,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 
 import assessment_bot_handlers as abh
 import checkin_agent as ck
+import hai_core
 import health_ai as ai
 import health_db as db
 
@@ -196,6 +197,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         reply = ai.chat(text)
+    except hai_core.ModelNotAdmitted:
+        raise
     except Exception as e:
         log.error(f"Claude API error: {e}")
         reply = await asyncio.to_thread(
@@ -238,6 +241,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply = await asyncio.to_thread(
             ai.chat_with_image, caption, bytes(image_bytes), "image/jpeg"
         )
+    except hai_core.ModelNotAdmitted:
+        raise
     except Exception as e:
         log.error(f"handle_photo error: {e}", exc_info=True)
         reply = await asyncio.to_thread(

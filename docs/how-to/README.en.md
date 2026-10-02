@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:be5938abdc50 -->
+<!-- translation-of: docs/how-to/README.md sha256:229764b0e1f1 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -39,13 +39,14 @@ No terminal needed.
 - [Send the bot a large file](send_large_file.md)
 - [Connect an Oura ring](connect_oura.md)
 - [Connect iPhone Health and Apple Watch](connect_apple_health.md)
+  (the safe path over Tailscale — [separately](connect_apple_health_tailscale.md))
 
 ## 2. You maintain your own installation
 
 A terminal on the machine where the system is installed is required. Use the rule above for commands.
 
 - Installation and updates: [install the system in Docker from an image](install_docker.md) ·
-  [with an OpenAI or Gemini key](llm_provider.md)
+  [with an OpenAI, Gemini or DeepSeek key](llm_provider.md)
 - The bot replied “I couldn't answer: something failed inside the system…” with a code: [find the cause by the code](bot_fault.md)
 - Respond to system alerts: [night cycle alert](night_cycle_respond.md) ·
   [escalation "a person has hit a problem"](service_trouble_alert.md) ·

@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # таблица/колонка → модуль, который создаёт её сам при первом обращении
 LAZY = {
+    "bot_prompts": "bot.actions (_DDL, первое ask())",
     "conversation_history": "hai_core", "dashboard_edits": "dashboard_db",
     "genome_source": "genome_parser", "hypothesis_outcomes": "health_db (гипотезы)",
     "lab_name_loinc": "loinc_match", "lab_results": "health_db._ensure_lab_table",

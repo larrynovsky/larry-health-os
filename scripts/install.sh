@@ -25,8 +25,9 @@ DIR="${HOME}/health-docker"
 MODE=install
 DIST=""            # каталог с compose.yaml/health.env вместо выпуска (CI, проверка невыпущенного)
 INTERACTIVE=1
-VERIFY=1           # проверять токен Telegram и ключ Anthropic по сети
+VERIFY=1           # проверять токен Telegram и ключ поставщика моделей по сети
 PROVIDER="${LLM_PROVIDER:-}"   # пусто = anthropic (урок — один путь); выбор — docs/how-to/llm_provider.md
+LAN_INGEST=""      # --lan-ingest / --no-lan-ingest: приём с телефона в домашней Wi-Fi (порт 8011)
 CI_FAKE=0          # --ci-fake-keys: ключи заведомо поддельные (CI) — бот обязан упасть на InvalidToken
 FAILS=0
 WARNS=0
@@ -50,8 +51,10 @@ usage() {
                      TELEGRAM_CHAT_ID, ANTHROPIC_KEY
   --no-verify        не проверять ключи по сети (и их формат)
   --dist КАТАЛОГ     взять compose.yaml и health.env из каталога, а не из выпуска
-  --provider ИМЯ     поставщик моделей: anthropic (по умолчанию), openai, gemini;
-                     ключ не-Anthropic в --non-interactive — из LLM_KEY" \
+  --provider ИМЯ     поставщик моделей: anthropic (по умолчанию), openai, gemini, deepseek;
+                     ключ не-Anthropic в --non-interactive — из LLM_KEY
+  --lan-ingest       принимать данные с телефона по домашней Wi-Fi (порт 8011, только запись
+                     под токеном; дашборд остаётся закрытым); --no-lan-ingest — выключить" \
 "Usage: bash install.sh [--check] [--dir DIR] [--non-interactive] [--no-verify]
   --check            only check dependencies, change nothing
   --dir DIR          where to install (default ~/health-docker)
@@ -59,8 +62,10 @@ usage() {
                      TELEGRAM_CHAT_ID, ANTHROPIC_KEY
   --no-verify        do not verify keys online (nor their format)
   --dist DIR         take compose.yaml and health.env from DIR instead of the release
-  --provider NAME    model provider: anthropic (default), openai, gemini;
-                     a non-Anthropic key in --non-interactive comes from LLM_KEY"
+  --provider NAME    model provider: anthropic (default), openai, gemini, deepseek;
+                     a non-Anthropic key in --non-interactive comes from LLM_KEY
+  --lan-ingest       accept data from the phone over home Wi-Fi (port 8011, token-protected
+                     writes only; the dashboard stays closed); --no-lan-ingest — turn it off"
 }
 
 while [ $# -gt 0 ]; do
@@ -70,6 +75,8 @@ while [ $# -gt 0 ]; do
     --dist) [ $# -ge 2 ] || die "--dist: нужен каталог" "--dist needs a directory"; DIST="$(abspath "$2")"; shift ;;
     --non-interactive) INTERACTIVE=0 ;;
     --provider) [ $# -ge 2 ] || die "--provider: нужно имя" "--provider needs a name"; PROVIDER="$2"; shift ;;
+    --lan-ingest) LAN_INGEST=1 ;;
+    --no-lan-ingest) LAN_INGEST=0 ;;
     --no-verify) VERIFY=0 ;;
     --ci-fake-keys) VERIFY=0; CI_FAKE=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -83,8 +90,8 @@ if [ "$MODE" = install ] && [ "$INTERACTIVE" = 1 ] && [ ! -t 0 ]; then
 fi
 
 case "${PROVIDER:-anthropic}" in
-  anthropic|openai|gemini) ;;
-  *) die "Неизвестный поставщик моделей: ${PROVIDER} (anthropic, openai, gemini)" "Unknown model provider: ${PROVIDER} (anthropic, openai, gemini)" ;;
+  anthropic|openai|gemini|deepseek) ;;
+  *) die "Неизвестный поставщик моделей: ${PROVIDER} (anthropic, openai, gemini, deepseek)" "Unknown model provider: ${PROVIDER} (anthropic, openai, gemini, deepseek)" ;;
 esac
 
 # ── 1. Проверка ──────────────────────────────────────────────────────────────────────────────
@@ -338,6 +345,15 @@ else
   PROVIDER="$(sed -n 's/^HEALTH_LLM_PROVIDER=//p' .env | tail -n1)"; PROVIDER="${PROVIDER:-anthropic}"
 fi
 ok "поставщик моделей: ${PROVIDER}" "model provider: ${PROVIDER}"
+# Приём с телефона в домашней Wi-Fi: compose берёт адрес порта 8011 из .env (HEALTH_INGEST_BIND).
+# Как с поставщиком: не названо — выбор прошлой установки сохраняется.
+if [ -n "$LAN_INGEST" ]; then
+  if [ "$LAN_INGEST" = 1 ]; then bind=0.0.0.0; else bind=127.0.0.1; fi
+  if grep -q '^HEALTH_INGEST_BIND=' .env; then
+    sed "s#^HEALTH_INGEST_BIND=.*#HEALTH_INGEST_BIND=${bind}#" .env > .env.part && mv .env.part .env
+  else printf 'HEALTH_INGEST_BIND=%s\n' "$bind" >> .env; fi
+fi
+[ "$(sed -n 's/^HEALTH_INGEST_BIND=//p' .env | tail -n1)" = 0.0.0.0 ] && LAN_INGEST=1
 
 # ── 3. Ключи ─────────────────────────────────────────────────────────────────────────────────
 SEC="${DIR}/secrets"
@@ -373,6 +389,7 @@ key_check() {  # key_check <поставщик> <ключ> → ok / bad / net (�
     anthropic) cfg='header = "x-api-key: %s"\nheader = "anthropic-version: 2023-06-01"\nurl = "https://api.anthropic.com/v1/models"\n' ;;
     openai) cfg='header = "Authorization: Bearer %s"\nurl = "https://api.openai.com/v1/models"\n' ;;
     gemini) cfg='header = "x-goog-api-key: %s"\nurl = "https://generativelanguage.googleapis.com/v1beta/models"\n' ;;
+    deepseek) cfg='header = "Authorization: Bearer %s"\nurl = "https://api.deepseek.com/models"\n' ;;
   esac
   # shellcheck disable=SC2059  # формат — константа из case выше, ключ — аргумент
   code="$(printf "$cfg" "$2" | curl -q -s -o /dev/null -w '%{http_code}' --max-time 20 -K - 2>/dev/null || true)"
@@ -422,6 +439,9 @@ case "$PROVIDER" in
   gemini)    KF=gemini_key; KV="$ENV_LK"; KN="Gemini"
              KH_RU="Ключ Gemini: aistudio.google.com → Get API key."
              KH_EN="Gemini key: aistudio.google.com → Get API key." ;;
+  deepseek)  KF=deepseek_key; KV="$ENV_LK"; KN="DeepSeek"
+             KH_RU="Ключ DeepSeek: platform.deepseek.com → API keys (и пополните баланс)."
+             KH_EN="DeepSeek key: platform.deepseek.com → API keys (and top up the balance)." ;;
 esac
 ENV_AK=""; ENV_LK=""
 while ! has_secret "$KF"; do
@@ -438,6 +458,11 @@ while ! has_secret "$KF"; do
   put_secret "$KF" "$k"
 done
 t=""; k=""
+# Токен приёма с телефона: его не получают где-то, его создаёт установка (docs/how-to/connect_apple_health.md).
+if [ "$LAN_INGEST" = 1 ] && ! has_secret hae_ingest_token; then
+  put_secret hae_ingest_token "$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+  ok "создан токен приёма с телефона: ${SEC}/hae_ingest_token" "phone intake token created: ${SEC}/hae_ingest_token"
+fi
 
 # Права ключей приводятся всегда, а не только у новых файлов: каталог 700, файлы 600, владелец —
 # пользователь контейнера (1000) там, где он отличается от вашего. Не вышло — установка стоп.
@@ -477,6 +502,11 @@ fi
 BROKEN=0
 if dash_ok; then ok "дашборд: http://127.0.0.1:8001" "dashboard: http://127.0.0.1:8001"
 else BROKEN=1; warn "дашборд не отвечает — docker compose ps" "the dashboard does not answer — docker compose ps"; fi
+if [ "$LAN_INGEST" = 1 ]; then
+  lan_ip="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')"
+  ok "приём с телефона по Wi-Fi: http://${lan_ip:-<адрес этой машины>}:8011/hae/ingest (инструкция: connect_apple_health)" \
+     "phone intake over Wi-Fi: http://${lan_ip:-<this machine address>}:8011/hae/ingest (guide: connect_apple_health)"
+fi
 if [ -z "$labels" ]; then ok "все службы отмечаются" "all services report in"
 else
   warn "не отмечаются: ${down}" "not reporting: ${down}"

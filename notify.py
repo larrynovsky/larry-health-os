@@ -228,7 +228,7 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -
     from _time_inject import get_now
 
     ts = get_now().astimezone().isoformat()
-    code = hashlib.sha1(f"{ts}\n{tech}".encode()).hexdigest()[:6]
+    code = hashlib.sha256(f"{ts}\n{tech}".encode()).hexdigest()[:6]   # код, не защита; sha1 CodeQL отбивает (#42)
     try:
         parts = tech.split(":", 2)
         where = parts[0]

@@ -50,8 +50,8 @@ capabilities:
     action_in_bot: true
     pending_action: {ru: "Проверить распознанное", en: "Check recognised values"}
     pending_href: /labs
-    howto: how-to/lab_review_queue.md
-    howto_label: {ru: "Как проверить распознанное", en: "How to check recognised values"}
+    howto: how-to/add_labs.md
+    howto_label: {ru: "Как добавить анализы", en: "How to add lab results"}
 
   - id: genome
     group: self

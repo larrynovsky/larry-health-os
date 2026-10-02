@@ -48,6 +48,13 @@ def test_unknown_outcome_is_rejected(conn):
         st.resolve_outcome(hid, "наверное да", conn=conn)
 
 
+def test_resolve_nonexistent_hypothesis_reports_failure(conn):
+    hid = st.remember(_verdict(), "fixture_tenant", conn=conn)
+    assert st.resolve_outcome(hid + 1, "confirmed", conn=conn) is False
+    assert conn.execute("SELECT outcome, outcome_at FROM service_trouble WHERE id=?",
+                        (hid,)).fetchone() == (None, None)
+
+
 def test_user_text_is_not_stored():
     """Переписка тенанта в журнал гипотез не попадает — там только признаки."""
     import inspect

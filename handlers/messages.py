@@ -117,9 +117,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Ссылка на файл в облаке или путь к файлу на диске (genome-link, 24.09) ──
     # Большой геном не пролезает в Telegram (20 МБ): человек присылает ссылку или путь.
     # Только ссылки на облака из списка — статья, упомянутая в разговоре, не скачивается.
+    import link_fetch
     try:
-        import link_fetch
         _req = link_fetch.parse(text)
+    except link_fetch._HumanError as _e:
+        await update.message.reply_text(str(_e))
+        return
     except Exception as _e:
         log.warning(f"handle_text: link_fetch.parse: {_e}")
         _req = None
@@ -150,6 +153,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ), reply_to_message_id=update.message.message_id, reply_markup=actions.keyboard([
                     actions.button(i18n.t("actions.answer.yes"), "ans_yes", pending[0]["id"]),
                     actions.button(i18n.t("actions.answer.no"), "ans_no", pending[0]["id"])]))
+                return
         except Exception as _e:
             log.warning(f"handle_text: pending question hint failed: {_e}")
 
@@ -360,15 +364,21 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_dup:
             await update.message.reply_text(i18n.t("documents.reply.duplicate"))
             return
+        paused = await asyncio.to_thread(_intake_down_note)
         dest.write_bytes(data)
+        receipt = paused or _receipt_text(dest.name, dest)
+        if not paused:
+            import genome_intake
+            kind = genome_intake.sniff(dest)
+            if kind and not kind["supported"]:
+                genome_intake._set_state(dest, status="unsupported", format=kind["format"])
         log.info(f"handle_document: saved {dest} ({len(data)} bytes)")
     except Exception as e:
         log.error(f"handle_document save error: {e}", exc_info=True)
         await update.message.reply_text(await asyncio.to_thread(
                 notify.fault, f"handlers/messages.py:handle_document: {type(e).__name__}: {e}", person_key="documents.error.save_failed"))
         return
-    paused = await asyncio.to_thread(_intake_down_note)
-    await update.message.reply_text(paused or _receipt_text(dest.name, dest))
+    await update.message.reply_text(receipt)
 
 
 BOT_DOWNLOAD_LIMIT = 20 * 1024 * 1024
@@ -414,10 +424,7 @@ def _receipt_text(name: str, path=None) -> str:
         if k and k["supported"]:
             return (i18n.t("genome.reply.raw_file_received", name=name))
         if k:
-            return (i18n.t(
-                "genome.reply.unsupported_format", name=name, format=k['format'],
-                supported_formats=genome_intake.SUPPORTED_TEXT
-            ))
+            return genome_intake.unsupported_receipt(name, k["format"])
     return (i18n.t("documents.reply.unsupported_format", name=name))
 
 

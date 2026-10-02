@@ -380,6 +380,40 @@ def test_reference_shows_a_failed_role_with_its_reason():
     assert "| нет |" in row and "MCH" in row
 
 
+def test_reference_has_a_section_per_provider_including_anthropic():
+    """Справочник повторяет устройство: каждый профиль — свой раздел. До 02.10 раздела anthropic
+    не было — посторонний с ключом Anthropic не видел ни основных моделей, ни запасных."""
+    import hai_core
+    import llm_client
+    t = {"anthropic": {"opus": {"claude-x-fallback": {"passed": True, "date": "2026-10-02", "corpus": "c"}}}}
+    md = la.admission_reference_md(t)
+    assert [ln[3:] for ln in md.splitlines() if ln.startswith("## ")] == list(llm_client.profiles())
+    sec = md.split("## anthropic", 1)[1].split("\n## ", 1)[0]
+    for role, model in hai_core.MODEL_DEFAULTS.items():
+        assert f"| {role} |" in sec and f"`{model}`" in sec
+    assert "`claude-x-fallback` | запасная: да |" in sec
+
+
+def test_readme_points_to_the_reference_and_names_no_model():
+    """Какие модели допущены, README не пересказывает — ссылается на генерируемый справочник.
+    Копия разъехалась бы при первом же допуске (02.10: за день у OpenAI/Gemini допуск менялся
+    дважды), и README обещал бы посторонним чат, которого нет. Имя модели в README — красный."""
+    import hai_core
+    import llm_client
+    root = Path(la.__file__).parent
+    t = json.loads(la._TABLE_FILE.read_text(encoding="utf-8"))
+    names = set(hai_core.MODEL_DEFAULTS.values())
+    names |= {m for p in llm_client.profiles().values() for m in (p.get("role_defaults") or {}).values()}
+    names |= {m for prov in t.values() if isinstance(prov, dict)
+              for role in prov.values() if isinstance(role, dict) for m in role}
+    for readme, ref, howto in (("README.md", "llm_providers.en.md", "llm_provider.en.md"),
+                               ("README.ru.md", "llm_providers.md", "llm_provider.md")):
+        text = (root / readme).read_text(encoding="utf-8")
+        assert f"docs/reference/{ref}" in text and f"docs/how-to/{howto}" in text, readme
+        leaked = sorted(n for n in names if n in text)
+        assert not leaked, f"{readme} называет модели {leaked} — ссылайтесь на справочник"
+
+
 # ── исправления после первого живого допуска (02.10) ────────────────────────
 def test_dated_previous_column_is_not_an_extra_row():
     """Жёсткий бланк печатает «Önceki (12.03.2026)». claude-opus-5-5 отдал эти значения отдельными

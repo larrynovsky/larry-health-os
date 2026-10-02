@@ -91,7 +91,7 @@ def _url_ok(url: str) -> bool:
 
 def parse(text: str) -> dict | None:
     """Сообщение → {'kind': 'url'|'path', ...} или None. Ссылка — только на облако из списка
-    (статья в разговоре не должна уехать в скачивание); путь — только если файл существует."""
+    (статья в разговоре не должна уехать в скачивание); недоступный путь к файлу — отказ."""
     t = (text or "").strip()
     for m in _URL.finditer(t):
         url = m.group(0).rstrip(").,;»")
@@ -104,6 +104,8 @@ def parse(text: str) -> dict | None:
         p = Path(os.path.expanduser(cand))
         if p.is_file():
             return {"kind": "path", "path": str(p.resolve())}
+        if cand.startswith(("/", "~/")) and len(cand.split()) == 1 and p.suffix:
+            raise _HumanError(i18n.t("intake.link.path_unavailable"))
     return None
 
 

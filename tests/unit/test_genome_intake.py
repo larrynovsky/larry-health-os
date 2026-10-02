@@ -7,6 +7,9 @@
 from __future__ import annotations
 
 import zipfile
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 from pathlib import Path
 
 import pytest
@@ -175,7 +178,74 @@ def test_bot_receipt_recognizes_genome_by_content(tmp_path):
     assert "исходные данные генетического теста" in _receipt_text(v.name, v)
     f = tmp_path / "a.fastq"
     f.write_text("@r1\nACGT\n+\nIIII\n@r2\nACGT\n+\nIIII\n")
-    assert "fastq" in _receipt_text(f.name, f) and "tellmeGen" in _receipt_text(f.name, f)
+    assert "сырые прочтения" in _receipt_text(f.name, f) and "tellmeGen" in _receipt_text(f.name, f)
+
+
+@pytest.mark.parametrize("arrival", ["path", "link", "telegram"])
+@pytest.mark.parametrize("lang", ["ru", "en"])
+@pytest.mark.parametrize("format,words", [
+    ("fastq", {"ru": "сырые прочтения", "en": "raw sequencing reads"}),
+    ("vcf_in_zip", {"ru": "VCF внутри ZIP-архива", "en": "VCF inside a ZIP archive"}),
+    ("zip_too_many_files", {"ru": "слишком большим числом файлов", "en": "too many files"}),
+])
+def test_unsupported_genome_arrivals_get_one_localized_receipt(
+        tmp_path, monkeypatch, arrival, lang, format, words):
+    import i18n, genome_intake as gi, link_fetch
+    from handlers import messages
+    monkeypatch.setattr(i18n, "lang_of", lambda: lang)
+    source = tmp_path / ("genome.fastq" if format == "fastq" else "genome.zip")
+    if format == "fastq":
+        source.write_text("@r1\nACGT\n+\nIIII\n")
+    else:
+        with zipfile.ZipFile(source, "w") as zf:
+            if format == "vcf_in_zip":
+                zf.writestr("genome.vcf", "##fileformat=VCFv4.2\n")
+            else:
+                monkeypatch.setattr(gi, "MAX_MEMBERS", 1)
+                zf.writestr("first.txt", "not a genome")
+                zf.writestr("second.txt", "not a genome")
+    inbox = tmp_path / "incoming"
+    inbox.mkdir()
+    told = []
+    monkeypatch.setattr(gi, "_tell", told.append)
+    monkeypatch.setattr(link_fetch, "_tell", lambda text: None)
+    if arrival == "telegram":
+        bot = SimpleNamespace(get_file=AsyncMock(return_value=SimpleNamespace(
+            download_as_bytearray=AsyncMock(return_value=source.read_bytes()))))
+        message = SimpleNamespace(document=SimpleNamespace(file_id="fixture", file_name=source.name,
+                                  file_size=source.stat().st_size), reply_text=AsyncMock(),
+                                  chat=SimpleNamespace(send_action=AsyncMock()))
+        monkeypatch.setattr(messages, "_tenant_inbox", lambda: inbox)
+        monkeypatch.setattr(messages, "_intake_down_note", lambda: "")
+        asyncio.run(messages.handle_document(SimpleNamespace(message=message), SimpleNamespace(bot=bot)))
+        receipt = message.reply_text.await_args.args[0]
+        assert message.reply_text.await_count == 1
+    else:
+        if arrival == "path":
+            req = link_fetch.parse(str(source))
+        else:
+            req = link_fetch.parse("https://drive.google.com/file/d/fixture/view")
+            def fetch(url, dest):
+                target = dest / source.name
+                target.write_bytes(source.read_bytes())
+                return target
+            monkeypatch.setattr(link_fetch, "_fetch", fetch)
+        link_fetch.enqueue(req, inbox)
+        assert link_fetch.process_requests(inbox) == 1
+    spawn = Mock()
+    assert gi.process_pending(inbox, spawn=spawn) == (0 if arrival == "telegram" else 1)
+    if arrival == "telegram":
+        assert told == [], "Telegram receipt must not be repeated by the watcher"
+    else:
+        assert len(told) == 1, "A link/path refusal must reach the person"
+        receipt = told[0]
+    assert words[lang] in receipt
+    assert ".vcf / .vcf.gz" in receipt
+    assert all(provider in receipt for provider in gi.PROVIDERS)
+    assert source.name in receipt and "__" not in receipt
+    assert format not in receipt.replace(source.name, "")
+    assert gi.process_pending(inbox, spawn=spawn) == 0
+    spawn.assert_not_called()
 
 
 

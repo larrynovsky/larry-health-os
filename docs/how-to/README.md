@@ -34,6 +34,7 @@
 - [Ответить на вопрос системы](answer_a_question.md)
 - [Пройти знакомство заново или исправить ответ](redo_onboarding.md)
 - [Прислать боту большой файл](send_large_file.md)
+- [Добавить анализы](add_labs.md)
 - [Подключить кольцо Oura](connect_oura.md)
 - [Подключить «Здоровье» iPhone и Apple Watch](connect_apple_health.md)
   (безопасный путь через Tailscale — [отдельно](connect_apple_health_tailscale.md))

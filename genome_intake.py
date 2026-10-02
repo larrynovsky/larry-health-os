@@ -57,7 +57,7 @@ SIDECAR = ".genome.json"
 # Поставщики сырых данных, которые разборщик узнаёт по содержимому. Один дом перечня: из него
 # собираются и русский текст ниже, и строка знакомства на языке человека (i18n, 28.09).
 PROVIDERS = ("23andMe", "AncestryDNA", "MyHeritage", "FTDNA", "tellmeGen (Starter/Advanced)", "LivingDNA")
-SUPPORTED_TEXT = "исходный файл от " + ", ".join(PROVIDERS[:-1]) + " или " + PROVIDERS[-1]
+SUPPORTED_TEXT = "genome.supported_formats"
 _SKIP_EXT = {".pdf", ".jpg", ".jpeg", ".png", ".heic", ".tif", ".tiff", ".json",
              ".failed", ".norows"}
 _CHROM = {**{str(i): str(i) for i in range(1, 23)}, "X": "X", "Y": "Y", "MT": "MT",
@@ -65,6 +65,14 @@ _CHROM = {**{str(i): str(i) for i in range(1, 23)}, "X": "X", "Y": "Y", "MT": "M
 _NOCALL = {"", "0", "00", "-", "--", "–", "—", "NC", "N", "NN", "?", "??"}
 _SPLIT = re.compile(r"[\t, ]+")
 _RSID = re.compile(r"^(rs|i)\d+$")
+
+
+def unsupported_receipt(name: str, format: str) -> str:
+    """Одинаковый отказ для загрузки в Telegram и файла из ссылки/пути."""
+    from _fmt_helpers import fmt_label
+    return i18n.t("genome.reply.unsupported_format", name=display_filename(name),
+                  format=fmt_label(format, "genome.format"),
+                  supported_formats=i18n.t(SUPPORTED_TEXT, providers=", ".join(PROVIDERS)))
 
 
 def _row(line: str):
@@ -256,8 +264,8 @@ def process_pending(inbox: Path, spawn=_spawn) -> int:
         except OSError:
             continue
         if not k["supported"]:
-            # человеку об этом уже сказала квитанция бота (handlers.messages._receipt_text)
             _set_state(f, status="unsupported", format=k["format"])
+            _tell(unsupported_receipt(f.name, k["format"]))
             n += 1
             continue
         _set_state(f, status="queued", format=k["format"], member=k["member"])

@@ -366,6 +366,7 @@
     "health_db"
   ],
   "genome_intake": [
+    "_fmt_helpers",
     "config_db",
     "genome_pipeline",
     "health_db",

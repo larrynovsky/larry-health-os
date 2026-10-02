@@ -6,7 +6,7 @@ The consultation check exercises ConversationHandler state transitions, not just
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -120,14 +120,26 @@ def test_confirmation_replies_to_person_and_saves_full_text(db, monkeypatch):
     tasks_db.mark_task_sent(tid, 31)
     monkeypatch.setattr(link_fetch, "parse", lambda text: None)
     monkeypatch.setattr(messages.ck, "checkin_state", SimpleNamespace(active=False))
-    monkeypatch.setattr(messages.abh, "get_active_assessment", lambda chat: {"id": 1})
-    monkeypatch.setattr(messages.abh, "handle_text_in_assessment", AsyncMock())
+    monkeypatch.setattr(messages.abh, "get_active_assessment", lambda chat: None)
+    chat = Mock(return_value="Ordinary chat reply")
+    monkeypatch.setattr(messages.ai, "chat", chat)
+    ordinary_send = AsyncMock()
+    monkeypatch.setattr(messages, "send_long", ordinary_send)
+    from bot import helpers
+    monkeypatch.setattr(helpers, "_run_arbiter_background", AsyncMock())
+    monkeypatch.setattr(helpers, "_service_trouble_background", AsyncMock())
     full_text = "Invented answer. " * 40 + "The final sentence must survive."
     original = _message(text=full_text)
     context = SimpleNamespace(bot=original.get_bot(), user_data={})
     asyncio.run(messages.handle_text(SimpleNamespace(message=original, effective_chat=original.chat), context))
+    chat.assert_not_called()
+    ordinary_send.assert_not_awaited()
+    assert original.reply_text.await_count == 1
     hint = original.reply_text.await_args.kwargs
     assert hint["reply_to_message_id"] == original.message_id
+    asyncio.run(messages.handle_text(SimpleNamespace(message=original, effective_chat=original.chat), context))
+    chat.assert_called_once_with(full_text)
+    assert original.reply_text.await_count == 1, "Only one hint may be shown per question"
     confirmation = _message(reply_to_message=original, reply_markup=hint["reply_markup"])
     yes, no = hint["reply_markup"].inline_keyboard[0]
     _press(monkeypatch, no.callback_data, confirmation, context)

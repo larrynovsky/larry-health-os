@@ -10,6 +10,9 @@ from __future__ import annotations
 import io
 import json
 import socket
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -46,8 +49,47 @@ def test_parse_paths(tmp_path):
     assert link_fetch.parse(str(f)) == {"kind": "path", "path": str(f.resolve())}
     assert link_fetch.parse(f'"{f}"')["kind"] == "path"                 # путь в кавычках
     assert link_fetch.parse("file://" + str(f).replace(" ", "%20"))["kind"] == "path"
-    assert link_fetch.parse(str(tmp_path / "нет.txt")) is None
+    with pytest.raises(link_fetch._HumanError):
+        link_fetch.parse(str(tmp_path / "нет.txt"))
     assert link_fetch.parse("/done 12 ответ") is None                     # команда, не файл
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+@pytest.mark.parametrize("home_relative", [False, True])
+def test_unavailable_file_path_replies_without_chat(tmp_path, monkeypatch, lang, home_relative):
+    import i18n, link_fetch
+    from pathlib import Path
+    from handlers import messages
+    from bot import helpers
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(link_fetch.os.path, "expanduser", lambda p: str(tmp_path / p[2:]) if p.startswith("~/") else p)
+    monkeypatch.setattr(i18n, "lang_of", lambda: lang)
+    chat = Mock(return_value="ordinary chat")
+    monkeypatch.setattr(messages.ai, "chat", chat)
+    monkeypatch.setattr(messages.db, "get_open_tasks", lambda n: [])
+    monkeypatch.setattr(messages.ck, "checkin_state", SimpleNamespace(active=False))
+    monkeypatch.setattr(messages.abh, "get_active_assessment", lambda cid: None)
+    monkeypatch.setattr(messages, "send_long", AsyncMock())
+    monkeypatch.setattr(helpers, "_run_arbiter_background", AsyncMock())
+    monkeypatch.setattr(helpers, "_service_trouble_background", AsyncMock())
+    enqueue = Mock()
+    monkeypatch.setattr(link_fetch, "enqueue", enqueue)
+    text = "~/genome.txt" if home_relative else str(tmp_path / "missing.txt")
+    message = SimpleNamespace(text=text, reply_to_message=None, reply_text=AsyncMock(),
+                              chat=SimpleNamespace(id=7, send_action=AsyncMock()), get_bot=lambda: None)
+    update = SimpleNamespace(message=message, effective_chat=message.chat)
+    asyncio.run(messages.handle_text(update, SimpleNamespace(user_data={})))
+    message.reply_text.assert_awaited_once_with(i18n.t("intake.link.path_unavailable", lang))
+    chat.assert_not_called()
+    enqueue.assert_not_called()
+
+
+@pytest.mark.parametrize("text", ["/done", "/done 12", "/folder", "/folder/",
+                                      "/missing.txt is a file", "~/folder", "relative.txt"])
+def test_path_heuristic_leaves_commands_and_prose_as_chat(text, monkeypatch):
+    import link_fetch
+    monkeypatch.setattr(link_fetch.Path, "is_file", lambda p: False)
+    assert link_fetch.parse(text) is None
 
 
 @pytest.mark.parametrize("url,ok", [

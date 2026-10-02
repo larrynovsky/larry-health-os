@@ -17,6 +17,42 @@
       ]
      }
     }
+   },
+   "gpt-5.6-luna": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "gpt-5.6-luna"
+    ],
+    "suites": {
+     "lab_vision_p2": {
+      "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   },
+   "gpt-5.2": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "gpt-5.2-2025-12-11"
+    ],
+    "suites": {
+     "lab_vision_p2": {
+      "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
    }
   },
   "haiku": {
@@ -54,6 +90,26 @@
      }
     }
    }
+  },
+  "opus": {
+   "gpt-5.6-sol": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "gpt-5.6-sol"
+    ],
+    "suites": {
+     "lab_vision_p1": {
+      "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
   }
  },
  "gemini": {
@@ -68,6 +124,62 @@
     "suites": {
      "lab_vision_p1": {
       "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  },
+  "sonnet": {
+   "gemini-3.8-flash": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "gemini-3.8-flash"
+    ],
+    "suites": {
+     "lab_vision_p2": {
+      "items": 3,
+      "errors": []
+     },
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  },
+  "haiku": {
+   "gemini-3.8-flash": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "gemini-3.8-flash"
+    ],
+    "suites": {
+     "text": {
+      "items": 10,
+      "errors": []
+     }
+    }
+   }
+  },
+  "haiku_pinned": {
+   "gemini-3.8-flash": {
+    "passed": true,
+    "date": "2026-10-02",
+    "corpus": "2026-10-02.4",
+    "model_ids": [
+     "gemini-3.8-flash"
+    ],
+    "suites": {
+     "treatment": {
+      "items": 2,
       "errors": []
      },
      "text": {

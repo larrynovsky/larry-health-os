@@ -34,7 +34,7 @@ async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     try:
-        task_id = int(args[0])
+        task_id = int(args[0].removeprefix("#"))
         resolved_text = " ".join(args[1:]) if len(args) > 1 else None
 
         await _complete_task(update.message, context, task_id, resolved_text)
@@ -49,7 +49,7 @@ async def cmd_dismiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(i18n.t("tasks.help.dismiss_usage"))
         return
     try:
-        task_id = int(args[0])
+        task_id = int(args[0].removeprefix("#"))
         await _dismiss_task(update.message, task_id)
     except ValueError:
         await update.message.reply_text(i18n.t("common.error.id_not_numeric"))

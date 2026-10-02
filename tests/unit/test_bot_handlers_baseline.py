@@ -140,6 +140,25 @@ def test_cmd_dismiss_resolves_as_dismissed(tg):
     assert any("отклонена" in m["text"].lower() for m in tg.outgoing)
 
 
+@pytest.mark.parametrize("command,status", [("done", "completed"), ("dismiss", "dismissed")])
+@pytest.mark.parametrize("token", ["12", "#12", "##12", "#abc"])
+def test_task_commands_accept_one_optional_hash(tg, monkeypatch, command, status, token):
+    from handlers import tasks
+    from unittest.mock import Mock
+    resolve = Mock(return_value=True)
+    monkeypatch.setattr(tasks.db, "get_open_tasks", lambda n: [])
+    monkeypatch.setattr(tasks.db, "resolve_task", resolve)
+    monkeypatch.setattr(tasks.ta, "complete_macos_reminder", lambda tid: None)
+    upd = _attach_reply(tg.make_update(text=f"/{command} {token} answer", chat_id=7), tg)
+    context = _make_context(args=[token, "answer"])
+    asyncio.run(getattr(tasks, f"cmd_{command}")(upd, context))
+    if token in ("12", "#12"):
+        resolve.assert_called_once_with(12, "answer" if command == "done" else "dismissed by user", status)
+    else:
+        resolve.assert_not_called()
+    assert len(tg.outgoing) == 1
+
+
 # ── Tests: cmd_tasks ─────────────────────────────────────────────────────────
 
 def test_cmd_tasks_empty_list(tg):

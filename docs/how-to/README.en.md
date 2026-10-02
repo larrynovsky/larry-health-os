@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:229764b0e1f1 -->
+<!-- translation-of: docs/how-to/README.md sha256:5d6b86ebe5ac -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -37,6 +37,7 @@ No terminal needed.
 - [Reply to a system question](answer_a_question.md)
 - [Redo onboarding or correct an answer](redo_onboarding.md)
 - [Send the bot a large file](send_large_file.md)
+- [Add lab results](add_labs.md)
 - [Connect an Oura ring](connect_oura.md)
 - [Connect iPhone Health and Apple Watch](connect_apple_health.md)
   (the safe path over Tailscale — [separately](connect_apple_health_tailscale.md))

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/llm_provider.md sha256:7316bbbd1243 -->
+<!-- translation-of: docs/how-to/llm_provider.md sha256:e11bb58e1e62 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](llm_provider.md)
@@ -57,5 +57,8 @@ will change, containers will be recreated, and the database and keys will remain
 - All texts and documents the system sends to the model (lab results, discharge summaries, chat) go to
   the chosen provider. Its data processing terms are your decision.
 - Model charges go against your key with the provider. The script cannot check your balance: top it up yourself.
+- The list of admitted models ships with the system version. New checks, and a replacement for a model
+  the provider has switched off, reach you after an update: the bot tells you about a new version,
+  and updating is running `bash install.sh` again.
 - How the system selects a model and what happens when a provider disables it —
   [explanation](../explanation/model_choice.md).

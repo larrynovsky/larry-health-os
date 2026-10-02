@@ -236,7 +236,8 @@ content is sent in requests as listed below — worth knowing up front:
 
 | Where | What | Why |
 |---|---|---|
-| Anthropic API | your medical context in the request text: profile, metrics, labs, document excerpts, scanned lab pages | briefs, consilium, reading labs |
+| Anthropic API (the default model provider) | your medical context in the request text: profile, metrics, labs, document excerpts, scanned lab pages | briefs, consilium, reading labs |
+| OpenAI, Google Gemini or DeepSeek — only if you installed with that provider instead of Anthropic | the same as the Anthropic row: it goes to the provider you chose | the same |
 | Telegram | bot messages and the files you send | interface |
 | Oura API | a request for your data with your token | import |
 | PubMed (NCBI) | search queries with condition names, no name of yours | literature search |
@@ -251,8 +252,8 @@ content is sent in requests as listed below — worth knowing up front:
 Secrets (tokens, keys) are checked before every model call: if a secret ends up in the request
 text, the call is blocked. This filter does not strip medical data — without it there is no brief.
 The dashboard has no password, so it listens only on the machine itself (`127.0.0.1`); each
-person's bot answers only that person's Telegram account. Model calls go through your own Anthropic API key and are
-billed to it — for one person, about €5–15 a month in the author's experience; how Anthropic stores API data is set by its own commercial terms and privacy policy
+person's bot answers only that person's Telegram account. Model calls go through your own API key with the model provider (Anthropic by default; with another
+provider nothing goes to Anthropic) and are billed to that key — with Anthropic, for one person about €5–15 a month in the author's experience; how the provider stores API data is set by its own commercial terms and privacy policy
 — worth reading before you connect a relative's records.
 
 ---
@@ -260,11 +261,16 @@ billed to it — for one person, about €5–15 a month in the author's experie
 ## Installation
 
 Docker (any: Docker Desktop, OrbStack or Colima on a Mac; Docker Engine on Linux; Windows via WSL2, not yet verified), a Telegram account, an Anthropic API
-key (about €5–15 a month per person). About 20 minutes:
+key (about €5–15 a month per person; another provider's key also works — see below). About 20 minutes:
 [docs/tutorials/first_install.en.md](docs/tutorials/first_install.en.md) — from downloading two
 files to meeting the bot. The image is prebuilt for amd64 and arm64; nothing to clone or build.
 Your own build (other document recognition languages, your own code changes):
 [docs/how-to/install_docker.en.md](docs/how-to/install_docker.en.md).
+
+No Anthropic key? The system also installs with an OpenAI, Gemini or DeepSeek key, but what works depends on the provider:
+a function runs only if its model passed checks on that provider, otherwise it says so instead of
+answering with an unchecked model. What works where: [docs/reference/llm_providers.en.md](docs/reference/llm_providers.en.md);
+how to install: [docs/how-to/llm_provider.en.md](docs/how-to/llm_provider.en.md).
 
 ## What it doesn't do
 

@@ -198,9 +198,9 @@ def resolve_outcome(hypothesis_id: int, outcome: str, conn=None) -> bool:
         import health_db as _hdb
         with (conn or _hdb.get_conn()) as c:
             c.execute(_DDL)
-            c.execute("UPDATE service_trouble SET outcome=?, outcome_at=datetime('now') "
-                      "WHERE id=?", (outcome, hypothesis_id))
-        return True
+            cur = c.execute("UPDATE service_trouble SET outcome=?, outcome_at=datetime('now') "
+                            "WHERE id=?", (outcome, hypothesis_id))
+        return cur.rowcount > 0
     except Exception as e:  # noqa: BLE001
         log.warning(f"исход гипотезы {hypothesis_id} не записан: {e}")
         return False

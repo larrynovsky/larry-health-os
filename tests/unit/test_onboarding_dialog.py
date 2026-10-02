@@ -219,13 +219,13 @@ def test_пропуск_в_карточке_не_читается_как_нет(
 
 def test_итог_знакомства_просит_документы_и_геном(db, monkeypatch, tmp_path):
     """Решение владельца 24.09: просить геном, анализы и заключения врачей за 3 года. Перечень
-    форматов генома — из дома разборщика (genome_intake.SUPPORTED_TEXT), а не копией."""
+    форматов генома — из дома разборщика (genome_intake.PROVIDERS), а не копией."""
     import genome_intake
     ad, abh, sid, _ = _real(db, monkeypatch, tmp_path)
     ins = ad._load_instrument_by_source_id("onboarding")
     card = ad.summary_text(ins, {})
     assert "заключения врачей" in card and "за последние 3 года" in card
-    assert genome_intake.SUPPORTED_TEXT in card and "20 МБ" in card
+    assert all(p in card for p in genome_intake.PROVIDERS) and "20 МБ" in card
 
 
 def test_после_геопозиции_reply_клавиатура_снимается(onb):

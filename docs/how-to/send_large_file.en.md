@@ -1,49 +1,76 @@
-<!-- translation-of: docs/how-to/send_large_file.md sha256:54a234aebbb4 -->
+<!-- translation-of: docs/how-to/send_large_file.md sha256:055ab1f64c14 -->
 **English** · [Русский](send_large_file.md)
 
 # How to send a large file to the bot
 
-> Document type: How-to (Diátaxis). For you if you have already installed the system and completed onboarding
-> (installation tutorial, step 8). The parser for submitted files (`com.larry.health.lab-intake`) is running.
+> For people who use the bot and have finished the introduction.
 
-Telegram does not let the bot retrieve files larger than 20 MB. Send such a file — most often raw genome data —
-as a cloud link or a path to a file on the machine where the bot runs. The file is then
-parsed just like one sent in chat.
+Send files up to 20 MB straight into the chat — with the paperclip, as a document. The bot replies
+"Received "<file name>" … Processing it now." Telegram does not hand the bot files over 20 MB —
+most often that is raw genome data.
 
-## Send a cloud link
+A chip file (23andMe, AncestryDNA and others from the list below) — first try packing it into a
+`.zip` (in Finder: right-click → "Compress"): such a text file shrinks several times, and if the
+archive is under 20 MB, send it straight into the chat. Do not pack a whole genome (VCF) into a
+`.zip` — the bot cannot read it from there; use a cloud for it. Anything else over 20 MB — also a
+cloud link.
 
-1. Put the file in Google Drive, Dropbox, Yandex Disk, or OneDrive. The bot does not recognize other clouds,
-   including iCloud Drive. You do not need to extract a `.zip` archive — the parser
-   will look inside it on its own.
-2. Enable “anyone with the link” access (viewing access is enough).
-3. Send the link to the bot as a regular message.
+## As a cloud link
 
-The bot replies “Link received”, and after downloading, “Received ‘<file name>’. Parsing.”
-For a genome, you will receive “Genome loaded: … variants” a few minutes later.
+1. Put the file in Google Drive, Dropbox, Yandex Disk or OneDrive. The bot does not know other
+   clouds and sites, including iCloud Drive and WeTransfer: this protects the machine from
+   downloading anything at all.
+2. Set access to "anyone with the link" (view is enough).
+3. Send the link to the bot as an ordinary message.
 
-As soon as “Received …” arrives, you can turn off link access: the file is already on your machine.
+The bot replies "I've received your link", and once downloaded — "Received "<file name>" … Processing
+it now." As soon as "Received …" arrives, close link access: while it is open, anyone with the
+link can download the file.
 
-## Send a path to a file on this computer
+How long to wait. A chip file (23andMe, AncestryDNA and others from the list below) is processed in
+a few minutes, ending with "Genome loaded: … variants" — for a chip usually hundreds of thousands.
+A whole genome (VCF) takes hours.
 
-If the bot runs on the same machine as the file, send its full path, for example
-`/Users/вы/Downloads/genome.zip`. In Finder, right-click the file, hold Option →
-“Copy … as Pathname”. The bot replies “Path received”; the rest works just like a link.
+## Which files fit
 
-The path is read with the permissions of the user running the bot: the bot can retrieve any file on that machine,
-not just yours. If you are the bot's only user, this changes nothing. On a machine where several people
-use the bot, this requires deliberate trust between them.
+- Raw chip data: 23andMe, AncestryDNA, MyHeritage, FTDNA, tellmeGen (Starter/Advanced),
+  LivingDNA. Straight in `.zip`, as the company gives it — no need to unpack.
+- A whole genome in VCF: `.vcf` or compressed `.vcf.gz` (tellmeGen Ultra, Atlas and others). Do
+  **not** put a VCF into a `.zip`: it is not read from an archive, unpack it. The limit is 3 GB per
+  file; an uncompressed VCF may not fit, a compressed `.vcf.gz` is 4–5 times smaller.
+- Raw sequencer reads (FASTQ, BAM) do not fit.
+
+## Where the file ends up
+
+The file is downloaded to the machine where the system runs and stays there after processing — in
+your installation's data directory; it is not deleted by itself. Whoever runs that machine can read
+it; if the system was set up for you on someone else's computer, that is its owner. Only they can
+delete the file too.
 
 ## If something goes wrong
 
-| Bot response | What to do |
+| What you see | What to do |
 |---|---|
-| “Could not retrieve the file: file not found or link access is closed” | Check “anyone with the link” access and send the link again |
-| “The cloud returned a page instead of a file” | Same as above: Google shows a login page instead of the file if access is closed |
-| “The file is larger than 3072 MB” | An uncompressed full genome may not fit: send `.vcf.gz` (compressed VCF, 4–5 times smaller) |
-| The bot responds to a link from another site as a regular message and does not say “Link received” | The bot downloads only from the four clouds above — this protects the machine. Move the file to one of them |
-| The genome format is not supported | Raw data from 23andMe, AncestryDNA, MyHeritage, FTDNA, tellmeGen (Starter/Advanced), and LivingDNA is supported. A full genome in VCF (`.vcf` or `.vcf.gz`, tellmeGen Ultra, “Atlas”) is parsed; it takes hours. A VCF inside a zip is not accepted — unzip it. Raw reads (FASTQ) are not parsed |
+| "I couldn't download the file: …" | Set access to "anyone with the link" and send the link again |
+| "the link opened a page instead of a file" | Same: the cloud shows a sign-in page instead of the file when access is closed |
+| "… more than 3072 MB …" | Send a compressed `.vcf.gz` |
+| The bot answers the link like an ordinary message and does not say "I've received your link" | The link is not from the four clouds above. Move the file there |
+| "… it looks like genetic data in … format, which I cannot import yet" | The format is not on the list above. Ask the company for a "raw data" download in a supported form |
+| Half an hour after "Received … Processing" for a chip (or a day for a VCF), "Genome loaded" has not arrived | Tell the person who maintains the installation or open an [issue](https://github.com/larrynovsky/larry-health-os/issues) for the developers |
 
-The bot does not load a second genome over an existing one, to avoid accidentally overwriting it with someone else's.
-You can replace a genome only manually. A full genome (VCF) over your own chip is allowed: it
-refines the genotypes. If the VCF noticeably disagrees with the chip (more than 0.5% of shared
-positions), the bot writes nothing and replies that this looks like another person's genome.
+The bot does not load a second genome over one already loaded, so as not to overwrite your genome
+with someone else's. A whole genome (VCF) over your own chip is fine: it refines the data. If the
+VCF differs strongly from the chip, the bot saves nothing and replies that it looks like another
+person's genome. The bot cannot replace a loaded genome with a different one — the person who
+maintains the installation does that by hand; there is no guide for it yet.
+
+## As a file path — only in an installation without Docker
+
+If the system runs without Docker (from a clone of the repository) and the file is on the same
+machine, you can send its full path, for example `/Users/anna/Downloads/genome.zip` (in Finder:
+right-click the file, hold Option → "Copy … as Pathname"). The bot replies "Received the file path".
+The bot reads the path with the rights of its own account: on a machine where several people use
+the bot, it can take someone else's file too.
+
+In a Docker installation the path does not work: the container does not see the Mac's folders, and
+the bot replies that it cannot see files on this computer. Use a cloud.

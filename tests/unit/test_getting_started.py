@@ -203,7 +203,8 @@ def test_bot_actions_are_text_and_links_lead_where_their_label_says(env):
     for cid in ("about", "record", "labs", "genome", "place"):
         p = _cap(b, cid)["primary"]
         assert p["kind"] == "text" and p["href"] is None, cid
-    assert _cap(b, "labs")["secondary"]["text"] == "Как проверить распознанное"
+    assert _cap(b, "labs")["secondary"]["text"] == "Как добавить анализы"
+    assert _cap(b, "labs")["secondary"]["href"].endswith("how-to/add_labs.md")
     for cid in ("place", "calendar"):
         assert _cap(b, cid)["secondary"] is None, cid
     cat = gs.load_catalog()

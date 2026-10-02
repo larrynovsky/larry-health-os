@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.317 | **Дата:** 2026-10-02
+**Версия:** 15.320 | **Дата:** 2026-10-02
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -1166,13 +1166,13 @@ hai_reports                  → _fmt_helpers, _time_inject, clinical_kb, gp_con
 patient_context              → _time_inject, beliefs, health_db, labs_db, memory_config, memory_facts_db, memory_salience, problems_db, treatment_summary
 safety_net                   → _time_inject, config_db, health_db, i18n, lab_canon, labs_db, norm_documents, notify, rules_db
 weekly_digest                → _time_inject, config_db, diagnosis_guard, hai_core, i18n, llm_client, notify, pii_census, secrets_paths
+genome_intake                → _fmt_helpers, config_db, genome_pipeline, health_db, i18n, infra_config, link_fetch, notify
 genome_pipeline              → backfill_effect_alleles, fix_palindromic_het, generate_constitutions, genome_annotator, genome_parser, health_db, profile_reconciler, prs_pipeline
 hai_chat                     → _time_inject, config_db, gp_context, hai_context, hai_core, hai_reports, health_db, memory_facts_db
 hai_hypotheses               → _time_inject, cbcr_hypothesis, gp_context, hai_core, health_db, i18n, patient_context, secrets_paths
 lab_backfill                 → _time_inject, hai_core, health_db, infra_config, lab_oracles, lab_recognizer, lab_specimen, labs_db
 llm_admission                → doc_translation, hai_core, health_db, i18n, lab_recognizer, llm_client, notify, treatment_extractor
 checkin_agent                → _time_inject, gp_context, hai_core, health_db, llm_client, patient_context, region_pack
-genome_intake                → config_db, genome_pipeline, health_db, i18n, infra_config, link_fetch, notify
 hai_core                     → _time_inject, calendar_client, health_db, i18n, llm_client, patient_context, region_pack
 import_all                   → _time_inject, config_db, health_db, hypothesis_lab_linker, import_coordinator, infra_config, lab_intake_watcher
 lifestyle_agents             → consilium_roster, genome_context, gp_context, hai_core, health_db, patient_context, promethease_context
@@ -1598,6 +1598,7 @@ XFAIL — известные баги, документированы как `pa
 ## ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ
 
 <!-- GEN:ARCH_LOG:START -->
+- `2026-10-02` — `genome_intake` + зависимость: _fmt_helpers
 - `2026-10-02` — новый модуль `ingest_lan` (зависит от: daemon_liveness, infra_config)
 - `2026-10-02` — `lab_backfill` + зависимость: hai_core; `lab_intake_watcher` + зависимость: hai_core
 - `2026-10-02` — `night_repair` + зависимость: finding_identity

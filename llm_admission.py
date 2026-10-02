@@ -637,12 +637,39 @@ def admission_reference_md(table: dict, lang: str = "ru") -> str:
             ("Anthropic is the tutorial path: every role works. For other providers only a role whose model "
              "passed admission on the synthetic corpus (`methodology/llm_corpus`) works; otherwise that "
              "role's functions refuse rather than answer with an unchecked model."), ""]
+    out += [("Роль — внутреннее имя задачи системы (opus, sonnet, haiku, haiku_pinned), не название модели: "
+             "у OpenAI роль opus исполняет модель OpenAI. Допуск — прогон модели по проверочным бланкам и "
+             "текстам с известным ответом; одна ошибка — «нет». Запасная модель — та, на которую система "
+             "сама переключится, если поставщик отключит основную; «запасная: нет» значит, что модель не "
+             "прошла и использоваться не будет. Проверка повторяется, когда поставщик меняет модели; "
+             "новые вердикты приходят с новой версией системы.") if ru else
+            ("A role is the system's internal name for a task (opus, sonnet, haiku, haiku_pinned), not a model "
+             "name: on OpenAI the opus role is performed by an OpenAI model. Admission runs the model over test "
+             "lab forms and texts with known answers; a single error means \"no\". A fallback is the model the "
+             "system switches to by itself if the provider switches off the default one; \"fallback: no\" "
+             "means the model failed and will not be used. Admission is re-run when a provider changes its "
+             "models; new verdicts arrive with a new version of the system."), ""]
+    head = ["| " + (" | ".join(["Роль", "Что делает", "Модель", "Допуск", "Дата", "Почему"] if ru
+                               else ["Role", "What it does", "Model", "Admitted", "Date", "Why"])) + " |",
+            "|---|---|---|---|---|---|"]
+    yes, no = ("да", "нет") if ru else ("yes", "no")
     for prov, prof in llm_client.profiles().items():
         if prov == "anthropic":
+            # Четыре поставщика — четыре раздела (Diátaxis: справочник повторяет устройство).
+            # Основная модель роли — код (hai_core.MODEL_DEFAULTS); запасные — допуск владельца
+            # из таблицы выпуска (только passed/date: ошибки несли бы значения его бланков).
+            import hai_core
+            out += ["## anthropic", "", *head]
+            for role, model in hai_core.MODEL_DEFAULTS.items():
+                out.append(f"| {role} | {_ROLE_DOC[role][i]} | `{model}` | "
+                           f"{'основная' if ru else 'default'} | — | — |")
+                for alt, v in sorted(((table.get(prov) or {}).get(role) or {}).items()):
+                    out.append(f"| {role} | {_ROLE_DOC[role][i]} | `{alt}` | "
+                               f"{'запасная' if ru else 'fallback'}: {yes if v.get('passed') else no} | "
+                               f"{v.get('date', '—')} | — |")
+            out.append("")
             continue
-        out += [f"## {prov}", "", "| " + (" | ".join(["Роль", "Что делает", "Модель", "Допуск", "Дата", "Почему"] if ru
-                                               else ["Role", "What it does", "Model", "Admitted", "Date", "Why"])) + " |",
-                "|---|---|---|---|---|---|"]
+        out += [f"## {prov}", "", *head]
         for role, model in prof["role_defaults"].items():
             v = ((table.get(prov) or {}).get(role) or {}).get(model)
             if v is None:

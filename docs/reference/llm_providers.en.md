@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/llm_providers.md sha256:618ed23bad14 -->
+<!-- translation-of: docs/reference/llm_providers.md sha256:1755241a0be2 -->
 **English** · [Русский](llm_providers.md)
 
 <!-- generated: python3 llm_admission.py --reference; не править руками / do not edit -->
@@ -40,6 +40,8 @@ A role is the system's internal name for a task (opus, sonnet, haiku, haiku_pinn
 | haiku_pinned | treatment and labs from text | `gemini-3.8-flash` | yes | 2026-10-02 | — |
 
 ## deepseek
+
+Not offered at install (owner's decision, 2026-10-03): not everything works on it. An installation that already uses it keeps updating as before.
 
 | Role | What it does | Model | Admitted | Date | Why |
 |---|---|---|---|---|---|

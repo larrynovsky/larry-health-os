@@ -157,6 +157,28 @@ def get_open_questions() -> list:
     return [dict(r) for r in rows]
 
 
+def get_tasks_known_to_person(dismissed_window_days: int) -> list:
+    """Задачи, которые человек уже держит в голове: открытые, отложенные и СНЯТЫЕ им
+    за последние `dismissed_window_days` дней. Против этого множества судья дублей
+    сверяет новую задачу из отчёта врача (нить task-dedup, 02.10).
+
+    Почему снятые. Сверка в `save_task` смотрит только на открытые, и снятая сегодня
+    задача рождалась заново на следующем обзоре: у партнёра 51 задача, 47 из них от
+    еженедельного обзора, повторяли друг друга в 2–4 формулировках с июля. Снятие —
+    решение человека, и писатель, который его не прочитал, это решение отменяет.
+
+    Выполненные (`completed`) сюда не входят сознательно: сданный анализ и новая
+    просьба врача о нём — новый цикл, а не повтор."""
+    with _hdb.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, type, status, content FROM tasks "
+            "WHERE status IN ('open', 'snoozed') "
+            "   OR (status='dismissed' AND julianday('now') - julianday(resolved_at) <= ?) "
+            "ORDER BY created_at, id", (dismissed_window_days,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_task_by_tg_message(tg_message_id: int) -> dict | None:
     """Открытая задача, к сообщению которой прилетел реплай.
 

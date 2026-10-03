@@ -67,5 +67,68 @@ def test_installer_providers_match_the_profiles():
     files = dict(re.findall(r'^\s+(\w+)\)\s+KF=(\w+);', text, re.M))
     assert urls == {n: p["models_url"] for n, p in prof.items()}
     assert files == {n: p["key_file"] for n, p in prof.items()}
-    allowed = re.search(r'^\s+(\S+)\) ;;\n\s+\*\) die "Неизвестный поставщик', text, re.M).group(1)
-    assert set(allowed.split("|")) == set(prof)
+    # Хосты и файлы ключей — у ВСЕХ профилей (уже выбравший DeepSeek обновляется); что
+    # предлагается к выбору — test_installer_offers_exactly_the_offered_providers ниже.
+
+
+# ── выбор поставщика моделей (нить provider-choice, 03.10) ───────────────────────────────────
+def _offered() -> set[str]:
+    import json
+    prof = json.loads((ROOT / "methodology" / "llm_providers.json").read_text(encoding="utf-8"))
+    return {p for p, v in prof.items() if not p.startswith("_") and v.get("offered", True) is not False}
+
+
+def _choose_provider_body() -> str:
+    text = SH.read_text(encoding="utf-8")
+    m = re.search(r"^choose_provider\(\) \{.*?^\}$", text, re.M | re.S)
+    assert m, "в install.sh нет функции choose_provider"
+    return m.group(0)
+
+
+def _ask(answers: str) -> subprocess.CompletedProcess:
+    """Исполняет НАСТОЯЩЕЕ тело choose_provider из install.sh (а не копию) с ответами на stdin."""
+    prelude = ('RU=0; WARNS=0\nsay() { printf \'%s\\n\' "$2"; }\nwarn() { WARNS=$((WARNS+1)); say "$1" "$2"; }\n'
+               'die() { say "$1" "$2" >&2; exit 1; }\n')
+    script = prelude + _choose_provider_body() + '\nchoose_provider\necho "CHOSEN=$PROVIDER"\n'
+    return subprocess.run(["bash", "-c", script], input=answers, capture_output=True, text=True, timeout=30)
+
+
+@pytest.mark.parametrize("answers,chosen", [("\n", "anthropic"), ("1\n", "anthropic"), ("2\n", "openai"),
+                                            ("3\n", "gemini"), ("x\n4\n2\n", "openai")])
+def test_provider_question_maps_answers(answers, chosen):
+    """Enter = Anthropic; мусор и «4» переспрашиваются, а не выбирают молча."""
+    r = _ask(answers)
+    assert r.returncode == 0, r.stderr
+    assert f"CHOSEN={chosen}" in r.stdout
+    assert r.stdout.count("type 1, 2 or 3") == answers.count("\n") - 1
+
+
+def test_provider_question_without_answer_fails_loudly():
+    r = _ask("")
+    assert r.returncode != 0 and "No answer" in r.stderr
+
+
+def test_installer_offers_exactly_the_offered_providers():
+    """Установщик скачивается отдельно от образа и профиля не видит — его список второй дом.
+    Сверка: варианты вопроса и принимаемые --provider = профили без "offered": false.
+    Красный, если DeepSeek вернётся в вопрос или новый поставщик появится только в одном доме."""
+    in_question = set(re.findall(r"PROVIDER=(\w+); return", _choose_provider_body()))
+    accepted = re.search(r'case "\$\{PROVIDER:-anthropic\}" in\n\s*([a-z|]+)\) ;;', SH.read_text(encoding="utf-8"))
+    assert accepted, "в install.sh не найден список принимаемых --provider"
+    assert in_question == set(accepted.group(1).split("|")) == _offered(), (in_question, accepted.group(1), _offered())
+
+
+def test_explicit_deepseek_is_refused_before_any_change(tmp_path):
+    d = tmp_path / "health-docker"
+    r = subprocess.run(["bash", str(SH), "--non-interactive", "--provider", "deepseek", "--dir", str(d)],
+                       capture_output=True, text=True, timeout=60,
+                       env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": str(tmp_path), "LANG": "C"})
+    assert r.returncode != 0 and "DeepSeek is not offered" in (r.stdout + r.stderr)
+    assert not d.exists(), "отказ должен случиться до создания каталога"
+
+
+def test_fresh_install_asks_and_update_reads_env():
+    """Вопрос — только у новой установки с вопросами (ENV_FRESH, INTERACTIVE); повтор читает .env."""
+    text = SH.read_text(encoding="utf-8")
+    assert 'if [ "$ENV_FRESH" = 1 ] && [ "$INTERACTIVE" = 1 ]; then choose_provider' in text
+    assert text.index("ENV_FRESH=1") < text.index("choose_provider\n  else")

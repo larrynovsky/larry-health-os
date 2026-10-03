@@ -94,6 +94,57 @@ def test_non_lab_file_never_reaches_the_recogniser(wat, monkeypatch, tmp_path):
     assert "заключение обследования.pdf" in json.loads(wat._state_path().read_text())["notlab"]
 
 
+def test_unreadable_file_is_explained_once(wat, monkeypatch):
+    """Настоящий classify-gate при отказе extract_text. Мутация: вернуть молчаливый пропуск."""
+    import import_all
+    import os
+    inbox = wat._incoming(); inbox.mkdir(parents=True)
+    p = inbox / "unreadable.jpg"; p.write_bytes(b"not an image")
+    old = time.time() - 100
+    os.utime(p, (old, old))
+    wat._save_state({"watermark": 0, "notlab": []})
+    monkeypatch.setattr(wat, "_processed", lambda: set())
+    monkeypatch.setattr(wat, "_watched", lambda: [inbox])
+    def fail(*a):
+        raise ValueError("synthetic unreadable file")
+    monkeypatch.setattr(import_all, "extract_text", fail)
+    told = []
+    monkeypatch.setattr(wat.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    for _ in range(3):
+        wat.process_once()
+    assert len(told) == 1 and p.name in told[0]
+    assert "оригинальный PDF" in told[0] and "чёткое фото" in told[0]
+
+
+def test_long_pdf_is_refused_before_classifier_and_vision(wat, monkeypatch):
+    """Мутация: проверить предел только после классификатора, который мог отказать."""
+    import fitz
+    import import_all
+    import os
+    inbox = wat._incoming(); inbox.mkdir(parents=True)
+    p = inbox / "too-long.pdf"
+    limit = wat.lab_recognizer._MAX_PAGES
+    with fitz.open() as doc:
+        for _ in range(limit + 1):
+            doc.new_page()
+        doc.save(str(p))
+    old = time.time() - 100
+    os.utime(p, (old, old))
+    wat._save_state({"watermark": 0, "notlab": []})
+    monkeypatch.setattr(wat, "_watched", lambda: [inbox])
+    monkeypatch.setattr(wat, "_processed", lambda: set())
+    import genome_intake, import_medical_events
+    monkeypatch.setattr(genome_intake, "process_pending", lambda *a, **k: 0)
+    monkeypatch.setattr(import_medical_events, "process_incoming", lambda *a, **k: 0)
+    classifiers, vision, told = [], [], []
+    monkeypatch.setattr(import_all, "classify", lambda *a: classifiers.append(a) or "other")
+    monkeypatch.setattr(wat.lab_backfill, "run_backfill", lambda *a: vision.append(a) or {})
+    monkeypatch.setattr(wat.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    wat.process_once(); wat.process_once()
+    assert len(told) == 1 and "Разделите PDF" in told[0]
+    assert not classifiers and not vision
+
+
 def test_sidecar_json_is_not_treated_as_an_image(wat, monkeypatch, tmp_path):
     """Живой баг на тенанте партнёра (Studio, 2026-07-29 14:08): вотчер брал
     `*.jpg.triage.json` и падал с «cannot identify image file» в каждом опросе.

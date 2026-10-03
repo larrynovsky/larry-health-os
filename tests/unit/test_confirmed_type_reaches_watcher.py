@@ -49,7 +49,7 @@ def test_human_verdict_overrides_the_classifier(wat, monkeypatch, tmp_path):
     monkeypatch.setattr(wat, "_ICLOUD_CR", tmp_path / "нет-такой")
     monkeypatch.setattr(wat, "_is_lab", lambda p: False)   # машина ПРОТИВ
     monkeypatch.setattr(wat, "_processed", lambda: set())
-    monkeypatch.setattr(wat.notify, "notify", lambda msg: None)
+    monkeypatch.setattr(wat.notify, "notify", lambda msg, fallback=True, *, reply_markup=None: "telegram")
     monkeypatch.setattr(wat.lab_backfill, "run_backfill",
                         lambda *a, **k: called.append(a) or {"rows": 3, "pending": 3})
     wat._save_state({"watermark": old - 10, "notlab": [doc.name]})
@@ -75,7 +75,7 @@ def test_human_verdict_beats_the_watermark_too(wat, monkeypatch, tmp_path):
     monkeypatch.setattr(wat, "_ICLOUD_CR", tmp_path / "нет-такой")
     monkeypatch.setattr(wat, "_is_lab", lambda p: True)
     monkeypatch.setattr(wat, "_processed", lambda: set())
-    monkeypatch.setattr(wat.notify, "notify", lambda msg: None)
+    monkeypatch.setattr(wat.notify, "notify", lambda msg, fallback=True, *, reply_markup=None: "telegram")
     monkeypatch.setattr(wat.lab_backfill, "run_backfill",
                         lambda *a, **k: called.append(a) or {"rows": 1, "pending": 1})
     wat._save_state({"watermark": time.time(), "notlab": []})

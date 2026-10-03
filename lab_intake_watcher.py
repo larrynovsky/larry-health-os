@@ -2,15 +2,11 @@
 """lab_intake_watcher.py — авто-распознавание новых файлов в инбоксе тенанта (L2).
 
 Поллит HEALTH_DATA_DIR/incoming; каждый новый устоявшийся файл → lab_backfill
-(сериализованно, очередь-1) → уведомление РЕВЬЮЕРУ (владельцу) со ссылкой на ревью.
+(сериализованно, очередь-1) → уведомление человеку со ссылкой на его ревью.
 
-Роли (multitenancy): распознаём в БД тенанта (HEALTH_DATA_DIR=partner), но шлём
-через `notify.notify_operator` — СЛУЖЕБНЫЙ канал, всегда владельцу, потому что
-value-review это роль владельца. Прежняя формулировка («процесс НЕ ставит
-HEALTH_SECRETS_DIR, поэтому notify уходит владельцу») была верна до мультитенантности
-30.06 и ложна после: плист партнёра HEALTH_SECRETS_DIR ставит, и запросы на ревью
-трое суток шли самому партнёру — 19278 сообщений (01.08). Теперь маршрут задан
-вызовом, а не побочным следствием окружения.
+Роли (решение владельца 02.10): результат бланка — содержательное сообщение
+в собственный чат через notify.notify. У отдельного тенанта остаётся также
+операторская ссылка без медицинских значений; его подтверждение от неё не зависит.
 
 Идемпотентность: по basename в lab_results_staging. Провал → sidecar .failed
 (без ретрай-шторма) + громкое уведомление. Studio-only. launchd KeepAlive.
@@ -29,7 +25,9 @@ from pathlib import Path
 import health_db
 import infra_config
 import lab_backfill
+import lab_recognizer
 import notify
+import i18n
 
 log = logging.getLogger("lab_intake_watcher")
 # basicConfig НЕ на импорте: датчик целостности импортирует этот модуль ради
@@ -102,11 +100,13 @@ def _load_state() -> dict:
         return {}
 
 
-def _save_state(st: dict) -> None:
+def _save_state(st: dict) -> bool:
     try:
         _state_path().write_text(json.dumps(st, ensure_ascii=False))
+        return True
     except OSError as e:
         log.error(f"не смог сохранить состояние: {e}")
+        return False
 
 
 def force_lab(path: Path) -> None:
@@ -138,7 +138,14 @@ def _is_lab(path: Path) -> bool:
     """
     import import_all
     try:
+        if path.suffix.lower() == ".pdf":
+            import fitz
+            with fitz.open(str(path)) as doc:
+                if doc.page_count > lab_recognizer._MAX_PAGES:
+                    raise lab_recognizer.PageLimitExceeded(doc.page_count, lab_recognizer._MAX_PAGES)
         return import_all.classify(path, import_all.extract_text(path)) == "lab"
+    except lab_recognizer.PageLimitExceeded:
+        raise
     except Exception as e:  # noqa: BLE001 — нечитаемый файл не лаб и не авария
         log.warning(f"classify failed {path.name}: {e}")
         return False
@@ -162,6 +169,12 @@ def _stable(p: Path) -> bool:
         return (time.time() - p.stat().st_mtime) > DEBOUNCE_SEC
     except OSError:
         return False
+
+
+def _tell_person(key: str, **params) -> None:
+    """Содержательное — в чат текущего тенанта; недоставка не выдаётся за успех."""
+    if notify.notify(i18n.t(key, **params), fallback=False) != "telegram":
+        notify.fault("lab_intake_watcher: person not reached", person_key=None)
 
 
 def heartbeat_path() -> Path:
@@ -288,21 +301,21 @@ def process_once() -> int:
             continue
         if not human and f.name in notlab:
             continue              # уже смотрели: не лабораторная таблица
-        if not human and not _is_lab(f):
-            # Не ошибка и не событие: в CR/ лежат документы разных типов.
-            # Запоминаем вердикт, чтобы не перечитывать файл каждую минуту (для
-            # сканов это означало бы OCR по кругу), и молчим — сообщать не о чем.
-            notlab.add(f.name)
-            state["notlab"] = sorted(notlab)
-            _save_state(state)
-            log.info(f"[{tenant}] не лабораторная таблица, пропуск: {f.name}")
-            continue
         run_id = f"intake_{get_now():%Y%m%d_%H%M%S}"
-        log.info(f"[{tenant}] recognize {f.name} run={run_id}")
         try:
+            if not human and not _is_lab(f):
+                # В CR/ лежат документы разных типов; ответ нужен приславшему файл в бот.
+                # Вердикт сохраняется ДО ответа: последующие опросы не шлют его снова.
+                notlab.add(f.name)
+                state["notlab"] = sorted(notlab)
+                saved = _save_state(state)
+                if saved and f.parent == _incoming():
+                    _tell_person("person.lab.not_readable", file=f.name)
+                log.info(f"[{tenant}] не лабораторная таблица, пропуск: {f.name}")
+                continue
+            log.info(f"[{tenant}] recognize {f.name} run={run_id}")
             summary = lab_backfill.run_backfill(run_id, None, None, str(f), None)
             rows = summary.get("rows", 0)
-            pend = summary.get("pending", 0)
             if rows == 0:
                 # РАСХОЖДЕНИЕ, а не успех. Файл попал сюда потому, что кто-то счёл его
                 # лабораторной таблицей (doc_triage или рука), а распознаватель не увидел
@@ -312,26 +325,32 @@ def process_once() -> int:
                 # файл берётся КАЖДЫЙ поллинг, и сигнал превращается в шторм раз в минуту.
                 f.with_suffix(f.suffix + ".norows").write_text(f"run={run_id} rows=0")
                 notify.fault("lab_intake_watcher: no rows recognized; retry stopped", person_key=None)
+                _tell_person("person.lab.no_rows", file=f.name)
                 log.warning(f"[{tenant}] 0 строк на {f.name} — помечен .norows")
                 n += 1
                 continue
-            import i18n
-            if pend:
+            from urllib.parse import quote, urlencode
+            url = (f"{DASHBOARD_URL}/lab-review/{quote(run_id, safe='')}?" +
+                   urlencode({"tenant": tenant, "show": "waiting"}))
+            _tell_person("person.lab.review", file=f.name, n=rows, url=url)
+            from secrets_paths import is_owner
+            if not is_owner():
                 notify.notify_operator(i18n.t("owner.card.intake",
-                    url=f"{DASHBOARD_URL}/lab-review/{run_id}?tenant={tenant}"))
-            else:
-                notify.weekly(i18n.t("owner.weekly.intake"))
+                    url=url))
             n += 1
         except Exception as e:
             # Установка поставщика без допуска чтения анализов (DeepSeek, решение владельца
             # 02.10, «А»): не сбой, а предел. Не журнал сбоев (его человек не видит, а ночной
             # ремонт чинить тут нечего) и не .failed (он навсегда): свой маркер, который снимается,
             # когда чтение станет допущено. Канал — служебный (решение владельца 01.08, сторож
-            # test_watcher_uses_the_operator_channel): поставщик — на всю установку, отказ бывает
+            # test_watcher_keeps_operator_and_person_channels): поставщик — на всю установку, отказ бывает
             # только на установке не-anthropic, а там оператор и есть тот, кто прислал документ.
             import hai_core
+            if isinstance(e, lab_recognizer.PageLimitExceeded):
+                f.with_suffix(f.suffix + ".failed").write_text(f"pages={e.pages} limit={e.limit}")
+                _tell_person("person.lab.too_long", file=f.name, pages=e.pages, limit=e.limit)
+                continue
             if isinstance(e, hai_core.ModelNotAdmitted):
-                import i18n
                 f.with_suffix(f.suffix + ".notadmitted").write_text(str(e)[:500])
                 log.warning(f"[{tenant}] чтение анализов не допущено: {f.name} ждёт допуска")
                 if notify.notify_operator(i18n.t("person.lab.not_admitted")) == "none":
@@ -342,6 +361,7 @@ def process_once() -> int:
             f.with_suffix(f.suffix + ".failed").write_text(str(e)[:500])
             notify.fault(f"lab_intake_watcher: recognition failed ({type(e).__name__}); retry stopped",
                          person_key=None)
+            _tell_person("person.lab.not_readable", file=f.name)
     return n
 
 

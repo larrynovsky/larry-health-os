@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:5d6b86ebe5ac -->
+<!-- translation-of: docs/how-to/README.md sha256:b39f32922356 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -6,7 +6,7 @@
 # How-to guides: where to start
 
 > **Document type:** How-to (Diátaxis), landing page. There are about fifty guides here, and they
-> are written for three different readers. Find yourself below — you can skip the other lists.
+> are written for four different readers. Find yourself below — you can skip the other lists.
 
 If you installed the system by following the [first-install tutorial](../tutorials/first_install.md), you do not have a clone of
 this repository — only a `~/health-docker` folder with `compose.yaml`. Most of the guides
@@ -28,7 +28,7 @@ Until they are rewritten, translate commands using the single rule below.
 
 Code in the container lives at `/app`, and that is where commands are executed: scripts referenced in the guides
 exist under the same names there (verified on 01.10 against a clean install from `v0.1.0`). The rule does
-not cover Git, tests, or editing code — those require a clone; see the third list.
+not cover Git, tests, or editing code — those require a clone; see the fourth list.
 
 ## 1. You use the system through the bot
 
@@ -48,12 +48,26 @@ A terminal on the machine where the system is installed is required. Use the rul
 
 - Installation and updates: [install the system in Docker from an image](install_docker.md) ·
   [with an OpenAI, Gemini or DeepSeek key](llm_provider.md)
+- [Connect Google Calendar](connect_google_calendar.md)
 - The bot replied “I couldn't answer: something failed inside the system…” with a code: [find the cause by the code](bot_fault.md)
-- Respond to system alerts: [night cycle alert](night_cycle_respond.md) ·
+
+The other maintenance guides are still written for the author's original installation and do not
+work in an image-based install — they are in section 3.
+
+## 3. The author's original installation (native, macOS services)
+
+These guides are written for an installation from a repository clone with `launchctl` services on
+the author's machine (a second machine, SSH, a Claude Desktop project, a second person on the same
+machine). **They do not work in an image-based install, and the command translation rule does not
+save them** — a check against the code on 02.10.2026 showed the difference is the installation
+model, not command syntax. They are rewritten for Docker one at a time, when people who install
+from the image need them.
+
+- System alerts: [night cycle alert](night_cycle_respond.md) ·
   [escalation "a person has hit a problem"](service_trouble_alert.md) ·
   [check fired but no message arrived](diagnose_silent_check.md) ·
   [guard blocked a model call](llm_guard_blocked.md)
-- Lab results: [recognition pipeline](lab_pipeline.md) · [row review queue](lab_review_queue.md) ·
+- Lab results inside: [recognition pipeline](lab_pipeline.md) · [row review queue](lab_review_queue.md) ·
   [lift quarantine on a pair](adjudicate_quarantine.md) ·
   [defer or close a question about a reference range](record_analyte_norm_verdict.md) ·
   [record a physician's surveillance decision](record_surveillance_decision.md)
@@ -62,12 +76,10 @@ A terminal on the machine where the system is installed is required. Use the rul
   [seasonal table](reseed_seasonal_produce.md) · [trail list](refresh_trail_list.md)
 - Channels: [email](email_channel.md) · [weekly digest](weekly_digest.md) ·
   [log rotation](rotate_logs.md)
-- **Not ported to Docker, the rule will not help:** [add a second person](add_person.md)
-  (a second person is not yet described for image-based installs) and
-  [migrating from a native install to a container](pilot_switch.md) (only for those who installed
-  the system before the image existed).
+- [Add a second person](add_person.md) ·
+  [migrating from a native install to a container](pilot_switch.md)
 
-## 3. You are developing the system
+## 4. You are developing the system
 
 A clone is required: `git clone https://github.com/larrynovsky/larry-health-os.git`. All
 remaining guides are here: [Git](git_workflow.md), [tests](run_tests.md),
@@ -85,5 +97,5 @@ Project rules and gates: [find what exists before building](discovery_before_bui
 [the disposability gate](disposability_gate.md) · [the lexicons-in-code sensor](move_lexicon_to_db.md) ·
 [a date in a memory channel](date_memory_channel.md) · [a document to history](move_to_archive.md).
 
-A new public guide in this folder must appear in one of the three lists — the test
+A new public guide in this folder must appear in one of the four lists — the test
 `tests/unit/test_howto_landing_lists_all.py` checks this.

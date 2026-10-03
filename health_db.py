@@ -4376,7 +4376,7 @@ from tasks_db import (  # noqa: E402
     save_task, resolve_task, get_open_tasks, get_overdue_tasks, mark_task_sent,
     get_unsent_assessment_tasks, get_unsent_tasks, get_task_by_tg_message,
     wake_snoozed_assessment_tasks,
-    get_questions_needing_delivery, get_open_questions,
+    get_questions_needing_delivery, get_open_questions, get_tasks_known_to_person,
 )
 
 

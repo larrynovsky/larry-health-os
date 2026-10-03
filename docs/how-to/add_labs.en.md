@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/add_labs.md sha256:32b551569656 -->
+<!-- translation-of: docs/how-to/add_labs.md sha256:b612bf47863e -->
 **English** · [Русский](add_labs.md)
 
 # How to add lab results
@@ -8,15 +8,16 @@
 
 Download the report from the laboratory's website or photograph the paper report, send it
 to the bot, then check the recognised results against the original. **“Received” means
-the file is saved; its values have not yet been added to your results.** If someone
-installed the system for you, you may need their help to complete the review.
+the file is saved; its values have not yet been added to your results.** You complete
+the review and add the values on your own page; the link arrives in your bot chat.
 
 ## 1. Prepare your reports
 
 - The best option is the original PDF from the laboratory's website with selectable
   text. Scanned PDFs are also accepted. Send a multi-page PDF as one file;
-  only the first **20 pages** are recognised by default. Split longer documents into
-  parts of at most 20 pages, keeping the date and test name on them.
+  the default limit is **20 pages**. A longer file is not partially recognised:
+  the bot asks you to split it into parts of at most 20 pages. Keep the date and
+  test name on them and send the parts as separate files.
 - Photograph the whole paper report, straight and in good light, without glare. The
   date, test names, numbers, units and reference ranges must be readable. Photograph
   each page separately and send it **as a file, without compression**, rather than as
@@ -75,52 +76,43 @@ Allow a few minutes for a short report; this is guidance, not a guaranteed deadl
 More pages, other queued files or a model service failure increase the wait.
 
 Read rows first go into a separate review queue (`staging`). Agreement between the
-models can give them the `auto` label; uncertainty gives them `pending`. **Even
-`auto` does not move results into the main database on its own:** the current intake
-path requires a separate step. Rows that nobody reviews and transfers remain queued;
-waiting does not count as agreement or add them to reports. This isolates unreviewed
-data; the system's separate “pair quarantine” concerns discovered relationships
-between metrics, rather than submitted lab reports.
+models can give them the `auto` label; uncertainty gives them `pending`. **Even `auto`
+needs your confirmation:** waiting does not count as agreement or add values to your
+database or reports.
 
-If review is needed, the person maintaining the system receives a message starting:
-«About your health, not urgent. A new lab document arrived and the system read numbers
-from it. Check them against the original?». It includes a link to a separate review
-sheet at `/lab-review/<run_id>?tenant=<tenant>`. This message may go to the person
-maintaining the installation rather than to you.
+The processing result goes **to you in your own bot chat**: the filename, number of
+recognised values and a link to your review sheet at
+`/lab-review/<run_id>?tenant=<tenant>&show=waiting`. Ordinary confirmation needs no operator.
+With several reports, the home **Lab results** card shows **waiting for you** and the
+value count; **Check recognised values** opens the oldest unfinished report. After
+adding its values, the card leads to the next report.
 
-1. Open the message's link on the computer running the system. For an installation
-   following the [first-install tutorial](../tutorials/first_install.md), the dashboard
-   is available at `http://127.0.0.1:8001`. On a phone, that address means the phone
-   itself; ask the person maintaining the system to arrange access through Tailscale,
-   or open the page on the computer.
-2. Keep the original report beside it. Check the **test date, test name, specimen**
-   (for example, blood or urine), **value, `<`/`>` sign, units and reference ranges**.
-   The review sheet does not show all these fields: ask the person maintaining the
-   system to check the date, specimen and comparison sign separately. Matching numbers
-   with a wrong date are also an error. Look for missing pages and rows.
-3. The sheet has `reject` checkboxes for incorrect rows and a «Промоутнуть» button to
-   transfer accepted results into the database. It accepts all eligible, non-rejected
-   rows in the run, including rows hidden by the filter: use «показать все →» before
-   transferring. The «Проверить (dry-run)» button **already saves rejections and assigned
-   names**, although it does not transfer the numbers yet. If a number is wrong or a
-   name is unclear, stop and give the report and a list of discrepancies to the person
-   maintaining the system; there is no field here for correcting a number.
+1. Open the link on the computer running the system. For an installation following
+   the [first-install tutorial](../tutorials/first_install.md), the dashboard is at
+   `http://127.0.0.1:8001`. On a phone, that address means the phone itself: open the
+   page on the computer or use private access already configured through Tailscale.
+2. Keep the original report beside it. Check names, numbers, units and reference
+   ranges; look for missing rows. The date, specimen and `<`/`>` sign are not yet
+   shown on the sheet, so this interface cannot confirm whether those fields are
+   correct. Mark a doubtful row **Incorrect**; there is no field for correcting a number.
+3. By default, the sheet shows all unfinished rows, including `auto`, `pending`,
+   `review` and `gold`. **All rows in this report** also shows finished and rejected rows.
+   **Check** checks whether values can be added, but already saves marked errors and
+   assigned names. **Add to database**, with your confirmation, transfers eligible,
+   non-rejected rows from the whole report, including rows hidden by the filter.
+   Then refresh the home page.
 
-«🧪 Lab tests» on a document-type card confirms only **the report type**, not the
-recognised values. The bot has no general button to confirm all numbers. If the sheet
-is empty although the card says there is a queue, do not treat the review as complete:
-the filter may hide rows already moved to `review` status.
-
-This step currently needs help from the person maintaining the system, including
-with Docker installations. Unknown tests, conflicts and specialised panels may need
-a separate decision; their deeper guide is [the lab row review queue](lab_review_queue.md).
+**“🧪 Lab tests”** on a document-type card confirms only **the report type**, not the
+recognised values. Values need separate confirmation on the review sheet. Opening
+the sheet or staying silent adds nothing. Unknown names, conflicts and specialised
+panels may need a separate decision; technical reasons for blocking rows are described
+in [the lab row review queue](lab_review_queue.md).
 
 ## 4. Check that results appeared
 
 - In the dashboard, open **Lab results** (`/labs`) and refresh the page. It shows the
   latest values by test and the last 50 results from the main database. This is a
-  viewing page; the home card's “Check recognised values” button currently leads here,
-  rather than to the review sheet.
+  viewing page; use the home Lab results card for the review queue.
 - Send `/labs` to the bot. It shows selected key tests from the last two years and
   other tests from the latest visit within the last 90 days, rather than the entire
   archive. «No lab results yet.» alone does not prove an old report was lost.
@@ -143,6 +135,7 @@ resending the same file does not complete the transfer.
 | «I've already received this image — I won't process it twice.» | This reply applies when regular-photo intake is enabled. A new photo of the same sheet may pass as a new file; flag the repeat during review |
 | «I've received your file. Processing is paused for now — I've reported the problem, and your file is saved.» | The file is saved. Pass the message to the person maintaining the system: the wording does not guarantee automatic repair of your installation |
 | A link does not download, or the cloud returns a page instead of a file | Enable “anyone with the link” access to the file itself and send the link again |
-| The report is unclear, or no results or review link follow the receipt | Get the original PDF or photograph the sheet again and send a new file. The system may silently skip an unreadable report; retries stop after zero rows or an error. Ask the person maintaining the system to check the queue |
+| The report is unclear, or no results or review link follow the receipt | Get the original PDF or photograph the sheet again and send a new file. The bot sends one message for this file asking for the original PDF or a clearer photo; later polls do not repeat it |
 | The review sheet does not open on your phone | Open it on the computer running the system, or ask for private access through Tailscale |
-| The review sheet is empty, or nothing appears after review | Ask the person maintaining the system to check hidden statuses and perform the transfer. A saved file and an `auto` label do not yet mean results have been added |
+| The review sheet is empty, or nothing appears after review | Refresh the home page: it opens the oldest unfinished report. Check it and click “Add to database”. A saved file and `auto` do not yet mean results have been added; doubtful or blocked rows need a separate decision |
+| PDF longer than 20 pages | The bot asks you to split it into parts of 20 pages or fewer; no rows from the long file are added |

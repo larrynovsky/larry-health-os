@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/install_docker.md sha256:5e2148a9fe2e -->
+<!-- translation-of: docs/how-to/install_docker.md sha256:ba67cf5158cc -->
 **English** · [Русский](install_docker.md)
 
 # How to install the system in Docker
@@ -26,7 +26,7 @@ The usual first install uses the ready image, with no clone and no build:
 - The person's time zone (IANA, e.g. `Europe/Berlin`): the morning brief follows it.
 - A secrets directory (mode 700) — as in the [first install](../tutorials/first_install.en.md) ([Русский](../tutorials/first_install.md)):
   - `telegram_chat_id` and `telegram_token` — without them the bot will not start (the other services will);
-  - `anthropic_key` (or `openai_key` / `gemini_key` / `deepseek_key` with another model provider — [recipe](llm_provider.md)) — without the provider key reports are not written.
+  - `anthropic_key` (or `openai_key` / `gemini_key` with another model provider — [recipe](llm_provider.md)) — without the provider key reports are not written.
 
 ## 1. Render the schedule and the image ignore list
 

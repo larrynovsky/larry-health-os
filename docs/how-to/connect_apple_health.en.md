@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/connect_apple_health.md sha256:1257fc0bcda4 -->
+<!-- translation-of: docs/how-to/connect_apple_health.md sha256:bdb5573fad78 -->
 **English** · [Русский](connect_apple_health.md)
 
 # How to connect Health on iPhone and Apple Watch
@@ -153,11 +153,14 @@ answered:
 ## After that — every day by itself
 
 The automation sends what is new on its schedule (**Sync Cadence**) while the phone and the Mac are
-on the same Wi-Fi. The app's help says Health is unavailable to apps while the phone is locked, so
-sending happens while you use the phone. In the system author's experience, the Health Auto Export
-widget on the Home Screen lets sending go on even with the phone locked — add it (long-press the
-Home Screen → "+" → Health Auto Export). Away from home sending does not arrive; with
-**Since Last Sync** the missed days go out with the first send at home.
+on the same Wi-Fi. The Health Auto Export widget on the Home Screen wakes the app and triggers
+send attempts more often, but the app still cannot read Health while the phone is locked. Of 44
+widget-triggered starts, 3 sends succeeded — while the phone was unlocked. Add the widget
+(long-press the Home Screen → "+" → Health Auto Export): more frequent attempts help data go out
+soon after you unlock, on the next successful attempt. The measurement recorded 1–5 successful
+sends per day; with **Since Last Sync**, each day's data arrived (measurement from the owner's
+app log, 25.09–02.10.2026). Away from home sending does not arrive; with **Since Last Sync**
+the missed days go out with the first send at home.
 
 **Not checked on a live phone (02.10.2026):** that "since last sync" counts from the last
 *successful* send rather than the last attempt. If after a trip the morning report has no steps for

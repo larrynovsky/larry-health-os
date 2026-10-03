@@ -90,9 +90,19 @@ jobs:
           grep -qx 'HEALTH_LLM_PROVIDER=anthropic' ~/health-sh/.env           # повтор выбор не меняет
       - name: install.sh с другим поставщиком моделей — до предсказуемого отказа непроверенной модели
         run: |
-          for prov in openai gemini deepseek; do
+          set -o pipefail   # отказ install.sh не должен потеряться в | tee
+          # DeepSeek не предлагается (решение владельца 03.10): явный выбор — отказ с причиной, .env цел
+          if LLM_KEY=ci-fake-deepseek bash ~/health-sh/install.sh --dir ~/health-sh --dist "$PWD/dist" \
+               --non-interactive --ci-fake-keys --provider deepseek > /tmp/ds.out 2>&1; then
+            echo "deepseek принят, а должен быть отказ"; cat /tmp/ds.out; exit 1
+          fi
+          grep -q 'DeepSeek' /tmp/ds.out
+          grep -qx 'HEALTH_LLM_PROVIDER=anthropic' ~/health-sh/.env
+          for prov in openai gemini; do
             LLM_KEY="ci-fake-${prov}" bash ~/health-sh/install.sh --dir ~/health-sh --dist "$PWD/dist" \
-              --non-interactive --ci-fake-keys --provider "$prov"
+              --non-interactive --ci-fake-keys --provider "$prov" | tee /tmp/prov.out
+            grep -Eq 'every function passed|все функции прошли' /tmp/prov.out     # итог словами, без имён ролей
+            ! grep -Eq 'opus|sonnet|haiku' /tmp/prov.out
             grep -qx "HEALTH_LLM_PROVIDER=${prov}" ~/health-sh/.env
             sudo test -s ~/health-sh/secrets/${prov}_key
             (cd ~/health-sh && docker compose exec -T cron python3 -c "

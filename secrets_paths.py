@@ -15,6 +15,16 @@ import re
 from pathlib import Path
 
 
+def oauth_token_source(seed: Path, live: Path) -> Path:
+    """Live refresh wins ties; a newer seed means explicit reauthorization.
+
+    Shared by Calendar and Oura. Selection checks metadata, never secret values.
+    """
+    if live.exists() and (not seed.exists() or live.stat().st_mtime_ns >= seed.stat().st_mtime_ns):
+        return live
+    return seed
+
+
 def secrets_dir() -> Path:
     """Каталог секретов текущего тенанта (env HEALTH_SECRETS_DIR или ~/.health_secrets).
 
@@ -302,6 +312,9 @@ SECRET_SCOPE: dict[str, str] = {
     "telegram_token": "tenant",
     "telegram_chat_id": "tenant",
     "oura_token": "tenant",
+    "oura_oauth.json": "tenant",
+    "oura_client_id": "tenant",        # installation supplies its own Oura app
+    "oura_client_secret": "tenant",
     "google_calendar_token.json": "tenant",
     # клиент ПРИЛОЖЕНИЯ, не пациента: client_id один на оба каталога (замер 02.09,
     # проект <gcp-project-id>). Тенантское — token.json и account: КТО вошёл

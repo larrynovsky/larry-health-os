@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:195c18bfec7f -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:8b9be58a9af9 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](first_install.md)
@@ -38,6 +38,7 @@ bash install.sh --check    # только проверка, ничего не м
 bash install.sh            # установка; повторный запуск — обновление
 ```
 
+The script asks which model provider you use — for this tutorial press Enter (Anthropic).
 Keys are entered without echo and are validated with Telegram and Anthropic before being written. Then go to step 8. The tutorial below explains what the script does and is needed if it stopped on something unclear.
 
 ## 1. Install Docker

@@ -1,0 +1,45 @@
+{
+  "module": "oura_oauth",
+  "public": [
+    "get_access_token",
+    "authorize_oura"
+  ],
+  "contract": {
+    "get_access_token": "get_access_token(data_dir: Path) -> str | None. None iff neither secrets/oura_oauth.json nor data_dir/oura_oauth.json exists. Use shared oauth_token_source selection. Lock data_dir/.oura_oauth.lock before reading/exchanging. Expiry within 60 seconds refreshes via form POST using tenant client files. Require access_token, NEW refresh_token, positive finite expires_in. Persist to data_dir/oura_oauth.json as 0600 via same-directory temp, fsync, atomic replace and directory fsync BEFORE returning access. Broken OAuth, exchange or write errors raise; never return a PAT. Seed is never written. Missing token_url defaults to documented cloud endpoint; a saved URL must be allowlisted before any exchange.",
+    "authorize_oura": "authorize_oura(data_dir: Path, portal: str = \"cloud\") -> None. Only cloud is supported, also for applications created in the new developer portal; reject other portal values before reading client files. Print cloud authorize URL with exactly daily workout spo2 stress, exact http://localhost:9876/callback/, unpredictable state and S256 PKCE. Read hidden pasted full redirect; validate exact origin/path, one matching state, no fragment/error, exactly one nonempty code before exchange. POST authorization_code to https://api.ouraring.com/oauth/token with matching redirect/verifier. Lock and save initial grant to writable data as above. Print no secrets/tokens/code. Script entry resolves HEALTH_DATA_DIR/data, defaults ~/health/data; errors exit 1; native argparse rejects --portal developer. Persist token_url for refresh; accept only the hardcoded cloud HTTPS token endpoint before any client read or exchange.",
+    "limits": "Cloud route for old/new portal apps. Owner observed first authorization and import working 2026-10-02; moi developer endpoint returned HTTP400 and is disabled. Fresh stress consent and subsequent resilience import remain owner follow-up after deploy, as does first real refresh. Existing grants do not gain scopes automatically and legacy moi tokens must be reauthorized. No automatic endpoint fallback/retry after ambiguous rotation; fsync cannot undo server rotation after lost response/disk failure. Presence on onboarding is not proof of valid credentials. Host filesystem must support flock/atomic rename."
+  },
+  "depends_on": [
+    {
+      "module": "secrets_paths",
+      "uses": [
+        "secrets_dir",
+        "oauth_token_source"
+      ],
+      "why": "tenant isolation and shared Calendar seed/live selection",
+      "legacy": "резолвер каталога ключей до гейта одноразовости; контракт не заводился"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "injectable project clock",
+      "legacy": "шов времени для тестов до гейта одноразовости; контракт не заводился"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "One responsibility: Oura credential lifecycle, no metrics/DB/UI.",
+      "D2": "Two declared entry points; helpers private, CLI calls authorize_oura.",
+      "D3": "Only public path and clock contracts plus stdlib; no Calendar private import.",
+      "D4": "Single compact module, contract plus tests sufficient for rewrite.",
+      "D5": "tests/unit/test_oura_oauth.py executes both entry points and importer boundary; mutations recorded in /tmp/codex_oura_report.md.",
+      "D6": "Seed/live choice shared in secrets_paths.oauth_token_source; filenames and order declared here. Importer passes its actual data directory."
+    },
+    "rationale": "Replaceable with declared contract and offline behavior tests. Owner verified cloud initial authorization/import 2026-10-02; new stress grant and real refresh remain external checks.",
+    "date": "2026-10-02",
+    "oracle": "tests/unit/test_oura_oauth.py and tests/unit/test_getting_started.py"
+  }
+}

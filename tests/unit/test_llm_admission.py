@@ -754,3 +754,26 @@ def test_fingerprint_changes_with_policy(monkeypatch):
     c2 = copy.deepcopy(CORPUS)
     c2["policy"]["reps"]["text"] += 1
     assert la._suite_fingerprint("text", c2, "anthropic") != a
+
+
+def test_unadmitted_functions_speak_words_not_role_names(monkeypatch):
+    """Итог install.sh (03.10): «работает всё» при полном допуске, иначе — функции словами.
+    До 03.10 итог печатал «допущены роли: opus sonnet …» и «остальное не работает» даже у
+    поставщика, где допущено всё."""
+    import hai_core
+    table = {"p_full": {r: {"m": {"passed": True}} for r in la._ROLE_DOC},
+             "p_half": {r: {"m": {"passed": True}} for r in ("sonnet", "haiku", "haiku_pinned")}}
+    monkeypatch.setattr(hai_core, "_admission_table", lambda: table)
+    assert la.unadmitted_functions("p_full") == []
+    off = la.unadmitted_functions("p_half", "en")
+    assert off == [la._ROLE_DOC["opus"][1]] and "consilium" in off[0]
+    assert not any(r in " ".join(off) for r in ("opus", "sonnet", "haiku"))
+
+
+def test_reference_marks_a_provider_that_is_not_offered():
+    import llm_client
+    hidden = [p for p, v in llm_client.profiles().items() if v.get("offered", True) is False]
+    assert hidden, "нет ни одного скрытого поставщика — тест потерял предмет"
+    md = la.admission_reference_md({})
+    for p in hidden:
+        assert "не предлагается" in md.split(f"## {p}", 1)[1].split("\n## ", 1)[0]

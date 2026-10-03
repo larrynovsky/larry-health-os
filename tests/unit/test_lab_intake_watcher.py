@@ -31,6 +31,9 @@ def env(tmp_path, monkeypatch):
     # что-либо доказывать. Сами предохранители проверяются отдельно и по одному:
     # tests/unit/test_lab_intake_gate.py.
     monkeypatch.setattr(w, "_is_lab", lambda p: True)
+    monkeypatch.setattr(w.lab_backfill, "_SHARED_VOCAB_DB", tmp_path / "lab_vocab.db")
+    monkeypatch.setattr(w.notify, "_SECRETS", tmp_path / "secrets")
+    monkeypatch.setattr(w.notify, "_telegram", lambda *a, **k: True)
     w._save_state({"watermark": 0.0, "notlab": []})
     return health_db, w, tmp_path
 
@@ -207,6 +210,122 @@ def test_subdirs_are_not_picked_by_watcher(env, monkeypatch):
                         lambda *a, **k: calls.append(1) or {"rows": 1, "pending": 1})
     monkeypatch.setattr(w.notify, "notify_operator", lambda msg: None)
     assert w.process_once() == 0 and calls == []
+
+
+@pytest.mark.parametrize("owner", [True, False])
+def test_auto_rows_reach_own_chat_and_stay_out_of_canon(env, monkeypatch, owner):
+    """Мутации: notify_operator вместо notify; убрать auto-уведомление; автопромоут."""
+    hdb, w, tmp = env
+    hdb._ensure_lab_table()
+    from secrets_paths import secrets_dir
+    import secrets_paths
+    monkeypatch.setattr(secrets_paths, "is_owner", lambda: owner)
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "own.jpg"; f.write_bytes(b"synthetic image"); _age(f, 999)
+    res = {"date": "2030-01-02", "extractor_version": "synthetic",
+           "stats": {"disagreements": 0, "singles": 0},
+           "tests": [{"canonical_name": "Glucose", "raw_name": "Glucose", "value": 5.0,
+                      "unit": "mmol/L", "page": 1, "value_agreement": "agree"}]}
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize", lambda *a, **k: res)
+    monkeypatch.setattr(w.lab_backfill.lab_oracles, "verify",
+                        lambda *a, **k: {"status": "green", "count": 0})
+    sent, operators = [], []
+    monkeypatch.setattr(w.notify, "_telegram",
+                        lambda msg, secrets=None: sent.append((msg, secrets or w.notify._SECRETS)) or True)
+    monkeypatch.setattr(w.notify, "notify_operator", lambda msg: operators.append(msg) or "telegram")
+    assert w.process_once() == 1
+    assert w.process_once() == 0
+    assert len(sent) == 1 and sent[0][1] == secrets_dir()
+    assert "own.jpg" in sent[0][0] and "Добавить в базу" in sent[0][0]
+    assert "/lab-review/" in sent[0][0] and "tenant=health_partner" in sent[0][0]
+    assert "show=waiting" in sent[0][0]
+    assert len(operators) == (0 if owner else 1)
+    with hdb.get_conn() as c:
+        assert c.execute("SELECT review_status FROM lab_results_staging").fetchall()[0][0] == "auto"
+        assert c.execute("SELECT COUNT(*) FROM lab_results").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("case", ["notlab", "zero", "read_failure", "failure"])
+def test_file_refusal_reaches_person_once(env, monkeypatch, case):
+    """Мутации: убрать личное уведомление либо отключить notlab/.norows/.failed дедуп."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / f"{case}.jpg"; f.write_bytes(b"invalid image"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    if case == "notlab":
+        monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    elif case == "zero":
+        monkeypatch.setattr(w.lab_backfill, "run_backfill", lambda *a, **k: {"rows": 0})
+    else:
+        def fail(*a, **k):
+            raise ValueError("synthetic read failure")
+        if case == "read_failure":
+            monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize", fail)
+        else:
+            monkeypatch.setattr(w.lab_backfill, "run_backfill", fail)
+    for _ in range(3):
+        w.process_once()
+    assert len(told) == 1 and f.name in told[0]
+    assert "оригинальный PDF" in told[0] and "чёткое фото" in told[0]
+
+
+def test_long_pdf_refused_once_without_partial_staging(env, monkeypatch):
+    """Настоящие PDF → recognizer → backfill → watcher. Мутации: усечь или проглотить отказ."""
+    hdb, w, _ = env
+    import fitz
+    lr = w.lab_backfill.lab_recognizer
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    p = inbox / "long.pdf"
+    with fitz.open() as doc:
+        for _ in range(lr._MAX_PAGES + 1):
+            doc.new_page()
+        doc.save(str(p))
+    _age(p, 999)
+    monkeypatch.setattr(lr.hai_core, "get_model", lambda role: role)
+    vision, told = [], []
+    monkeypatch.setattr(lr, "_vision_call", lambda *a: vision.append(a) or [])
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    w.process_once(); w.process_once(); w.process_once()
+    assert len(told) == 1 and "Разделите PDF" in told[0] and str(lr._MAX_PAGES) in told[0]
+    assert not vision and p.with_suffix(".pdf.failed").exists()
+    with hdb.get_conn() as c:
+        assert c.execute("SELECT COUNT(*) FROM lab_results_staging").fetchone()[0] == 0
+
+
+def test_undelivered_person_result_leaves_fault_without_retry_spam(env, monkeypatch):
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "notlab.jpg"; f.write_bytes(b"x"); _age(f, 999)
+    monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    attempts, faults = [], []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: attempts.append(k) or "none")
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append(a))
+    w.process_once(); w.process_once()
+    assert attempts == [{"fallback": False}] and len(faults) == 1
+
+
+def test_notlab_notification_waits_for_durable_dedup(env, monkeypatch):
+    """Мутация: сообщать при неудачной записи notlab, создавая шторм по минутам."""
+    _, w, _ = env
+    from pathlib import Path
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "notlab.jpg"; f.write_bytes(b"x"); _age(f, 999)
+    monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    original = Path.write_text
+    blocked = True
+    def write(path, *a, **k):
+        if blocked and path == w._state_path():
+            raise OSError("synthetic full disk")
+        return original(path, *a, **k)
+    monkeypatch.setattr(Path, "write_text", write)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    w.process_once(); w.process_once()
+    assert not told
+    blocked = False
+    w.process_once(); w.process_once()
+    assert len(told) == 1
 
 
 # --- периметр датчика пульса (§18) -------------------------------------------

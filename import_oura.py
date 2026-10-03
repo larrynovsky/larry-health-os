@@ -40,9 +40,16 @@ log = logging.getLogger(__name__)
 # ── API ────────────────────────────────────────────────────────────────────
 
 def get_token():
+    from oura_oauth import get_access_token
+    token = get_access_token(METRICS_DIR.parent)
+    if token is not None:
+        log.info("Oura token source: OAuth2")
+        return token
     # secrets_dir() — единый резолвер; он же fail-closed для тенанта без secrets
     # (иначе взяли бы токен владельца → доказанная кросс-тенант утечка 2026-07-03).
-    return (secrets_dir() / "oura_token").read_text().strip()
+    token = (secrets_dir() / "oura_token").read_text().strip()
+    log.info("Oura token source: PAT")
+    return token
 
 
 def oura_get(endpoint: str, start: str, end: str) -> list:

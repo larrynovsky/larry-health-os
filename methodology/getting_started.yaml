@@ -49,7 +49,7 @@ capabilities:
     action: {ru: "Пришлите бланки боту", en: "Send lab reports to the bot"}
     action_in_bot: true
     pending_action: {ru: "Проверить распознанное", en: "Check recognised values"}
-    pending_href: /labs
+    # Ссылка на самый старый незавершённый прогон вычисляется судьёй из staging.
     howto: how-to/add_labs.md
     howto_label: {ru: "Как добавить анализы", en: "How to add lab results"}
 
@@ -68,7 +68,7 @@ capabilities:
     intent: [device_metrics_owner, morning_brief]
     title: {ru: "Сон и восстановление", en: "Sleep and recovery"}
     benefit: {ru: "Ночь, вариабельность пульса и активность — с кольца Oura.", en: "Night sleep, heart rate variability and activity — from an Oura ring."}
-    need: {ru: "Личный токен Oura — файлом oura_token в каталог ключей на этой машине. Не в чат", en: "An Oura personal token — as the file oura_token in the secrets directory on this machine. Not in the chat"}
+    need: {ru: "Авторизация Oura по инструкции подключения; существующий личный токен тоже подходит. Ключи — только файлами, не в чат", en: "Authorize Oura using the connection guide; an existing personal token also works. Keys go in files, never in chat"}
     action: {ru: "Как подключить Oura", en: "How to connect Oura"}
     broken_action: {ru: "Заменить токен Oura", en: "Replace the Oura token"}
     howto: how-to/connect_oura.md
@@ -101,7 +101,8 @@ capabilities:
     intent: [morning_brief]
     title: {ru: "Календарь поездок", en: "Travel calendar"}
     benefit: {ru: "Карточка за день до поездки из Google Calendar. Необязательно.", en: "A card the day before a trip, from Google Calendar. Optional."}
-    need: {ru: "Токен Google Calendar в каталоге ключей. Как получить его для установки в Докере, пока не описано", en: "A Google Calendar token in the secrets directory. How to get one for a Docker installation is not described yet"}
+    need: {ru: "OAuth-клиент Google и разрешение на чтение календаря; в Докере токен сохраняется в каталоге данных", en: "A Google OAuth client and permission to read the calendar; Docker saves the token in the data directory"}
+    howto: how-to/connect_google_calendar.md
 
   - id: brief
     group: time

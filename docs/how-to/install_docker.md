@@ -25,7 +25,7 @@
 - Часовой пояс человека (IANA, например `Europe/Berlin`): утренняя сводка приходит по нему.
 - Каталог секретов (права 700) — как в [первой установке](../tutorials/first_install.md) ([English](../tutorials/first_install.en.md)):
   - `telegram_chat_id` и `telegram_token` — без них не поднимется бот (остальные службы поднимутся);
-  - `anthropic_key` (или `openai_key` / `gemini_key` / `deepseek_key` при другом поставщике моделей — [рецепт](llm_provider.md)) — без ключа поставщика не пишутся отчёты.
+  - `anthropic_key` (или `openai_key` / `gemini_key` при другом поставщике моделей — [рецепт](llm_provider.md)) — без ключа поставщика не пишутся отчёты.
 
 ## 1. Собрать расписание и список исключений образа
 

@@ -19,7 +19,7 @@ def test_import_all_maps_ca19_to_canonical():
     assert '"Ca 19": "CA19_9"' not in src    # старое имя-цель убрано
 
 
-def test_render_pages_caps_at_max_pages(tmp_path):
+def test_render_pages_refuses_partial_pdf_at_max_pages(tmp_path):
     fitz = pytest.importorskip("fitz")
     import lab_recognizer
     p = tmp_path / "big.pdf"
@@ -28,8 +28,10 @@ def test_render_pages_caps_at_max_pages(tmp_path):
         doc.new_page()
     doc.save(str(p))
     doc.close()
-    pages = lab_recognizer._render_pages(p)
-    assert len(pages) == lab_recognizer._MAX_PAGES
+    with pytest.raises(lab_recognizer.PageLimitExceeded) as error:
+        lab_recognizer._render_pages(p)
+    assert error.value.pages == lab_recognizer._MAX_PAGES + 5
+    assert error.value.limit == lab_recognizer._MAX_PAGES
 
 
 # Адресное перечитывание позволяет выбрать страницу за общей отсечкой.

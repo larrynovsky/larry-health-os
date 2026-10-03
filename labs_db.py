@@ -12,6 +12,10 @@ from _time_inject import get_today
 
 log = logging.getLogger(__name__)
 
+# Незавершённые строки: auto — согласие моделей, а не подтверждение человека.
+# specialized уже приняты отдельным писателем; неизвестный статус остаётся видимым.
+WAITING_REVIEW_SQL = "COALESCE(review_status,'pending') NOT IN ('rejected','promoted','specialized')"
+
 
 def get_recent_labs(n_days: int = 365, key_tests: list = None, exclude_pro: bool = True) -> list[dict]:
     """

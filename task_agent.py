@@ -331,6 +331,26 @@ def extract_tasks_from_report(report_text: str, source: str,
                      f"{(t.get('content') or '')[:40]} → {v['ru'][:60]}")
             t["content"] = v["ru"]
 
+    # Сверка с тем, что человек уже держит (нить task-dedup, 02.10). ПОСЛЕ судьи
+    # адресации: он переписывает формулировки, и дубль рождается на его выходе
+    # (тот же довод, что у duplicates_die_after_the_judge). Сбой сверки — пустой
+    # словарь, и всё создаётся, как до неё.
+    _dups = {}
+    try:
+        _known = db.get_tasks_known_to_person(dismissed_recall_days())
+        _dups = judge_task_duplicates(
+            [{"id": str(i), "type": t.get("type"), "text": t.get("content")}
+             for i, t in enumerate(tasks_raw)
+             if t.get("content") and t.get("type") in DEDUP_JUDGED_TYPES], _known)
+    except Exception as e:  # noqa: BLE001 — сверка необязательна, задачи важнее
+        log.warning(f"Сверка дублей не выполнена ({e}) — задачи создаются без неё")
+    for i, t in enumerate(tasks_raw):
+        d = _dups.get(str(i))
+        if d and d["verdict"] == "covered":
+            log.info(f"Задача не создана — уже есть #{', #'.join(map(str, d['ids']))} "
+                     f"({d['reason']}): {(t.get('content') or '')[:60]}")
+            t["content"] = None
+
     saved = []
     for t in tasks_raw:
         if not t.get("content"):
@@ -389,6 +409,151 @@ def extract_tasks_from_report(report_text: str, source: str,
 
 # Public API alias — extract_tasks (для UC-G-01 unit-тестов и внешних callers)
 extract_tasks = extract_tasks_from_report
+
+
+# ── Судья дублей: новая задача врача против того, что человек уже держит ──────────
+#
+# Нить task-dedup, 02.10. Ключ `fingerprint` придумывает экстрактор, и разные недели
+# дают разные ключи одной просьбы: у партнёра 51 снятая задача — 51 разный ключ, и
+# сверка по ключу не сработала ни разу. Точное совпадение набора аналитов склеило бы
+# 2 из 29 «сдать анализ»: дубли тут не равные, а ВЛОЖЕННЫЕ (панель, потом её часть,
+# потом часть плюс новый анализ). Поэтому сравнивает модель, как у гипотез
+# (hypothesis_semantic_check), а правило решения строгое: не создаём только то, что
+# ЦЕЛИКОМ уже есть. Лишняя задача стоит одной строки в списке; потерянная просьба
+# врача — молчания, которое снаружи не видно.
+#
+# Сколько дней снятая человеком задача не возвращается — решение владельца 02.10:
+# 90. Число — данные (system_config), здесь только seed для пустой установки.
+RECALL_KEY = "tasks.dismissed_recall_days"
+RECALL_SEED_DAYS = 90
+
+TASK_DEDUP_PROMPT = """Ты сверяешь НОВЫЕ задачи из отчёта врача с задачами, которые у человека УЖЕ есть
+(открытые или недавно снятые им самим как ненужные).
+
+Для каждой новой задачи:
+1. Разложи её на отдельные просьбы: каждый анализ — отдельная просьба («сдать ALT, AST» —
+   две), каждое действие — отдельная, каждый вопрос — отдельная.
+2. Для каждой просьбы найди старые задачи, которые просят ТО ЖЕ САМОЕ. Смысл, а не слова:
+   «сдать ферритин» = «Ferritin»; «измерять давление неделю» = «измерять АД 7 дней».
+   Уточнение без новой сути («натощак», «при следующем визите», дата последней сдачи в
+   скобках) просьбу не меняет. НЕ то же самое: другой анализ из той же панели; вопрос
+   человеку и действие (спросить «было ли» ≠ сделать); просьба сообщить результат и само
+   действие; другое время или другой порог в режиме. Нет такой старой — пустой список.
+
+Сомневаешься — пустой список. Пропустить новую просьбу врача хуже, чем показать повтор.
+
+Верни ТОЛЬКО JSON-массив, по объекту на КАЖДУЮ новую задачу:
+[{"id": "<id новой>",
+  "items": [{"request": "<просьба, коротко>", "in": [<номера старых, где она уже есть>]}]}]
+Ничего, кроме JSON."""
+
+# Роль модели и судимые типы — по замеру 02.10 на истории обоих людей (168 задач врача,
+# разметка и арбитраж — отдельные агенты). haiku: 17 ложных «покрыто» на тенанта —
+# отвергнут. sonnet: 50 из 51 повтора пойманы, но на действиях и вопросах 9 существенных
+# просьб потеряны бы (действия и вопросы врача; примеры — в закрытой записке нити), на
+# задачах-анализах — 1 спорная из 83 при 43 пойманных повторах. Решение владельца 02.10:
+# судить только анализы. Действия и вопросы создаются как раньше.
+DEDUP_MODEL_ROLE = "sonnet"
+DEDUP_JUDGED_TYPES = {"lab_test"}
+
+
+def dismissed_recall_days() -> int:
+    """Окно памяти о снятых задачах в днях: из system_config; нет ключа → seed пишется."""
+    import config_db
+    v = config_db.get_config(RECALL_KEY)
+    if v in (None, ""):
+        config_db.upsert_config(RECALL_KEY, value_num=float(RECALL_SEED_DAYS), category="tasks",
+                                source="task_agent.dismissed_recall_days")
+        v = config_db.get_config(RECALL_KEY)
+    return int(float(v))
+
+
+def _dedup_verdicts_from_rows(raw: list, wanted: set, known_ids: set) -> dict:
+    """Ответ модели → {id_новой: {verdict, ids, reason}}. Чистая функция — судится тестом.
+
+    "covered" выносит КОД, а не модель: только если КАЖДАЯ просьба задачи нашлась в
+    старой задаче, номер которой был во входе. Замер 02.10 на истории обоих людей: когда
+    модель сама ставила «покрыто» и «поглощает», на 168 задачах вышло 7–12 ложных
+    «покрыто» (новые анализы панели терялись) и 44 из 58 ложных «поглощает» (снятие
+    старой унесло бы её собственные просьбы). Поэтому «поглощает» убран совсем, а
+    «покрыто» требует улики на каждую просьбу.
+
+    Ответ модели — недоверенный вход: просьба без номера, номер, которого не было во
+    входе, пустой список просьб — всё это "new"."""
+    out = {}
+    for row in raw or []:
+        if not isinstance(row, dict):
+            continue
+        rid = str(row.get("id"))
+        if rid not in wanted:
+            continue
+        items = row.get("items") if isinstance(row.get("items"), list) else []
+        ids, covered = [], bool(items)
+        for it in items:
+            found = []
+            for x in (it.get("in") if isinstance(it, dict) else None) or []:
+                try:
+                    if int(x) in known_ids:
+                        found.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+            covered = covered and bool(found)
+            ids += [x for x in found if x not in ids]
+        out[rid] = {"verdict": "covered" if covered else "new",
+                    "ids": ids if covered else [],
+                    "reason": "; ".join(str(it.get("request") or "") for it in items
+                                        if isinstance(it, dict))[:300]}
+    return out
+
+
+def _dedup_once(new_items: list[dict], known: list[dict]) -> dict:
+    """Один вызов судьи дублей; сбой → {} (вызывающий создаёт всё, как до судьи)."""
+    listing = ["НОВЫЕ:"]
+    listing += [f"{it['id']}: [{it.get('type') or '?'}] {it['text']}" for it in new_items]
+    listing.append("\nУЖЕ ЕСТЬ:")
+    listing += [f"#{k['id']} [{'снята' if k.get('status') == 'dismissed' else 'открыта'}]"
+                f" [{k.get('type') or '?'}] {k.get('content') or ''}" for k in known]
+    try:
+        response = _get_client().messages.create(
+            model=hai_core.get_model(DEDUP_MODEL_ROLE),
+            max_tokens=8000,
+            system=TASK_DEDUP_PROMPT + hai_core.answer_language(),
+            messages=[{"role": "user", "content": "\n".join(listing)}],
+        )
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            log.warning("judge_task_duplicates: ответ упёрся в max_tokens — разбираю, что дошло")
+        raw = _parse_tasks_json(response.content[0].text)
+    except Exception as e:  # noqa: BLE001 — сбой судьи = старое поведение, не потеря задач
+        log.warning(f"judge_task_duplicates: судья не отработал ({e})")
+        return {}
+    return _dedup_verdicts_from_rows(raw, {str(it["id"]) for it in new_items},
+                                     {int(k["id"]) for k in known})
+
+
+def judge_task_duplicates(new_items: list[dict], known: list[dict]) -> dict:
+    """{id_новой: {verdict, ids, reason}} для каждой новой задачи, которую судья рассудил.
+
+    Отсутствие id в ответе значит «создать» — FAIL-OPEN, и это зеркало асимметрии цены:
+    судья, который упал, не должен стоить человеку недели без задач от врача. Потерянные
+    вердикты переспрашиваются один раз (тот же приём, что у судьи адресации, 28.09).
+    Полный отказ — в журнал сбоев: тихий откат к старому поведению без датчика сделал бы
+    дубли невидимо вернувшимися."""
+    if not new_items or not known:
+        return {}
+    out = _dedup_once(new_items, known)
+    missing = [it for it in new_items if str(it["id"]) not in out]
+    if missing and len(missing) < len(new_items):
+        out.update(_dedup_once(missing, known))
+    elif missing:
+        out = _dedup_once(new_items, known)
+    if not out:
+        try:
+            import notify
+            notify.fault("task_agent.judge_task_duplicates: судья дублей не ответил — "
+                         f"{len(new_items)} задач создано без сверки", person_key=None)
+        except Exception as e:  # noqa: BLE001 — журнал сбоев не важнее задач
+            log.warning(f"judge_task_duplicates: сбой не записан в журнал ({e})")
+    return out
 
 
 def format_tasks_message(tasks: list[dict]) -> str:

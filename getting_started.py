@@ -120,10 +120,15 @@ def _labs(ctx):
     # Число значений, а не названий: имя анализа здесь не нужно, и читатель по имени мимо
     # отображения LOINC был бы новым домом имени (ратчет test_lab_trend_readers_ratchet).
     n = _count(ctx, "lab_results")
-    pending = _count(ctx, "lab_results_staging", "review_status='pending'")
+    from labs_db import WAITING_REVIEW_SQL
+    from urllib.parse import quote
+    pending = _count(ctx, "lab_results_staging", WAITING_REVIEW_SQL)
     last = ctx.one("SELECT MAX(date) FROM lab_results") if n else None
     if pending:
-        return _r("ok" if n else "wait", "labs.pending", receipt=last, pending=pending, n=pending)
+        run_id = ctx.one("SELECT run_id FROM lab_results_staging WHERE " + WAITING_REVIEW_SQL +
+                         " GROUP BY run_id ORDER BY MIN(created_at), MIN(id) LIMIT 1")
+        return _r("ok" if n else "wait", "labs.pending", receipt=last, pending=pending, n=pending) | {
+            "pending_href": f"/lab-review/{quote(str(run_id), safe='')}?show=waiting"}
     if n:
         return _r("ok", "labs.ok", receipt=last, n=n)
     return _r("not", "labs.none")
@@ -143,7 +148,10 @@ def _device(ctx, source: str, secret: str):
     from metrics_db import SOURCE_STALE_DAYS
     days = _device_days(ctx, source)
     if not days:
-        return _r("wait", "device.wait") if ctx.secret(secret) else _r("not", "device.none")
+        connected = ctx.secret(secret)
+        if source == "Oura":
+            connected = connected or ctx.secret("oura_oauth.json") or (ctx.data_dir / "oura_oauth.json").exists()
+        return _r("wait", "device.wait") if connected else _r("not", "device.none")
     last = date.fromisoformat(str(days[-1])[:10])
     age = (ctx.today - last).days
     if age > SOURCE_STALE_DAYS:
@@ -170,7 +178,7 @@ def _calendar(ctx):
         if age_h > CACHE_ERROR_AGE_H:
             return _r("broken", "calendar.broken", age=age_h)
         return _r("ok", "calendar.ok")
-    if ctx.secret("google_calendar_token.json"):
+    if ctx.secret("google_calendar_token.json") or (ctx.data_dir / "google_calendar_token.json").exists():
         return _r("wait", "calendar.wait")
     return _r("not", "calendar.none")
 
@@ -301,11 +309,13 @@ def _render(cat: dict, cap: dict, res: dict, lang: str | None) -> dict:
         secondary = {"text": pick(cap.get("howto_label") or cat["page"]["howto"]), "href": howto}
     return {
         "id": cap["id"], "group": cap["group"], "optional": bool(cap.get("optional")),
-        "state": res["state"], "icon": st["icon"], "label": pick(st["label"]),
+        "state": res["state"], "icon": st["icon"],
+        "label": i18n.t("person.lab.waiting_label", lang) if cap["id"] == "labs" and res["pending"] else pick(st["label"]),
         "title": pick(cap["title"]), "benefit": pick(cap.get("benefit", "")),
         "sub": pick(cap.get("sub", "")),
         "need": pick(cap.get("need", "")).format(**params),
-        "status": pick(cat["texts"][res["text"]]).format(**params),
+        "status": (i18n.t("person.lab.waiting_count", lang, **params) if res["text"] == "labs.pending"
+                   else pick(cat["texts"][res["text"]]).format(**params)),
         "receipt": res["receipt"], "progress": res["progress"], "pending": res["pending"],
         "primary": primary, "secondary": secondary,
         "note": ({"kind": cap["note"]["kind"], "text": pick(cap["note"]["text"])} if cap.get("note") else None),
@@ -324,7 +334,7 @@ def _primary(cap: dict, res: dict, howto: str | None, pick) -> dict | None:
     if state == "broken" and cap.get("broken_action"):
         return {"text": pick(cap["broken_action"]), "href": howto, "kind": "warning"}
     if res["pending"] and cap.get("pending_action"):
-        return {"text": pick(cap["pending_action"]), "href": cap.get("pending_href") or howto, "kind": "solid"}
+        return {"text": pick(cap["pending_action"]), "href": res.get("pending_href") or cap.get("pending_href") or howto, "kind": "solid"}
     if state == "not" and cap.get("action"):
         if cap.get("action_in_bot"):
             return {"text": pick(cap["action"]), "href": None, "kind": "text"}

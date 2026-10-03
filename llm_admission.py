@@ -620,6 +620,14 @@ _ROLE_DOC = {"opus": ("анализы по фото (проход 1), конси
              "haiku_pinned": ("лечение и анализы из текста", "treatment and labs from text")}
 
 
+def unadmitted_functions(prov: str, lang: str = "ru") -> list[str]:
+    """Что НЕ работает на провайдере установки — словами, без имён ролей (итог install.sh).
+    Пусто — работает всё. Слова — из _ROLE_DOC, того же дома, что у справочника."""
+    import hai_core
+    i = 0 if lang == "ru" else 1
+    return [_ROLE_DOC[r][i] for r in _ROLE_DOC if not hai_core.admitted_models(prov, r)]
+
+
 def admission_reference_md(table: dict, lang: str = "ru") -> str:
     """Справочник «что работает на каком провайдере» — ТОЛЬКО из таблицы допуска; руками не
     пишется (docs/reference/llm_providers.md, сверку держит тест)."""
@@ -669,7 +677,13 @@ def admission_reference_md(table: dict, lang: str = "ru") -> str:
                                f"{v.get('date', '—')} | — |")
             out.append("")
             continue
-        out += [f"## {prov}", "", *head]
+        out += [f"## {prov}", ""]
+        if prof.get("offered", True) is False:
+            out += [("При установке не предлагается (решение владельца 03.10.2026): на нём работает не всё. "
+                     "Установка, где он уже выбран, обновляется как раньше.") if ru else
+                    ("Not offered at install (owner's decision, 2026-10-03): not everything works on it. "
+                     "An installation that already uses it keeps updating as before."), ""]
+        out += head
         for role, model in prof["role_defaults"].items():
             v = ((table.get(prov) or {}).get(role) or {}).get(model)
             if v is None:

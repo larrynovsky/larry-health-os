@@ -162,6 +162,14 @@ _JPEG_Q = 85
 _MAX_PAGES = int(os.environ.get("HEALTH_LAB_MAX_PAGES", "20"))  # анти-runaway (дефолт 20); override env HEALTH_LAB_MAX_PAGES для больших многостраничных буклетов
 
 
+class PageLimitExceeded(ValueError):
+    """Полный бланк не прочитан: вызывающий обязан объяснить предел человеку."""
+
+    def __init__(self, pages: int, limit: int):
+        self.pages, self.limit = pages, limit
+        super().__init__(f"PDF pages={pages} exceeds limit={limit}")
+
+
 def _encode(img) -> bytes:
     """PIL.Image → JPEG-байты с даунскейлом до _MAX_EDGE (держим размер запроса
     под лимитом API — иначе 413 на многостраничных сканах)."""
@@ -181,8 +189,8 @@ def _render_pages(doc_path: Path, pages: list[int] | None = None) -> list[bytes]
     """Документ → список JPEG-байтов постранично (даунскейл до _MAX_EDGE).
     PDF через PyMuPDF, изображения (jpg/png/heic) через Pillow.
 
-    `pages` — номера страниц с единицы. None сохраняет обработку первых
-    `_MAX_PAGES`. Адресный прогон позволяет перечитать нужные страницы,
+    `pages` — номера страниц с единицы. None требует полный документ в пределах
+    `_MAX_PAGES`, иначе явный отказ. Адресный прогон позволяет перечитать нужные страницы,
     не затрагивая остальные и не оплачивая полный vision-разбор.
 
     Явный список ОБХОДИТ отсечку по индексу, но не отменяет предел количества:
@@ -199,8 +207,9 @@ def _render_pages(doc_path: Path, pages: list[int] | None = None) -> list[bytes]
         from PIL import Image
         doc = fitz.open(str(doc_path))
         if want is None and doc.page_count > _MAX_PAGES:
-            log.warning(f"{doc_path.name}: {doc.page_count} страниц > cap {_MAX_PAGES} "
-                        f"— беру первые {_MAX_PAGES} (анти-runaway)")
+            count = doc.page_count
+            doc.close()
+            raise PageLimitExceeded(count, _MAX_PAGES)
         for i, page in enumerate(doc):
             if want is not None:
                 if (i + 1) not in want:

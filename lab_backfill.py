@@ -385,7 +385,7 @@ def run_backfill(run_id: str, max_docs: int | None = None,
             # Роль чтения анализов не допущена у поставщика установки — предел установки, а не
             # сбой документа: проглоченный, он выглядел бы для приёмника как «0 строк» (замер 02.10).
             import hai_core
-            if isinstance(e, hai_core.ModelNotAdmitted):
+            if isinstance(e, (hai_core.ModelNotAdmitted, lab_recognizer.PageLimitExceeded)):
                 raise
             summary["errors"] += 1
             log.error(f"ERROR {source_file}: {e}")

@@ -237,7 +237,7 @@ content is sent in requests as listed below — worth knowing up front:
 | Where | What | Why |
 |---|---|---|
 | Anthropic API (the default model provider) | your medical context in the request text: profile, metrics, labs, document excerpts, scanned lab pages | briefs, consilium, reading labs |
-| OpenAI, Google Gemini or DeepSeek — only if you installed with that provider instead of Anthropic | the same as the Anthropic row: it goes to the provider you chose | the same |
+| OpenAI or Google Gemini — only if you installed with that provider instead of Anthropic | the same as the Anthropic row: it goes to the provider you chose | the same |
 | Telegram | bot messages and the files you send | interface |
 | Oura API | a request for your data with your token | import |
 | PubMed (NCBI) | search queries with condition names, no name of yours | literature search |
@@ -267,7 +267,7 @@ files to meeting the bot. The image is prebuilt for amd64 and arm64; nothing to 
 Your own build (other document recognition languages, your own code changes):
 [docs/how-to/install_docker.en.md](docs/how-to/install_docker.en.md).
 
-No Anthropic key? The system also installs with an OpenAI, Gemini or DeepSeek key, but what works depends on the provider:
+No Anthropic key? The installer asks which provider you use; the system also works with an OpenAI or Gemini key, but what works depends on the provider:
 a function runs only if its model passed checks on that provider, otherwise it says so instead of
 answering with an unchecked model. What works where: [docs/reference/llm_providers.en.md](docs/reference/llm_providers.en.md);
 how to install: [docs/how-to/llm_provider.en.md](docs/how-to/llm_provider.en.md).

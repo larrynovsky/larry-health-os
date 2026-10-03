@@ -7,7 +7,31 @@
     "get_weekly_followup",
     "process_gp_report"
   ],
-  "depends_on": [],
+  "depends_on": [
+    {
+      "module": "llm_client",
+      "uses": [
+        "guarded_client"
+      ],
+      "why": "экстрактор и оба судьи (адресации, дублей) зовут модель только через гард секретов"
+    },
+    {
+      "module": "hai_core",
+      "uses": [
+        "get_model",
+        "answer_language"
+      ],
+      "why": "выбор модели — один дом конфигурации моделей"
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "save_task",
+        "get_tasks_known_to_person"
+      ],
+      "why": "дом задач; судья дублей сверяет новую задачу врача с тем, что человек уже держит (нить task-dedup, 02.10)"
+    }
+  ],
   "disposability": null,
-  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился."
+  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился. depends_on заполнен при касании 02.10 (нить task-dedup)."
 }

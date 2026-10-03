@@ -469,6 +469,9 @@
 38197d27cb34:
   ru: Записывает документ в очередь на подтверждение типа.
   en: Queues a document for type confirmation.
+38c0c6dca76c:
+  ru: '{id_новой: {verdict, ids, reason}} для каждой новой задачи, которую судья рассудил.'
+  en: '{new_id: {verdict, ids, reason}} for each new task the judge has ruled on.'
 38f53baa416f:
   ru: Отмечает что результат доставлен в Telegram.
   en: Marks that the result has been delivered to Telegram.
@@ -1600,6 +1603,9 @@ af73deefed74:
 afcfa87ab899:
   ru: 'Чистая логика датчика затора: сколько строк ждут промоута и сколько дней.'
   en: 'Pure congestion sensor logic: how many rows are pending promotion and how many days.'
+b0633fd07f1d:
+  ru: 'Окно памяти о снятых задачах в днях: из system_config; нет ключа → seed пишется.'
+  en: 'Memory window for dismissed tasks in days: from system_config; key absent → seed is written.'
 b0b77520015a:
   ru: Гипотезы со status='open' старше 60 дней без перехода в testing.
   en: Hypotheses with status='open' older than 60 days without transition to testing.
@@ -1705,6 +1711,9 @@ b9f3a57d798d:
 ba11d695025b:
   ru: 'WARN: КТО в периметре считает корреляцию — объявлен либо находка.'
   en: 'WARN: WHO inside the perimeter computes correlation — is declared or is a finding.'
+ba2b5ace88af:
+  ru: 'Задачи, которые человек уже держит в голове: открытые, отложенные и СНЯТЫЕ им'
+  en: 'Tasks already held in the person''s head: open, deferred, and DISMISSED by them.'
 ba30849b7942:
   ru: Вставляет или обновляет запись в реестре.
   en: Inserts or updates a record in the registry.

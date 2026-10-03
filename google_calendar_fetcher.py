@@ -6,12 +6,11 @@ google_calendar_fetcher.py — получает события из Google Calen
 Запускается launchd каждый час. calendar_client.py читает кэш — без
 зависимости от icalbuddy, EventKit или iCloud-синхронизации на Studio.
 
-Первичная настройка (ОДНОКРАТНО, на MacBook с браузером):
+Первичная настройка (ОДНОКРАТНО, нативно с браузером):
     python3.11 google_calendar_fetcher.py --setup
 
-После авторизации скопировать секреты на Studio:
-    rsync -a ~/.health_secrets/google_calendar_token.json \\
-          <studio_ssh>:~/.health_secrets/
+В контейнере: --setup --manual (браузер на хосте, адрес перенаправления — в терминал).
+Инструкция: docs/how-to/connect_google_calendar.md.
 
 Для профиля партнёра:
     HEALTH_SECRETS_DIR=~/.health_secrets_partner \\
@@ -23,8 +22,11 @@ import argparse
 import json
 import logging
 import os
+import secrets
+import tempfile
+from urllib.parse import parse_qs, urlsplit
 
-from secrets_paths import owner_secrets_dir
+from secrets_paths import oauth_token_source, owner_secrets_dir
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -39,6 +41,7 @@ FETCH_DAYS_AHEAD = 30  # горизонт будущего
 CACHE_WARN_AGE_H = 3
 # Через N часов кэш пустой — ошибка, calendar_client вернёт []
 CACHE_ERROR_AGE_H = 25
+MANUAL_REDIRECT_URI = "http://localhost:9877/"
 
 
 # ── Пути ──────────────────────────────────────────────────────────────────────
@@ -67,9 +70,9 @@ def _client_file() -> Path:
     <gcp-project-id>) — это одно приложение, а не два. Тенантское здесь —
     google_calendar_token.json и google_calendar_account: КТО авторизовался. Клиент
     же адресован ОПЕРАТОРУ системы, как и другие служебные вещи (см. docstring
-    secrets_paths.owner_secrets_dir), и нужен только в setup_auth — разовой браузерной
-    авторизации, которую запускают руками на MacBook; ежедневная синхронизация живёт
-    на refresh-токене и клиента не открывает вовсе.
+    secrets_paths.owner_secrets_dir), и нужен только в setup_auth — нативной браузерной
+    или ручной авторизации из контейнера; ежедневная синхронизация живёт на refresh-токене
+    и клиента не открывает вовсе.
 
     Прежнее чтение через _secrets_dir() требовало КОПИЮ общего секрета в каталоге
     каждого тенанта — и копия у партнёра появилась, а у владельца на Studio файла нет
@@ -79,18 +82,12 @@ def _client_file() -> Path:
 
 
 def _token_file() -> Path:
-    """Токен, который кладёт авторизация (--setup) — в каталоге ключей тенанта."""
+    """Токен нативной авторизации (--setup) — в каталоге ключей тенанта."""
     return _secrets_dir() / "google_calendar_token.json"
 
 
 def _live_token_file() -> Path:
-    """Обновлённый токен — в данных тенанта, куда запись разрешена.
-
-    В Докере каталог ключей смонтирован только для чтения (517ed05, 30.09): обновить токен там
-    нельзя, и синхронизация 30.09–02.10 падала каждый час с Errno 30, а кэш календаря застыл
-    (нить calendar-token, 02.10). Каталог ключей остаётся домом авторизации; сюда пишется
-    только то, что токен сделал сам — обновление по уже выданному разрешению.
-    """
+    """Токен обновления И первичной ручной авторизации — в записываемых данных тенанта."""
     return _data_dir() / "google_calendar_token.json"
 
 
@@ -100,10 +97,7 @@ def _token_source() -> Path:
     Новее по времени файла: повторный --setup (новое разрешение) обязан побеждать старое
     обновление, иначе переавторизация не действовала бы, пока не удалишь файл руками.
     """
-    seed, live = _token_file(), _live_token_file()
-    if live.exists() and (not seed.exists() or live.stat().st_mtime >= seed.stat().st_mtime):
-        return live
-    return seed
+    return oauth_token_source(_token_file(), _live_token_file())
 
 
 # ── OAuth ─────────────────────────────────────────────────────────────────────
@@ -130,9 +124,7 @@ def _get_credentials():
         try:
             creds.refresh(Request())
             live = _live_token_file()
-            live.parent.mkdir(parents=True, exist_ok=True)
-            live.touch(mode=0o600, exist_ok=True)
-            live.write_text(creds.to_json())
+            _save_token(live, creds.to_json())
             log.info("Google Calendar token refreshed → %s", live)
             return creds
         except Exception as exc:
@@ -146,8 +138,49 @@ def _get_credentials():
     return None
 
 
-def setup_auth():
-    """OAuth авторизация в браузере (запускать на MacBook, не на Studio)."""
+def _save_token(path: Path, token: str):
+    """Atomic 0600 replacement; a failed save must never report success or use the grant."""
+    tmp = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as f:
+            tmp = Path(f.name)
+            f.write(token)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        raise RuntimeError("Google Calendar token could not be saved; access stopped. "
+                           "Check directory permissions/free space and authorize again.") from None
+    finally:
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
+
+
+def _callback_code(url: str, state: str) -> str:
+    """Validate the pasted, untrusted redirect before exchanging any authorization code."""
+    parsed, expected = urlsplit(url.strip()), urlsplit(MANUAL_REDIRECT_URI)
+    if (parsed.scheme, parsed.netloc, parsed.path) != (expected.scheme, expected.netloc, expected.path) or parsed.fragment:
+        raise ValueError("Wrong redirect URL; paste the full localhost callback address.")
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    returned = query.get("state", [])
+    if len(returned) != 1 or not secrets.compare_digest(returned[0].encode(), state.encode()):
+        raise ValueError("Wrong state; use the URL from this authorization attempt.")
+    if "error" in query:
+        raise ValueError("Google authorization denied; authorize again and approve access.")
+    codes = query.get("code", [])
+    if len(codes) != 1 or not codes[0]:
+        raise ValueError("Missing/duplicate code in callback URL.")
+    return codes[0]
+
+
+def setup_auth(manual: bool = False):
+    """Native browser flow, or host-browser paste flow with the grant saved in DATA."""
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
     except ImportError:
@@ -166,16 +199,36 @@ def setup_auth():
         print("  5. Повторить: python3.11 google_calendar_fetcher.py --setup")
         sys.exit(1)
 
-    flow = InstalledAppFlow.from_client_secrets_file(str(client_file), SCOPES)
-    creds = flow.run_local_server(port=0, open_browser=True)
-
-    token_file = _token_file()
-    token_file.write_text(creds.to_json())
-    token_file.chmod(0o600)
+    try:
+        client = json.loads(client_file.read_text())
+        if not isinstance(client, dict) or "installed" not in client:
+            raise ValueError("Desktop app required")
+        flow = InstalledAppFlow.from_client_config(client, SCOPES, autogenerate_code_verifier=True)
+    except (OSError, ValueError, KeyError, TypeError):
+        raise RuntimeError("Unreadable/invalid google_calendar_client.json; download a Desktop app JSON.") from None
+    manual = manual or os.environ.get("HEALTH_RUNTIME") == "container"
+    if manual:
+        from getpass import getpass
+        flow.redirect_uri = MANUAL_REDIRECT_URI
+        url, state = flow.authorization_url(prompt="consent")
+        print("Open this URL in your host browser and approve read-only Calendar access:\n" + url)
+        print("The localhost page will not load. Copy its FULL address; do not share it in chat.")
+        code = _callback_code(getpass("Paste the full redirect URL (hidden): "), state)
+        try:
+            flow.fetch_token(code=code, timeout=30)
+        except Exception:
+            raise RuntimeError("Google OAuth exchange failed; check the client and authorize again.") from None
+        creds, token_file = flow.credentials, _live_token_file()
+    else:
+        try:
+            creds = flow.run_local_server(port=0, open_browser=True, prompt="consent")
+        except Exception:
+            raise RuntimeError("Google browser authorization failed; retry --setup or use --manual.") from None
+        token_file = _token_file()
+    if not creds.refresh_token:
+        raise RuntimeError("Google did not return a refresh token; authorize again and approve access.")
+    _save_token(token_file, creds.to_json())
     print(f"\n✅ Токен сохранён: {token_file}")
-    print("\nСкопировать на Studio:")
-    import infra_config
-    print(f"  rsync -a {token_file} {infra_config.STUDIO_SSH}:{token_file}")
 
 
 # ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -288,10 +341,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Google Calendar → JSON cache")
     parser.add_argument("--setup", action="store_true",
                         help="Однократная OAuth авторизация (нужен браузер)")
+    parser.add_argument("--manual", action="store_true",
+                        help="С --setup: браузер на хосте, вставка адреса; токен в DATA")
     args = parser.parse_args()
 
+    if args.manual and not args.setup:
+        parser.error("--manual requires --setup")
     if args.setup:
-        setup_auth()
+        try:
+            setup_auth(manual=args.manual)
+        except (RuntimeError, ValueError, EOFError, KeyboardInterrupt) as exc:
+            # Provider exceptions/redirects may contain credentials; never echo them.
+            log.error("Google Calendar setup stopped: %s. See docs/how-to/connect_google_calendar.md", exc)
+            sys.exit(1)
     else:
         ok = fetch_and_cache()
         sys.exit(0 if ok else 1)

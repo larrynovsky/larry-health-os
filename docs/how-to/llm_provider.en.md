@@ -1,56 +1,56 @@
-<!-- translation-of: docs/how-to/llm_provider.md sha256:e11bb58e1e62 -->
+<!-- translation-of: docs/how-to/llm_provider.md sha256:9fac08be0b2a -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](llm_provider.md)
 
 # How to Set Up the System with Another Model Provider's Key
 
-The [first install](../tutorials/first_install.md) tutorial sets up the system with an Anthropic key — that is
-the only path where everything works. This recipe is for those who have an OpenAI,
-Gemini or DeepSeek key and no Anthropic key.
+The [first install](../tutorials/first_install.md) tutorial sets up the system with an Anthropic key —
+everything is tested on it. This recipe is for those who have an OpenAI or Gemini key and no
+Anthropic key.
 
 ## First, See What Will Work
 
-Only the part of the system whose model has been admitted by that provider works. The table shows
-[what works with which provider](../reference/llm_providers.md). A role marked 'no' or 'not
-tested' fails loudly (error `ModelNotAdmitted`), rather than responding with an untested
-model. Example: if the sonnet role is marked 'no', lab result recognition from photos does not work
-(it reads each page with two different models), while chat and check-in may work.
-DeepSeek example (admission of 2026-10-02): on a lab-form photo `deepseek-v4-pro` returned numbers
-that are not on the form, and the opus role failed — with a DeepSeek key, numbers from lab forms
-do not enter the lab canon: for a sent document the bot says lab reading has not passed the checks,
-and the document is processed automatically once reading becomes available (for example, with an
-Anthropic key). Chat, check-in and treatment parsing from text work; the bot will describe a photo
-in chat, but those numbers do not go into the canon.
+Only the part of the system whose model passed the checks with that provider works: the table shows
+[what works with which provider](../reference/llm_providers.md). A function whose model did not
+pass refuses in words rather than answering with an unchecked model. The checks are narrow:
+reading lab forms, extracting treatment from text, and short text tasks. How well another
+provider's model writes the morning brief or reasons in the consilium has not been compared with
+Claude.
 
 ## Installation
 
-Instead of `bash install.sh` from the tutorial:
+Run `bash install.sh`, as in the tutorial. A new installation asks:
 
-```bash
-bash install.sh --provider openai
+```
+Which key will you use? Lab results, medical letters and your chats with the bot go to the chosen provider.
+  1 — Anthropic (recommended: everything is tested on it)
+  2 — OpenAI
+  3 — Gemini (Google)
+Number [1]:
 ```
 
-The script will ask for the OpenAI key (input is hidden), verify it against `api.openai.com` using the models list
-(this is free), and store it in `secrets/openai_key`. For Gemini — `--provider gemini`, the key
-is verified against `generativelanguage.googleapis.com` and stored in `secrets/gemini_key`.
-For DeepSeek — `--provider deepseek`: get a key at `platform.deepseek.com` → API keys
-and top up the balance; the script verifies it against `api.deepseek.com` and stores it in `secrets/deepseek_key`.
+Answer `2` or `3`. The script asks for that provider's key (input is hidden), checks it against
+the models list (this is free) and stores it in `secrets/openai_key` or `secrets/gemini_key`. An
+OpenAI key comes from platform.openai.com → API keys (top up the balance), a Gemini key from
+aistudio.google.com → Get API key. At the end the script says that every function passed the checks, or lists in
+words what does not.
 
-Without prompts (for example, on a server):
+Without questions (for example, on a server) the provider is named with a flag:
 
 ```bash
 LLM_KEY=… HEALTH_TZ=Europe/Berlin TELEGRAM_TOKEN=… TELEGRAM_CHAT_ID=… \
   bash install.sh --provider gemini --non-interactive
 ```
 
-At the end the script will list the admitted roles and remind you that everything else does not work.
+DeepSeek is not offered for now: lab photos and the consilium do not work on it.
 
 ## Switching Provider Later
 
-Run the install again with a different `--provider`: the `HEALTH_LLM_PROVIDER` line in `.env`
-will change, containers will be recreated, and the database and keys will remain. Running again without
-`--provider` does not change the selection.
+Running `bash install.sh` again is an update: it does not ask for the provider and does not
+change the choice. To switch provider, run it with the flag, for example
+`bash install.sh --provider openai`: the `HEALTH_LLM_PROVIDER` line in `.env` will change,
+containers will be recreated, and the database and keys will remain.
 
 ## Important Things to Know
 

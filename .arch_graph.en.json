@@ -409,6 +409,7 @@
     "google_calendar_fetcher",
     "health_db",
     "i18n",
+    "labs_db",
     "metrics_db",
     "release_notice",
     "secrets_paths",
@@ -416,7 +417,6 @@
   ],
   "google_calendar_fetcher": [
     "_time_inject",
-    "infra_config",
     "secrets_paths"
   ],
   "gp_agent": [
@@ -664,6 +664,7 @@
   "import_oura": [
     "health_db",
     "infra_config",
+    "oura_oauth",
     "secrets_paths"
   ],
   "import_status_db": [
@@ -781,9 +782,11 @@
     "import_medical_events",
     "infra_config",
     "lab_backfill",
+    "lab_recognizer",
     "link_fetch",
     "notify",
-    "plist_env_liveness"
+    "plist_env_liveness",
+    "secrets_paths"
   ],
   "lab_oracles": [
     "lab_canon"
@@ -1025,6 +1028,10 @@
     "notify",
     "secrets_paths"
   ],
+  "oura_oauth": [
+    "_time_inject",
+    "secrets_paths"
+  ],
   "owner_nag": [
     "_fmt_helpers",
     "_time_inject",
@@ -1238,6 +1245,7 @@
     "llm_client",
     "location_signal",
     "memory_facts_db",
+    "notify",
     "reminders_backend",
     "reminders_sync",
     "secrets_paths"

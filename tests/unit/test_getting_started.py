@@ -75,6 +75,21 @@ def test_device_states_follow_data_not_flags(env):
     assert _cap(_board(env), "oura")["state"] == "ok"
 
 
+@pytest.mark.parametrize("location", ["seed", "live"])
+def test_oura_oauth_presence_connects_without_reading_secret_values(env, monkeypatch, location):
+    _, secrets, data_dir = env
+    credential = (secrets if location == "seed" else data_dir) / "oura_oauth.json"
+    credential.write_text("INVALID-JSON-SENTINEL")  # judge must check presence only
+    original = Path.read_text
+    def guarded(path, *args, **kwargs):
+        assert path != credential, "Oura card read credential content"
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "read_text", guarded)
+    card = _cap(_board(env), "oura")
+    assert card["state"] == "wait"
+    assert "INVALID-JSON-SENTINEL" not in repr(card)
+
+
 def test_silent_source_is_broken_and_becomes_the_next_step(env):
     conn, secrets, _ = env
     from metrics_db import SOURCE_STALE_DAYS
@@ -102,6 +117,33 @@ def test_pending_decision_beats_new_source(env):
     rec = _cap(b, "record")
     assert rec["pending"] == 1 and rec["primary"]["href"] == "/proposals"
     assert b["next"]["id"] == "record"
+
+
+def test_labs_wait_for_person_and_open_oldest_unfinished_run(env):
+    """Мутации: считать только pending; вести в /labs; выбрать новый прогон; забыть счётчик."""
+    conn, secrets, data_dir = env
+    rows = [("a-new", "pending", "2030-01-02")]
+    rows += [("z-old", s, "2030-01-01") for s in ("auto", "review", "gold", None)]
+    rows += [("finished", s, "2029-01-01") for s in ("promoted", "rejected", "specialized")]
+    conn.executemany("INSERT INTO lab_results_staging "
+                     "(run_id,extractor_version,source_file,date,review_status,created_at) "
+                     "VALUES (?,'test','synthetic.pdf','2029-01-01',?,?)", rows)
+    conn.commit()
+    b = _board(env)
+    c = _cap(b, "labs")
+    assert c["pending"] == 5 and "5" in c["status"]
+    assert c["label"] == "ждёт вас" and "Ждёт вас" in c["status"]
+    assert c["primary"]["href"] == "/lab-review/z-old?show=waiting"
+    assert b["next"]["id"] == "labs" and b["counts"]["pending"] == 1
+    en = _cap(gs.board(conn=conn, secrets=secrets, data_dir=data_dir, today=TODAY, lang="en"), "labs")
+    assert en["label"] == "waiting for you" and "5" in en["status"]
+    conn.execute("UPDATE lab_results_staging SET review_status='promoted' WHERE run_id='z-old'")
+    conn.commit()
+    c = _cap(_board(env), "labs")
+    assert c["pending"] == 1 and c["primary"]["href"] == "/lab-review/a-new?show=waiting"
+    conn.execute("UPDATE lab_results_staging SET review_status='rejected' WHERE run_id='a-new'")
+    conn.commit()
+    assert _cap(_board(env), "labs")["pending"] == 0
 
 
 def test_secret_content_never_reaches_the_board(env):
@@ -205,9 +247,18 @@ def test_bot_actions_are_text_and_links_lead_where_their_label_says(env):
         assert p["kind"] == "text" and p["href"] is None, cid
     assert _cap(b, "labs")["secondary"]["text"] == "Как добавить анализы"
     assert _cap(b, "labs")["secondary"]["href"].endswith("how-to/add_labs.md")
-    for cid in ("place", "calendar"):
-        assert _cap(b, cid)["secondary"] is None, cid
+    assert _cap(b, "place")["secondary"] is None
+    assert _cap(b, "calendar")["secondary"]["href"].endswith("how-to/connect_google_calendar.md")
     cat = gs.load_catalog()
     howtos = {c["howto"] for c in cat["capabilities"] if c.get("howto")}
     root = Path(gs.__file__).parent / "docs"
     assert all((root / h).exists() for h in howtos), "ссылка на несуществующую инструкцию"
+
+
+def test_calendar_data_token_is_seen_without_reading_it(env):
+    conn, secrets, data_dir = env
+    token = data_dir / "google_calendar_token.json"
+    token.write_text("SENTINEL-SECRET-7f3a")
+    b = _board(env)
+    assert _cap(b, "calendar")["state"] == "wait"
+    assert "SENTINEL-SECRET-7f3a" not in repr(b)

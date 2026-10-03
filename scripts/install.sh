@@ -26,7 +26,7 @@ MODE=install
 DIST=""            # каталог с compose.yaml/health.env вместо выпуска (CI, проверка невыпущенного)
 INTERACTIVE=1
 VERIFY=1           # проверять токен Telegram и ключ поставщика моделей по сети
-PROVIDER="${LLM_PROVIDER:-}"   # пусто = anthropic (урок — один путь); выбор — docs/how-to/llm_provider.md
+PROVIDER="${LLM_PROVIDER:-}"   # пусто: новая установка спросит (choose_provider), повтор возьмёт выбор из .env
 LAN_INGEST=""      # --lan-ingest / --no-lan-ingest: приём с телефона в домашней Wi-Fi (порт 8011)
 CI_FAKE=0          # --ci-fake-keys: ключи заведомо поддельные (CI) — бот обязан упасть на InvalidToken
 FAILS=0
@@ -51,7 +51,7 @@ usage() {
                      TELEGRAM_CHAT_ID, ANTHROPIC_KEY
   --no-verify        не проверять ключи по сети (и их формат)
   --dist КАТАЛОГ     взять compose.yaml и health.env из каталога, а не из выпуска
-  --provider ИМЯ     поставщик моделей: anthropic (по умолчанию), openai, gemini, deepseek;
+  --provider ИМЯ     поставщик моделей без вопроса: anthropic, openai, gemini;
                      ключ не-Anthropic в --non-interactive — из LLM_KEY
   --lan-ingest       принимать данные с телефона по домашней Wi-Fi (порт 8011, только запись
                      под токеном; дашборд остаётся закрытым); --no-lan-ingest — выключить" \
@@ -62,7 +62,7 @@ usage() {
                      TELEGRAM_CHAT_ID, ANTHROPIC_KEY
   --no-verify        do not verify keys online (nor their format)
   --dist DIR         take compose.yaml and health.env from DIR instead of the release
-  --provider NAME    model provider: anthropic (default), openai, gemini, deepseek;
+  --provider NAME    model provider without the question: anthropic, openai, gemini;
                      a non-Anthropic key in --non-interactive comes from LLM_KEY
   --lan-ingest       accept data from the phone over home Wi-Fi (port 8011, token-protected
                      writes only; the dashboard stays closed); --no-lan-ingest — turn it off"
@@ -89,9 +89,15 @@ if [ "$MODE" = install ] && [ "$INTERACTIVE" = 1 ] && [ ! -t 0 ]; then
       "No terminal for questions. Download the script as a file and run: bash install.sh (or --non-interactive)."
 fi
 
+# Предлагаемые поставщики — те, у кого в methodology/llm_providers.json нет "offered": false
+# (сверку двух списков держит tests/unit/test_install_sh.py). DeepSeek снят решением владельца
+# 03.10: на нём не работают анализы с фото и консилиум. Установка, где он уже записан в .env,
+# обновляется как раньше — отказ только новому явному выбору.
 case "${PROVIDER:-anthropic}" in
-  anthropic|openai|gemini|deepseek) ;;
-  *) die "Неизвестный поставщик моделей: ${PROVIDER} (anthropic, openai, gemini, deepseek)" "Unknown model provider: ${PROVIDER} (anthropic, openai, gemini, deepseek)" ;;
+  anthropic|openai|gemini) ;;
+  deepseek) die "DeepSeek сейчас не предлагается: на нём не работают анализы с фото и консилиум. Выберите anthropic, openai или gemini." \
+                "DeepSeek is not offered for now: lab photos and the consilium do not work on it. Choose anthropic, openai or gemini." ;;
+  *) die "Неизвестный поставщик моделей: ${PROVIDER} (anthropic, openai, gemini)" "Unknown model provider: ${PROVIDER} (anthropic, openai, gemini)" ;;
 esac
 
 # ── 1. Проверка ──────────────────────────────────────────────────────────────────────────────
@@ -310,9 +316,11 @@ tz_ok() {  # имя пояса существует в базе часовых �
   printf '%s' "$1" | grep -Eq '^[A-Za-z0-9_+/-]+$' || return 1
   if [ -d /usr/share/zoneinfo ]; then [ -f "/usr/share/zoneinfo/$1" ]; else return 0; fi
 }
+ENV_FRESH=0   # .env создан этим запуском — значит, установка новая и поставщика можно спросить
 if [ -f .env ]; then
   ok ".env уже есть — пояс и настройки не трогаю" ".env already exists — keeping time zone and settings"
 else
+  ENV_FRESH=1
   tz="${HEALTH_TZ:-}"
   if [ -z "$tz" ]; then
     if [ -L /etc/localtime ]; then tz="$(readlink /etc/localtime | sed 's#.*/zoneinfo/##')"; fi
@@ -335,15 +343,38 @@ else
   mv .env.part .env
   ok "часовой пояс: ${tz}" "time zone: ${tz}"
 fi
-# Поставщик моделей: названный явно (--provider / LLM_PROVIDER) пишется в .env; не названный —
-# берётся из .env (повтор = обновление не меняет выбор), иначе anthropic.
-if [ -n "$PROVIDER" ]; then
+choose_provider() {  # вопрос новой установки; ответ — в PROVIDER. Только из предлагаемых (см. выше)
+  say "Каким ключом будете пользоваться? Анализы, выписки и переписка с ботом уходят выбранному поставщику." \
+      "Which key will you use? Lab results, medical letters and your chats with the bot go to the chosen provider."
+  say "  1 — Anthropic (рекомендуется: на нём проверено всё)" "  1 — Anthropic (recommended: everything is tested on it)"
+  say "  2 — OpenAI" "  2 — OpenAI"
+  say "  3 — Gemini (Google)" "  3 — Gemini (Google)"
+  local a
+  while :; do
+    printf '%s [1]: ' "$(say "Номер" "Number")"
+    read -r a || die "Нет ответа на вопрос о поставщике." "No answer to the provider question."
+    case "${a:-1}" in
+      1) PROVIDER=anthropic; return ;;
+      2) PROVIDER=openai; return ;;
+      3) PROVIDER=gemini; return ;;
+    esac
+    warn "нужна цифра 1, 2 или 3" "type 1, 2 or 3"
+  done
+}
+# Поставщик моделей: названный явно (--provider / LLM_PROVIDER) пишется в .env. Не названный: у
+# новой установки с вопросами — вопрос (значение в только что скачанном health.env — умолчание
+# выпуска, не выбор человека); у повтора = обновления — из .env, без вопроса; иначе anthropic.
+# Ответ пишется в .env, чтобы обновление его не повторяло.
+if [ -z "$PROVIDER" ]; then
+  if [ "$ENV_FRESH" = 1 ] && [ "$INTERACTIVE" = 1 ]; then choose_provider
+  else PROVIDER="$(sed -n 's/^HEALTH_LLM_PROVIDER=//p' .env | tail -n1)"; fi
+fi
+if [ -n "$PROVIDER" ] && ! grep -qx "HEALTH_LLM_PROVIDER=${PROVIDER}" .env; then
   if grep -q '^HEALTH_LLM_PROVIDER=' .env; then
     sed "s#^HEALTH_LLM_PROVIDER=.*#HEALTH_LLM_PROVIDER=${PROVIDER}#" .env > .env.part && mv .env.part .env
   else printf 'HEALTH_LLM_PROVIDER=%s\n' "$PROVIDER" >> .env; fi
-else
-  PROVIDER="$(sed -n 's/^HEALTH_LLM_PROVIDER=//p' .env | tail -n1)"; PROVIDER="${PROVIDER:-anthropic}"
 fi
+PROVIDER="${PROVIDER:-anthropic}"
 ok "поставщик моделей: ${PROVIDER}" "model provider: ${PROVIDER}"
 # Приём с телефона в домашней Wi-Fi: compose берёт адрес порта 8011 из .env (HEALTH_INGEST_BIND).
 # Как с поставщиком: не названо — выбор прошлой установки сохраняется.
@@ -490,12 +521,17 @@ done
 bad_token=0
 docker compose exec -T cron sh -c 'grep -q InvalidToken /app/logs/bot_err.log' 2>/dev/null && bad_token=1
 
-# Не-Anthropic: работают только роли, чьи модели прошли допуск (таблица выпуска в образе);
-# остальные функции отказывают громко, а не отвечают непроверенной моделью.
+# Не-Anthropic: работает только то, чьи модели прошли допуск (таблица выпуска в образе); прочее
+# отказывает словами, а не отвечает непроверенной моделью. Итог — словами, без имён ролей.
 if [ "$PROVIDER" != anthropic ]; then
-  roles="$(docker compose exec -T cron python3 -c "import hai_core, llm_client as c; p = c.provider(); print(' '.join(r for r in ('opus', 'sonnet', 'haiku', 'haiku_pinned') if hai_core.admitted_models(p, r)) or '-')" 2>/dev/null || echo '?')"
-  warn "${PROVIDER}: допущены роли моделей: ${roles} — остальное не работает (docs/how-to/llm_provider.md)" \
-       "${PROVIDER}: admitted model roles: ${roles} — everything else is off (docs/how-to/llm_provider.md)"
+  lang=en; [ "$RU" = 1 ] && lang=ru
+  off="$(docker compose exec -T cron python3 -c "import llm_admission as a; print('; '.join(a.unadmitted_functions('${PROVIDER}', '${lang}')))" 2>/dev/null || echo '?')"
+  if [ -z "$off" ]; then ok "${PROVIDER}: все функции прошли проверку у этого поставщика (docs/reference/llm_providers.md)" \
+                         "${PROVIDER}: every function passed the checks with this provider (docs/reference/llm_providers.md)"
+  elif [ "$off" = '?' ]; then warn "${PROVIDER}: не удалось узнать, что работает (docs/reference/llm_providers.md)" \
+                                   "${PROVIDER}: could not tell what works (docs/reference/llm_providers.md)"
+  else warn "${PROVIDER}: не работает: ${off} (docs/reference/llm_providers.md)" \
+            "${PROVIDER}: not working: ${off} (docs/reference/llm_providers.md)"; fi
 fi
 
 # Итог считается в конце, по свежему состоянию.

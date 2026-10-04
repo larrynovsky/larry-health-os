@@ -5,6 +5,7 @@ hai_reports — утренний, еженедельный, ежемесячны
 Внешние (lazy): wellally_consult, pubmed_client.
 """
 
+import llm_client
 import json
 import hai_core
 import logging
@@ -228,13 +229,13 @@ def generate_morning_report(target: date = None) -> str:
     db.init_db()
 
     context  = build_context_block(target)
-    response = client.messages.create(
+    response = client.messages.create(task="hai_reports.generate_morning_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=4096,
         system=system_prompt,
         messages=[{"role": "user", "content": f"{context}\n\n---\n{MORNING_PROMPT}"}]
     )
-    report = _guarded_report(response.content[0].text, "morning")
+    report = _guarded_report(llm_client.answer_text(response), "morning")
     save_message("assistant", f"[утренний отчёт {target}]\n{report}")
     return report
 
@@ -342,13 +343,13 @@ def generate_weekly_report(end_date: date = None) -> str:
 - Если PubMed показал релевантные исследования — упомяни ключевую находку в 1 предложении
 - Не пересказывай все источники — только то что меняет вывод или гипотезу
 """
-    response = client.messages.create(
+    response = client.messages.create(task="hai_reports.generate_weekly_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=4096,
         system=system_prompt,
         messages=[{"role": "user", "content": f"{full_context}\n\n---\n{weekly_prompt_enhanced}"}]
     )
-    report = _guarded_report(response.content[0].text, "weekly")
+    report = _guarded_report(llm_client.answer_text(response), "weekly")
     save_message("assistant", f"[еженедельный отчёт {end_date}]\n{report}")
     return report
 
@@ -478,12 +479,12 @@ def generate_monthly_check(target: date = None) -> str:
     system_prompt = get_system_prompt()
     db.init_db()
 
-    response = client.messages.create(
+    response = client.messages.create(task="hai_reports.generate_monthly_check",
         model=hai_core.get_model("sonnet"),
         max_tokens=8192,
         system=system_prompt,
         messages=[{"role": "user", "content": f"{full_context}\n\n---\n{MONTHLY_PROMPT}"}]
     )
-    report = _guarded_report(response.content[0].text, "monthly")
+    report = _guarded_report(llm_client.answer_text(response), "monthly")
     save_message("assistant", f"[ежемесячный чекап {target}]\n{report}")
     return report

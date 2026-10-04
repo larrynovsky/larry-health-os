@@ -64,3 +64,24 @@ def test_model_failure_leaves_it_empty_not_invented(db, monkeypatch):
     pid = pdb.save_problem_proposal("document", _add())
     prop = [p for p in prdb.get_pending_proposals() if p["id"] == pid][0]
     assert json.loads(prop["proposed"])[0]["plain_summary"] is None
+
+
+def test_old_proposal_without_plain_gets_it_on_approval(db, calls):
+    """Предложение, сохранённое до 27.09, не несёт простого текста; одобрение 03.10 не должно
+    класть в медкарту голый код (замер: проблема партнёра от 02.10)."""
+    import proposals_db as prdb
+    db.execute("INSERT INTO problem_list_proposals (source, proposed, status) VALUES (?,?,?)",
+               ("gp_weekly", json.dumps(_add(title="Old cardio risk", desc="early risk")), "pending"))
+    pid = db.fetchone("SELECT max(id) AS m FROM problem_list_proposals")["m"]
+    prdb.apply_proposal(pid)
+    row = db.fetchone("SELECT plain_summary FROM problem_list WHERE title=?", ("Old cardio risk",))
+    assert row["plain_summary"] == "Простое описание" and len(calls) == 1
+
+
+def test_carried_plain_is_not_recomputed(db, calls):
+    import problems_db as pdb
+    import proposals_db as prdb
+    pid = pdb.save_problem_proposal("document", _add(title="Fresh one"))
+    assert len(calls) == 1
+    prdb.apply_proposal(pid)
+    assert len(calls) == 1, "простой текст уже в предложении — модель второй раз не зовётся"

@@ -139,6 +139,7 @@ sleep.reply.score: "; sleep score — {sc:.0f}/100"
 
 start.reply.welcome: "Hi! I keep track of your data and send you a report every morning at {brief_time}, your local time.\n\nYou can ask about your sleep, tell me how you feel or share something you'd like to try. You'll still get your reports even if you don't send a message."
 
+symptoms.reply.restart_with_photo: "Alright, let us start over. Send a photo, with a caption if you like — what bothers you and since when."
 symptoms.reply.case_closed: "Observation finished."
 symptoms.reply.observation_continues: "Observation continues. Send a new photo so I can compare changes for your doctor. Without a new photo, I cannot compare them."
 
@@ -286,6 +287,9 @@ jobs.visual.closed: "Observation of “{region}” ended because no new photos c
 jobs.visual.continue: "Continue monitoring"
 jobs.visual.decision: "There is no new photo of “{region}”. Continue observation or finish? You can leave this unanswered — I will then finish observation in {days}."
 jobs.visual.fresh_photo: "It has been at least {days} since the photo of “{region}”. Send a new photo, with a caption if you wish, so I can compare. Without a new photo, I cannot compare changes."
+jobs.visual.restart: "Start over"
+jobs.visual.unfinished: "The review of the photo from {date} was left unfinished: I asked a follow-up question and got no answer. Start over or close it? You can leave this unanswered — I will then close it in {days}."
+jobs.visual.closed_unfinished: "The unfinished review of “{region}” is closed. If the symptom still bothers you, send a photo and we will start from the beginning."
 jobs.visual.region_fallback: "problem area"
 jobs.weekly.failed: "I couldn't prepare your weekly review today. I've reported the problem. You don't need to do anything."
 jobs.weekly.heading: "*📊 Weekly review*\n\n"
@@ -1047,3 +1051,16 @@ person.lab.sheet.start_failed: "Could not start adding lab results. Details are 
 person.lab.sheet.adding: "Adding lab results: result"
 person.lab.sheet.checking: "Checking lab results: result"
 person.lab.sheet.back: "Back to report"
+
+# Pair for every line promising "I've reported it" — see notify.honest_key (incident 2026-10-03).
+tasks.error.answer_not_saved.unrepaired: "I couldn't save your answer. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself. Please try again later; the question stays open until you reply again."
+jobs.monthly.failed.unrepaired: "I couldn’t prepare your monthly report. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself."
+jobs.weekly.failed.unrepaired: "I couldn't prepare your weekly review today. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself."
+reports.error.not_ready.unrepaired: "I couldn't prepare your report just now. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself. You can try again later."
+protocols.error.plan_failed.unrepaired: "The hypothesis is confirmed. I couldn’t prepare an action plan for it yet. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself."
+cards.assessment.answers_not_saved.unrepaired: "I received your answers but couldn't save them. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself. You don't need to fill it out again for now."
+jobs.morning.failed.unrepaired: "I couldn’t prepare your morning report today. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself."
+documents.reply.intake_paused.unrepaired: "I've received your file. Processing is paused, and automatic repair isn't working either, so the pause won't lift by itself. Your file is saved."
+intake.link.retry_later.unrepaired: "I couldn't download the file from your link. I've logged the fault, but automatic repair isn't working right now, so it won't pick this up by itself. You can send the link again later."
+intake.link.paused.unrepaired: "I've received your request. Downloading and processing are paused, and automatic repair isn't working either, so the pause won't lift by itself. Your request is saved."
+jobs.brief.data_doubt_header.unrepaired: "🛑 Some of today's data may be inaccurate: I found a fault on my side, but automatic repair isn't working right now, so it won't pick this up by itself. Read the numbers in the report below with caution."

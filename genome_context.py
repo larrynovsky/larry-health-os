@@ -318,13 +318,13 @@ rsIDs проверены: {', '.join(rsids) if rsids else 'не найдено'}
 Ответь на вопрос на основе этих данных."""
 
     client = llm_client.guarded_client()
-    msg = client.messages.create(
+    msg = client.messages.create(task="genome_context.answer_trait_question",
         model=hai_core.get_model("sonnet"),
         max_tokens=600,
         system=GENOME_QA_SYSTEM + hai_core.answer_language(),
         messages=[{"role": "user", "content": user_prompt}]
     )
-    return msg.content[0].text.strip()
+    return llm_client.answer_text(msg).strip()
 
 
 

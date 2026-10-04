@@ -88,7 +88,7 @@ def test_pipeline_selects_its_checkout_before_starting_jobs(tmp_path):
     source = (ROOT / "scripts/run_survivorship_pipeline.sh").read_text()
     # Execute only the actual prologue, stopping before the first Python job.
     # Neither proposal expiry nor analysis/curation can run in this check.
-    prologue = source.split("/opt/homebrew/bin/python3.11", 1)[0]
+    prologue = source.split('"$PY" ', 1)[0]
     script = scripts / "run_survivorship_pipeline.sh"
     script.write_text(prologue + '\nprintf "%s\\n" "$PWD" "$HEALTH_DATA_DIR"\n')
     result = subprocess.run(

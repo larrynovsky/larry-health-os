@@ -334,12 +334,12 @@ def _diagnose_failure(failure: FailureEntry, reports_dir: Path) -> Optional[Path
         import anthropic
         client = llm_client.guarded_client()
         prompt = _build_diagnosis_prompt(failure)
-        resp = client.messages.create(
+        resp = client.messages.create(task="test_failure_handler._diagnose_failure",
             model=hai_core.get_model("haiku_pinned"),
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
-        text = resp.content[0].text
+        text = llm_client.answer_text(resp)
         usage = resp.usage
         # Лог spend (T-0.17)
         _log_api_spend(failure.test_id, "claude-haiku-4-5", usage, cache_hit=False)

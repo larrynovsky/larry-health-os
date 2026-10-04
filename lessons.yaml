@@ -3131,3 +3131,107 @@ lessons:
   status: observation
   evidence: ['git:6931795']
   owner: владелец
+- id: C-144
+  date: '2026-10-03'
+  thread: release-v020
+  modules: [task_agent.py, docs/explanation/patient_answer_channel.md, docs/explanation/patient_answer_channel.en.md]
+  event: 'Чтение публичного диффа перед v0.2.0 нашло в комментарии task_agent и в объяснении канала пациента медицинские подробности сверх диагноза, взятые из замера. Перепись по словарю их не видела; нашло только чтение строк.'
+  cost: 'отдельная нить pub-scrub-v020 и два лишних полных прогона (~30 мин) в утро выпуска; в открытый репозиторий не ушли'
+  cause: 'замер на живом корпусе естественно цитируется как пример; правило C-140 записано наблюдением и не внедрено в ритуал старта, поэтому соседняя нить повторила тот же класс через сутки'
+  address: {kind: ritual, ref: letitbe}
+  subject: [pii]
+  outcome: {kind: rule, text: 'повтор группы ritual:letitbe·pii после C-140: в шаге «Новые тексты» letitbe — пример из живого корпуса только выдуманным и с пометкой; внедрение правила в ритуал — решение владельца'}
+  status: observation
+  evidence: ['git:b8d3440']
+  owner: владелец
+- id: C-145
+  date: '2026-10-03'
+  thread: release-v020
+  modules: [oura_oauth.py, docs/how-to/connect_oura.md]
+  event: 'Живая проверка Oura OAuth владельцем нашла три дефекта, которых не видели 7061 зелёный тест: обмен на moi.ouraring.com даёт HTTP 400; переключатели согласия выключены по умолчанию (Allow с выключенными = access_denied); запрошенные scopes без stress — daily_resilience 401. Инструкция до проверки честно писала «не проверено», но уже стояла в main.'
+  cost: 'у владельца ~8 часов без resilience (переход PAT→OAuth), две пере-авторизации, отдельная нить oura-live-fix'
+  cause: 'тесты подделывают ответ Oura, поэтому проверяют только наш код против наших же допущений о сервисе; форма портала, экран согласия и связь endpoint↔scope живут у поставщика'
+  address: {kind: ritual, ref: the-end}
+  subject: [vendor_data]
+  outcome: {kind: rule, text: 'нить, подключающая внешний сервис, закрывается «принято условно» до одного живого прохода с учёткой владельца; переключение владельца на новый путь — только после живого импорта без ошибок'}
+  status: observation
+  evidence: ['git:8759711']
+  owner: владелец
+- id: C-146
+  date: '2026-10-03'
+  thread: release-v020
+  modules: [scripts/test_on_studio.sh]
+  event: 'Ночью на MacBook разлогинился Tailscale; закрытие labs-self упало с «не удалось создать каталог стенда на Studio (получено: '''')». Очередь простояла ~6 часов до утреннего входа владельца; причину нашёл только ручной tailscale status.'
+  cost: 'очередь слияния остановлена ~6 ч (23:15–05:19), выпуск сдвинулся на утро'
+  cause: 'шаг sanity полного прогона сообщает следствие (пустой ответ ssh), а не причину; состояние локального Tailscale никто не проверяет'
+  address: {kind: runtime, ref: scripts/test_on_studio.sh}
+  subject: [sensor_perimeter, message_delivery]
+  outcome: {kind: check, text: 'при пустом ответе Studio sanity печатает tailscale status MacBook и называет «Tailscale: Logged out — войдите» как причину'}
+  status: observation
+  evidence: ['docs/handoff/release-v020/LATEST.md']
+  owner: владелец
+- id: C-147
+  date: '2026-10-03'
+  thread: release-v020
+  modules: [scripts/public_mirror.py, docs/how-to/release.md]
+  event: 'Скрипт выпуска дважды остановился до выгрузки: --mark-read записывает отметку в файл, но выгрузка судит закоммиченную; и признак «нить слита» брался из последней строки журнала ожидания, где ещё стояло «start».'
+  cost: 'два перезапуска выпуска (~20 мин); наружу ничего не ушло'
+  cause: 'в release.md нет шага «закоммить отметку прочитанного», а --mark-read лишь печатает просьбу; признак завершения читался из журнала, а не из исхода закрытия'
+  address: {kind: methodology_page, ref: docs/how-to/release.md}
+  subject: [run_version]
+  outcome: {kind: rule, text: 'release.md: шаг 0 — --unread, чтение, --mark-read и коммит отметки; признак слияния нити — merge-коммит в main, не строка журнала'}
+  status: observation
+  evidence: ['git:55f2c39']
+  owner: владелец
+- id: C-148
+  date: '2026-10-03'
+  thread: thinking-block
+  modules: [llm_client.py, llm_admission.py, gp_agent.py, night_investigator.py, memory_consolidation.py]
+  event: 'Допуск 02.10 пропустил claude-sonnet-5-5 и claude-opus-5; в первое же утро утренний отчёт, ночной разбор и консолидация памяти упали с «ThinkingBlock has no attribute text»: модель кладёт первым блок рассуждения, а 55 мест рабочего кода читали content[0].text. Допуск читал ответ иначе — склеивал текстовые блоки — и судил не то, что потом читает работа.'
+  cost: 'пропущенный утренний отчёт владельца, упавший ночной разбор (до ремонта не доехал ни один сбой дня), откат цепочек моделей у владельца до 4-й серии'
+  cause: 'у вопроса «где текст ответа модели» было два ключа: инлайн content[0].text в рабочем коде и фильтр по type в допуске; второй ключ делает допуск слепым к форме ответа'
+  address: {kind: runtime, ref: llm_client.answer_text}
+  subject: [contract_change, llm_output]
+  outcome: {kind: check, text: 'один читатель llm_client.answer_text у работы и допуска; храповик test_no_content0_text_readers_in_working_code краснеет на новом content[0].text'}
+  status: observation
+  evidence: [tests/unit/test_llm_answer_text.py]
+  owner: владелец
+- id: C-149
+  date: '2026-10-03'
+  thread: thinking-block
+  modules: [notify.py, scripts/install.py, methodology/i18n/ru.yaml]
+  event: 'Бот написал «Утренний отчёт не получился. Я уже передал это на починку», когда ночной разбор (единственная дорога сбоя к ремонту) упал на том же сбое. Проверка обещания жила только у common.error.our_side и смотрела на отметку ремонта, а 11 других строк обещали без проверки. Судить ритм разбора бот не мог: .env всех служб указывал на каталог плистов, который рендерил только cron-контейнер.'
+  cost: 'ложное «тебе ничего делать не нужно» владельцу; без вопроса владельца сбой не дошёл бы до починки'
+  cause: 'обещание — утверждение о чужом носителе (§18), а проверялся не носитель (разбор), а соседний (ремонт); сигнал «не судимо» в контейнере бота был постоянным и незаметным'
+  address: {kind: runtime, ref: notify.honest_key}
+  subject: [llm_output]
+  outcome: {kind: check, text: 'обещание — только если ночной разбор покрыл свой плановый запуск по живому плисту; пара .unrepaired у каждой строки-обещания; каждая служба рендерит плисты (test_repair_promise, test_docker_render)'}
+  status: observation
+  evidence: [tests/unit/test_repair_promise.py]
+  owner: владелец
+- id: C-150
+  date: '2026-10-03'
+  thread: machine-judge
+  modules: [integrity_tests.py, scripts/machine_check.sh]
+  event: 'Разбор находок 03.10: проверки самой Studio (снимки MacBook, launchd, счётчик тенантов, экспозиция) после переезда владельца в контейнер 30.09 судил только ночной прогон партнёра на хосте. Контейнер владельца их не видит («не судимо» либо «снимок не читается» каждое утро). Партнёр уйди или переедь — проверки ослепли бы, и ни один датчик этого не заметил бы.'
+  cost: 'четыре дня проверки машины держались на случайном судье; ежедневный шум «не читается» у владельца'
+  cause: 'судья проверки определялся тем, какой прогон оказался на нужной машине, а не объявлением; у проверки не было признака «предмет — машина», и переезд рантайма не мог его пересчитать'
+  address: {kind: runtime, ref: integrity_tests.check(host_only)}
+  subject: [sensor_perimeter, tenant]
+  outcome: {kind: rule, text: 'предмет «машина» объявляется у регистрации (host_only/machine); судит его один машинный прогон (--scope machine), остальные — проверяют свежесть его результата и переносят находки (check_machine_judge_alive)'}
+  status: observation
+  evidence: ['tests/unit/test_machine_judge.py']
+  owner: владелец
+- id: C-151
+  date: '2026-10-03'
+  thread: symptom-ttl
+  modules: [visual_db.py, jobs/scheduled.py, integrity_tests.py]
+  event: 'Два кейса разбора симптома тенанта висели open больше двух месяцев: человек прислал фото и не ответил на уточнение. Разговор бот держит в памяти и теряет на перезапуске, база помнила кейс открытым; датчик «open >72ч» звенел каждую ночь, но исхода у кейса не было — звон чинить было нечем.'
+  cost: 'два месяца ежедневного предупреждения без действия; приучение пролистывать датчик'
+  cause: 'у состояния «система ждёт человека» не было срока жизни и исхода; датчик судил молчание человека вместо работы механизма'
+  address: {kind: runtime, ref: jobs/scheduled.check_visual_followups}
+  subject: [state_lifetime, sensor_perimeter]
+  outcome: {kind: rule, text: 'у каждого состояния «жду человека» — срок и исход по умолчанию (вопрос → автозакрытие, решение владельца 03.10: спрашивать); датчик судит механизм (get_cases_stuck), а не молчание человека'}
+  status: observation
+  evidence: ['tests/unit/test_symptom_case_ttl.py']
+  owner: владелец

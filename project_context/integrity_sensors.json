@@ -741,6 +741,27 @@
           "verdict": "ПОКРАСНЕЛ"
         }
       ]
+    },
+    "check_machine_judge_alive": {
+      "harness": "plans/mutate_machine_judge_2026-10-03.sh",
+      "ran_at": "2026-10-03",
+      "mutations": [
+        {
+          "tag": "host-skip-lost",
+          "statement": "контейнер судит машинные проверки сам вместо пропуска",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "findings-not-carried",
+          "statement": "находки машинного прогона не переносятся владельцу",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "missed-run-silent",
+          "statement": "пропущенный запуск машинного судьи не звенит",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
     }
   },
   "_harm": "Кого задевает поломка, которую ловит датчик (нить repair-order, решение владельца 02.10): person — человек получает неверное или не получает нужное (совет, отчёт, бриф, ответ бота); data — портятся или устаревают данные, на которых всё строится; system — только внутренняя кухня (гейты, документы, журналы, тесты). Читатель — night_repair.pick_cards: первое место ночи самой вредной карточке, второе — старейшей. Новый датчик приходит с пометкой: tests/consistency/test_sensor_harm_declared.py краснеет на датчике без неё. Разметка 02.10 — суждение по имени и метке датчика; спорные отнесены к system и перечислены в записке нити.",
@@ -933,7 +954,8 @@
       "check_translations_fresh",
       "check_ungrounded_corr_ratchet",
       "check_validation_gate_methodology_present",
-      "check_watchdog_liveness"
+      "check_watchdog_liveness",
+      "check_machine_judge_alive"
     ]
   }
 }

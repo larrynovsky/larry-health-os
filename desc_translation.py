@@ -100,7 +100,7 @@ def _translate_batch(lines: list[str]) -> list[str]:
     import llm_client
     import hai_core
     body = _PROMPT + "\n".join(json.dumps(x, ensure_ascii=False) for x in lines)
-    resp = llm_client.guarded_client().messages.create(
+    resp = llm_client.guarded_client().messages.create(task="desc_translation._translate_batch",
         model=hai_core.get_model("sonnet"), max_tokens=8000,
         messages=[{"role": "user", "content": body}])
     text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()

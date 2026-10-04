@@ -432,7 +432,7 @@ async def _call_medical_specialist_async(
 
         try:
             response = await asyncio.wait_for(
-                client.messages.create(
+                client.messages.create(task="wellally_consult._call_medical_specialist_async",
                     model=hai_core.model_for("consult_specialist"),
                     max_tokens=400,
                     system=system,
@@ -441,7 +441,7 @@ async def _call_medical_specialist_async(
                 timeout=300.0,   # Opus медленнее; live-consult не чувствителен к задержке
             )
             log.info(f"  {name} (Раунд {round_label}): OK")
-            return {"name": name, "opinion": response.content[0].text, "ok": True}
+            return {"name": name, "opinion": llm_client.answer_text(response), "ok": True}
         except asyncio.TimeoutError:
             log.error(f"  {name} (Раунд {round_label}): TIMEOUT")
             return {"name": name, "opinion": "Таймаут ответа.", "ok": False}
@@ -604,7 +604,7 @@ async def _call_coordinator_async(
 
     try:
         response = await asyncio.wait_for(
-            client.messages.create(
+            client.messages.create(task="wellally_consult._call_coordinator_async",
                 model=hai_core.model_for("consult_coordinator"),
                 max_tokens=2048,
                 system=system,
@@ -612,7 +612,7 @@ async def _call_coordinator_async(
             ),
             timeout=600.0,   # Opus-синтез 16k, задержка неважна
         )
-        return response.content[0].text
+        return llm_client.answer_text(response)
     except asyncio.TimeoutError:
         log.error("Координатор: TIMEOUT (90s)")
         raise RuntimeError("Координатор не ответил за 90 секунд")

@@ -34,7 +34,9 @@ ulimit -n 4096
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PY="/opt/homebrew/bin/python3.11"
+# Интерпретатор — тот же шов, что в run_checks.sh: в контейнере HEALTH_PY=python3, пути Homebrew
+# там нет (до 03.10 эта задача в контейнере не запускалась с 30.09, нить host-container-split).
+PY="${HEALTH_PY:-/opt/homebrew/bin/python3.11}"
 TODAY="$(date +%Y-%m-%d)"
 REPORTS_DIR="$SCRIPT_DIR/tests/reports/$TODAY"
 LOG="$SCRIPT_DIR/logs/test_suite.log"

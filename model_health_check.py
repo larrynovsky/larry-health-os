@@ -49,7 +49,7 @@ def _listed_ids(client) -> set[str]:
 
 def _ping(client, mid: str) -> tuple[bool, str | None]:
     try:
-        client.messages.create(model=mid, max_tokens=4,
+        client.messages.create(task="model_health_check._ping", model=mid, max_tokens=4,
                                messages=[{"role": "user", "content": "ping"}])
         return True, None
     except Exception as e:  # silent-ok: surfaced via run_check

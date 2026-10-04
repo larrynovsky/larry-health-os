@@ -265,7 +265,7 @@ def _vision_call(image: bytes, prompt: str, model: str) -> list[dict]:
                     "data": base64.standard_b64encode(image).decode("utf-8")}},
         {"type": "text", "text": prompt},
     ]
-    resp = client.messages.create(
+    resp = client.messages.create(task="lab_recognizer._vision_call",
         model=hai_core.get_model(model),
         max_tokens=8000,
         messages=[{"role": "user", "content": content}],

@@ -132,6 +132,14 @@ def test_covered_is_skipped_partial_and_new_are_created(harness):
     assert {r["status"] for r in h.db.fetchall(
         "SELECT status FROM tasks WHERE id IN (?, ?)", (a, b))} == {"open"}
     assert h.closed == []
+    # След пропуска — в базе (04.10: у владельца пропуск не оставил следа, приёмка не смогла
+    # проверить судью). Строка невидима человеку и не входит в «уже известно».
+    trace = h.db.fetchall("SELECT content, resolved_text, judge_verdict FROM tasks "
+                          "WHERE status='duplicate'")
+    assert len(trace) == 1 and "показатель А" in trace[0]["content"]
+    assert f"#{a}" in trace[0]["resolved_text"] and trace[0]["judge_verdict"] == "covered"
+    import tasks_db
+    assert all(r["status"] != "duplicate" for r in tasks_db.get_tasks_known_to_person(90))
 
 
 def test_dismissed_by_person_is_not_reborn(harness):

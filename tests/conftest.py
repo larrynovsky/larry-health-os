@@ -233,6 +233,11 @@ def fault_journal(tmp_path_factory, monkeypatch):
     path = home / "faults.jsonl"
     monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(path))
     (home / notify.REPAIR_SEEN).write_text(str(int(time.time())))
+    # И дорога до ремонта: ночной разбор отработал «только что» (квитанция покрывает любой
+    # последний плановый запуск). Без неё обещания нет (инцидент 03.10, test_repair_promise).
+    import json as _json
+    from datetime import datetime as _dt
+    (home / notify.NIGHT_CYCLE_RECEIPT).write_text(_json.dumps({"ran_at": _dt.now().isoformat()}))
     return path
 
 

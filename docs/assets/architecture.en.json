@@ -405,7 +405,7 @@
       "id": "tasks",
       "type": "frontend",
       "label": "Tasks",
-      "sublabel": "bot + macOS Reminders",
+      "sublabel": "bot + phone Reminders",
       "pos": [
         1020,
         326
@@ -474,7 +474,7 @@
     {
       "id": "monitor",
       "type": "security",
-      "label": "Night monitor",
+      "label": "Self-check",
       "sublabel": "freshness · integrity · harm",
       "pos": [
         794,
@@ -503,7 +503,7 @@
   "boundaries": [
     {
       "kind": "region",
-      "label": "Your Mac — the primary machine",
+      "label": "Your machine, in Docker — the primary one",
       "wraps": [
         "recog",
         "staging",
@@ -753,7 +753,7 @@
       "dot": "amber",
       "title": "What leaves your machine",
       "items": [
-        "Medical context, scans → Anthropic API",
+        "Medical context, scans → your AI provider",
         "Messages — via Telegram",
         "Variant positions → annotation APIs"
       ]
@@ -771,7 +771,7 @@
       "dot": "emerald",
       "title": "Around it",
       "items": [
-        "31 macOS background services",
+        "Docker: 4 services, ~25 scheduled jobs",
         "Nightly backup; snapshot before risky ops",
         "Several people, one database each"
       ]

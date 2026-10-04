@@ -37,7 +37,8 @@ def _load(file, names, **env):
 
 
 # fault и то, на чём он стоит (нить first-contact, 02.10: выбор текста по живости ремонта).
-_FAULT_NAMES = {"fault", "_faults_journal", "repairer_alive", "REPAIR_SEEN", "REPAIR_FRESH_S"}
+_FAULT_NAMES = {"fault", "_faults_journal", "repairer_alive", "REPAIR_SEEN", "REPAIR_FRESH_S",
+                "_night_cycle_covered", "honest_key", "NIGHT_CYCLE_RECEIPT"}
 
 
 def _notify(operator):
@@ -54,6 +55,8 @@ class FaultRoutingTests(unittest.TestCase):
         # другой текст, его судит tests/unit/test_first_contact.py.
         self.journal.parent.mkdir(parents=True, exist_ok=True)
         (self.journal.parent / "night_repair_seen").write_text(str(int(datetime.now().timestamp())))
+        (self.journal.parent / "night_cycle_last_run.json").write_text(
+            '{"ran_at": "%s"}' % datetime.now().isoformat())   # дорога до ремонта жива (03.10)
         env = patch.dict(os.environ, HEALTH_FAULTS_JOURNAL=str(self.journal))
         env.start()
         self.addCleanup(env.stop)
@@ -358,7 +361,8 @@ class FaultRoutingTests(unittest.TestCase):
             _get_client=lambda: SimpleNamespace(messages=SimpleNamespace(create=create)),
             hai_core=SimpleNamespace(get_model=lambda _: "invented-model", answer_language=lambda *a: ""), REPORTS_DIR=MagicMock(),
             # K8 (29.09): заголовок отчёта — из словаря; словарь тут не предмет суда
-            i18n=SimpleNamespace(t=lambda key, *a, **kw: key))
+            i18n=SimpleNamespace(t=lambda key, *a, **kw: key),
+            llm_client=__import__("llm_client"))   # читатель ответа модели (03.10)
         with patch.dict(sys.modules, {
             "notify": _notify(operator),
             "treatment_summary": SimpleNamespace(treatment_text=lambda **kw: ""),

@@ -2,6 +2,7 @@
 # INTENT: problem_list_proposals — правка медкарты как единица решения владельца.
 #          Замысел и инварианты — subsystem_intent.yaml, раздел problem_list_proposals.
 from __future__ import annotations
+import llm_client
 
 import json
 import os
@@ -164,9 +165,8 @@ _PLAIN_SYSTEM = (
 def _plain_llm(text: str) -> str:
     """Один короткий вызов модели через единственный выход во внешний LLM (llm_client)."""
     import hai_core
-    import llm_client
     model = hai_core.get_model("haiku")
-    resp = llm_client.guarded_client().messages.create(
+    resp = llm_client.guarded_client().messages.create(task="problems_db._plain_llm",
         model=model, max_tokens=200, system=_PLAIN_SYSTEM + __import__("hai_core").answer_language(),
         messages=[{"role": "user", "content": text[:1500]}])
     try:
@@ -175,7 +175,7 @@ def _plain_llm(text: str) -> str:
                                tokens_in=resp.usage.input_tokens, tokens_out=resp.usage.output_tokens)
     except Exception as e:  # noqa: BLE001 — журнал трат не должен ронять предложение
         log.warning("problem_plain: журнал трат не записан: %s", e)
-    return resp.content[0].text.strip()
+    return llm_client.answer_text(resp).strip()
 
 
 def _plain_for_add(ch: dict, source: str, prev_payload: str | None = None) -> str | None:

@@ -319,13 +319,13 @@ GP ОТЧЁТ:
 
     try:
         client = _get_client()
-        response = client.messages.create(
+        response = client.messages.create(task="gp_agent._review_problem_list",
             model=hai_core.get_model("sonnet"),
             max_tokens=2500,
             system=_build_problem_list_reviewer_prompt(),
             messages=[{"role": "user", "content": user_content}]
         )
-        raw = response.content[0].text.strip()
+        raw = llm_client.answer_text(response).strip()
         # Убираем markdown если модель всё же добавила
         if raw.startswith("```"):
             raw = raw.split("```")[1]
@@ -518,9 +518,9 @@ def _guard_absent_claims(report: str, context: str, system_prompt: str, client, 
                "ссылайся на дату последней строки («нет данных с 2023») либо не упоминай вовсе. "
                f"Если дата новее чем {win} дн. назад, строка показана в лаб-блоке выше: про "
                "такой аналит нельзя писать и «нет данных» — бери значение из блока.")
-        resp = client.messages.create(model=model, max_tokens=max_tokens, system=system_prompt,
+        resp = client.messages.create(task="gp_agent._guard_absent_claims", model=model, max_tokens=max_tokens, system=system_prompt,
                                       messages=[{"role": "user", "content": context + fix}])
-        report = resp.content[0].text
+        report = llm_client.answer_text(resp)
     log.error(f"gp {kind}: отчёт ОТКЛОНЁН после {retries} поправок — «не сдавался» против "
               f"канона: {'; '.join(f'{t} ({d})' for t, d in sorted(known.items()))} "
               f"| клаузы: {clauses}")
@@ -587,13 +587,13 @@ def generate_weekly_report(end_date: date = None, run_mdt: bool = True) -> str:
 
     # 4. GP синтез через Sonnet
     client = _get_client()
-    response = client.messages.create(
+    response = client.messages.create(task="gp_agent.generate_weekly_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=4096,
         system=_build_gp_system_prompt(),
         messages=[{"role": "user", "content": context}],
     )
-    report = response.content[0].text
+    report = llm_client.answer_text(response)
     try:
         report = _guard_absent_claims(report, context, _build_gp_system_prompt(), client,
                                       hai_core.get_model("sonnet"), 4096, "weekly")
@@ -648,13 +648,13 @@ def generate_monthly_report(end_date: date = None) -> str:
         pass
 
     client = _get_client()
-    response = client.messages.create(
+    response = client.messages.create(task="gp_agent.generate_monthly_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=6000,
         system=_build_gp_monthly_prompt(),
         messages=[{"role": "user", "content": context}],
     )
-    report = response.content[0].text
+    report = llm_client.answer_text(response)
     try:
         report = _guard_absent_claims(report, context, _build_gp_monthly_prompt(), client,
                                       hai_core.get_model("sonnet"), 6000, "monthly")
@@ -1537,13 +1537,13 @@ def generate_daily_report(target: date = None, gate_sink: dict = None) -> str:
         k.startswith("genome:") for k in _shown)
 
     client = _get_client()
-    response = client.messages.create(
+    response = client.messages.create(task="gp_agent.generate_daily_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=1500,   # было 700 — обрезало при насыщенном контексте
         system=_build_gp_daily_prompt(genome_in_scope=_genome_in_scope),
         messages=[{"role": "user", "content": user_content}]
     )
-    report = response.content[0].text.strip()
+    report = llm_client.answer_text(response).strip()
     log.info(f"GP daily отчёт сгенерирован за {target} ({len(briefs)} агентов)")
 
     # ── Хирургический скраб генов (детерминированная гарантия) ──────────────
@@ -1735,13 +1735,13 @@ def run_experiment_checks(target: date = None) -> list[str]:
                         "Без markdown, без emoji, обычный текст."
                     )
                     client = _get_client()
-                    resp = client.messages.create(
+                    resp = client.messages.create(task="gp_agent.run_experiment_checks",
                         model=hai_core.get_model("haiku_pinned"),
                         max_tokens=200,
                         messages=[{"role": "user", "content": summary_prompt}]
                     )
                     lines.append("")
-                    lines.append(resp.content[0].text.strip())
+                    lines.append(llm_client.answer_text(resp).strip())
                 except Exception as e:
                     log.warning(f"GP summary для experiment check: {e}")
 
@@ -1851,12 +1851,12 @@ def generate_attribution_report(experiment_id: int) -> str:
     )
 
     client = _get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="gp_agent.generate_attribution_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=800,
         messages=[{"role": "user", "content": prompt}]
     )
-    report_text = resp.content[0].text.strip()
+    report_text = llm_client.answer_text(resp).strip()
 
     # Закрываем эксперимент в БД
     try:

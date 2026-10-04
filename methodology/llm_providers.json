@@ -5,7 +5,52 @@
   "hosts": [
    "api.anthropic.com"
   ],
-  "models_url": "https://api.anthropic.com/v1/models"
+  "models_url": "https://api.anthropic.com/v1/models",
+  "thinking": {
+   "_why": "Как каждая модель включает и выключает думание — у всех по-разному (замер 04.10, нить thinking-modes). think — параметр включения; no_think — параметр выключения или null (модель без него не думает). {reserve} подставляется запасом под думание из таблицы допуска. Модель без записи здесь не думает никогда, а запись с no_think обязательна для моделей, думающих по умолчанию: иначе рассуждение съедает лимит ответа (04.10 недельный отчёт: 4096 токенов рассуждения, 0 текста).",
+   "models": {
+    "claude-sonnet-4-6": {
+     "think": {
+      "type": "adaptive"
+     },
+     "no_think": null,
+     "measured": "2026-10-04: adaptive и enabled приняты; без параметра не думает"
+    },
+    "claude-opus-4-7": {
+     "think": {
+      "type": "adaptive"
+     },
+     "no_think": null,
+     "measured": "2026-10-04: adaptive принят, enabled — 400; без параметра не думает"
+    },
+    "claude-haiku-4-5": {
+     "think": {
+      "type": "enabled",
+      "budget_tokens": "{reserve}"
+     },
+     "no_think": null,
+     "measured": "2026-10-04: adaptive — 400, enabled+budget принят; без параметра не думает"
+    },
+    "claude-sonnet-5-5": {
+     "think": {
+      "type": "adaptive"
+     },
+     "no_think": {
+      "type": "between_tools"
+     },
+     "measured": "2026-10-04: думает по умолчанию; disabled — 400 («send between_tools»); enabled — 400; adaptive принят"
+    },
+    "claude-opus-5": {
+     "think": {
+      "type": "adaptive"
+     },
+     "no_think": {
+      "type": "disabled"
+     },
+     "measured": "2026-10-04: думает по умолчанию; disabled принят; enabled — 400; adaptive принят"
+    }
+   }
+  }
  },
  "openai": {
   "key_file": "openai_key",

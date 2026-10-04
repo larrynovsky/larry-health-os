@@ -1,0 +1,297 @@
+{
+ "_why": "Режим думания каждой задачи, вызывающей модель (нить thinking-modes, 04.10, решение владельца: «где ответ детерминированный, там думать не надо»; уточнение — думать, где между входом и ответом есть вывод). Ключ задачи стоит в вызове (task=), режим — здесь. think — думать, если модель умеет и запас под думание замерен (таблица допуска); read — не думать; disputed — как read, пока замер на эталонах не решит. Храповик tests/unit/test_llm_task_modes.py: у каждого вызова ключ, у ключа — вызов.",
+ "tasks": {
+  "cbcr_hypothesis.critique_hypothesis": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "cbcr_hypothesis.generate_hypothesis": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "checkin_agent.continue_checkin": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "checkin_agent.finalize_checkin": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "checkin_agent.generate_opening_question": {
+   "mode": "read",
+   "why": "живой диалог: скорость ответа важнее глубины (обсуждается с владельцем)"
+  },
+  "consult_prep.prepare_hypothesis_query": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "consult_prep.prepare_visit_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "desc_translation._translate_batch": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "doc_agent._regen_change_section": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "doc_agent.analyze_diff": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "doc_agent.regenerate_install_page": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "doc_agent.regenerate_intent_page": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "doc_agent.translate_page": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "doc_triage._ask": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "fill_description_ru._call_haiku": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "food_rule_generator._default_llm_call": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "generate_constitutions._call_claude": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "generate_constitutions._run_alert_review": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "genome_context.answer_trait_question": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "genome_update_agent.generate_genome_narrative": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "gp_agent._guard_absent_claims": {
+   "mode": "disputed",
+   "why": "сверка текста отчёта с базой анализов — на грани вывода, эталона нет"
+  },
+  "gp_agent._review_problem_list": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "gp_agent.generate_attribution_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "gp_agent.generate_daily_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "gp_agent.generate_monthly_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "gp_agent.generate_weekly_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "gp_agent.run_experiment_checks": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "hai_chat.chat": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_chat.chat.2": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_chat.chat_with_image": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_chat.judge_service_trouble": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_chat.run_arbiter": {
+   "mode": "disputed",
+   "why": "вынимает факты о человеке из разговора; ошибка пишет ложь в профиль — кандидат в думание, эталона нет"
+  },
+  "hai_hypotheses.generate_protocol_from_hypothesis": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_reports.generate_monthly_check": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_reports.generate_morning_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hai_reports.generate_weekly_report": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "handlers/symptom._classify_symptom": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "hypothesis_consilium_eval._arbiter_extract_verdict": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "hypothesis_consilium_eval._call_eval_coordinator_async": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hypothesis_consilium_eval._call_eval_specialist_async": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "hypothesis_semantic_check._haiku_compare": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "import_medical_events.llm_extract": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "import_medical_events.llm_extract_image": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "lab_drytest.run": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "lab_extractor.extract_labs": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "lab_recognizer._vision_call": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "lab_schedule_extractor.extract_monitoring_rules": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "lifestyle_agents.generate_mdt_opinion": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "literature_curator._haiku_decide": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "llm_admission._call": {
+   "mode": "read",
+   "why": "режим берётся из проверяемой роли — этап 4 нити thinking-modes"
+  },
+  "memory_consolidation.propose": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "memory_consolidation.propose_merges": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "model_health_check._ping": {
+   "mode": "read",
+   "why": "лимит 4 токена: при думании ответа не будет никогда"
+  },
+  "monthly_consilium._call_round_a": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "monthly_consilium._call_round_b": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "monthly_consilium._run_coordinator": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "night_investigator._ask": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "problems_db._plain_llm": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "publication_reader._haiku_call": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "survivorship_curator._haiku_decide": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "symptom_intake._call_model": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "symptom_intake._call_vision": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "task_agent._dedup_once": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "task_agent._judge_once": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "task_agent.extract_tasks_from_report": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "test_failure_handler._diagnose_failure": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "treatment_extractor.extract_regimens": {
+   "mode": "disputed",
+   "why": "спорно: решает замер на эталонах (пока как чтение)"
+  },
+  "weekly_digest._judge_fidelity": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "weekly_digest._judge_leaks": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "weekly_digest._render_digest": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "weekly_digest._translate": {
+   "mode": "read",
+   "why": "ответ получается внимательным чтением, вывода нет"
+  },
+  "wellally_consult._call_coordinator_async": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  },
+  "wellally_consult._call_medical_specialist_async": {
+   "mode": "think",
+   "why": "суждение: между входом и ответом есть вывод"
+  }
+ }
+}

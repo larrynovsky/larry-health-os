@@ -100,6 +100,30 @@ class ModelNotServed(RuntimeError):
     без этой проверки допуск записал бы вердикт чужой модели, а датчик отзыва не увидел бы ухода."""
 
 
+class NoTextInAnswer(RuntimeError):
+    """В ответе модели нет ни одного текстового блока (например, рассуждение съело лимит)."""
+
+
+def answer_text(resp) -> str:
+    """Текст ответа модели — ЕДИНСТВЕННЫЙ читатель для рабочего кода и допуска моделей.
+
+    До 03.10 рабочий код брал `content[0].text`, а допуск склеивал текстовые блоки: допуск
+    пропустил claude-sonnet-5-5, у которой первым идёт блок рассуждения, и утренний отчёт,
+    ночной разбор и консолидация памяти упали в первое же утро. Один способ чтения на всех —
+    чтобы допуск судил то, что потом читает работа (урок C-139, тот же класс).
+    Текста нет — громко, с причиной остановки: тихая пустая строка ушла бы человеку."""
+    def _is_text(b) -> bool:
+        kind = getattr(b, "type", None)
+        if isinstance(kind, str):           # блок SDK: thinking/tool_use/text — решает тип
+            return kind == "text"
+        return isinstance(getattr(b, "text", None), str)   # подставной блок без типа (тесты)
+    parts = [b.text for b in (getattr(resp, "content", None) or []) if _is_text(b)]
+    if not parts:
+        raise NoTextInAnswer(f"в ответе нет текста: stop_reason={getattr(resp, 'stop_reason', None)!r}, "
+                             f"блоки={[getattr(b, 'type', '?') for b in getattr(resp, 'content', None) or []]}")
+    return "".join(parts)
+
+
 def is_model_not_found(exc: BaseException) -> bool:
     """«Модели нет у провайдера» у любого из SDK — для датчика отзыва моделей."""
     if isinstance(exc, ModelNotServed):
@@ -213,21 +237,171 @@ def _guard_kwargs(kw) -> None:
     guard_outgoing({k: v for k, v in kw.items() if k not in ("model", "max_tokens")})
 
 
+# ── Думание по задачам (нить thinking-modes, 04.10) ─────────────────────────────
+# Лимит max_tokens в вызове значит ДЛИНУ ОТВЕТА. Думает ли задача — данные
+# (methodology/llm_task_modes.json), как модель включает/выключает думание — данные
+# (llm_providers.json, anthropic.thinking), запас под думание — замер допуска
+# (llm_admission_table.json, reasoning_reserve_tokens). Без замеренного запаса задача
+# не думает: 03–04.10 рассуждение съедало весь лимит ответа (бриф, недельный отчёт).
+# Поля и состояние моделей — docs/reference/llm_thinking.md.
+_TASK_MODES_FILE = Path(__file__).parent / "methodology" / "llm_task_modes.json"
+
+
+def task_mode(task: "str | None") -> str:
+    """think | read | disputed для ключа задачи; неизвестный ключ — read (как до 04.10)."""
+    import json
+    tasks = json.loads(_TASK_MODES_FILE.read_text(encoding="utf-8")).get("tasks", {})
+    return (tasks.get(task) or {}).get("mode", "read")
+
+
+def thinking_profile(model: "str | None") -> dict:
+    """Запись модели из anthropic.thinking.models: точное имя или самый длинный префикс
+    (датированный снимок claude-haiku-4-5-20251001 — та же модель). Нет записи — {}."""
+    models = ((profiles().get("anthropic") or {}).get("thinking") or {}).get("models") or {}
+    m = str(model or "")
+    best = max((k for k in models if m == k or m.startswith(k + "-")), key=len, default=None)
+    return models.get(best, {}) if best else {}
+
+
+def reasoning_reserve(model: "str | None") -> int:
+    """Запас под думание, замеренный допуском (любая роль, где у модели есть запись). 0 — не замерен."""
+    import hai_core   # поздний импорт: hai_core импортирует этот модуль
+    vals = [int(v.get("reasoning_reserve_tokens") or 0)
+            for role in (hai_core._admission_table().get("anthropic") or {}).values()
+            for m, v in role.items() if m == model]
+    return max(vals, default=0)
+
+
+def _fill(param, reserve: int):
+    if isinstance(param, dict):
+        return {k: _fill(v, reserve) for k, v in param.items()}
+    return reserve if param == "{reserve}" else param
+
+
+def _thinking_plan(kw: dict, task) -> "tuple[dict, dict | None]":
+    """→ (kwargs первого вызова, kwargs повтора при голодном ответе или None)."""
+    if "thinking" in kw:          # вызывающий решил сам — не трогаем
+        return kw, None
+    prof = thinking_profile(kw.get("model"))
+    reserve = reasoning_reserve(kw.get("model"))
+    if task_mode(task) == "think" and prof.get("think") and reserve > 0:
+        def think(r):
+            # С думанием API не принимает temperature ≠ 1: убираем, а не падаем.
+            base = {k: v for k, v in kw.items() if k != "temperature"}
+            return {**base, "thinking": _fill(prof["think"], r),
+                    "max_tokens": int(kw["max_tokens"]) + r}
+        return think(reserve), think(2 * reserve)
+    if prof.get("no_think"):
+        return {**kw, "thinking": prof["no_think"]}, None
+    return kw, None
+
+
+def _starved(resp) -> bool:
+    """Рассуждение съело весь лимит: остановка по лимиту и ни одного текстового блока."""
+    return getattr(resp, "stop_reason", None) == "max_tokens" and not any(
+        getattr(b, "type", "") == "text" for b in (getattr(resp, "content", None) or []))
+
+
+def _is_async(create) -> bool:
+    """Асинхронен ли вызов. У SDK `AsyncMessages.create` обёрнут СИНХРОННЫМ декоратором
+    (required_args), и iscoroutinefunction на нём даёт False — смотреть надо сквозь обёртку
+    (замер 04.10: консилиум упал бы на `with` вместо `async with`)."""
+    import inspect
+    return inspect.iscoroutinefunction(inspect.unwrap(create))
+
+
+def _streamed(create):
+    """Думающий вызов идёт ПОТОКОМ (замер 04.10): с запасом под думание лимит велик, и SDK
+    отказывает обычному вызову («Streaming is required for operations that may take longer
+    than 10 minutes»). Поток возвращает то же сообщение целиком — читатели не меняются."""
+    import inspect
+    inner = getattr(create, "__self__", None)
+    if inner is None or not hasattr(inner, "stream"):
+        return create
+    if _is_async(create):
+        async def _a(**k):
+            async with inner.stream(**k) as s:
+                return await s.get_final_message()
+        return _a
+
+    def _s(**k):
+        with inner.stream(**k) as s:
+            return s.get_final_message()
+    return _s
+
+
+def _log_thinking(create, task, kw, resp, attempts):
+    """Сколько ушло на думание — в общий журнал расходов (api_spend_log), чтобы запас под
+    думание пересчитывался по рабочим вызовам, а не по разовому замеру. Сбой учёта не роняет
+    вызов; текст ответа в журнал не пишется — только числа."""
+    try:
+        import inspect
+        import api_spend_log
+        text = "".join(getattr(b, "text", "") for b in (resp.content or []) if getattr(b, "type", "") == "text")
+        inner = getattr(create, "__self__", None)
+        text_tok = 0
+        if text and inner is not None and not _is_async(create):
+            _guard_kwargs({"messages": [{"role": "user", "content": text}]})   # исходящий текст — через гард
+            text_tok = inner.count_tokens(model=kw["model"],
+                                          messages=[{"role": "user", "content": text}]).input_tokens
+        out = int(resp.usage.output_tokens)
+        api_spend_log.log_call(agent=str(task), model=getattr(resp, "model", kw["model"]),
+                               tokens_in=resp.usage.input_tokens, tokens_out=out,
+                               extra={"mode": "think", "answer_limit": int(kw["max_tokens"]),
+                                      "text_tokens": text_tok or None,
+                                      "think_tokens": (out - text_tok) if text_tok else None,
+                                      "stop": resp.stop_reason, "attempts": attempts})
+    except Exception as e:  # noqa: BLE001 — учёт не роняет вызов, но и не молчит
+        import logging
+        logging.getLogger(__name__).warning("учёт думания не записан: %r", e)
+
+
+def _create_with_mode(create, kw: dict, task):
+    first, retry = _thinking_plan(kw, task)
+    if retry is None:
+        return create(**first)
+    send = _streamed(create)
+    resp = send(**first)
+    import inspect
+    if inspect.isawaitable(resp):
+        async def _async():
+            r = await resp
+            n = 1
+            if _starved(r):
+                r, n = await send(**retry), 2
+            _log_thinking(create, task, first, r, n)
+            return r
+        return _async()
+    n = 1
+    if _starved(resp):
+        resp, n = send(**retry), 2
+    _log_thinking(create, task, first, resp, n)
+    return resp
+
+
 class _GuardedMessages:
-    def __init__(self, inner):
+    def __init__(self, inner, prov: str = "anthropic"):
         self._inner = inner
+        self._prov = prov
 
     def create(self, **kw):
+        task = kw.pop("task", None)
         _guard_kwargs(kw)
+        if self._prov == "anthropic":
+            return _create_with_mode(self._inner.create, kw, task)
         return self._inner.create(**kw)
 
     def stream(self, **kw):
         # До 01.10 stream уходил через __getattr__ без гарда; вызывающих нет,
         # но «нет вызывающих» — не защита: первый же новый вызов прошёл бы мимо.
+        task = kw.pop("task", None)
         _guard_kwargs(kw)
+        if self._prov == "anthropic":   # без повтора: поток не перезапускают
+            kw = _thinking_plan(kw, task)[0]
         return self._inner.stream(**kw)
 
     def count_tokens(self, **kw):
+        kw.pop("task", None)
         _guard_kwargs(kw)
         return self._inner.count_tokens(**kw)
 
@@ -255,9 +429,11 @@ class _GuardedModels:
 
 
 class _GuardedClient:
-    def __init__(self, inner):
+    def __init__(self, inner, prov: "str | None" = None):
         self._inner = inner
-        self.messages = _GuardedMessages(inner.messages)
+        # Чужой и совместимый клиенты знают своего поставщика; родной SDK — это Anthropic.
+        self._prov = prov or getattr(inner, "_prov", "anthropic")
+        self.messages = _GuardedMessages(inner.messages, self._prov)
 
     @property
     def models(self):
@@ -267,7 +443,7 @@ class _GuardedClient:
         # Ключи аутентификации — назначение клиента; пользовательские заголовки
         # и query — ещё один путь исходящего текста, проверяем до клонирования.
         _guard_kwargs({k: v for k, v in kw.items() if k not in ("api_key", "auth_token")})
-        return _GuardedClient(self._inner.with_options(**kw))
+        return _GuardedClient(self._inner.with_options(**kw), self._prov)
 
     def close(self):
         return self._inner.close()

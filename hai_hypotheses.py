@@ -4,6 +4,7 @@ hai_hypotheses — гипотезы, протоколы, форматирова�
 Зависимости: health_db, hai_core (get_client).
 """
 
+import llm_client
 import logging
 import hai_core
 from datetime import date
@@ -548,12 +549,12 @@ def generate_protocol_from_hypothesis(hypothesis: dict) -> dict:
         "Протокол должен быть конкретным, реалистичным, проверяемым, учитывая профиль пациента выше."
     ) + hai_core.answer_language()
 
-    resp = client.messages.create(
+    resp = client.messages.create(task="hai_hypotheses.generate_protocol_from_hypothesis",
         model=hai_core.get_model("haiku_pinned"),
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}]
     )
-    raw = resp.content[0].text.strip()
+    raw = llm_client.answer_text(resp).strip()
     _judge_protocol(raw)          # структурный выход: судим и кричим, текст не трогаем
 
     m = _re.search(r'\{', raw)

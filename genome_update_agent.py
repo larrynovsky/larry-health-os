@@ -183,12 +183,12 @@ def generate_genome_narrative(changes: list[dict], genotype_map: dict[str, str])
         genotypes=genotypes_text
     ) + hai_core.answer_language()
 
-    msg = client.messages.create(
+    msg = client.messages.create(task="genome_update_agent.generate_genome_narrative",
         model=hai_core.get_model("sonnet"),
         max_tokens=1000,
         messages=[{"role": "user", "content": prompt}]
     )
-    return msg.content[0].text.strip()
+    return llm_client.answer_text(msg).strip()
 
 
 def run_monthly_update() -> dict:

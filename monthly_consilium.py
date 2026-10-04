@@ -455,13 +455,13 @@ async def _call_round_a(client, name: str, role: str, input_pkg: str, sem) -> di
         log.info(f"  Round A → {name}")
         try:
             loop = asyncio.get_event_loop()
-            resp = await loop.run_in_executor(None, lambda: client.messages.create(
+            resp = await loop.run_in_executor(None, lambda: client.messages.create(task="monthly_consilium._call_round_a",
                 model=hai_core.model_for("consilium_specialist"),
                 max_tokens=3000,
                 system=role + "\n\n" + ROUND_A_TASK,
                 messages=[{"role": "user", "content": input_pkg}],
             ))
-            text = resp.content[0].text.strip()
+            text = llm_client.answer_text(resp).strip()
         except Exception as e:
             return {"name": name, "ok": False, "patterns": [], "raw": str(e)}
 
@@ -543,13 +543,13 @@ async def _call_round_b(client, name: str, role: str, input_pkg: str,
 
         try:
             loop = asyncio.get_event_loop()
-            resp = await loop.run_in_executor(None, lambda: client.messages.create(
+            resp = await loop.run_in_executor(None, lambda: client.messages.create(task="monthly_consilium._call_round_b",
                 model=hai_core.model_for("consilium_specialist"),
                 max_tokens=3000,
                 system=role + "\n\n" + ROUND_B_TASK,
                 messages=[{"role": "user", "content": full_input}],
             ))
-            text = resp.content[0].text.strip()
+            text = llm_client.answer_text(resp).strip()
         except Exception as e:
             return {"name": name, "ok": False, "final_patterns": [], "raw": str(e)}
 
@@ -673,13 +673,13 @@ def _run_coordinator(input_pkg: str, round_b_findings: list[dict]) -> dict:
 
     log.info("  Coordinator синтезирует...")
     try:
-        resp = client.messages.create(
+        resp = client.messages.create(task="monthly_consilium._run_coordinator",
             model=hai_core.model_for("consilium_coordinator"),
             max_tokens=16000,  # 2026-06-26: raised from 8000 — genome-enriched hypotheses exceed 8k output
             system=COORDINATOR_TASK + hai_core.answer_language(),
             messages=[{"role": "user", "content": input_pkg + findings_text}],
         )
-        text = resp.content[0].text.strip()
+        text = llm_client.answer_text(resp).strip()
     except Exception as e:
         log.error(f"Coordinator failed: {e}")
         return {"hypotheses": [], "no_hypotheses_reason": f"API error: {e}"}

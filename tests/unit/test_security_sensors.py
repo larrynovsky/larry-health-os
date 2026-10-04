@@ -256,6 +256,28 @@ def test_tailscale_unexpected_endpoint_and_garbage():
     assert any("датчик слеп" in f for f in ss._parse_tailscale("not json at all"))
 
 
+def test_tailscale_tcp_forward_is_judged():
+    """Секция TCP (serve --tcp) до 03.10 не судилась: случайный проброс без TLS не загорался."""
+    ok = json.loads(_TS_CANON)
+    ok["TCP"]["8001"] = {"TCPForward": "127.0.0.1:8001"}
+    assert ss._parse_tailscale(json.dumps(ok)) == []
+    bad = json.loads(json.dumps(ok))
+    bad["TCP"]["2222"] = {"TCPForward": "127.0.0.1:22"}
+    bad["TCP"]["8001"] = {"TCPForward": "127.0.0.1:9999"}
+    found = ss._parse_tailscale(json.dumps(bad))
+    assert any("неожиданный TCP-проброс :2222" in f for f in found)
+    assert any("TCP-проброс :8001 → 127.0.0.1:9999" in f for f in found)
+
+
+def test_caldav_5232_is_canon_on_tailnet_only():
+    """Решение владельца 03.10: CalDAV :5232 — ожидаемая tailnet-точка; Funnel на ней — дрейф."""
+    ok = json.loads(_TS_CANON)
+    ok["Web"]["studio.ts.net:5232"] = {"Handlers": {"/": {"Proxy": "http://127.0.0.1:5232"}}}
+    assert ss._parse_tailscale(json.dumps(ok)) == []
+    ok["AllowFunnel"]["studio.ts.net:5232"] = True
+    assert any("ПУБЛИЧНО торчит порт :5232" in f for f in ss._parse_tailscale(json.dumps(ok)))
+
+
 # ── публичная функция: никогда не бросает ─────────────────────────────────────
 
 @pytest.mark.host_only

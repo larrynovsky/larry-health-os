@@ -289,13 +289,13 @@ def generate_opening_question() -> str:
     context = _build_day_context()
     client = _get_client()
 
-    response = client.messages.create(
+    response = client.messages.create(task="checkin_agent.generate_opening_question",
         model=hai_core.get_model("haiku"),
         max_tokens=200,
         system=_build_checkin_opener_system(),
         messages=[{"role": "user", "content": context}],
     )
-    return _guarded_reply(response.content[0].text.strip())
+    return _guarded_reply(llm_client.answer_text(response).strip())
 
 
 def continue_checkin(conversation: list[dict]) -> tuple[str, bool]:
@@ -304,13 +304,13 @@ def continue_checkin(conversation: list[dict]) -> tuple[str, bool]:
     Возвращает (ответ, is_complete).
     """
     client = _get_client()
-    response = client.messages.create(
+    response = client.messages.create(task="checkin_agent.continue_checkin",
         model=hai_core.get_model("haiku"),
         max_tokens=300,
         system=_build_checkin_system(),
         messages=conversation,
     )
-    reply = response.content[0].text.strip()
+    reply = llm_client.answer_text(response).strip()
     is_complete = "[CHECKIN_COMPLETE]" in reply
     reply = reply.replace("[CHECKIN_COMPLETE]", "").strip()
     return _guarded_reply(reply), is_complete
@@ -325,13 +325,13 @@ def finalize_checkin(conversation: list[dict]) -> dict:
     full_text = "\n".join(
         f"{m['role'].upper()}: {m['content']}" for m in conversation
     )
-    response = client.messages.create(
+    response = client.messages.create(task="checkin_agent.finalize_checkin",
         model=hai_core.get_model("haiku"),
         max_tokens=500,
         system=CHECKIN_EXTRACTOR_SYSTEM,
         messages=[{"role": "user", "content": full_text}],
     )
-    raw = response.content[0].text.strip()
+    raw = llm_client.answer_text(response).strip()
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:

@@ -1,4 +1,4 @@
-<!-- translation-of: SECURITY.md sha256:367015318d15 -->
+<!-- translation-of: SECURITY.md sha256:dcc332f829e8 -->
 **English** · [Русский](SECURITY.md)
 
 # SECURITY POLICY: Larry Health OS
@@ -263,6 +263,9 @@ Until 23.09, `/hae/ingest` read the token from the hard-coded path `~/.health_se
 ---
 
 ### SEC-52: The first-contact smoke test answered the onboarding home question with coordinates near the owner's home — replaced with neutral ones (Berlin, the time zone from the tutorial example). Caught by the pre-export read; the census dictionary did not see this form of writing.
+
+### SEC-53: CalDAV :5232 added to the exposure canon; server password stored as a bcrypt hash; TCP forwards are judged (2026-10-03, owner's decision, thread serve-exposure)
+Radicale in the container (phone Reminders after the 30.09 move) is a tailnet-only Serve :5232 → 127.0.0.1:5232. The sensor called it drift for four nights: the endpoint was opened but not added to the canon. It is now in `infra_config.EXPECTED_SERVE_PORTS`. The password in `~/.health_caldav/users` was stored in plain text (`htpasswd_encryption = plain`) — switched to bcrypt; the image installs `radicale[bcrypt]`. Boundary: the client (the bot) keeps the password in the secrets directory — that is its home, it cannot be hashed there. The TCP section of `tailscale serve status` (a forward without TLS, :8001) was not judged at all — now `EXPECTED_TCP_FORWARDS`. Open for the owner: a tailnet access rule — only phones and the MacBook may reach :5232.
 
 ---
 

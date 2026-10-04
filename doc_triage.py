@@ -108,7 +108,7 @@ def _fit(image: bytes) -> bytes:
 
 
 def _ask(client, model: str, image: bytes, media_type: str) -> str:
-    resp = client.messages.create(
+    resp = client.messages.create(task="doc_triage._ask",
         model=model, max_tokens=12,
         system="Отвечай двумя словами из предложенных списков, без пояснений.",
         messages=[{"role": "user", "content": [

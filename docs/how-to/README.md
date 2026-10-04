@@ -88,7 +88,8 @@
 Расширить систему: [канал в утренний бриф](add_brief_channel.md) ·
 [клинический порог](add_clinical_threshold.md) · [тема литературного агента](add_survivorship_topic.md) ·
 [домен приёма изображений](add_visual_domain.md) · [сценарий и его тест](add_new_uc.md) ·
-[получатель сообщений владельца](add_bot_consumer.md).
+[получатель сообщений владельца](add_bot_consumer.md) ·
+[вызов модели](add_llm_call.md).
 Правила и гейты проекта: [найти существующее до постройки](discovery_before_build.md) ·
 [гейт одноразовости](disposability_gate.md) · [датчик словарей в коде](move_lexicon_to_db.md) ·
 [дата в канале памяти](date_memory_channel.md) · [документ в историю](move_to_archive.md).

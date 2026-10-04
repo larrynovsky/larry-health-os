@@ -233,7 +233,8 @@ def _load_check():
               if isinstance(n, ast.FunctionDef) and n.name == "check")
     ns = {"PASS": 0, "FAIL": 0, "JSON_OUTPUT": True, "WARN_ONLY": False,
           "_failures": [], "_code_failures": [], "_critical": [], "sys": sys,
-          "_sensor_of": {}, "_current_sensor": ""}   # repair-order: check() пишет, какой датчик упал
+          "_sensor_of": {}, "_current_sensor": "",
+          "MACHINE_SCOPE": False, "_not_judged_here": [], "_host_judged_here": lambda: True}   # repair-order: check() пишет, какой датчик упал
     exec(compile(ast.Module(body=[fn], type_ignores=[]), str(_SRC), "exec"), ns)
     return ns
 

@@ -225,7 +225,7 @@ async def _call_eval_specialist_async(
 
         try:
             response = await asyncio.wait_for(
-                client.messages.create(
+                client.messages.create(task="hypothesis_consilium_eval._call_eval_specialist_async",
                     model=hai_core.get_model("haiku"),
                     max_tokens=400,
                     system=system,
@@ -234,7 +234,7 @@ async def _call_eval_specialist_async(
                 timeout=45.0,
             )
             log.info(f"  {name} eval (Раунд {round_label}): OK")
-            return {"name": name, "opinion": response.content[0].text, "ok": True}
+            return {"name": name, "opinion": llm_client.answer_text(response), "ok": True}
         except asyncio.TimeoutError:
             log.error(f"  {name} eval (Раунд {round_label}): TIMEOUT")
             return {"name": name, "opinion": "Таймаут.", "ok": False}
@@ -338,7 +338,7 @@ async def _call_eval_coordinator_async(
 
     try:
         response = await asyncio.wait_for(
-            client.messages.create(
+            client.messages.create(task="hypothesis_consilium_eval._call_eval_coordinator_async",
                 model=hai_core.get_model("sonnet"),
                 max_tokens=2048,
                 system=system,
@@ -346,7 +346,7 @@ async def _call_eval_coordinator_async(
             ),
             timeout=90.0,
         )
-        return response.content[0].text
+        return llm_client.answer_text(response)
     except asyncio.TimeoutError:
         log.error("Eval координатор: TIMEOUT (90s)")
         raise RuntimeError(i18n.t("hypothesis_consilium.error.timeout"))
@@ -359,12 +359,12 @@ def _arbiter_extract_verdict(coordinator_text: str) -> dict:
     prompt = _ARBITER_EXTRACT_PROMPT + coordinator_text + hai_core.answer_language()
 
     try:
-        resp = client.messages.create(
+        resp = client.messages.create(task="hypothesis_consilium_eval._arbiter_extract_verdict",
             model=hai_core.get_model("haiku_pinned"),
             max_tokens=1500,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw = resp.content[0].text.strip()
+        raw = llm_client.answer_text(resp).strip()
 
         # Убираем markdown-обёртку ```json ... ```
         clean = re.sub(r'^```(?:json)?\s*', '', raw, flags=re.MULTILINE)

@@ -88,7 +88,7 @@ def _parse(raw):
 
 def run(tag):
     client = hai_core.get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="lab_drytest.run",
         model=hai_core.get_model(MODEL), max_tokens=4000,
         messages=[{"role": "user", "content": PROMPT}])
     raw = next((b.text for b in resp.content if b.type == "text"), "")

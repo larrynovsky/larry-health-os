@@ -222,6 +222,7 @@
     "intent_registry",
     "llm_client",
     "notify",
+    "pii_census",
     "secret_guard",
     "secrets_paths"
   ],
@@ -262,7 +263,8 @@
   ],
   "fill_description_ru": [
     "hai_core",
-    "health_db"
+    "health_db",
+    "llm_client"
   ],
   "fix_palindromic_het": [
     "health_db"
@@ -484,6 +486,7 @@
     "hai_core",
     "hai_reports",
     "health_db",
+    "llm_client",
     "memory_facts_db"
   ],
   "hai_context": [
@@ -515,6 +518,7 @@
     "hai_core",
     "health_db",
     "i18n",
+    "llm_client",
     "patient_context",
     "secrets_paths"
   ],
@@ -526,6 +530,7 @@
     "hai_core",
     "health_db",
     "infra_config",
+    "llm_client",
     "pubmed_client",
     "wellally_consult"
   ],
@@ -612,7 +617,8 @@
     "_time_inject",
     "assessment_scheduler",
     "hai_core",
-    "health_db"
+    "health_db",
+    "llm_client"
   ],
   "i18n": [
     "profile_db"
@@ -849,6 +855,7 @@
     "gp_context",
     "hai_core",
     "health_db",
+    "llm_client",
     "patient_context",
     "promethease_context"
   ],
@@ -864,7 +871,8 @@
     "hai_hypotheses",
     "health_db",
     "hypothesis_semantic_check",
-    "i18n"
+    "i18n",
+    "llm_client"
   ],
   "llm_admission": [
     "doc_translation",
@@ -877,6 +885,8 @@
     "treatment_extractor"
   ],
   "llm_client": [
+    "api_spend_log",
+    "hai_core",
     "llm_translate",
     "secret_guard"
   ],
@@ -922,6 +932,7 @@
     "hai_core",
     "health_db",
     "i18n",
+    "llm_client",
     "memory_facts_db"
   ],
   "memory_db": [
@@ -1019,6 +1030,8 @@
   "notify": [
     "_time_inject",
     "i18n",
+    "owner_nag",
+    "plist_env_liveness",
     "release_notice",
     "secrets_paths"
   ],
@@ -1141,6 +1154,7 @@
     "_time_inject",
     "hai_core",
     "health_db",
+    "llm_client",
     "patient_context"
   ],
   "pubmed_client": [
@@ -1225,7 +1239,8 @@
     "hai_hypotheses",
     "health_db",
     "hypothesis_semantic_check",
-    "i18n"
+    "i18n",
+    "llm_client"
   ],
   "symptom_intake": [
     "hai_core",

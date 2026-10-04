@@ -14,6 +14,7 @@ com.larry.health.literature-read (после reader в одном bash-скри�
 CLI: python3.11 literature_curator.py [--max N]
 """
 from __future__ import annotations
+import llm_client
 import hai_core
 import i18n
 
@@ -160,12 +161,12 @@ def _haiku_decide(finding: dict, context: str) -> dict | None:
     )
     try:
         client = get_client()
-        resp = client.messages.create(
+        resp = client.messages.create(task="literature_curator._haiku_decide",
             model=hai_core.get_model("haiku"),
             max_tokens=500,
             messages=[{"role": "user", "content": prompt + hai_core.answer_language()}],
         )
-        text = resp.content[0].text.strip()
+        text = llm_client.answer_text(resp).strip()
         m = re.search(r"\{[\s\S]*\}", text)
         if not m:
             return None

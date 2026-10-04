@@ -215,6 +215,7 @@ async def callback_visual_followup(update: Update, context: ContextTypes.DEFAULT
     """этап2: решение по follow-up кейсу серии.
       visfu_{id}_continue — продолжить наблюдение (снова напоминание прислать фото)
       visfu_{id}_close    — закрыть кейс
+      visfu_{id}_restart  — незаконченный разбор: закрыть и начать с фото заново (symptom-ttl)
     UC-I-02 fail-closed: owner-check inline (CallbackQueryHandler не принимает filters=)."""
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return
@@ -233,6 +234,11 @@ async def callback_visual_followup(update: Update, context: ContextTypes.DEFAULT
         _vdb.close_visual_case(cid)
         await query.edit_message_text(i18n.t("symptoms.reply.case_closed"))
         log.info(f"callback_visual_followup: {cid} → closed")
+    elif action == "restart":
+        # Незаконченный разбор (symptom-ttl): разговор потерян, начинаем с фото заново.
+        _vdb.close_visual_case(cid)
+        await query.edit_message_text(i18n.t("symptoms.reply.restart_with_photo"))
+        log.info(f"callback_visual_followup: {cid} → restart")
     elif action == "continue":
         _vdb.mark_followup_reminded(cid)   # снова awaiting_followup, таймер решения перевзведён
         await query.edit_message_text(

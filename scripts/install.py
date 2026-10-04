@@ -219,6 +219,9 @@ def _cron_interval(sec: int) -> str:
     raise ValueError(f"StartInterval {sec} с не выражается строкой cron без дрейфа частоты")
 
 
+RENDER_IN_SERVICE = 'python3 /app/scripts/install.py --docker --tz "$$TZ" >/dev/null 2>&1; '
+
+
 def _shell(pl: dict) -> str:
     """Командная строка задачи: каталог, окружение плиста, логи — те же файлы, что у launchd
     (список ротации один, log_rotation.one_home_of_the_list). PATH плиста выбрасывается:
@@ -341,9 +344,14 @@ def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_
                 raise ValueError(f"имя службы compose {name!r} занято дважды")
             # Метка — для пульса службы (daemon_liveness.beat, этап 2б): PID соседнего
             # контейнера датчику не виден, живость служба доказывает сама.
+            # Плисты рендерятся и здесь, не только в cron: .env у ВСЕХ служб указывает на
+            # build/docker/plists, а build/ в образ не входит — до 03.10 у бота каталога не было,
+            # и любой его датчик ритма отвечал «не судимо» (ему же решать, правда ли «передал на
+            # починку»). «;» а не «&&»: сбой рендера не роняет службу, датчик честно скажет «не судимо».
             services[name] = {"image": image, "hostname": hostname, "env_file": [".env"],
                               "environment": {"HEALTH_SERVICE_LABEL": label},
-                              "restart": "unless-stopped", "command": ["sh", "-c", _shell(pl)]}
+                              "restart": "unless-stopped",
+                              "command": ["sh", "-c", RENDER_IN_SERVICE + _shell(pl)]}
     head = "# сгенерировано scripts/install.py --docker из templates/launchd — руками не править\n"
     services["cron"] = {"image": image, "hostname": hostname, "env_file": [".env"],
                         "restart": "unless-stopped",
@@ -383,7 +391,8 @@ def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_
         services["ingest"] = {**services["dashboard"],
                               "environment": {"HEALTH_SERVICE_LABEL": "com.larry.health.ingest",
                                               "INGEST_HOST": "0.0.0.0"},
-                              "command": ["sh", "-c", f"env HEALTH_DATA_DIR={values['DATA']} python3 /app/ingest_lan.py"
+                              "command": ["sh", "-c", RENDER_IN_SERVICE
+                                          + f"env HEALTH_DATA_DIR={values['DATA']} python3 /app/ingest_lan.py"
                                           " >> /app/logs/ingest.out.log 2>> /app/logs/ingest.err.log"],
                               "ports": ["${HEALTH_INGEST_BIND:-127.0.0.1}:8011:8011"]}
     return {
@@ -522,10 +531,15 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> 
             # (удаление профиля или сбой образа диска не уносят и базу, и её бэкапы разом, 30.09)
             f"{home}/{OWNER_BACKUPS_REL}:{DOCKER_VALUES['DATA']}/backups"]
     services = {name: {"hostname": primary_host, "volumes": list(vols)} for name in base}
-    services["cron"]["environment"] = {"HEALTH_FAULTS_EXTRA": f"{HOST_LOGS}/faults.jsonl"}
+    # HEALTH_HOST_LOGS — где в контейнере журналы хоста: по ним ночная проверка судит хостовые
+    # службы владельца (сторож незакоммиченного, нить host-container-split 03.10).
+    services["cron"]["environment"] = {"HEALTH_FAULTS_EXTRA": f"{HOST_LOGS}/faults.jsonl",
+                                       "HEALTH_HOST_LOGS": HOST_LOGS}
+    # [bcrypt] (нить serve-exposure, 03.10): пароль в ~/.health_caldav/users хранится хешем, а не
+    # открытым текстом; без модуля bcrypt Radicale такой файл не примет и телефон перестанет входить.
     services["caldav"] = {
         "image": "python:3.11-slim", "restart": "unless-stopped",
-        "command": ["sh", "-c", f'pip install -q "radicale=={RADICALE_VERSION}" && exec python -m radicale --config /caldav/config'],
+        "command": ["sh", "-c", f'pip install -q "radicale[bcrypt]=={RADICALE_VERSION}" && exec python -m radicale --config /caldav/config'],
         "volumes": [f"{home}/.health_caldav:/caldav"],
         "ports": ["127.0.0.1:5232:5232"]}
     head = "# сгенерировано scripts/install.py --owner-override (этап 11 волны Б) — руками не править\n"

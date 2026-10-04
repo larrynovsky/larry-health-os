@@ -105,10 +105,10 @@ def _extract_json(text: str) -> dict:
 
 def _ask(failure: dict) -> dict:
     client = llm_client.guarded_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="night_investigator._ask",
         model=_model(), max_tokens=MAX_TOKENS, system=_SYSTEM,
         messages=[{"role": "user", "content": _build_prompt(failure)}])
-    return _extract_json(resp.content[0].text)
+    return _extract_json(llm_client.answer_text(resp))
 
 
 def investigate(failure: dict) -> dict:

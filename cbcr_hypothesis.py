@@ -360,7 +360,7 @@ def generate_hypothesis(observation: dict) -> dict:
     total_cost_usd = 0.0  # W5A-INT-7
 
     for iteration in range(MAX_TOOL_ITERATIONS):
-        resp = client.messages.create(
+        resp = client.messages.create(task="cbcr_hypothesis.generate_hypothesis",
             model=_model(),
             max_tokens=MAX_TOKENS_GEN,
             system=system_prompt,
@@ -767,7 +767,7 @@ def critique_hypothesis(hypothesis: dict, observation: dict | None = None) -> di
 
     total_cost_usd = 0.0  # W5A-INT-7
     for iteration in range(MAX_TOOL_ITERATIONS):
-        resp = client.messages.create(
+        resp = client.messages.create(task="cbcr_hypothesis.critique_hypothesis",
             model=_model(),
             max_tokens=2000,
             system=CRITIQUE_SYSTEM,

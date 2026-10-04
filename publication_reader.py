@@ -14,6 +14,7 @@
 Запуск вручную: python3.11 publication_reader.py [--max N]
 """
 from __future__ import annotations
+import llm_client
 import hai_core
 
 import argparse
@@ -88,12 +89,12 @@ ANALYSIS_PROMPT_TEMPLATE = (
 
 def _haiku_call(prompt: str, max_tokens: int = 400) -> str:
     client = get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="publication_reader._haiku_call",
         model=hai_core.get_model("haiku"),
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
-    return resp.content[0].text.strip()
+    return llm_client.answer_text(resp).strip()
 
 
 def _parse_json(text: str) -> dict | None:

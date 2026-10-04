@@ -57,6 +57,7 @@ MONITORED: dict[str, str] = {
     "com.larry.health.night-repair": "night_repair --gate: last_run.json старше 36 ч — строка каждой сессии при коммите в main (pre-commit MacBook; контейнерный монитор хоста не видит)",
     "com.larry.health.pipaudit": "check_security_sensors → pip_audit staleness (>8д)",
     "com.larry.health.uncommitted-watchdog": "check_watchdog_liveness",
+    "com.larry.health.machine-check": "check_machine_judge_alive (контейнер владельца: результат из журналов хоста покрывает плановый запуск)",
     # 28.09: понедельничная сводка оператору; её квитанцию судит рельса доставки (п.3 —
     # доказанная доставка не старше последнего понедельника 09:10, owner_weekly.last_scheduled_at).
     "com.larry.health.owner-weekly": "check_triage_delivery_liveness п.3 (квитанция owner_weekly)",

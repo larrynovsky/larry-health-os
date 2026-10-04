@@ -139,6 +139,32 @@ def format_proposal_card(prop: dict) -> str:
     return "\n".join(lines)
 
 
+def _plains_before_write(proposal_id: int) -> dict:
+    """{номер правки: простой текст} для добавлений без plain_summary — ДО транзакции записи.
+
+    Предложения, сохранённые до 27.09, простого текста не несут; одобренные позже ложились в
+    медкарту без него (замер 03.10: проблема партнёра, одобренная 02.10 из предложения 09.08,
+    человек видел код проблемы). Модель зовётся вне транзакции: пока она думает, база не
+    держит блокировку записи. Неудача — None, пропуск увидит check_problem_plain_summary."""
+    import json as _j
+    import problems_db as _pdb
+    with _hdb.get_conn() as conn:
+        row = conn.execute("SELECT source, proposed FROM problem_list_proposals WHERE id=?",
+                           (proposal_id,)).fetchone()
+    if not row:
+        return {}
+    out = {}
+    for i, ch in enumerate(_j.loads(row["proposed"])):
+        if ch.get("action") != "add":
+            continue
+        src = dict(ch)
+        if isinstance(ch.get("new_value"), dict):
+            src.update(ch["new_value"])
+        if not (src.get("plain_summary") or "").strip():
+            out[i] = _pdb._plain_for_add(ch, row["source"])
+    return out
+
+
 def apply_proposal(proposal_id: int) -> int:
     """
     Применяет пропозал: вносит изменения в problem_list.
@@ -147,6 +173,7 @@ def apply_proposal(proposal_id: int) -> int:
     import json as _j
     from datetime import datetime as _dt
 
+    plains = _plains_before_write(proposal_id)
     with _hdb.get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM problem_list_proposals WHERE id=?", (proposal_id,)
@@ -158,7 +185,7 @@ def apply_proposal(proposal_id: int) -> int:
         applied = 0
         now = str(get_today())
 
-        for ch in changes:
+        for i, ch in enumerate(changes):
             action = ch.get("action")
 
             if action == "update_status":
@@ -228,7 +255,7 @@ def apply_proposal(proposal_id: int) -> int:
                         _src.get("priority", 3), _src.get("domain", "other"),
                         now, now,
                         _src.get("watch_trigger"), _src.get("watch_deadline"),
-                        _src.get("reason", ""), _rd, _src.get("plain_summary")
+                        _src.get("reason", ""), _rd, _src.get("plain_summary") or plains.get(i)
                     ))
                     applied += 1
 

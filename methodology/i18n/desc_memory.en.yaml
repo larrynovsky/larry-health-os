@@ -28,6 +28,9 @@
 045285b94b6a:
   ru: Сырые имена, которым РАЗНЫЕ форматы дали разные канонические имена.
   en: Raw names to which DIFFERENT formats assigned different canonical names.
+046d4b4f795d:
+  ru: 'visual-intake: срок жизни разбора работает'
+  en: 'visual-intake: parse lifetime is working'
 050f2cba8a1e:
   ru: открытые проблемы описаны простыми словами
   en: open issues are described in plain language
@@ -601,9 +604,6 @@
 490d992f9be0:
   ru: Методология валидационного гейта в git (наличие+непустота)
   en: Validation gate methodology in git (presence+non-emptiness)
-497448bb3e05:
-  ru: 'Застрявший elicitation-диалог: кейс open >72ч без движения (liveness §14 —'
-  en: 'Stuck elicitation dialog: case open >72h with no activity (liveness §14 —'
 49c215b20299:
   ru: Читает выполненные напоминания из списка текущего тенанта через AppleScript.
   en: Reads completed reminders from the current tenant's list via AppleScript.
@@ -925,6 +925,9 @@
 68e138f5ad98:
   ru: лечение извлечено из документов
   en: treatment extracted from documents
+694bc60844f0:
+  ru: 'Проверки машины Studio дошли до владельца: квитанция машинного прогона свежа, его находки —'
+  en: 'Studio machine checks reached the owner: the machine run receipt is fresh, its findings —'
 698808b93cfb:
   ru: 'Guard безопасной позы: промпт elicitation не потерял запрет успокоения;'
   en: 'Safe-pose guard: elicitation prompt has not lost the reassurance prohibition;'
@@ -1174,9 +1177,6 @@
 8053c887d9fb:
   ru: Перезаписывает раздел МОДУЛЬНЫЙ РЕЕСТР в ARCH_SNAPSHOT.md между GEN-маркерами.
   en: Overwrites the MODULE REGISTRY section in ARCH_SNAPSHOT.md between GEN markers.
-8062f37b443d:
-  ru: visual-intake застрявшие диалоги (>72ч)
-  en: visual-intake stuck dialogs (>72h)
 81b75ad19a3b:
   ru: История снимков короче календаря → её подчистили или файл пересоздали.
   en: Snapshot history is shorter than the calendar → it was trimmed or the file was recreated.
@@ -1375,6 +1375,9 @@
 98013d41af05:
   ru: recovery завтра
   en: recovery tomorrow
+980f30f9deae:
+  ru: проверки машины Studio дошли (машинный судья)
+  en: Studio machine checks reached (machine judge)
 988c487b8b9d:
   ru: 'Единый судья «это вопрос К ЧЕЛОВЕКУ»: {id: {verdict, reason, ru}}.'
   en: 'Unified judge ''this is a question TO THE PERSON'': {id: {verdict, reason, ru}}.'
@@ -1564,6 +1567,9 @@ ab326e2c51ac:
 ab658bfcc697:
   ru: протоколы читаются
   en: protocols are readable
+aba4687cac1a:
+  ru: 'След того, что судья повторов НЕ создал задачу: строка со статусом ''duplicate''.'
+  en: 'Trace that the duplicate judge did NOT create a task: row with status ''duplicate''.'
 ac0ac232dd10:
   ru: FAIL, если конституции сгенерированы на ПУСТОМ effect_allele (полые).
   en: FAIL if constitutions are generated on EMPTY effect_allele (hollow).
@@ -1831,6 +1837,9 @@ c53af738fd22:
 c5424de8ce52:
   ru: РАБОТА НИТИ В ОДНОМ ЭКЗЕМПЛЯРЕ — вопрос ПОСТРАДАВШЕГО, не строителя.
   en: THREAD WORK IN A SINGLE INSTANCE — question for the AFFECTED party, not the builder.
+c548f8fdd55a:
+  ru: Сторож МЕХАНИЗМА срока жизни разбора (нить symptom-ttl, 03.10), а не человека.
+  en: Watchdog of the parse lifetime MECHANISM (thread symptom-ttl, 03.10), not of a human.
 c5750f870649:
   ru: Belt-and-suspenders к fail-closed secrets_dir() (2026-07-03).
   en: Belt-and-suspenders for fail-closed secrets_dir() (2026-07-03).

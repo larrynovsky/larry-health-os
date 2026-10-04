@@ -138,7 +138,7 @@ def llm_extract_image(img_path, filename: str) -> dict:
         media_type = "image/jpeg"
 
         client = llm_client.guarded_client()
-        resp = client.messages.create(
+        resp = client.messages.create(task="import_medical_events.llm_extract_image",
             model=hai_core.get_model("haiku_pinned"),
             max_tokens=2048,
             messages=[{
@@ -159,7 +159,7 @@ def llm_extract_image(img_path, filename: str) -> dict:
                 ],
             }],
         )
-        raw = resp.content[0].text.strip()
+        raw = llm_client.answer_text(resp).strip()
         if raw.startswith("```"):
             raw = re.sub(r"^```[a-z]*\n?", "", raw)
             raw = re.sub(r"\n?```$", "", raw)
@@ -228,14 +228,14 @@ def llm_extract(filename: str, text: str) -> dict:
     # первые 4000 символов часто съедают шапка клиники, анамнез и жалобы.
     user_msg = f"Имя файла: {filename}\n\nТекст документа (первые {TEXT_LIMIT} символов):\n{text[:TEXT_LIMIT]}"
 
-    resp = client.messages.create(
+    resp = client.messages.create(task="import_medical_events.llm_extract",
         model=hai_core.get_model("haiku_pinned"),
         max_tokens=2048,
         messages=[
             {"role": "user", "content": f"{EXTRACT_PROMPT}\n\n{user_msg}" + hai_core.answer_language()}
         ],
     )
-    raw = resp.content[0].text.strip()
+    raw = llm_client.answer_text(resp).strip()
 
     # Вычищаем markdown-блоки если LLM их добавил
     if raw.startswith("```"):

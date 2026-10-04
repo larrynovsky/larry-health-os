@@ -190,7 +190,8 @@ def test_k8_consult_saved_headings_and_missing_hypothesis(monkeypatch, tmp_path)
         _build_specialist_questions_block=Mock(return_value="fixture questions"),
         build_genetic_context_block=Mock(return_value="fixture context"),
         _get_client=lambda: client, log=Mock(),
-        hai_core=SimpleNamespace(get_model=lambda role: "fixture model", answer_language=lambda: ""))
+        hai_core=SimpleNamespace(get_model=lambda role: "fixture model", answer_language=lambda: ""),
+        llm_client=__import__("llm_client"))   # читатель ответа модели (03.10)
     for language in (None, "en", "ru"):
         profile.clear()
         if language:
@@ -285,7 +286,8 @@ def test_k8_constitution_notice_uses_tenant_profile(monkeypatch):
     ns = _k8_function_namespace("generate_constitutions.py", {"_run_alert_review"},
         i18n=translator, DOMAINS={"fixture": {"title": "fixture domain"}},
         _CHANGED_HEADS=("## What changed",), _build_alert_config_excerpt=lambda: "fixture config",
-        _load_epistemic=lambda: "", llm_client=SimpleNamespace(guarded_client=lambda: client),
+        _load_epistemic=lambda: "", llm_client=SimpleNamespace(guarded_client=lambda: client,
+                                    answer_text=__import__("llm_client").answer_text),
         hai_core=SimpleNamespace(get_model=lambda role: "fixture model"),
         get_today=lambda: date(2099, 1, 1), get_now=lambda: datetime(2099, 1, 1),
         _tg_notify=delivery)

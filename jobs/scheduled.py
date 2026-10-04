@@ -289,7 +289,8 @@ def critical_header(crit: list) -> str:
     if not crit:
         return ""
     import i18n
-    return i18n.t("jobs.brief.data_doubt_header")
+    import notify
+    return i18n.t(notify.honest_key("jobs.brief.data_doubt_header"))
 
 
 def critical_header_file(crit: list) -> str:
@@ -1166,6 +1167,31 @@ async def check_visual_followups(context: ContextTypes.DEFAULT_TYPE):
     days = int(_cfg.get_config("visual_followup_days", 7))
     dec_after = int(_cfg.get_config("visual_decision_after_days", 1))
     close_after = int(_cfg.get_config("visual_close_after_days", 1))
+    idle_days = int(_cfg.get_config("visual_open_idle_days", 3))
+
+    # (0) незаконченный разбор (нить symptom-ttl, решение владельца 03.10 — спрашивать):
+    # человек не ответил на уточнение → один вопрос «начать заново или закрыть?»; дальше —
+    # тот же шаг (3): без ответа кейс закрывается сам. Разговор бот потерял на перезапуске,
+    # поэтому «продолжить» здесь честно значит «начать заново».
+    try:
+        idle = _vdb.get_open_cases_idle(idle_days)
+    except Exception as e:  # noqa: BLE001
+        log.warning(f"check_visual_followups: get idle: {e}")
+        idle = []
+    for c in idle:
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton(i18n.t("jobs.visual.restart"), callback_data=f"visfu_{c['id']}_restart"),
+            InlineKeyboardButton(i18n.t("jobs.visual.close"), callback_data=f"visfu_{c['id']}_close"),
+        ]])
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=i18n.t("jobs.visual.unfinished", date=str(c.get("opened_at") or "")[:10],
+                            days=fmt_count(close_after, "days")),
+                reply_markup=kb)
+            _vdb.mark_decision_requested(c["id"])
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"check_visual_followups: unfinished {c['id']}: {e}")
 
     # (1) напоминание прислать свежее фото
     try:
@@ -1214,9 +1240,11 @@ async def check_visual_followups(context: ContextTypes.DEFAULT_TYPE):
         try:
             _vdb.close_visual_case(c["id"])
             region = c.get("region") or i18n.t("jobs.visual.region_fallback")
+            # Незаконченный разбор гипотезы не имеет — его закрытие звучит иначе (symptom-ttl).
+            key = "jobs.visual.closed" if c.get("hypothesis_memory_id") else "jobs.visual.closed_unfinished"
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=i18n.t("jobs.visual.closed", region=region))
+                text=i18n.t(key, region=region))
         except Exception as e:  # noqa: BLE001
             log.warning(f"check_visual_followups: close {c['id']}: {e}")
 

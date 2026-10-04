@@ -276,7 +276,7 @@ def extract_tasks_from_report(report_text: str, source: str,
 
     client = _get_client()
     try:
-        response = client.messages.create(
+        response = client.messages.create(task="task_agent.extract_tasks_from_report",
             model=hai_core.get_model("haiku"),
             # 2026-07-05: было 800 → JSON задач обрезался mid-string. 2026-09-28: 2000 тоже мало —
             # замер на 21 реальном отчёте GP × 2 (42 вызова): 3 ответа упёрлись в 2000 и обрезались
@@ -294,7 +294,7 @@ def extract_tasks_from_report(report_text: str, source: str,
         if getattr(response, "stop_reason", None) == "max_tokens":
             log.warning("Task extractor: ответ упёрся в max_tokens — усечение, "
                         "включаю salvage неполного JSON")
-        tasks_raw = _parse_tasks_json(response.content[0].text)
+        tasks_raw = _parse_tasks_json(llm_client.answer_text(response))
     except Exception as e:
         log.warning(f"Task extractor parse error: {e}")
         return []
@@ -349,6 +349,17 @@ def extract_tasks_from_report(report_text: str, source: str,
         if d and d["verdict"] == "covered":
             log.info(f"Задача не создана — уже есть #{', #'.join(map(str, d['ids']))} "
                      f"({d['reason']}): {(t.get('content') or '')[:60]}")
+            try:
+                db.record_duplicate_skip(source, t.get("type"), t.get("content"), source_date,
+                                         t.get("fingerprint"), d["ids"], d["reason"])
+            except Exception as e:  # noqa: BLE001 — след важен, но задачи важнее
+                log.warning(f"След пропуска не записан ({e})")
+                try:
+                    import notify
+                    notify.fault(f"task_agent.record_duplicate_skip: след пропуска не записан ({e})",
+                                 person_key=None)
+                except Exception as e2:  # noqa: BLE001
+                    log.warning(f"Сбой следа не записан в журнал ({e2})")
             t["content"] = None
 
     saved = []
@@ -436,7 +447,10 @@ TASK_DEDUP_PROMPT = """Ты сверяешь НОВЫЕ задачи из отч
 2. Для каждой просьбы найди старые задачи, которые просят ТО ЖЕ САМОЕ. Смысл, а не слова:
    «сдать ферритин» = «Ferritin»; «измерять давление неделю» = «измерять АД 7 дней».
    Уточнение без новой сути («натощак», «при следующем визите», дата последней сдачи в
-   скобках) просьбу не меняет. НЕ то же самое: другой анализ из той же панели; вопрос
+   скобках) просьбу не меняет. Панель целиком (общий анализ крови, общий анализ мочи,
+   биохимия, липидограмма) и отдельный показатель — разные просьбы в обе стороны: старая
+   задача на один показатель не покрывает новую на всю панель, даже если панель его включает.
+   НЕ то же самое: другой анализ из той же панели; вопрос
    человеку и действие (спросить «было ли» ≠ сделать); просьба сообщить результат и само
    действие; другое время или другой порог в режиме. Нет такой старой — пустой список.
 
@@ -514,7 +528,7 @@ def _dedup_once(new_items: list[dict], known: list[dict]) -> dict:
     listing += [f"#{k['id']} [{'снята' if k.get('status') == 'dismissed' else 'открыта'}]"
                 f" [{k.get('type') or '?'}] {k.get('content') or ''}" for k in known]
     try:
-        response = _get_client().messages.create(
+        response = _get_client().messages.create(task="task_agent._dedup_once",
             model=hai_core.get_model(DEDUP_MODEL_ROLE),
             max_tokens=8000,
             system=TASK_DEDUP_PROMPT + hai_core.answer_language(),
@@ -522,7 +536,7 @@ def _dedup_once(new_items: list[dict], known: list[dict]) -> dict:
         )
         if getattr(response, "stop_reason", None) == "max_tokens":
             log.warning("judge_task_duplicates: ответ упёрся в max_tokens — разбираю, что дошло")
-        raw = _parse_tasks_json(response.content[0].text)
+        raw = _parse_tasks_json(llm_client.answer_text(response))
     except Exception as e:  # noqa: BLE001 — сбой судьи = старое поведение, не потеря задач
         log.warning(f"judge_task_duplicates: судья не отработал ({e})")
         return {}
@@ -1024,13 +1038,13 @@ def _judge_once(items: list[dict]) -> dict:
         for it in items)
     try:
         client = _get_client()
-        response = client.messages.create(
+        response = client.messages.create(task="task_agent._judge_once",
             model=hai_core.get_model("haiku"),
             max_tokens=2000,
             system=QUESTION_ADDRESSING_PROMPT + hai_core.answer_language(),
             messages=[{"role": "user", "content": listing}],
         )
-        raw = _parse_tasks_json(response.content[0].text)
+        raw = _parse_tasks_json(llm_client.answer_text(response))
     except Exception as e:
         log.warning(f"addressed_to_patient: судья не отработал ({e}) — "
                     f"fail-closed, ни одна формулировка не считается вопросом")

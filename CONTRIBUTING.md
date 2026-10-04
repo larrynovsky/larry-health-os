@@ -9,13 +9,19 @@ Russian-only. English contributions are welcome.
 ## How a PR gets in
 
 The public GitHub repository is a one-way mirror of the author's private working
-copy. PRs opened here are imported with Copybara and go through the full private
-test suite and checks. Accepted changes land in the private copy and come back
-out in the next sync. Nobody commits directly to the public repository.
+copy. There is no access to the working copy for contributors, and there won't be:
+its history contains real people's medical data, and git can't share history
+partially. So the path is fork → PR here.
 
-Here, "merged" means accepted into the private copy; the change appears on GitHub
-with the next sync. Expect review within about a week. "No" is a normal answer,
-and the maintainer will explain why.
+The maintainer applies your PR's diff to the private copy by hand, runs it through
+the full private test suite and checks, and commits it with you credited as
+co-author (`Co-Authored-By`). The change then comes back out with the next export,
+and the PR here is closed with a link to the export commit that carries it. PRs are
+never merged on GitHub directly: the next export would overwrite them.
+
+Base your branch on the latest export; a diff written against an old one may not
+apply, and you'll be asked to rebase. Expect review within about a week. "No" is a
+normal answer, and the maintainer will explain why.
 
 ## Medical changes and privacy
 
@@ -30,7 +36,7 @@ including in error logs, code, tests and fixtures.
 
 ## Checks and local tests
 
-After import, PRs are checked by the project's guards: a personal-data census on
+Once applied to the private copy, changes are checked by the project's guards: a personal-data census on
 every commit, a disposability sidecar contract for new modules
 ([docs/how-to/disposability_gate.md](docs/how-to/disposability_gate.md)), and contract tests. You don't need to master these
 upfront; the maintainer will help you through them.

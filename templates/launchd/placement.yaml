@@ -40,6 +40,7 @@ services:
   com.larry.health.weekly-digest: "none: дайджест строится из истории git (weekly_digest.py, git log), а в образе её нет — .dockerignore; на Маке-хосте остаётся нативным"
   com.larry.health.wellally-check: container
   com.larry.health.multitenant-env: env
+  com.larry.health.machine-check: "host: машинный судья — проверки самой Studio (launchd, снимки MacBook, экспозиция); контейнер их не видит, читает результат из журналов хоста"
   com.larry.health.night-repair: "host: ночной ремонт — автору нужен claude на Маке-хосте и клон репозитория; в образе их нет, а стол владельца он читает из контейнера (docker exec)"
   com.larry.health.code-watcher: "host: мастерская разработчика — гоняет тесты на правку исходников машины"
   com.larry.health.uncommitted-watchdog: "host: сторожит незакоммиченное в git-дереве машины, не данные"

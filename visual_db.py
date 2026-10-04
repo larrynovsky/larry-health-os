@@ -142,6 +142,36 @@ def get_visual_orphans() -> dict:
             "handed_off_no_hypothesis": handed_no_hyp}
 
 
+def get_open_cases_idle(idle_days: int) -> list[dict]:
+    """Незаконченный разбор: кейс open без движения дольше idle_days (нить symptom-ttl, 03.10).
+
+    Человек прислал фото и не ответил на уточнение. Разговор бот держит в памяти и теряет на
+    перезапуске, а база помнила кейс открытым навсегда — два дома одного состояния. Отсюда
+    берёт кандидатов шаг (0) check_visual_followups: спросить «начать заново или закрыть?»."""
+    with _hdb.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, chat_id, tenant, region, opened_at FROM visual_case "
+            "WHERE status='open' AND updated_at < datetime('now', ?)",
+            (f"-{int(idle_days)} days",),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_cases_stuck(idle_days: int, close_after_days: int, cadence_days: int = 1) -> list[dict]:
+    """Кейсы, которые механизм срока жизни уже должен был разрешить, а не разрешил: open дольше
+    idle+cadence (вопрос не задан) или awaiting_decision дольше close_after+cadence (не закрыт).
+    cadence — ритм джоба check_visual_followups (раз в сутки). Пусто = механизм жив."""
+    with _hdb.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, status FROM visual_case WHERE "
+            "(status='open' AND updated_at < datetime('now', ?)) OR "
+            "(status='awaiting_decision' AND decision_requested_at < datetime('now', ?))",
+            (f"-{int(idle_days) + int(cadence_days)} days",
+             f"-{int(close_after_days) + int(cadence_days)} days"),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_stale_visual_cases(hours: int = 72) -> list[dict]:
     """Открытые кейсы без движения дольше N часов (застрявший диалог, liveness)."""
     with _hdb.get_conn() as conn:
@@ -222,7 +252,7 @@ def get_cases_decision_expired(after_days: int) -> list[dict]:
     """awaiting_decision кейсы без выбора дольше after_days → авто-закрытие (дефолт «закрыть»)."""
     with _hdb.get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, chat_id, tenant, region FROM visual_case "
+            "SELECT id, chat_id, tenant, region, hypothesis_memory_id FROM visual_case "
             "WHERE status='awaiting_decision' AND decision_requested_at IS NOT NULL "
             "AND decision_requested_at < datetime('now', ?)",
             (f"-{int(after_days)} days",),

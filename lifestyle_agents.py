@@ -11,6 +11,7 @@ MDT-участие: generate_mdt_opinion() — async метод для deliberat
   Раунд B: round_a_opinions=dict  → видит коллег, может не согласиться
 """
 
+import llm_client
 import asyncio
 import hai_core
 import logging
@@ -150,7 +151,7 @@ class LifestyleAgent:
         user_message = "\n\n".join(msg_parts)
 
         response = await asyncio.wait_for(
-            client.messages.create(
+            client.messages.create(task="lifestyle_agents.generate_mdt_opinion",
                 model=hai_core.model_for("lifestyle"),
                 max_tokens=500,
                 system=system_prompt,
@@ -158,7 +159,7 @@ class LifestyleAgent:
             ),
             timeout=45.0,
         )
-        return _guarded_text(response.content[0].text, self.agent_name)
+        return _guarded_text(llm_client.answer_text(response), self.agent_name)
 
     def run(self, sleep_date: date, activity_date: date) -> str | None:
         """Возвращает текст брифа если данные есть, None если нет."""

@@ -179,6 +179,30 @@ def get_tasks_known_to_person(dismissed_window_days: int) -> list:
     return [dict(r) for r in rows]
 
 
+def record_duplicate_skip(source: str, type_: str, content: str, source_date: str,
+                          fingerprint: str | None, covered_ids: list[int],
+                          judge_reason: str) -> int:
+    """След того, что судья повторов НЕ создал задачу: строка со статусом 'duplicate'.
+
+    Зачем в базе, а не в логе (нить task-dedup-tails, 04.10). Приёмка первого живого обзора
+    не смогла проверить судью у владельца: отчёт пересобрали вне процесса бота, и единственный
+    след — строка лога — не остался нигде. Пропуск, которого не видно, неотличим от «экстрактор
+    не выделил задачу», а потеря просьбы врача — молчание, которое снаружи не видно.
+
+    Статус 'duplicate' не видит человек: бот, дашборд и напоминания читают open/snoozed/answered
+    (перепись 14 читателей tasks, 04.10). В множество «уже известно человеку» строка тоже не
+    входит (get_tasks_known_to_person), так что след не порождает новых пропусков."""
+    with _hdb.get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO tasks (source, source_date, type, content, status, resolved_at, "
+            "resolved_text, fingerprint, judge_verdict, judge_reason) "
+            "VALUES (?, ?, ?, ?, 'duplicate', datetime('now'), ?, ?, 'covered', ?)",
+            (source, source_date, type_, content,
+             "повтор: уже есть " + ", ".join(f"#{i}" for i in covered_ids),
+             fingerprint, judge_reason))
+        return cur.lastrowid
+
+
 def get_task_by_tg_message(tg_message_id: int) -> dict | None:
     """Открытая задача, к сообщению которой прилетел реплай.
 

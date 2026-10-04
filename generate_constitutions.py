@@ -639,12 +639,12 @@ def _rules_text() -> str:
 
 def _call_claude(prompt: str, max_tokens: int = 8000) -> str:
     client = llm_client.guarded_client()
-    response = client.messages.create(
+    response = client.messages.create(task="generate_constitutions._call_claude",
         model=hai_core.get_model("opus"),
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt + hai_core.answer_language()}],
     )
-    return response.content[0].text
+    return llm_client.answer_text(response)
 
 
 # ── Язык человека (нить model-lang, 28.09) ───────────────────────────────────
@@ -980,12 +980,12 @@ def _run_alert_review(targets: list[str]) -> None:
     # 5. Вызываем Claude
     client  = llm_client.guarded_client()
     print("  Вызов Claude (alert review)...")
-    response = client.messages.create(
+    response = client.messages.create(task="generate_constitutions._run_alert_review",
         model=hai_core.get_model("sonnet"),
         max_tokens=2000,
         messages=[{"role": "user", "content": prompt}],
     )
-    review_text = response.content[0].text
+    review_text = llm_client.answer_text(response)
     print(f"  Ревью готово: {len(review_text)} символов")
 
     # 6. Сохраняем в agent_reports

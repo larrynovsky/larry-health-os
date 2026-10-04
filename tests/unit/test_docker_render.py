@@ -246,9 +246,10 @@ def test_override_владельца_имя_машины_слой_только_�
         assert f"/Users/o/.health_reference:{install.DOCKER_VALUES['HOME']}/.health_reference:ro" in vols
         assert "ports" not in s                                        # порты — только из базового рендера
         assert f"{repo}/logs:{install.HOST_LOGS}:ro" in vols            # журнал сбоев хоста (partner-faults)
-    assert svc["cron"]["environment"] == {"HEALTH_FAULTS_EXTRA": f"{install.HOST_LOGS}/faults.jsonl"}
+    assert svc["cron"]["environment"] == {"HEALTH_FAULTS_EXTRA": f"{install.HOST_LOGS}/faults.jsonl",
+                                          "HEALTH_HOST_LOGS": install.HOST_LOGS}
     assert svc["caldav"]["ports"] == ["127.0.0.1:5232:5232"]           # наружу — только tailscale serve
-    assert f"radicale=={install.RADICALE_VERSION}" in svc["caldav"]["command"][-1]
+    assert f"radicale[bcrypt]=={install.RADICALE_VERSION}" in svc["caldav"]["command"][-1]  # пароль — хешем
 
 
 def test_каталог_логов_данных_создаётся_до_первой_задачи():
@@ -262,3 +263,13 @@ def test_каталог_логов_данных_создаётся_до_перв
     writers = [l for l in (install.TPL / "launchd").glob("*.tmpl") if "{{DATA}}/logs" in l.read_text()]
     assert writers, "никто не пишет в {{DATA}}/logs — тогда и проверка не нужна"
     assert f"HEALTH_DATA_DIR={install.DOCKER_VALUES['DATA']}" in files[".env"]
+
+
+def test_every_service_renders_the_schedule_it_is_pointed_at():
+    """.env всех служб указывает на build/docker/plists; до 03.10 каталог рендерил только cron,
+    и бот судил живость ночного разбора вслепую («не судимо» → обещание без основания)."""
+    import yaml
+    services = yaml.safe_load(install.render_docker("UTC")["compose.yaml"])["services"]
+    blind = [n for n, s in services.items()
+             if "scripts/install.py --docker" not in " ".join(s["command"])]
+    assert not blind, f"службы без каталога расписаний: {blind}"

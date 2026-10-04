@@ -88,14 +88,43 @@ _sensor_of: dict[str, str] = {}
 _current_sensor = ""
 WARN_ONLY   = "--warn-only" in sys.argv
 JSON_OUTPUT = "--json"      in sys.argv
+# МАШИННЫЙ СУДЬЯ (нить machine-judge, 03.10). `--scope machine` — прогон на хосте Studio, не
+# привязанный ни к одному тенанту: судит ТОЛЬКО проверки самой машины (host_only / machine).
+# До 03.10 их судил ночной прогон партнёра — случайно: уйди партнёр, и снимки MacBook, launchd
+# и экспозиция хоста ослепли бы молча. Пишет scripts/machine_check.sh, читает контейнер владельца.
+MACHINE_SCOPE = "--scope" in sys.argv and sys.argv[sys.argv.index("--scope") + 1:][:1] == ["machine"]
+MACHINE_LABEL = "com.larry.health.machine-check"
+MACHINE_RESULT = "machine_integrity_latest.json"
+_not_judged_here: list[str] = []
 
 
-def check(label: str, fn, critical: bool = False, repo_only: bool = False):
+def _host_judged_here() -> bool:
+    """Судит ли ЭТОТ прогон проверки машины сам: да — только нативный прогон владельца на хосте
+    (установка без контейнера). Контейнер их не видит, прогон тенанта — не хозяин машины; у них
+    судья — машинный прогон, а здесь — проверка его квитанции (check_machine_judge_alive)."""
+    import plist_env_liveness as _pl
+    import secrets_paths as _sp
+    return (not _pl.in_container() and _sp.is_owner_data()
+            and not _sp.moved_to_container(_sp.owner_root()))
+
+
+def check(label: str, fn, critical: bool = False, repo_only: bool = False,
+          host_only: bool = False, machine: bool = False):
     """repo_only (docker-install, этап 6): предмет проверки — РЕПОЗИТОРИЙ (git, хуки, приватная
     зона), а не работающая система. В контейнере его нет по построению (.dockerignore): там
-    проверка говорит «не судимо» вслух, а судит её прогон в мастерской (run_checks на MacBook)."""
+    проверка говорит «не судимо» вслух, а судит её прогон в мастерской (run_checks на MacBook).
+
+    host_only (machine-judge, 03.10): предмет — сама машина Studio (launchd, снимки MacBook,
+    счётчик тенантов). Судит машинный прогон (--scope machine) или нативный прогон владельца;
+    остальные прогоны её пропускают молча — их громкость держит check_machine_judge_alive.
+    machine: проверка общая — идёт и в обычном прогоне, и в машинном (SEC-датчики хоста)."""
     global PASS, FAIL, _current_sensor
     _current_sensor = getattr(fn, "__name__", "")
+    if MACHINE_SCOPE and not (host_only or machine):
+        return None
+    if host_only and not MACHINE_SCOPE and not _host_judged_here():
+        _not_judged_here.append(label)
+        return None
     if repo_only:
         import plist_env_liveness
         if plist_env_liveness.in_container():
@@ -2605,7 +2634,7 @@ def check_tenant_count_vs_silence_decision():
     return {"partner_tenants": len(partners)}
 
 
-check("счётчик тенантов под решением о молчании (§18)", check_tenant_count_vs_silence_decision)
+check("счётчик тенантов под решением о молчании (§18)", check_tenant_count_vs_silence_decision, host_only=True)
 
 
 def check_plist_env_consistency():
@@ -2627,7 +2656,7 @@ def check_plist_env_consistency():
     return None
 
 
-check("env-консистентность launchd-плистов (мультитенант)", check_plist_env_consistency)
+check("env-консистентность launchd-плистов (мультитенант)", check_plist_env_consistency, host_only=True)
 
 
 # Замер 2026-08-04 (Studio): живых health-джоб 38, копий в `launchd/` — 14, значит без
@@ -2672,7 +2701,7 @@ def check_launchd_inventory():
     return f"{n} без копии, {len(inv['drifted'])} разошлись"
 
 
-check("launchd: инвентарь джоб против репозитория", check_launchd_inventory)
+check("launchd: инвентарь джоб против репозитория", check_launchd_inventory, host_only=True)
 
 
 def _stamp_unreadable(what, where, value):
@@ -2897,9 +2926,21 @@ def check_watchdog_liveness():
     # Дом переехал в logs/ 2026-08-03 (ISO-timestamp в каталоге секретов
     # становился «иглой» secret_guard). Легаси-путь читается, пока watchdog
     # не отметился на новом месте — иначе датчик покраснел бы на деплое.
-    hb = Path(__file__).parent / "logs" / "uncommitted_watchdog.heartbeat"
-    if not hb.exists():
-        hb = Path.home() / ".health_secrets" / "uncommitted_watchdog.heartbeat"
+    import os as _os
+    import plist_env_liveness as _pl
+    if _pl.in_container():
+        # Сторож живёт на хосте (launchd), его отметка — в logs/ репозитория хоста. До 03.10
+        # контейнер искал её в своём /app/logs и каждое утро писал «отсутствует» (нить
+        # host-container-split). Журналы хоста видны только у владельца (HEALTH_HOST_LOGS
+        # ставит install.py --owner-override); у постороннего сторожа нет — судить нечего.
+        host_logs = _os.environ.get("HEALTH_HOST_LOGS")
+        if not host_logs:
+            return "не судимо в контейнере: сторож незакоммиченного живёт на хосте, журналов хоста здесь нет"
+        hb = Path(host_logs) / "uncommitted_watchdog.heartbeat"
+    else:
+        hb = Path(__file__).parent / "logs" / "uncommitted_watchdog.heartbeat"
+        if not hb.exists():
+            hb = Path.home() / ".health_secrets" / "uncommitted_watchdog.heartbeat"
     if not hb.exists():
         warn("watchdog heartbeat отсутствует",
              "uncommitted_watchdog ни разу не отметился — launchd выгружен?")
@@ -3007,7 +3048,7 @@ def check_macbook_uncommitted():
                              if f.strip() in _gf.MACHINE_REGENERATED_FILES]}
 
 
-check("незакоммиченная работа на MacBook (по снимку)", check_macbook_uncommitted)
+check("незакоммиченная работа на MacBook (по снимку)", check_macbook_uncommitted, host_only=True)
 
 
 def check_macbook_head_deployed():
@@ -3033,7 +3074,7 @@ def check_macbook_head_deployed():
     return r
 
 
-check("код MacBook доехал до Studio (по снимку)", check_macbook_head_deployed)
+check("код MacBook доехал до Studio (по снимку)", check_macbook_head_deployed, host_only=True)
 
 
 THREAD_COPY_GRACE_H = 6      # два периода снимка (backup-wip каждые 3ч), решение владельца 16.09
@@ -3146,7 +3187,7 @@ def check_thread_work_has_a_second_copy():
             "broken": broken}
 
 
-check("копия работы нитей (не один экземпляр)", check_thread_work_has_a_second_copy)
+check("копия работы нитей (не один экземпляр)", check_thread_work_has_a_second_copy, host_only=True)
 
 
 THREAD_ORPHAN_GRACE_H = 48   # решение владельца 22.09: свежую нить не шуметь двое суток
@@ -3210,7 +3251,7 @@ def check_threads_have_index_row():
     return {"orphans": [(s, round(a, 1)) for s, a in orphans], "broken": broken}
 
 
-check("нить без строки в реестре (сирота)", check_threads_have_index_row)
+check("нить без строки в реестре (сирота)", check_threads_have_index_row, host_only=True)
 
 
 def check_captured_files():
@@ -3269,7 +3310,7 @@ def check_captured_files():
             "truncated": len(все) > ПОТОЛОК}
 
 
-check("захват чужого файла в коммит (по ленте снимков)", check_captured_files)
+check("захват чужого файла в коммит (по ленте снимков)", check_captured_files, host_only=True)
 
 
 def check_git_hooks_executable():
@@ -3639,21 +3680,30 @@ check("visual-intake сироты (фото/кейс/гипотеза)", check_v
 
 
 def check_stale_visual_cases():
-    """Застрявший elicitation-диалог: кейс open >72ч без движения (liveness §14 —
-    невидимо висящий кейс = симптом не дошёл до врача)."""
+    """Сторож МЕХАНИЗМА срока жизни разбора (нить symptom-ttl, 03.10), а не человека.
+
+    До 03.10 судился сам факт «open >72ч» — и два кейса тенанта висели в отчёте
+    два месяца: молчание человека выглядело поломкой, а срока жизни у кейса не было. Теперь у
+    незаконченного разбора есть исход (check_visual_followups: вопрос → автозакрытие), и
+    красное значит одно — механизм не сработал: open дольше visual_open_idle_days + сутки
+    (вопрос не задан) или awaiting_decision дольше visual_close_after_days + сутки (не закрыт).
+    Сутки — ритм джоба (run_daily 10:00)."""
     try:
+        import config_db as _cfg
         import visual_db
-        stale = visual_db.get_stale_visual_cases(72)
+        stuck = visual_db.get_cases_stuck(int(_cfg.get_config("visual_open_idle_days", 3)),
+                                          int(_cfg.get_config("visual_close_after_days", 1)))
     except Exception as e:  # noqa: BLE001
         warn("не смог проверить застрявшие visual-кейсы", str(e)[:120])
         return None
-    if stale:
-        warn("visual-intake: застрявшие диалоги",
-             f"{len(stale)} кейсов open >72ч: {[s['id'] for s in stale[:5]]}")
+    if stuck:
+        warn("visual-intake: срок жизни разбора не сработал",
+             f"{len(stuck)} кейсов: {[(s['id'], s['status']) for s in stuck[:5]]} — "
+             f"проверь джоб visual_followups (symptom_intake_enabled) и его журнал")
     return None
 
 
-check("visual-intake застрявшие диалоги (>72ч)", check_stale_visual_cases)
+check("visual-intake: срок жизни разбора работает", check_stale_visual_cases)
 
 
 def check_visual_verdict_rate():
@@ -8079,7 +8129,7 @@ def check_security_sensors():
     return {k: len(v) for k, v in findings.items()}
 
 
-check("SEC-датчики отработали (perms/ports/tokens)", check_security_sensors)
+check("SEC-датчики отработали (perms/ports/tokens)", check_security_sensors, machine=True)
 
 
 def check_changelog_freshness(changelog=None):
@@ -9475,6 +9525,69 @@ def check_lab_class_verdicts_complete():
 
 
 check("у каждого класса лаб-строк есть вердикт о доме", check_lab_class_verdicts_complete)
+
+
+def check_machine_judge_alive(host_logs=None, now=None):
+    """Проверки машины Studio дошли до владельца: квитанция машинного прогона свежа, его находки —
+    здесь, под своими метками (нить machine-judge, 03.10).
+
+    Контейнер машины не видит, прогон партнёра — не хозяин машины. Их судья — машинный прогон
+    на хосте (scripts/machine_check.sh); здесь он судится по ДВУМ признакам, оба из журналов
+    хоста (HEALTH_HOST_LOGS): (1) результат покрывает последний плановый запуск его ЖИВОГО
+    плиста — копия лежит рядом с результатом, второго дома ритма нет; (2) находки
+    переносятся сюда как есть — так они попадают на стол ночного цикла и ремонта с тем же
+    именем и вредом датчика. Молчащий судья — громко (blind_sensor_is_loud)."""
+    import os as _os
+    if MACHINE_SCOPE:
+        return "это и есть машинный прогон"
+    if _host_judged_here():
+        return "проверки машины судит этот прогон"
+    import plist_env_liveness as _pl
+    if host_logs is None:
+        if not _pl.in_container():
+            return f"прогон тенанта на хосте — машину судит {MACHINE_LABEL}; судья проверяется у владельца"
+        host_logs = _os.environ.get("HEALTH_HOST_LOGS")
+        if not host_logs:
+            return "журналов хоста здесь нет (установка без хоста-владельца) — судить машину нечем"
+    res = Path(host_logs) / MACHINE_RESULT
+    if not res.exists():
+        warn("машинный судья не отметился ни разу",
+             f"{res} нет — {MACHINE_LABEL} не установлен или не запускался; проверки Studio "
+             f"({len(_not_judged_here)}) сейчас не судит никто")
+        return None
+    try:
+        data = json.loads(res.read_text(encoding="utf-8"))
+        ran = str(data["ran_at"])
+    except (ValueError, KeyError, OSError) as e:
+        warn("машинный судья: результат не читается", f"{res}: {e!r} — «датчик мёртв» ≠ «всё хорошо»")
+        return None
+    covered = _pl.artifact_covers_last_fire(MACHINE_LABEL, ran, now or get_now(),
+                                            la_dir=Path(host_logs) / "launchd_live")
+    if covered is None:
+        warn("машинный судья: живость не судима",
+             f"расписание {MACHINE_LABEL} не выводится из копии живого плиста — «не знаю» ≠ «жив»")
+    elif not covered:
+        warn("машинный судья молчит",
+             f"последний результат {ran[:16]}, плановый запуск после него не отметился — "
+             f"проверки Studio ({len(_not_judged_here)}) не судятся")
+    if data.get("broken"):
+        warn("машинный судья: прогон упал", str(data["broken"])[:300])
+    so = data.get("sensor_of") or {}
+    # Общие датчики (machine=True) идут и здесь, и там: одна находка — одна строка на столе.
+    seen = {lab for lab, _ in _warnings} | {lab for lab, _ in _failures}
+    for label, detail in data.get("failures") or []:
+        if label not in seen:
+            _sensor_of.setdefault(label, so.get(label, ""))
+            fail_(label, detail)
+    for label, detail in data.get("warnings") or []:
+        if label not in seen:
+            _sensor_of.setdefault(label, so.get(label, ""))
+            warn(label, detail)
+    return {"ran_at": ran, "fail": len(data.get("failures") or []),
+            "warn": len(data.get("warnings") or [])}
+
+
+check("проверки машины Studio дошли (машинный судья)", check_machine_judge_alive)
 
 
 # ── Итог ──────────────────────────────────────────────────────────────────────

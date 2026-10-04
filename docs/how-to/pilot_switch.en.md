@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/pilot_switch.md sha256:0fe1c25e4f52 -->
+<!-- translation-of: docs/how-to/pilot_switch.md sha256:5f778b9889af -->
 **English** · [Русский](pilot_switch.md)
 
 # How to move a tenant from the native install into a container and back
@@ -84,7 +84,7 @@ $TS serve status
 ```
 
 CalDAV (if the tenant uses Reminders): create `~/.health_caldav/config` and `users` following the stage 3
-probe, with a new password and `users` at mode 600; `$TS serve --bg --https=5232 http://127.0.0.1:5232`;
+probe, with a new password stored in `users` as its bcrypt hash (`htpasswd_encryption = bcrypt` in `config`), mode 600; `$TS serve --bg --https=5232 http://127.0.0.1:5232`;
 put `caldav.json` ({"url", "username", "password"}) into `$S` (mode 600); move the open tasks:
 
 ```sh

@@ -8,6 +8,7 @@ fill_description_ru.py
 Позиционный матчинг ответов — не полагаемся на точное воспроизведение
 conditions-строки от модели.
 """
+import llm_client
 import sys
 import json
 import time
@@ -42,13 +43,13 @@ def _call_haiku(pairs: list[dict]) -> list[str]:
     """Возвращает список description_ru той же длины что pairs (позиционно)."""
     client = hai_core.get_client()
     model = hai_core.get_model("haiku_pinned")
-    resp = client.messages.create(
+    resp = client.messages.create(task="fill_description_ru._call_haiku",
         model=model,
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": json.dumps(pairs, ensure_ascii=False)}],
     )
-    text = resp.content[0].text.strip()
+    text = llm_client.answer_text(resp).strip()
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])

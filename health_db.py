@@ -4377,6 +4377,7 @@ from tasks_db import (  # noqa: E402
     get_unsent_assessment_tasks, get_unsent_tasks, get_task_by_tg_message,
     wake_snoozed_assessment_tasks,
     get_questions_needing_delivery, get_open_questions, get_tasks_known_to_person,
+    record_duplicate_skip,
 )
 
 

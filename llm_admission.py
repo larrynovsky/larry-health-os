@@ -291,11 +291,15 @@ def _call(client, model: str, *, prompt: str, image: bytes | None, system: str |
         kw["system"] = system
     if temperature is not None:
         kw["temperature"] = temperature
-    r = client.messages.create(**kw)
+    r = client.messages.create(task="llm_admission._call", **kw)
     ledger.charge(r.usage.input_tokens, r.usage.output_tokens,
                   cache_read_input_tokens=getattr(r.usage, "cache_read_input_tokens", 0),
                   cache_creation_input_tokens=getattr(r.usage, "cache_creation_input_tokens", 0))
-    text = "".join(getattr(b, "text", "") for b in r.content if getattr(b, "type", "") == "text")
+    import llm_client   # тот же читатель, что у рабочего кода: допуск судит то, что прочтёт работа (03.10)
+    try:
+        text = llm_client.answer_text(r)
+    except llm_client.NoTextInAnswer:
+        text = ""      # пустой ответ — ошибка набора у судьи, а не падение прогона
     return text, str(getattr(r, "model", model))
 
 

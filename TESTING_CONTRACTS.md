@@ -114,7 +114,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 
 <!-- BEGIN AUTOGEN: integrity-sensors (gen_testing_contracts.py) -->
 
-### Реестр датчиков целостности (184 шт., генерируется)
+### Реестр датчиков целостности (185 шт., генерируется)
 
 > Источник: `integrity_tests.py`. Таблица построена из AST — не редактировать руками, менять код. launchd 07:50 → triage 08:00.
 
@@ -170,7 +170,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | frozen-relative → transient (Ф1/Ф2) | `check_frozen_relative_not_current` | WARN: active state с «сегодня/вчера» в ТЕКСТЕ, но НЕ классифицированное transient → |
 | регрессия числа строк vs бэкап | `check_db_row_regression` | Таблица упала >50% против пика последних бэкапов → тихое стирание данных. |
 | visual-intake сироты (фото/кейс/гипотеза) | `check_visual_orphans` | Целостность visual-intake: фото без кейса / кейс без фото / handed_off без |
-| visual-intake застрявшие диалоги (>72ч) | `check_stale_visual_cases` | Застрявший elicitation-диалог: кейс open >72ч без движения (liveness §14 — |
+| visual-intake: срок жизни разбора работает | `check_stale_visual_cases` | Сторож МЕХАНИЗМА срока жизни разбора (нить symptom-ttl, 03.10), а не человека. |
 | symptom_intake verdict-rate (lagging) | `check_visual_verdict_rate` | ЗАПАЗДЫВАЮЩИЙ сигнал качества elicitation: доля symptom_intake-гипотез, |
 | symptom-intake дисциплина промпта (поза+§9) | `check_symptom_prompt_discipline` | Guard безопасной позы: промпт elicitation не потерял запрет успокоения; |
 | усыхание лаб-истории vs бэкап (FAIL) | `check_lab_history_regression` | FAIL (health-критично): lab_results резко усохла vs последний бэкап — класс |
@@ -304,6 +304,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | колокол решений жив (§14, поведенческий) | `check_doorbell_liveness` | §14 для КОЛОКОЛА, поведенческий: молчание = launchd owner_nag мёртв (WARN); |
 | граница двух домов лабораторных данных цела | `check_domain_boundary` | Граница двух домов лабораторных данных стережётся (работа B, 2026-08-01). |
 | у каждого класса лаб-строк есть вердикт о доме | `check_lab_class_verdicts_complete` | Каждый класс, который РЕАЛЬНО есть в данных, имеет вердикт человека. |
+| проверки машины Studio дошли (машинный судья) | `check_machine_judge_alive` | Проверки машины Studio дошли до владельца: квитанция машинного прогона свежа, его находки — |
 
 ### Пороги-константы (41 шт., генерируется)
 

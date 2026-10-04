@@ -76,14 +76,14 @@ def extract_regimens(text: str, event_id: int) -> list:
         return []
     try:
         client = _get_client()
-        resp = client.messages.create(
+        resp = client.messages.create(task="treatment_extractor.extract_regimens",
             model=hai_core.get_model("haiku_pinned"),
             max_tokens=700,
             temperature=0,
             system=EXTRACTION_PROMPT,
             messages=[{"role": "user", "content": f"ДОКУМЕНТ:\n{text[:4000]}"}],
         )
-        raw = resp.content[0].text.strip()
+        raw = llm_client.answer_text(resp).strip()
         if raw.startswith("```"):
             raw = re.sub(r"^```[a-z]*\n?", "", raw)
             raw = re.sub(r"\n?```$", "", raw)

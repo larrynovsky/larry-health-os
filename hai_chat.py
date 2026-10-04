@@ -4,6 +4,7 @@ hai_chat — chat(), run_arbiter(), CLI.
 Зависимости: health_db, hai_core, hai_context.
 """
 
+import llm_client
 import base64
 import hai_core
 import logging
@@ -99,7 +100,7 @@ def chat(user_message: str, include_data: bool = True) -> str:
 
     # Agentic loop
     for _ in range(5):
-        response = client.messages.create(
+        response = client.messages.create(task="hai_chat.chat",
             model=hai_core.get_model("sonnet"),
             max_tokens=800,
             system=system_prompt,
@@ -123,7 +124,7 @@ def chat(user_message: str, include_data: bool = True) -> str:
         messages.append({"role": "user", "content": tool_results})
 
     # Fallback без tools
-    response = client.messages.create(
+    response = client.messages.create(task="hai_chat.chat.2",
         model=hai_core.get_model("sonnet"), max_tokens=800,
         system=system_prompt, messages=messages,
     )
@@ -165,7 +166,7 @@ def chat_with_image(caption: str, image_bytes: bytes, mime_type: str = "image/jp
         {"type": "text", "text": text_block},
     ]
 
-    response = client.messages.create(
+    response = client.messages.create(task="hai_chat.chat_with_image",
         model=hai_core.get_model("sonnet"),
         max_tokens=1000,
         system=system_prompt,
@@ -388,13 +389,13 @@ def run_arbiter(user_message: str, assistant_reply: str,
     )
 
     try:
-        response = client.messages.create(
+        response = client.messages.create(task="hai_chat.run_arbiter",
             model=hai_core.get_model("haiku"),
             max_tokens=1024,
             system=ARBITER_SYSTEM,
             messages=[{"role": "user", "content": prompt}]
         )
-        raw = response.content[0].text.strip()
+        raw = llm_client.answer_text(response).strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -508,14 +509,14 @@ def judge_service_trouble(user_message: str, assistant_reply: str) -> tuple:
     import json as _json
     try:
         client = get_client()
-        r = client.messages.create(
+        r = client.messages.create(task="hai_chat.judge_service_trouble",
             model=hai_core.get_model("haiku"),
             max_tokens=200,
             system=TROUBLE_SYSTEM,
             messages=[{"role": "user", "content":
                        f"Человек: {user_message[:1500]}\n\nБот: {assistant_reply[:1500]}"}],
         )
-        raw = r.content[0].text.strip()
+        raw = llm_client.answer_text(r).strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):

@@ -272,6 +272,19 @@ def _parse_tailscale(json_text: str) -> list[str]:
     for p in sorted(infra_config.EXPECTED_FUNNEL_PORTS - funnel_ports):
         found.append(f"ожидаемый Funnel :{p} выключен — публичный фасад соседнего проекта недоступен?")
 
+    # TCP-пробросы (нить serve-exposure, 03.10): лежат в секции TCP, а не Web, и до сегодня не
+    # судились — случайный `serve --tcp` на новый порт не загорелся бы. HTTPS-строки той же секции
+    # (HTTPS: true) судит ветка Web ниже.
+    for port, cfg in sorted((data.get("TCP") or {}).items(), key=lambda kv: str(kv[0])):
+        fwd = (cfg or {}).get("TCPForward")
+        if not fwd:
+            continue
+        want = infra_config.EXPECTED_TCP_FORWARDS.get(_port(f"x:{port}"))
+        if want is None:
+            found.append(f"неожиданный TCP-проброс :{port} → {fwd} — не в EXPECTED_TCP_FORWARDS (канон infra_config)")
+        elif fwd != want:
+            found.append(f"TCP-проброс :{port} → {fwd}, а в каноне {want}")
+
     web = data.get("Web") or {}
     for hostport, cfg in sorted(web.items()):
         port = _port(hostport)

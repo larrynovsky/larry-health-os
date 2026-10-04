@@ -59,7 +59,8 @@ def test_monitor_records_which_sensor_raised_each_finding():
     tree = ast.parse(src)
     tree.body = [n for n in tree.body if getattr(n, "name", None) in {"check", "warn"}]
     env = {"PASS": 0, "FAIL": 0, "WARN": 0, "_failures": [], "_warnings": [], "_code_failures": [],
-           "_critical": [], "_sensor_of": {}, "_current_sensor": "", "JSON_OUTPUT": True}
+           "_critical": [], "_sensor_of": {}, "_current_sensor": "", "JSON_OUTPUT": True,
+           "MACHINE_SCOPE": False, "_not_judged_here": [], "_host_judged_here": lambda: True}
     exec(compile(tree, "integrity_tests.py", "exec"), env)
 
     def check_example():

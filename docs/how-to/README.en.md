@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:b39f32922356 -->
+<!-- translation-of: docs/how-to/README.md sha256:41f65c815263 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -92,7 +92,8 @@ remaining guides are here: [Git](git_workflow.md), [tests](run_tests.md),
 Extending the system: [a channel in the morning brief](add_brief_channel.md) ·
 [a clinical threshold](add_clinical_threshold.md) · [a literature agent topic](add_survivorship_topic.md) ·
 [an image-intake domain](add_visual_domain.md) · [a scenario and its test](add_new_uc.md) ·
-[a recipient of owner messages](add_bot_consumer.md).
+[a recipient of owner messages](add_bot_consumer.md) ·
+[a model call](add_llm_call.md).
 Project rules and gates: [find what exists before building](discovery_before_build.md) ·
 [the disposability gate](disposability_gate.md) · [the lexicons-in-code sensor](move_lexicon_to_db.md) ·
 [a date in a memory channel](date_memory_channel.md) · [a document to history](move_to_archive.md).

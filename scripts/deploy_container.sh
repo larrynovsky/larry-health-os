@@ -19,8 +19,10 @@ alarm() {
     /opt/homebrew/bin/python3.11 -c 'import sys, notify; notify.fault("контейнер владельца не обновился: " + sys.argv[1], person_key=None)' "$1" \
         || echo "$(date '+%F %T') ещё и notify.fault не сработал"
 }
+LOCK=""; NEXT=""   # заданы ниже; пустые до того — выход до очереди ничего не снимает
 on_exit() {
     [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ] && rm -rf "$LOCK"
+    [ "$(cat "$NEXT/pid" 2>/dev/null)" = "$$" ] && rm -rf "$NEXT"
     if [ "$DONE" != 1 ]; then
         echo "$(date '+%F %T') FAIL на шаге: ${STEP}"
         alarm "${STEP} (лог: ${LOG})"
@@ -31,16 +33,38 @@ trap on_exit EXIT
 # журнал, карта), каждый post-commit звал деплой в фоне — два compose up пересоздавали одни службы
 # одновременно, оба упали на конфликте имён, бот и дашборд владельца лежали до следующего деплоя.
 # Ждущий строит HEAD на момент захвата — поздний деплой накрывает ранние, а не теряется.
-LOCK="$HOME/.health_container_deploy.lock"
+#
+# ОДНО МЕСТО В ОЧЕРЕДИ (нить queue-and-plain, 03.10). Ждущий строит HEAD на момент захвата, значит
+# второму ждущему делать нечего: первый задеплоит коммит не старше его. До 03.10 ждали все, и при
+# закрытии пяти нитей подряд хвост очереди сдавался через 15 минут с тревогой «очередь деплоя» —
+# 10 ложных сбоев за сутки на стол ночного ремонта, при том что последний коммит доезжал.
+# Сбоем остаётся одно: держатель замка жив и не отпускает дольше срока ожидания.
+LOCK="${HEALTH_DEPLOY_LOCK:-$HOME/.health_container_deploy.lock}"
+NEXT="$LOCK.next"
 STEP="очередь деплоя"
-for i in $(seq 1 180); do
+for i in $(seq 1 "${HEALTH_DEPLOY_WAIT_TRIES:-180}"); do
     if mkdir "$LOCK" 2>/dev/null; then echo $$ > "$LOCK/pid"; break; fi
     p=$(cat "$LOCK/pid" 2>/dev/null)
     if [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; then rm -rf "$LOCK"; continue; fi
-    [ "$i" = 1 ] && echo "$(date '+%F %T') жду предыдущий деплой (pid ${p:-?})"
-    sleep 5
+    if [ "$i" = 1 ]; then
+        if ! mkdir "$NEXT" 2>/dev/null; then
+            q=$(cat "$NEXT/pid" 2>/dev/null)
+            if [ -n "$q" ] && kill -0 "$q" 2>/dev/null; then
+                echo "$(date '+%F %T') место в очереди занято (pid $q) — он задеплоит коммит не старше моего, выхожу"
+                DONE=1; exit 0
+            fi
+            rm -rf "$NEXT"
+            mkdir "$NEXT" 2>/dev/null || { echo "$(date '+%F %T') место в очереди взял сосед — выхожу"; DONE=1; exit 0; }
+        fi
+        echo $$ > "$NEXT/pid"
+        echo "$(date '+%F %T') жду предыдущий деплой (pid ${p:-?})"
+    fi
+    sleep "${HEALTH_DEPLOY_WAIT_S:-5}"
 done
 [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ] || exit 1
+[ "$(cat "$NEXT/pid" 2>/dev/null)" = "$$" ] && rm -rf "$NEXT"
+# Шов проверки очереди (tests/unit/test_deploy_queue.py): дальше — сборка и compose, их тест не трогает.
+[ -n "${HEALTH_DEPLOY_QUEUE_ONLY:-}" ] && { DONE=1; exit 0; }
 cd "$HOME/health_scripts" || exit 1
 SHA=$(git rev-parse --short HEAD)
 TZ_HOST=$(readlink /etc/localtime | sed 's#.*/zoneinfo/##')

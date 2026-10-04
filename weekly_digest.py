@@ -218,7 +218,7 @@ def _render_digest(threads: dict[str, list[Commit]], week: str) -> str:
     since, until = _week_bounds(week.split(" ")[0])
     user = (f"Неделя {week}: {since.strftime('%d.%m')}–{until.strftime('%d.%m.%Y')}. "
             f"Коммиты, сгруппированные в нити:\n\n{_threads_as_text(threads)}")
-    r = _client().messages.create(model=_model("sonnet"), max_tokens=1500, system=system,
+    r = _client().messages.create(task="weekly_digest._render_digest", model=_model("sonnet"), max_tokens=1500, system=system,
                                   messages=[{"role": "user", "content": user}])
     return "".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip()
 
@@ -231,7 +231,7 @@ _JUDGE = ("Ниже текст, который уйдёт нескольким �
 
 
 def _judge_leaks(text: str) -> bool:
-    r = _client().messages.create(model=_model("haiku"), max_tokens=5,
+    r = _client().messages.create(task="weekly_digest._judge_leaks", model=_model("haiku"), max_tokens=5,
                                   messages=[{"role": "user", "content": _JUDGE + text}])
     ans = "".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip().upper()
     return ans.startswith("ДА")
@@ -259,7 +259,7 @@ def _judge_fidelity(text: str, raw_major: str) -> list[int]:
     """Номера сюжетов (1-based), которые судья счёл искажающими сырьё."""
     bad = []
     for i, par in enumerate(_sujets(text), 1):
-        r = _client().messages.create(model=_model("haiku"), max_tokens=5,
+        r = _client().messages.create(task="weekly_digest._judge_fidelity", model=_model("haiku"), max_tokens=5,
                                       messages=[{"role": "user", "content": _FIDELITY.format(raw=raw_major, par=par)}])
         ans = "".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip().upper()
         if ans.startswith("ДА"):
@@ -464,7 +464,7 @@ _CYR = re.compile(r"[А-Яа-яЁё]")
 
 
 def _translate(text: str) -> str:
-    r = _client().messages.create(model=_model("sonnet"), max_tokens=2000,
+    r = _client().messages.create(task="weekly_digest._translate", model=_model("sonnet"), max_tokens=2000,
                                   messages=[{"role": "user", "content": _TRANSLATE + text}])
     return "".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip()
 

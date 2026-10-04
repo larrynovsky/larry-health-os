@@ -101,7 +101,7 @@ def _call_model(system: str, messages: list) -> str:
     """LLM-вызов (seam для тестов). Возвращает raw text (ожидаем JSON)."""
     import hai_core
     client = hai_core.get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="symptom_intake._call_model",
         model=hai_core.get_model("sonnet"),
         max_tokens=2000,
         system=system,
@@ -251,7 +251,7 @@ def _call_vision(system: str, messages: list) -> str:
     """LLM vision-вызов (seam для тестов). Возвращает текст."""
     import hai_core
     from hai_core import _strip_markdown
-    resp = hai_core.get_client().messages.create(
+    resp = hai_core.get_client().messages.create(task="symptom_intake._call_vision",
         model=hai_core.get_model("sonnet"), max_tokens=500, system=system, messages=messages,
     )
     return _strip_markdown(next((b.text for b in resp.content if b.type == "text"), ""))

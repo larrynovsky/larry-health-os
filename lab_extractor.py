@@ -66,14 +66,14 @@ def extract_labs(summary_text: str, date: str, source: str,
     """
     try:
         client = _get_client()
-        resp = client.messages.create(
+        resp = client.messages.create(task="lab_extractor.extract_labs",
             model=hai_core.get_model("haiku_pinned"),
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content":
                         EXTRACTION_PROMPT.format(text=summary_text[:3000])}]
         )
-        raw = resp.content[0].text.strip()
+        raw = llm_client.answer_text(resp).strip()
         # Убрать возможный markdown-блок
         raw = re.sub(r"^```json\s*|\s*```$", "", raw, flags=re.S).strip()
         extracted = json.loads(raw)

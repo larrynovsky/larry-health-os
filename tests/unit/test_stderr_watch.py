@@ -191,6 +191,29 @@ def test_unreadable_or_parentless_log_stays_blind(env):
         os.chmod(locked, 0o755)
 
 
+def test_blindness_names_untracked_logs_and_why(env):
+    """Карточка 28.09 после починки 01.10: «объявляют 28, отслеживает 18» — и ни одного
+    имени. Чинить такое нечем: причина живёт в среде, а какие 10 логов — неизвестно.
+    Слепота обязана назвать лейбл и причину (нет каталога / нет доступа)."""
+    import os
+    agents, logs = env
+    a = logs / "a.err.log"; a.write_text("x\n")
+    _agent(agents, "com.larry.health.a", a)
+    locked = logs / "locked"; locked.mkdir()
+    (locked / "c.err.log").write_text("x\n")
+    _agent(agents, "com.larry.health.c", locked / "c.err.log")
+    _agent(agents, "com.larry.health.b", logs / "нет-каталога" / "b.err.log")
+    os.chmod(locked, 0)
+    try:
+        sw.new_errors()
+        msg = " ".join(sw.blind_spots())
+    finally:
+        os.chmod(locked, 0o755)
+    assert "com.larry.health.b" in msg and "нет каталога" in msg, msg
+    assert "com.larry.health.c" in msg and "нет доступа" in msg, msg
+    assert "com.larry.health.a:" not in msg, msg       # отслеживаемый не назван слепым
+
+
 def test_temporary_access_loss_does_not_replay_history(env):
     """Ревью п.2: учтённый Traceback → временный отказ доступа → доступ вернулся, файл
     тот же — старая ошибка не выдаётся повторно."""

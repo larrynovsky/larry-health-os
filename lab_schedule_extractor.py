@@ -41,13 +41,13 @@ def extract_monitoring_rules(plan_text: str, event_id: int) -> list:
         return []
     try:
         client = _get_client()
-        response = client.messages.create(
+        response = client.messages.create(task="lab_schedule_extractor.extract_monitoring_rules",
             model=hai_core.get_model("haiku_pinned"),
             max_tokens=400,
             system=EXTRACTION_PROMPT,
             messages=[{"role": "user", "content": f"ПЛАН ВРАЧА:\n{plan_text}"}],
         )
-        raw = response.content[0].text.strip()
+        raw = llm_client.answer_text(response).strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"): raw = raw[4:]

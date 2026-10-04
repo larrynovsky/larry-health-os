@@ -165,12 +165,32 @@ def blind_spots(max_age_hours: float = 26.0) -> list[str]:
     if age_h > max_age_hours:
         out.append(f"состояние stderr-датчика не обновлялось {age_h:.0f} ч "
                    f"(порог {max_age_hours:.0f}) — датчик не отрабатывает")
-    declared = len(_err_logs())
+    logs = _err_logs()
+    declared = len(logs)
     tracked = len(raw)
     if declared and tracked < declared:
+        # Имена и причины, а не только счёт: «18 из 28» без имён чинить нечем —
+        # причина обычно в среде, и инженеру надо знать, ГДЕ (карточка 28.09, вторая ночь).
+        missing = [f"{lbl}: {_why_untracked(p)}" for lbl, p in logs if lbl not in raw]
         out.append(f"плисты объявляют {declared} stderr-логов, датчик отслеживает "
-                   f"{tracked} — он смотрит не на всё, что пишет ошибки")
+                   f"{tracked} — он смотрит не на всё, что пишет ошибки"
+                   + (f"; не отслеживаются: {', '.join(missing)}" if missing else ""))
     return out
+
+
+def _why_untracked(path: Path) -> str:
+    """Причина словами — те же ветки, по которым new_errors выбрасывает лейбл."""
+    if not path.parent.is_dir():
+        return f"нет каталога {path.parent}"
+    try:
+        path.stat()
+    except FileNotFoundError:
+        return "файла нет — встанет на учёт следующим прогоном"
+    except PermissionError:
+        return f"нет доступа к {path}"
+    except OSError as e:
+        return f"не читается ({e.__class__.__name__})"
+    return "не было на прошлом прогоне — встанет на учёт следующим"
 
 
 if __name__ == "__main__":

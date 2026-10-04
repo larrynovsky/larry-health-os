@@ -14,6 +14,7 @@
 CLI: python3.11 survivorship_curator.py [--max N] [--dry-run]
 """
 from __future__ import annotations
+import llm_client
 import hai_core
 import i18n
 
@@ -141,12 +142,12 @@ def _haiku_decide(finding, context):
     )
     try:
         client = get_client()
-        resp = client.messages.create(
+        resp = client.messages.create(task="survivorship_curator._haiku_decide",
             model=hai_core.get_model("haiku"),
             max_tokens=500,
             messages=[{"role": "user", "content": prompt + hai_core.answer_language()}],
         )
-        text = resp.content[0].text.strip()
+        text = llm_client.answer_text(resp).strip()
         m = re.search(r"\{[\s\S]*\}", text)
         if not m:
             return None

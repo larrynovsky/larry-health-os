@@ -16,6 +16,7 @@ survivorship_curator, monthly_consilium, manual). Использует Haiku д�
         - (True, mid, reason) — дубль, save_hypothesis должен пропустить.
 """
 from __future__ import annotations
+import llm_client
 import hai_core
 
 import json
@@ -105,12 +106,12 @@ def _haiku_compare(candidate_obs: str, existing: list[dict]) -> tuple[bool, int 
 
     try:
         client = get_client()
-        resp = client.messages.create(
+        resp = client.messages.create(task="hypothesis_semantic_check._haiku_compare",
             model=hai_core.get_model("haiku"),
             max_tokens=400,
             messages=[{"role": "user", "content": prompt}],
         )
-        text = resp.content[0].text.strip()
+        text = llm_client.answer_text(resp).strip()
         # Грубый JSON-extract
         import re
         m = re.search(r"\{[^{}]*\}", text, re.DOTALL)

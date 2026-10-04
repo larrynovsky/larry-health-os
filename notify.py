@@ -200,7 +200,43 @@ def repairer_alive() -> bool:
         seen = int((_faults_journal().parent / REPAIR_SEEN).read_text().strip())
     except (OSError, ValueError):
         return False
-    return 0 <= get_now().timestamp() - seen <= REPAIR_FRESH_S
+    return 0 <= get_now().timestamp() - seen <= REPAIR_FRESH_S and _night_cycle_covered()
+
+
+NIGHT_CYCLE_RECEIPT = "night_cycle_last_run.json"   # пишет night_cycle._heartbeat_path — тот же файл
+
+
+def _night_cycle_covered() -> bool:
+    """Отработал ли ночной разбор свой последний плановый запуск — по живому расписанию.
+
+    Сбой доезжает до ремонта только через разбор: журнал → integrity → night_cycle → стол →
+    night_repair. 03.10 ремонт жил (отметка 08:40), а разбор в 08:00 упал на том же сбое, что
+    и утренний отчёт; бот обещал починку, которой не могло быть. Порога-числа нет: ритм берётся
+    из плиста (plist_env_liveness), «не судимо» (None) — не обещаем."""
+    import json
+    from _time_inject import get_now
+    path = Path(os.environ.get("HEALTH_NIGHT_CYCLE_RECEIPT") or
+                _faults_journal().parent / NIGHT_CYCLE_RECEIPT)
+    try:
+        ran_at = str(json.loads(path.read_text(encoding="utf-8"))["ran_at"])
+        import plist_env_liveness as pl
+        from owner_nag import NIGHT_CYCLE_LABEL
+        return pl.artifact_covers_last_fire(NIGHT_CYCLE_LABEL, ran_at, get_now()) is True
+    except Exception:  # noqa: BLE001 — нет квитанции/расписания = дорога не доказана, не обещаем
+        return False
+
+
+def honest_key(person_key: str) -> str:
+    """Ключ строки, обещающей «передал на починку», или её пара `.unrepaired`, если дорога
+    до ремонта не доказана. У строки без пары ключ не меняется (обещания в ней нет — сторож
+    tests/unit/test_repair_promise.py::test_every_repair_promise_has_unrepaired_pair)."""
+    alt = f"{person_key}.unrepaired"
+    try:
+        import i18n
+        i18n.t(alt, "ru")
+    except KeyError:
+        return person_key
+    return person_key if repairer_alive() else alt
 
 
 def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -> "str | None":
@@ -260,6 +296,8 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -
         from release_notice import REPO   # один дом адреса открытого репозитория
         kw = {**kw, "code": code, "link": f"https://github.com/{REPO}/blob/main/docs/how-to/"
                                           + i18n.t("common.error.fault_page")}
+    elif person_key != "common.error.our_side":
+        person_key = honest_key(person_key)
     import i18n
     return i18n.t(person_key, **kw)
 

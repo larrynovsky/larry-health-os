@@ -84,7 +84,16 @@ echo "  repo=$LOCAL_REPO"
 STAGING="$(ssh "$STUDIO" "mkdir -p '$STAGING_ROOT' && mktemp -d '$STAGING_ROOT/run.XXXXXXXX'" 2>/dev/null || echo "")"
 case "$STAGING" in
   "$STAGING_ROOT"/run.*) ;;
-  *) echo "ОШИБКА: не удалось создать каталог стенда на Studio (получено: '$STAGING')" >&2; exit 1 ;;
+  *) echo "ОШИБКА: не удалось создать каталог стенда на Studio (получено: '$STAGING')" >&2
+     # Урок C-146 (03.10): пустой ответ чаще всего значит, что Studio недоступна, — так было, когда
+     # Tailscale на MacBook разлогинился, и очередь закрытий простояла ~6 часов. Называем причину.
+     TS=/Applications/Tailscale.app/Contents/MacOS/Tailscale
+     if [[ -x "$TS" ]] && "$TS" status 2>&1 | grep -qi "logged out"; then
+       echo "  ПРИЧИНА: Tailscale на этой машине разлогинен — войдите в Tailscale и повторите." >&2
+     elif ! ssh -o ConnectTimeout=8 "$STUDIO" true 2>/dev/null; then
+       echo "  ПРИЧИНА: Studio ($STUDIO) не отвечает по ssh — проверьте, что она включена и в сети." >&2
+     fi
+     exit 1 ;;
 esac
 STAGING_SECRETS="$STAGING/.secrets_staging"
 echo "  стенд=$STAGING (свой на этот запуск, убирается при выходе)"

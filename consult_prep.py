@@ -351,12 +351,12 @@ def prepare_visit_report(consultation_date: str,
 Пиши кратко и конкретно. Это документ для врача, не для пациента."""
 
     client = _get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="consult_prep.prepare_visit_report",
         model=hai_core.get_model("sonnet"),
         max_tokens=3000,
         messages=[{"role": "user", "content": prompt + hai_core.answer_language()}]
     )
-    report_text = resp.content[0].text.strip()
+    report_text = llm_client.answer_text(resp).strip()
 
     # Сохраняем файл
     filename = f"consult_{specialist_type}_{consultation_date}.md"
@@ -490,12 +490,12 @@ def prepare_hypothesis_query(hypothesis_id: int) -> str:
 Пиши как врач врачу. Используй конкретные числа из предоставленных данных. Кратко, без воды."""
 
     client = _get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="consult_prep.prepare_hypothesis_query",
         model=hai_core.get_model("sonnet"),
         max_tokens=3500,
         messages=[{"role": "user", "content": prompt + hai_core.answer_language()}]
     )
-    query_text = resp.content[0].text.strip()
+    query_text = llm_client.answer_text(resp).strip()
 
     # Сохраняем файл
     filename = f"consult_query_hyp{hypothesis_id}_{get_today()}.md"

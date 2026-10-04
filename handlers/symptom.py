@@ -35,7 +35,7 @@ def _classify_symptom(caption: str) -> bool:
     import hai_core
     try:
         client = hai_core.get_client()
-        r = client.messages.create(
+        r = client.messages.create(task="handlers/symptom._classify_symptom",
             model=hai_core.get_model("haiku"), max_tokens=5,
             system="Отвечай одним словом: да или нет.",
             messages=[{"role": "user", "content":

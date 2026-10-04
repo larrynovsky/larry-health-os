@@ -16,6 +16,7 @@ memory_facts. Применение — отдельный человек-гей�
 Действия: KEEP | MERGE | DEFER | STALE | SUPERSEDE.
 """
 from __future__ import annotations
+import llm_client
 
 import json as _json
 import logging
@@ -132,13 +133,13 @@ def propose(persist: bool = True, batch_size: int = 40) -> list[dict]:
     for i in range(0, len(facts), batch_size):
         chunk = facts[i:i + batch_size]
         facts_txt = "\n".join(f"{f['key']} | {f['value']}" for f in chunk)
-        resp = client.messages.create(
+        resp = client.messages.create(task="memory_consolidation.propose",
             model=hai_core.get_model(_MODEL_ROLE),
             max_tokens=8192,
             system=SYSTEM + hai_core.answer_language(),
             messages=[{"role": "user", "content": PROMPT.format(facts=facts_txt)}],
         )
-        raw = resp.content[0].text.strip()
+        raw = llm_client.answer_text(resp).strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             raw = raw[4:] if raw.startswith("json") else raw
@@ -228,13 +229,13 @@ def propose_merges(persist: bool = True) -> list[dict]:
     facts_txt = "\n".join(f"{k} | {v}" for k, v in src)
 
     client = hai_core.get_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="memory_consolidation.propose_merges",
         model=hai_core.get_model(_MODEL_ROLE),
         max_tokens=4096,
         system=MERGE_SYSTEM,
         messages=[{"role": "user", "content": MERGE_PROMPT.format(facts=facts_txt)}],
     )
-    raw = resp.content[0].text.strip()
+    raw = llm_client.answer_text(resp).strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         raw = raw[4:] if raw.startswith("json") else raw

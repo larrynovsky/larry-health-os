@@ -84,7 +84,7 @@ $TS serve status
 ```
 
 CalDAV (если тенант пользуется Напоминаниями): создайте `~/.health_caldav/config` и `users` по образцу
-пробы этапа 3, пароль — новый, файл `users` с правами 600; `$TS serve --bg --https=5232 http://127.0.0.1:5232`;
+пробы этапа 3, пароль — новый, в `users` — его bcrypt-хеш (`htpasswd_encryption = bcrypt` в `config`), права 600; `$TS serve --bg --https=5232 http://127.0.0.1:5232`;
 положите `caldav.json` ({"url", "username", "password"}) в `$S` (права 600); перенесите открытые задачи:
 
 ```sh

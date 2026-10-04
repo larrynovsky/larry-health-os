@@ -218,9 +218,9 @@ def _model_name() -> str:
 def _default_llm_call(system: str, user: str) -> str:
     import anthropic
     client = llm_client.guarded_client()
-    resp = client.messages.create(model=_model_name(), max_tokens=4000,
+    resp = client.messages.create(task="food_rule_generator._default_llm_call", model=_model_name(), max_tokens=4000,
                                   system=system + __import__("hai_core").answer_language(), messages=[{"role": "user", "content": user}])
-    return resp.content[0].text
+    return llm_client.answer_text(resp)
 
 
 def generate_shadow(input_pkg: str, period_days: int = 30, *, llm_call=None,

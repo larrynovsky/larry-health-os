@@ -62,8 +62,16 @@ def journal(tmp_path, monkeypatch):
 
 
 def _seen(journal, age_s):
+    """Отметка ремонта нужного возраста; ночной разбор — свежий (его судит test_repair_promise)."""
     import notify
     (journal.parent / notify.REPAIR_SEEN).write_text(str(int(time.time() - age_s)))
+    _cycle_ran(journal.parent)
+
+
+def _cycle_ran(logs):
+    import datetime as _d
+    import notify
+    (logs / notify.NIGHT_CYCLE_RECEIPT).write_text(json.dumps({"ran_at": _d.datetime.now().isoformat()}))
 
 
 def test_repairer_alive_promises_repair(journal):
@@ -123,4 +131,5 @@ def test_night_repair_mark_is_read_by_the_bot(tmp_path, monkeypatch):
     monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(tmp_path / "repo" / "logs" / "faults.jsonl"))
     assert not notify.repairer_alive()
     assert night_repair._mark_repairer_seen()
+    _cycle_ran(tmp_path / "repo" / "logs")
     assert notify.repairer_alive()

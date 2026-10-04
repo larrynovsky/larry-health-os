@@ -18,6 +18,7 @@ git commit через Claude API и обновляет:
 Вызывается из: .git/hooks/post-commit (через run_checks.sh)
 """
 
+import llm_client
 from _time_inject import get_today, get_now  # seam
 import argparse
 import difflib
@@ -283,12 +284,12 @@ def analyze_diff(commit_msg: str, diff: str, description: str = "") -> dict:
 <reasoning>1 предложение</reasoning>
 </result>"""
 
-    resp = client.messages.create(
+    resp = client.messages.create(task="doc_agent.analyze_diff",
         model=_model(),
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}]
     )
-    text = resp.content[0].text
+    text = llm_client.answer_text(resp)
 
     def extract(tag):
         m = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
@@ -510,10 +511,10 @@ def _regen_change_section(client, entry: dict, old_text: str, new_body: str,
     if secret_guard.find_secret_values(prompt):
         return "## Что изменилось\n\n(сравнение пропущено: SEC-21)" + stamp
     try:
-        resp = client.messages.create(
+        resp = client.messages.create(task="doc_agent._regen_change_section",
             model=_model(), max_tokens=1000,
             messages=[{"role": "user", "content": prompt}])
-        sec = resp.content[0].text.strip()
+        sec = llm_client.answer_text(resp).strip()
         if sec.startswith("```"):
             sec = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", sec).strip()
         if not sec.startswith("## Что изменилось"):
@@ -533,6 +534,22 @@ def _insert_change_section(body: str, section: str) -> str:
             idx = i + 1
             break
     return "".join(lines[:idx]) + "\n" + section + "\n\n" + "".join(lines[idx:])
+
+
+def _private_probe_mark(entry: dict, delta_facts: list[str]) -> str:
+    """Пометка закрытой части для строки delta-facts (урок C-143, нить task-dedup-tails 04.10).
+
+    Строка пишется дословно из реестра, а носитель доказательства инварианта (поле probe)
+    обычно лежит в plans/ — в закрытой части. Публичная страница с голым закрытым путём
+    краснела только на полном прогоне закрытия (test_public_doc_refs). Источник путей тот же,
+    что у дельты, — поля probe инвариантов записи; дом закрытой зоны — pii_census."""
+    text = json.dumps(delta_facts, ensure_ascii=False)
+    paths = {p for inv in entry.get("invariants") or [] for p in ir.probes_of(inv) if p in text}
+    if not paths:
+        return ""
+    import pii_census as pc
+    globs = pc._zones(pc.ROOT)
+    return " (файл пробы — в закрытой части)" if any(pc._is_private(p, globs) for p in paths) else ""
 
 
 def regenerate_intent_page(entry_id: str, dry_run: bool = False) -> bool:
@@ -564,10 +581,10 @@ def regenerate_intent_page(entry_id: str, dry_run: bool = False) -> bool:
 
     import llm_client
     client = llm_client.guarded_client()
-    resp = client.messages.create(
+    resp = client.messages.create(task="doc_agent.regenerate_intent_page",
         model=_model(), max_tokens=2500,  # 1500 обрезал длинные страницы на полуслове
         messages=[{"role": "user", "content": prompt}])
-    body = resp.content[0].text.strip()
+    body = llm_client.answer_text(resp).strip()
     if body.startswith("```"):
         body = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", body).strip()
 
@@ -581,7 +598,7 @@ def regenerate_intent_page(entry_id: str, dry_run: bool = False) -> bool:
         f"     Перегенерируется doc_agent.py --regen-intent по сигналу сторожа (провенанс-свежесть). -->\n"
         f"{ir.provenance_comment(entry)}\n"
         f"<!-- delta-facts (детерминировано, источник истины «что поменялось»): "
-        f"{json.dumps(delta_facts, ensure_ascii=False)} -->\n\n"
+        f"{json.dumps(delta_facts, ensure_ascii=False)}{_private_probe_mark(entry, delta_facts)} -->\n\n"
     )
     page = _ensure_ru_switch(header + body + "\n", page_path.name,
                              page_path.stem + ".en.md")
@@ -708,9 +725,9 @@ def translate_page(page: str, *, entry: dict | None = None, dry_run: bool = Fals
         leaked = secret_guard.find_secret_values(prompt)
         if leaked:
             print(f"🛑 SEC-21: секреты в промпте ({', '.join(leaked)}) — блок"); return False
-        resp = client.messages.create(model=_model(), max_tokens=8000,
+        resp = client.messages.create(task="doc_agent.translate_page", model=_model(), max_tokens=8000,
                                       messages=[{"role": "user", "content": prompt}])
-        en_body = resp.content[0].text.strip() + "\n"
+        en_body = llm_client.answer_text(resp).strip() + "\n"
         problems = _en_problems(entry, ru_body, en_body)
         if not problems:
             break
@@ -826,13 +843,13 @@ def regenerate_install_page(page: str, dry_run: bool = False) -> bool:
         print(f"🛑 SEC-21: секреты в промпте ({', '.join(leaked)}) — блок")
         return False
     try:
-        resp = llm_client.guarded_client().messages.create(
+        resp = llm_client.guarded_client().messages.create(task="doc_agent.regenerate_install_page",
             model=_model(), max_tokens=16000, messages=[{"role": "user", "content": prompt}])
         if getattr(resp, "stop_reason", None) == "max_tokens":
             raise ValueError("ответ модели обрезан по max_tokens")
         # Модель, несмотря на просьбу, иногда оборачивает JSON в ```json … ``` (замер 30.09: две
         # попытки подряд, обе отказ «Expecting value») — снимаем ОДНУ внешнюю ограду, не больше.
-        text = resp.content[0].text.strip()
+        text = llm_client.answer_text(resp).strip()
         fenced = re.fullmatch(r"```(?:json)?[ \t]*\n(.*)\n```", text, re.S)
         # Замер 02.10: ответ начался с разбора расхождений прозой, JSON — в ограде после неё
         # (две попытки подряд, обе «Expecting value»). Берём объект, начинающийся с {"page".

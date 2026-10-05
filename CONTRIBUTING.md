@@ -6,6 +6,10 @@ for the bot's own interface texts; model-generated prose remains Russian. The RE
 installation tutorial and several guides have English versions; other documentation remains
 Russian-only. English contributions are welcome.
 
+Read [AGENTS.md](AGENTS.md) for the public development contract: architecture,
+design invariants, discovery before editing, isolated setup, and evidence expected
+in review. It applies to human contributors and coding agents alike.
+
 ## How a PR gets in
 
 The public GitHub repository is a one-way mirror of the author's private working
@@ -41,13 +45,11 @@ every commit, a disposability sidecar contract for new modules
 ([docs/how-to/disposability_gate.md](docs/how-to/disposability_gate.md)), and contract tests. You don't need to master these
 upfront; the maintainer will help you through them.
 
-On macOS with Apple Silicon and Homebrew Python 3.11, run these commands from the
-repository root (from [README's Installation section](README.md#installation)):
-
-```bash
-/opt/homebrew/bin/python3.11 scripts/clean_clone_probe.py   # fresh install in a temp directory
-/opt/homebrew/bin/python3.11 -m pytest -q                   # tests, about five minutes
-```
+For a public clone, follow the
+[isolated setup and test workflow in AGENTS.md](AGENTS.md#public-clone-development-and-checks).
+It installs pinned dependencies in a virtual environment and generates missing
+runtime templates before tests. Choose tests for the affected behavior and its
+failure paths; broaden validation when the change warrants it.
 
 Tests marked `owner_data` are skipped in the public copy because the author's
 private data is absent. Tell us what you ran and what passed or failed.

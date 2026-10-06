@@ -499,6 +499,7 @@ OWNER_BACKUPS_REL = "container_backups/health"   # не «health*»: иначе 
 
 
 HOST_LOGS = "/app/host_logs"   # журналы хоста в контейнере владельца (только чтение)
+DIGEST_DIR = "/app/outputs/weekly_digest"   # = weekly_digest.OUT_DIR в образе (ROOT=/app)
 
 
 def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> dict[str, str]:
@@ -529,7 +530,11 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> 
             f"{repo}/logs:{HOST_LOGS}:ro",
             # единственный пишущий том хоста: бэкапы базы — вне ВМ Colima, где лежит сама база
             # (удаление профиля или сбой образа диска не уносят и базу, и её бэкапы разом, 30.09)
-            f"{home}/{OWNER_BACKUPS_REL}:{DOCKER_VALUES['DATA']}/backups"]
+            f"{home}/{OWNER_BACKUPS_REL}:{DOCKER_VALUES['DATA']}/backups",
+            # дайджест недели: генератор — на хосте (launchd сб 22:00, ему нужен git), бот — здесь.
+            # Запись нужна: бот кладёт рядом свой вердикт <неделя>.gate.<тег>.json. Без тома бот
+            # с 30.09 видел «дайджеста нет» и молчал — W40 владельцу потерян (нить digest-container)
+            f"{repo}/outputs/weekly_digest:{DIGEST_DIR}"]
     services = {name: {"hostname": primary_host, "volumes": list(vols)} for name in base}
     # HEALTH_HOST_LOGS — где в контейнере журналы хоста: по ним ночная проверка судит хостовые
     # службы владельца (сторож незакоммиченного, нить host-container-split 03.10).

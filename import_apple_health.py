@@ -40,14 +40,19 @@ def historical_export():
     return max(candidates, key=lambda p: p.stat().st_size) if candidates else None
 
 # ── Logging ────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler(Path.home() / f"health_apple_import{_LOG_SFX}.log"),
-        logging.StreamHandler()
-    ]
-)
+def _setup_logging() -> None:
+    """Журнал скрипта — только при запуске скрипта (нить treatment-tails, 04.10.2026).
+    До этого basicConfig стоял на уровне модуля: любой импорт (тесты, бот) создавал
+    ~/health_apple_import{суффикс}.log и перехватывал корневое логирование импортёра;
+    у Studio в домашней папке накопилось 392 пустых файла на модуль от прогонов тестов."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[
+            logging.FileHandler(Path.home() / f"health_apple_import{_LOG_SFX}.log"),
+            logging.StreamHandler()
+        ]
+    )
 log = logging.getLogger(__name__)
 
 
@@ -545,6 +550,7 @@ def _mark_apple_health_fresh() -> None:
 
 
 if __name__ == "__main__":
+    _setup_logging()
     # Tenant-safety (2026-07-02): источник Apple Health — ХАРДКОД владельца (его
     # iCloud HealthExport/HISTORICAL_JSON). Запись в чужой тенант = утечка данных
     # владельца (инцидент: Oura/AppleHealth владельца осели в БД партнёра). Разрешаем

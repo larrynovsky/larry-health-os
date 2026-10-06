@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import llm_client
 import hai_core
+import consilium_roster
 
 import asyncio
 import json
@@ -449,6 +450,16 @@ ROUND_A_TASK = """
 """
 
 
+def _roles() -> dict:
+    """{участник: промпт} — медицина + lifestyle; совпавшее имя схлопнуло бы участника молча."""
+    pairs = [(spec, _read_medical_prompt(key)) for spec, key in _medical_specialists()]
+    pairs += list(_lifestyle_participants(_patient_brief()))
+    roles = dict(pairs)
+    if len(roles) != len(pairs):
+        raise ValueError(f"monthly_consilium: duplicate participant name: {[n for n, _ in pairs]}")
+    return roles
+
+
 async def _call_round_a(client, name: str, role: str, input_pkg: str, sem) -> dict:
     """Один specialist в Round A."""
     async with sem:
@@ -483,14 +494,12 @@ async def _run_round_a(input_pkg: str) -> list[dict]:
     client = llm_client.guarded_client()
     sem = asyncio.Semaphore(4)
 
-    tasks = []
-    for spec, key in _medical_specialists():
-        role = _read_medical_prompt(key)
-        tasks.append(_call_round_a(client, spec, role, input_pkg, sem))
-    for display, prompt in _lifestyle_participants(_patient_brief()):
-        tasks.append(_call_round_a(client, display, prompt, input_pkg, sem))
-
-    return await asyncio.gather(*tasks)
+    roles = _roles()
+    askers = {name: (lambda name=name, role=role: _call_round_a(client, name, role, input_pkg, sem))
+              for name, role in roles.items()}
+    # Все обязаны ответить (consilium_roster.ask_all): не ответивший — повтор, затем отказ.
+    answers = await consilium_roster.ask_all(askers, lambda r: bool(r.get("ok")), "monthly_consilium round A")
+    return [answers[n] for n in roles]
 
 
 # ── Round B: каждый видит ПОЛНЫЕ findings остальных ───────────────────────────
@@ -571,14 +580,12 @@ async def _run_round_b(input_pkg: str, round_a_findings: list[dict]) -> list[dic
     client = llm_client.guarded_client()
     sem = asyncio.Semaphore(4)
 
-    tasks = []
-    for spec, key in _medical_specialists():
-        role = _read_medical_prompt(key)
-        tasks.append(_call_round_b(client, spec, role, input_pkg, round_a_findings, sem))
-    for display, prompt in _lifestyle_participants(_patient_brief()):
-        tasks.append(_call_round_b(client, display, prompt, input_pkg, round_a_findings, sem))
-
-    return await asyncio.gather(*tasks)
+    roles = _roles()
+    askers = {name: (lambda name=name, role=role: _call_round_b(
+                  client, name, role, input_pkg, round_a_findings, sem))
+              for name, role in roles.items()}
+    answers = await consilium_roster.ask_all(askers, lambda r: bool(r.get("ok")), "monthly_consilium round B")
+    return [answers[n] for n in roles]
 
 
 # ── Coordinator: Sonnet синтезирует N финальных гипотез ──────────────────────
@@ -675,7 +682,7 @@ def _run_coordinator(input_pkg: str, round_b_findings: list[dict]) -> dict:
     try:
         resp = client.messages.create(task="monthly_consilium._run_coordinator",
             model=hai_core.model_for("consilium_coordinator"),
-            max_tokens=16000,  # 2026-06-26: raised from 8000 — genome-enriched hypotheses exceed 8k output
+            max_tokens=20000,  # 04.10 решение владельца: замер — текст 14.6k и 15.1k при 16k (94%); 06-26: 8000→16000
             system=COORDINATOR_TASK + hai_core.answer_language(),
             messages=[{"role": "user", "content": input_pkg + findings_text}],
         )
@@ -691,6 +698,14 @@ def _run_coordinator(input_pkg: str, round_b_findings: list[dict]) -> dict:
         parsed = None
     if not parsed:
         log.warning(f"Coordinator не вернул JSON. text[:300]: {text[:300]}")
+        if getattr(resp, "stop_reason", None) == "max_tokens":
+            # Обрыв на пределе ответа выглядел как «консилиум не нашёл тем» — месяц терялся молча
+            # (замер 04.10: текст 15.1k при пределе 16k). В инженерную очередь, не человеку.
+            import i18n
+            import notify
+            notify.fault(i18n.t("monthly_consilium.fault.answer_limit", "ru",
+                                tokens=getattr(resp.usage, "output_tokens", "?")), person_key=None)
+            return {"hypotheses": [], "no_hypotheses_reason": "answer limit reached"}
         return {"hypotheses": [], "no_hypotheses_reason": "JSON parse failed"}
 
     return parsed
@@ -807,6 +822,14 @@ def _alert_food_generation_gap(reason: str) -> None:
 
 # ── Main pipeline ────────────────────────────────────────────────────────────
 
+def _incomplete(e) -> list[int]:
+    """Месячный консилиум идёт из launchd/cron: исключение осталось бы в лог-файле. Неполного
+    итога нет (решение владельца 04.10) — сбой в инженерную очередь, гипотез месяца нет."""
+    import notify
+    notify.fault(f"monthly_consilium: {e.label}: {', '.join(e.missing)} / {e.total}", person_key=None)
+    return []
+
+
 def run(period_days: int = 30) -> list[int]:
     """Запуск monthly consilium. Возвращает список memory_id сохранённых гипотез."""
     end_date = get_today() - timedelta(days=1)
@@ -817,12 +840,18 @@ def run(period_days: int = 30) -> list[int]:
     log.info(f"  input_pkg: {len(input_pkg)} chars")
 
     log.info("Round A: 11 specialists discovery (Haiku, parallel sem=4)...")
-    findings_a = asyncio.run(_run_round_a(input_pkg))
+    try:
+        findings_a = asyncio.run(_run_round_a(input_pkg))
+    except consilium_roster.ConsiliumIncomplete as e:
+        return _incomplete(e)
     a_count = sum(len(f["patterns"]) for f in findings_a if f["ok"])
     log.info(f"  Round A: {a_count} findings от {sum(1 for f in findings_a if f['ok'])} specialists")
 
     log.info("Round B: peer review с полными findings (Haiku, parallel sem=4)...")
-    findings_b = asyncio.run(_run_round_b(input_pkg, findings_a))
+    try:
+        findings_b = asyncio.run(_run_round_b(input_pkg, findings_a))
+    except consilium_roster.ConsiliumIncomplete as e:
+        return _incomplete(e)
     b_count = sum(len(f["final_patterns"]) for f in findings_b if f["ok"])
     log.info(f"  Round B: {b_count} refined findings")
 

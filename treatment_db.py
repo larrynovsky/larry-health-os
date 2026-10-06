@@ -10,6 +10,24 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+# Словарь статуса режима — ЕДИНСТВЕННЫЙ дом: отсюда же health_db строит триггер в БД.
+MED_STATUSES = ("active", "completed", "discontinued")
+# Синонимы, которые приносит модель (промпт экстрактора просит ongoing|stopped), → словарь.
+# До 04.10 «ongoing» писался как есть: consult_prep (status='active') его не видел, а
+# treatment_db.get_medications видел — один факт, два противоположных прочтения.
+_STATUS_SYNONYMS = {"ongoing": "active", "stopped": "discontinued", "finished": "completed"}
+
+
+def _normalize_status(status):
+    """Статус режима → словарь. None остаётся None (UPDATE не трогает поле).
+    Неизвестное слово — ValueError: молча записать нельзя (два читателя разойдутся)."""
+    if status is None:
+        return None
+    s = _STATUS_SYNONYMS.get(str(status).strip().lower(), str(status).strip().lower())
+    if s not in MED_STATUSES:
+        raise ValueError(f"medications.status вне словаря {MED_STATUSES}: {status!r}")
+    return s
+
 
 def get_medications(confirmation: tuple = ("confirmed", "manual"),
                     include_proposed: bool = False) -> list[dict]:
@@ -53,6 +71,7 @@ def upsert_medication(
     canon = _hdb._normalize_regimen(name)
     if not canon:
         return None
+    status = _normalize_status(status)
     agents_json = _json.dumps(agents, ensure_ascii=False) if agents else None
     with _hdb.get_conn() as conn:
         row = conn.execute(

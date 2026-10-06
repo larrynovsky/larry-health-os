@@ -298,7 +298,6 @@ def prepare_visit_report(consultation_date: str,
     _cp_ident = _cp_prof.get("identity", {})
     _cp_med   = _cp_prof.get("medical",  {})
     from datetime import date as _cpd
-    _cp_name  = (_cp_ident.get("name") or "имя не указано")
     _cp_birth = _cp_ident.get("birth_date", "")
     _cp_age   = ((_cpd.today() - _cpd.fromisoformat(_cp_birth)).days // 365 if _cp_birth else None)
     _cp_dx    = "\n".join(_pc_frame(_cp_med))  # empty-profile: один дом рамки
@@ -326,7 +325,7 @@ def prepare_visit_report(consultation_date: str,
 
     prompt = f"""Ты — медицинский ассистент, помогаешь пациенту подготовиться к визиту к {specialist_type}.
 {_chat_sec}
-Пациент: {_cp_name}, {f"{_cp_age} лет" if _cp_age is not None else "возраст не указан"}.
+Пациент: {f"{_cp_age} лет" if _cp_age is not None else "возраст не указан"}.
 {_cp_dx}
 {_cp_tx_line}
 Дата визита: {_fmt_date(consultation_date)}
@@ -409,7 +408,6 @@ def prepare_hypothesis_query(hypothesis_id: int) -> str:
     _cp_ident = _cp_prof.get("identity", {})
     _cp_med   = _cp_prof.get("medical",  {})
     from datetime import date as _cpd
-    _cp_name  = (_cp_ident.get("name") or "имя не указано")
     _cp_birth = _cp_ident.get("birth_date", "")
     _cp_age   = ((_cpd.today() - _cpd.fromisoformat(_cp_birth)).days // 365 if _cp_birth else None)
     _cp_dx    = "\n".join(_pc_frame(_cp_med))  # empty-profile: один дом рамки
@@ -455,7 +453,7 @@ def prepare_hypothesis_query(hypothesis_id: int) -> str:
 
     prompt = f"""Ты — медицинский ассистент. Помогаешь сформулировать клинический запрос к специалисту.
 
-ПАЦИЕНТ: {_cp_name}, {f"{_cp_age} лет" if _cp_age is not None else "возраст не указан"}
+ПАЦИЕНТ: {f"{_cp_age} лет" if _cp_age is not None else "возраст не указан"}
 {_cp_dx}
 {_cp_tx_line}
 {pet_line}

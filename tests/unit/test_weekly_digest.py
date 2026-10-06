@@ -96,6 +96,38 @@ def test_due_table(now, digest, verd, last, expect):
     assert wd.due(now, digest, verd, last) == expect
 
 
+@pytest.mark.parametrize("decision,now,digest,dir_ok,expect", [
+    # 04.10: текста нет, папка генератора есть, вс после 09:00 — раньше молчало, W40 потерян
+    ("wait", SUN9, None, True, True),
+    ("wait", SUN9, None, False, False),          # генератора у установки нет — молчание законно
+    ("wait", datetime(2026, 9, 6, 8, 59), None, True, False),   # до окна доставки
+    ("wait", datetime(2026, 9, 5, 23, 0), None, True, False),   # суббота
+    ("wait", SUN9, D, False, True),              # текст есть, вердикта соседа нет
+    ("blocked", datetime(2026, 9, 5, 22, 5), D, True, True),    # блок — сразу
+    ("blocked", SUN9, None, True, False),
+    ("send", SUN9, D, True, False),
+    ("done", SUN9, D, True, False),
+])
+def test_alarm_table(decision, now, digest, dir_ok, expect):
+    assert wd.alarm(decision, now, digest, dir_ok) is expect
+
+
+def test_чужой_блок_из_общей_папки_блокирует_и_того_кто_видит_только_себя(tmp_path, monkeypatch):
+    """С 30.09 владелец (контейнер) и партнёр (хост) видят тенантом только себя; общая папка —
+    единственное место, где встречаются их вердикты. Блок соседа обязан остановить и меня."""
+    monkeypatch.setattr(wd, "OUT_DIR", tmp_path)
+    w = "2026-W41"
+    (tmp_path / f"{w}.gate.health.json").write_text('{"verdict": "pass"}')
+    (tmp_path / f"{w}.gate.health_partner.json").write_text('{"verdict": "blocked"}')
+    (tmp_path / f"{w}.gate.health_partner.tmp").write_text("недописанный")   # tmp не вердикт
+    v = wd.verdicts(w, ["health"])
+    assert v == {"health": "pass", "health_partner": "blocked"}
+    assert wd.due(datetime(2026, 10, 11, 9, 0), {**D, "week": w}, v, "2026-W40") == "blocked"
+    (tmp_path / f"{w}.gate.health_partner.json").write_text("{битый")
+    assert "blocked" in wd.verdicts(w, ["health"]).values()          # битый чужой — не pass
+    assert wd.verdicts("2026-W42", ["health"]) == {"health": None}    # своего нет — ждём
+
+
 def test_scrub_secret_paths():
     assert wd._scrub_secret_paths("файл ~/.health_secrets/anthropic_key") == "файл <secret-path>"
     assert wd._scrub_secret_paths("/Users/x/.health_secrets_partner/telegram_token и") == "<secret-path> и"

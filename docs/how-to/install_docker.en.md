@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/install_docker.md sha256:0fd67204fef3 -->
+<!-- translation-of: docs/how-to/install_docker.md sha256:26421a92af5f -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](install_docker.md)
@@ -38,7 +38,7 @@ cd health_scripts
 python3 scripts/install.py --docker --tz Europe/Berlin
 ```
 
-Summary line: `cron 25, service 3, env 1, host 5, none 3 (total 37)`. `compose.yaml` and `.env`
+Summary line: `cron 26, service 3, env 1, host 5, none 3 (total 38)`. `compose.yaml` and `.env`
 will appear in `build/docker/`, and `.dockerignore` in the root. All of this is generated; do not edit by hand.
 
 ## 2. Build the Image

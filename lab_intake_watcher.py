@@ -130,11 +130,19 @@ def force_lab(path: Path) -> None:
     log.info(f"человек подтвердил тип «lab»: {path.name} — возьмём следующим опросом")
 
 
-def _is_lab(path: Path) -> bool:
+def _is_lab(path: Path) -> bool | None:
     """Гейт: распознаватель зовём ТОЛЬКО на лабораторные бланки.
 
-    Архив может содержать документы разных типов. Текстовая классификация
-    исключает неподходящие файлы до платного vision-вызова.
+    True — бланк; False — не бланк (его разберёт маршрут заключений); None — файл не читается.
+
+    Два суда по порядку цены. Сначала слова (`import_all.classify`, бесплатно). Их «да» — окончательное,
+    их «нет» — НЕТ: словарь слов — данные установки (§9), и на новой установке он пуст (`'{}'`), а
+    встроенные признаки — английская шапка, латинская триада анализа крови, грузинский Synevo. Русский
+    бланк Инвитро на такой установке получал «общий медицинский документ», и человек слышал «не удалось
+    распознать», хотя модель его ни разу не видела (нить lab-intake-retry, 05.10: установка на Windows,
+    «большинство чистых PDF не распознаёт»). Поэтому «нет» слов переспрашивается у модели по первой
+    странице (`doc_triage`, младшая модель, один кадр) — у неё безопасная сторона «lab» при любом
+    сомнении и при сбое, тот же принцип, что у фото из бота.
     """
     import import_all
     try:
@@ -143,12 +151,18 @@ def _is_lab(path: Path) -> bool:
             with fitz.open(str(path)) as doc:
                 if doc.page_count > lab_recognizer._MAX_PAGES:
                     raise lab_recognizer.PageLimitExceeded(doc.page_count, lab_recognizer._MAX_PAGES)
-        return import_all.classify(path, import_all.extract_text(path)) == "lab"
+        if import_all.classify(path, import_all.extract_text(path)) == "lab":
+            return True
+        first = lab_recognizer._render_pages(path, [1])[0]
     except lab_recognizer.PageLimitExceeded:
         raise
     except Exception as e:  # noqa: BLE001 — нечитаемый файл не лаб и не авария
         log.warning(f"classify failed {path.name}: {e}")
-        return False
+        return None
+    import doc_triage
+    verdict = doc_triage.classify_image(first, "image/jpeg")
+    log.info(f"слова: не бланк; модель: {verdict['label']} (fallback={verdict['fallback']}) — {path.name}")
+    return verdict["label"] == doc_triage.LAB
 
 
 def _processed() -> set[str]:
@@ -291,6 +305,10 @@ def process_once() -> int:
             na.unlink(missing_ok=True)   # чтение анализов стало допущено (сменили ключ или модель) — разбираем сами
         if f.name in done:
             continue
+        wk = f.with_suffix(f.suffix + KEY_WAIT)
+        waiting = wk.exists()
+        if waiting and _age(wk) < KEY_RETRY_SEC:
+            continue   # ждём ключ: повтор не чаще KEY_RETRY_SEC (пустой ключ отвечает отказом бесплатно)
         if not _stable(f):
             continue
         human = f.name in forced
@@ -302,20 +320,32 @@ def process_once() -> int:
         if not human and f.name in notlab:
             continue              # уже смотрели: не лабораторная таблица
         run_id = f"intake_{get_now():%Y%m%d_%H%M%S}"
+        name = _shown(f)
         try:
-            if not human and not _is_lab(f):
+            lab = True if human else _is_lab(f)
+            if not lab:
                 # В CR/ лежат документы разных типов; ответ нужен приславшему файл в бот.
                 # Вердикт сохраняется ДО ответа: последующие опросы не шлют его снова.
+                # Два разных ответа (05.10): «не бланк» — правда о суждении, и файл не потерян:
+                # его разбирает маршрут заключений (import_medical_events, выше в этом проходе);
+                # «не читается» — правда о файле. До 05.10 оба звучали «пришлите почётче».
                 notlab.add(f.name)
                 state["notlab"] = sorted(notlab)
                 saved = _save_state(state)
+                wk.unlink(missing_ok=True)
                 if saved and f.parent == _incoming():
-                    _tell_person("person.lab.not_readable", file=f.name)
-                log.info(f"[{tenant}] не лабораторная таблица, пропуск: {f.name}")
+                    _tell_person("person.lab.not_readable" if lab is None else "person.lab.not_lab",
+                                 file=name)
+                log.info(f"[{tenant}] не лабораторная таблица ({lab}), пропуск: {f.name}")
                 continue
             log.info(f"[{tenant}] recognize {f.name} run={run_id}")
             summary = lab_backfill.run_backfill(run_id, None, None, str(f), None)
             rows = summary.get("rows", 0)
+            wk.unlink(missing_ok=True)
+            if rows == 0 and summary.get("errors"):
+                # Распознаватель упал, а не «прочитал и не нашёл»: run_backfill проглатывает сбой
+                # документа в счётчик errors. Это сбой у нас — ветка сбоя ниже, не «0 строк».
+                raise RuntimeError(f"lab_backfill: {summary['errors']} ошибок, 0 строк")
             if rows == 0:
                 # РАСХОЖДЕНИЕ, а не успех. Файл попал сюда потому, что кто-то счёл его
                 # лабораторной таблицей (doc_triage или рука), а распознаватель не увидел
@@ -325,14 +355,14 @@ def process_once() -> int:
                 # файл берётся КАЖДЫЙ поллинг, и сигнал превращается в шторм раз в минуту.
                 f.with_suffix(f.suffix + ".norows").write_text(f"run={run_id} rows=0")
                 notify.fault("lab_intake_watcher: no rows recognized; retry stopped", person_key=None)
-                _tell_person("person.lab.no_rows", file=f.name)
+                _tell_person("person.lab.no_rows", file=name)
                 log.warning(f"[{tenant}] 0 строк на {f.name} — помечен .norows")
                 n += 1
                 continue
             from urllib.parse import quote, urlencode
             url = (f"{DASHBOARD_URL}/lab-review/{quote(run_id, safe='')}?" +
                    urlencode({"tenant": tenant, "show": "waiting"}))
-            _tell_person("person.lab.review", file=f.name, n=rows, url=url)
+            _tell_person("person.lab.review", file=name, n=rows, url=url)
             from secrets_paths import is_owner
             if not is_owner():
                 notify.notify_operator(i18n.t("owner.card.intake",
@@ -348,7 +378,7 @@ def process_once() -> int:
             import hai_core
             if isinstance(e, lab_recognizer.PageLimitExceeded):
                 f.with_suffix(f.suffix + ".failed").write_text(f"pages={e.pages} limit={e.limit}")
-                _tell_person("person.lab.too_long", file=f.name, pages=e.pages, limit=e.limit)
+                _tell_person("person.lab.too_long", file=name, pages=e.pages, limit=e.limit)
                 continue
             if isinstance(e, hai_core.ModelNotAdmitted):
                 f.with_suffix(f.suffix + ".notadmitted").write_text(str(e)[:500])
@@ -357,12 +387,82 @@ def process_once() -> int:
                     notify.fault("lab_intake_watcher: lab reading not admitted; person not reached",
                                  person_key=None)
                 continue
+            import llm_client
+            if llm_client.is_account_problem(e):
+                # Ключ или баланс у поставщика (05.10, установка с нулевым балансом OpenAI): чинит
+                # только человек, и после пополнения тот же файл пройдёт. Не .failed навсегда, а
+                # ожидание с повтором раз в KEY_RETRY_SEC; сказать — один раз, а не каждый повтор.
+                wk.write_text(str(e)[:300])
+                log.warning(f"[{tenant}] поставщик отказал по ключу/счёту: {f.name} ждёт ({e})")
+                if not waiting:
+                    _tell_person("person.lab.key_problem", file=name, provider=_provider_name())
+                    from secrets_paths import is_owner
+                    if not is_owner():
+                        notify.notify_operator(i18n.t("person.lab.key_problem", file=name,
+                                                      provider=_provider_name()))
+                continue
+            wk.unlink(missing_ok=True)
             log.error(f"[{tenant}] recognize failed {f.name}: {e}", exc_info=True)
             f.with_suffix(f.suffix + ".failed").write_text(str(e)[:500])
             notify.fault(f"lab_intake_watcher: recognition failed ({type(e).__name__}); retry stopped",
                          person_key=None)
-            _tell_person("person.lab.not_readable", file=f.name)
+            _tell_person("person.lab.failed", file=name)
     return n
+
+
+KEY_WAIT = ".waitkey"           # сайдкар «ждём ключ/баланс»; mtime — время последней попытки
+KEY_RETRY_SEC = 30 * 60        # системная механика: как часто пробовать снова, пока ключ пуст
+
+
+def _age(p: Path) -> float:
+    try:
+        return time.time() - p.stat().st_mtime
+    except OSError:
+        return float("inf")
+
+
+def _shown(f: Path) -> str:
+    """Имя файла, как его прислал человек: без хеша инбокса (`…__38860e362d5e0b69.pdf`)."""
+    from link_fetch import display_filename
+    return display_filename(f.name)
+
+
+def _provider_name() -> str:
+    import llm_client
+    p = llm_client.provider()
+    return {"anthropic": "Anthropic", "openai": "OpenAI", "gemini": "Gemini",
+            "deepseek": "DeepSeek"}.get(p, p)
+
+
+# Сайдкары отказов: каждый останавливает повторы навсегда (или до своего снятия). Повторная
+# присылка того же файла — единственный способ человека сказать «попробуй ещё», поэтому их
+# список живёт здесь, рядом с теми, кто их пишет. `.events.failed` пишет маршрут заключений.
+_REFUSAL_SIDECARS = (".failed", ".norows", ".notadmitted", KEY_WAIT, ".events.failed")
+
+
+def retry_after_refusal(path: Path) -> bool:
+    """Тот же файл прислан снова. Если прошлый разбор ОТКАЗАЛ — снять отказ и взять заново.
+
+    True — отказ был и снят (бот отвечает «беру ещё раз»); False — отказа не было (файл разобран
+    или ещё в очереди — это настоящий дубль). До 05.10 бот отвечал «уже получал — пропускаю дубль»
+    на любой повтор: файл, отвергнутый при нулевом балансе, нельзя было разобрать никогда —
+    отпечаток содержимого тот же, переименование не помогает.
+
+    Повтор файла с вердиктом «не бланк» — это человек спорит с вердиктом: тогда файл идёт в
+    распознавание мимо гейта (`force_lab`), как по кнопке «🧪 Анализы»."""
+    path = Path(path)
+    cleared = False
+    for suf in _REFUSAL_SIDECARS:
+        side = path.with_name(path.name + suf)
+        if side.exists():
+            side.unlink(missing_ok=True)
+            cleared = True
+    if path.name in set(_load_state().get("notlab", [])):
+        force_lab(path)
+        cleared = True
+    if cleared:
+        log.info(f"повтор после отказа: {path.name} — снова в очереди")
+    return cleared
 
 
 def _lab_reading_admitted() -> bool:

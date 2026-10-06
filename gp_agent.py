@@ -254,8 +254,7 @@ def _build_gp_daily_prompt(genome_in_scope: bool = True) -> str:
 @hai_core.with_answer_language
 def _build_problem_list_reviewer_prompt() -> str:
     import health_db as _db; _db.init_db()
-    _n = _db.get_profile_context().get("identity", {}).get("name") or "(имя не указано)"
-    return """Ты — клинический редактор списка проблем GP пациента __PATIENT_NAME__.
+    return """Ты — клинический редактор списка проблем GP пациента.
 
 Ты получишь:
 1. Текущий problem list (из базы данных)
@@ -290,7 +289,7 @@ def _build_problem_list_reviewer_prompt() -> str:
       "reason": "конкретное клиническое обоснование из данных"
     }
   ]
-}""".replace("__PATIENT_NAME__", _n)
+}"""
 
 
 

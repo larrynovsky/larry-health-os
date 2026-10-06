@@ -47,8 +47,11 @@ for arg in "$@"; do
 done
 
 mkdir -p "$SCRIPT_DIR/logs"
-echo "" >> "$LOG"
-echo "$(date '+%Y-%m-%d %H:%M:%S') === run_checks запущен (mode: $*) ===" >> "$LOG"
+# Строка старта — в журнал того, чей прогон (05.10.2026). Плановый прогон узнаёт тенанта ниже и
+# пишет её сам: прежде проверка партнёра оставляла здесь, в журнале владельца, одну строку
+# старта в день, и журнал выглядел как ежедневно умирающая проверка владельца.
+_start_line() { echo "" >> "$LOG"; echo "$(date '+%Y-%m-%d %H:%M:%S') === run_checks запущен (mode: $*) ===" >> "$LOG"; }
+[[ "$SCHEDULED" == "true" ]] || _start_line "$@"
 
 cd "$SCRIPT_DIR"
 
@@ -113,7 +116,9 @@ pytest_failed_ids() {
     # против пустого — и мёртвый набор тестов молчал (первое утро в контейнере: 0 тестов прогнано).
     # Такой исход получает своё имя и проходит через ту же хронику, что обычные падения.
     local ids
-    ids="$(grep '^FAILED ' "$1" | sed 's/^FAILED //; s/ .*//' | sort -u)"
+    # ERROR — тоже имя (05.10.2026): сбой фикстуры или разборки — не FAILED, и до этого дня пять
+    # таких тестов каждую ночь шли без имени мимо хроники («набор не изменился — молчим»).
+    ids="$(grep -E '^(FAILED|ERROR) ' "$1" | sed -E 's/^(FAILED|ERROR) //; s/ .*//' | sort -u)"
     if [ -n "$ids" ]; then printf '%s\n' "$ids"; else echo "pytest-не-запустился"; fi
 }
 # --- pytest_diff end ---
@@ -151,6 +156,7 @@ if [[ "$SCHEDULED" == "true" ]]; then
         TLOGS="$HEALTH_DATA_DIR/logs"; mkdir -p "$TLOGS"
         TAG="$(basename "$HEALTH_DATA_DIR")"
         LOG="$TLOGS/run_checks.log"
+        _start_line "$@"
         TJSON=$($PY integrity_tests.py --json 2>/dev/null)
         if echo "$TJSON" | $PY -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
             echo "$TJSON" > "$TLOGS/integrity_latest.json"
@@ -176,6 +182,7 @@ if [[ "$SCHEDULED" == "true" ]]; then
         $PY -c "import memory_truthcheck as m; print('A1', m.apply_confirmations()['bumped'])" >> "$LOG" 2>&1 || true
         exit 0
     fi
+    _start_line "$@"
     # ЗАХВАТ И ФОЛБЭК — РАЗНЫЕ ШАГИ (2026-08-10). Было одной строкой:
     #     INTEGRITY_JSON=$($PY integrity_tests.py --json || echo '{"fail":1,...}')
     # `$(A || B)` не выбирает между A и B: оно исполняет A, забирает её stdout и
@@ -242,9 +249,9 @@ if [[ "$SCHEDULED" == "true" ]]; then
     # красным на ?)» — о поломке, которой в бою не было. Реализовалось 02.09.
     _PYTEST_FAIL_STATE="$SCRIPT_DIR/logs/pytest_recovery_state"
     _PYTEST_OUT="$(mktemp -t health_pytest.XXXXXX)"
-    # -rf: короткая сводка со списком FAILED node-id → алерт называет, ЧТО именно сгнило
+    # -rfE (E с 05.10.2026 — сбои фикстур тоже по именам): короткая сводка со списком FAILED node-id → алерт называет, ЧТО именно сгнило
     # (какой датчик), а не «что-то в pytest упало». Гранулярность для ВСЕХ consistency-датчиков.
-    if $PY -m pytest tests/ -q --tb=no -rf > "$_PYTEST_OUT" 2>&1; then
+    if $PY -m pytest tests/ -q --tb=no -rfE > "$_PYTEST_OUT" 2>&1; then
         cat "$_PYTEST_OUT" >> "$LOG"
         echo "$(date '+%H:%M:%S') ✅ pytest tests/ OK (HEAD ${_PYTEST_HEAD})" >> "$LOG"
         # E1r (2026-07-23): recovery-пинг. Если прошлый прогон был красным — закрываем петлю.

@@ -411,3 +411,19 @@ def test_rejected_reborn_keeps_self_managed(db):
     result = resolve_hypothesis(parent_id, verdict)
     child = _load_payload(db, result["new_hypothesis_id"])["payload"]
     assert child["resolution_type"] == "self_managed"
+
+
+# ── чужая категория (05.10.2026, test-thread-leak) ─────────────────────────────
+
+def test_resolver_never_writes_a_row_of_another_category(db):
+    """Номер строки memory общий у всех категорий. Замер 05.10: решатель, получивший номер
+    строки чужой категории, пять недель дописывал в неё вердикты (ключ ниже — условный)."""
+    import hypothesis_resolution as hr
+    cur = db.execute("INSERT INTO memory (date, category, key, value, confidence, source, active) "
+                     "VALUES ('2026-03-22', 'profile_update', 'k', 'plain text', 0.9, 'conversation', 1)")
+    mid = cur.lastrowid
+    hr.set_eval_error(mid, "boom")
+    ok = hr._update_hypothesis_versioned(mid, {"observation": "x", "version": 1}, expected_version=0)
+    assert ok is False
+    assert hr._read_hypothesis_row(mid) is None
+    assert db.fetchone("SELECT value FROM memory WHERE id=?", (mid,))["value"] == "plain text"

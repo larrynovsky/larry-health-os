@@ -19,6 +19,7 @@ pending_doc_reviews). Верификацию делает lab_oracles.
 #          Замысел и инварианты — subsystem_intent.yaml, раздел lab_recognizer.
 from __future__ import annotations
 import base64
+import datetime as _dt
 import io
 import json
 import logging
@@ -77,6 +78,7 @@ _SCHEMA = """Верни ТОЛЬКО валидный JSON, без коммен�
   "doc_flag": "<H если документ пометил высоко, L если низко, N если документ ЯВНО напечатал «норма»; null если пометки нет>",
   "panel": "<тип теста: cbc | chemistry | lipids | hormones | urine | coagulation | immunoreactivity | microbiome | tumor_markers | vitamins | other>",
   "date": "<дата ВЗЯТИЯ/регистрации именно этого анализа в YYYY-MM-DD, если видна на странице; иначе null>",
+  "date_printed": "<та же дата РОВНО как напечатана, символ в символ, без перевода в другой формат: 08/12/2024, 12.08.2024; null если даты нет>",
   "page": <номер страницы, с 1>
 }]}
 
@@ -437,6 +439,64 @@ def _measure_fields(a: dict | None, b: dict | None, base: dict) -> None:
     base["field_evidence"] = json.dumps(ev, ensure_ascii=False) if ev else None
 
 
+# ДАТА — КОДОМ ИЗ НАПЕЧАТАННОЙ ФОРМЫ (нить lab-date-order, 2026-10-04). Модель переводит
+# «08/12/2024» в ISO сама и выбирает порядок день/месяц наугад: замер 04.10 — заключение,
+# где бланк печатает день первым («Date received 08/12/2024», 8 декабря), легло в staging как
+# 2024-08-12. Поэтому модель отдаёт ещё и дату как напечатана, а порядок решает код: по
+# однозначным датам того же документа (число больше 12 стоит только на месте дня). Нет
+# однозначных — дата не угадывается, строка идёт человеку (date_source=ambiguous_order).
+_PRINTED_DATE = re.compile(r"(?<!\d)(\d{1,2})[./\-](\d{1,2})[./\-](\d{4}|\d{2})(?!\d)")
+
+
+def _date_order(printed: list[str]) -> str | None:
+    """'dmy' | 'mdy' по однозначным датам документа; None — нечем решить или документ противоречит себе."""
+    seen = set()
+    for text in printed:
+        for m in _PRINTED_DATE.finditer(text or ""):
+            a, b = int(m.group(1)), int(m.group(2))
+            if a > 12 >= b:
+                seen.add("dmy")
+            elif b > 12 >= a:
+                seen.add("mdy")
+    return seen.pop() if len(seen) == 1 else None
+
+
+def _printed_iso(printed: str | None, order: str | None) -> tuple[str | None, str]:
+    """(ISO | None, как_решено): unambiguous | by_order | ambiguous | unparsed."""
+    m = _PRINTED_DATE.fullmatch((printed or "").strip())
+    if not m:
+        return None, "unparsed"
+    a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    y = y + 2000 if y < 100 else y
+    if a == b or (a > 12 >= b):
+        day, month, how = a, b, "unambiguous"
+    elif b > 12 >= a:
+        day, month, how = b, a, "unambiguous"
+    elif order == "dmy":
+        day, month, how = a, b, "by_order"
+    elif order == "mdy":
+        day, month, how = b, a, "by_order"
+    else:
+        return None, "ambiguous"
+    try:
+        return _dt.date(y, month, day).isoformat(), how
+    except ValueError:
+        return None, "unparsed"
+
+
+def _doc_page_texts(doc_path: Path) -> list[str]:
+    """Текстовый слой PDF для порядка дат (дата рождения, «Referral Date» — тоже улики).
+    Скан или не-PDF — пусто: тогда порядок решают только даты, прочитанные моделью."""
+    if doc_path.suffix.lower() != ".pdf":
+        return []
+    try:
+        import lab_specimen
+        return lab_specimen.page_texts(doc_path)
+    except Exception as e:   # битый PDF → без улик текстового слоя, решение по датам модели
+        log.warning(f"lab_recognizer: текстовый слой {doc_path.name} не прочитан ({type(e).__name__}) — порядок дат только по модели")
+        return []
+
+
 def _reconcile(p1: list[dict], p2: list[dict]) -> list[dict]:
     """Слияние двух проходов по canonical_name. agree/disagree/single."""
     by1 = {_key(t): t for t in p1 if _key(t)}
@@ -500,23 +560,44 @@ def recognize(doc_path: str | Path, date: str,
     tests: list[dict] = []
     p1_total = p2_total = 0
     last_read = None   # B1: перенос прочитанной даты на страницы-продолжения
+    pages_read = []
     for idx, png in zip(numbers, rendered):
         p1 = _vision_call(png, prompt_p1, model_pass1)
         p2 = _vision_call(png, prompt_p2, model_pass2)
         p1_total += len(p1)
         p2_total += len(p2)
-        page_tests = _reconcile(p1, p2)
+        pages_read.append((idx, _reconcile(p1, p2)))
+    # Порядок день/месяц — по всему документу сразу: однозначная дата на стр. 3 решает
+    # неоднозначную на стр. 1. Поэтому сначала все страницы, потом даты.
+    order = _date_order(_doc_page_texts(doc_path)
+                        + [t.get("date_printed") or "" for _, pt in pages_read for t in pt])
+    for idx, page_tests in pages_read:
+        ambiguous = set()
+        for t in page_tests:
+            iso, how = _printed_iso(t.get("date_printed"), order)
+            model_iso = (t.get("date") or "").strip()
+            if iso and iso != model_iso:
+                ev = json.loads(t.get("field_evidence") or "{}")
+                ev["date"] = [model_iso or None, t.get("date_printed")]
+                t["field_evidence"] = json.dumps(ev, ensure_ascii=False)
+                t["date"] = iso
+            elif how == "ambiguous":
+                ambiguous.add(id(t))
         pd = [(t.get("date") or "").strip() for t in page_tests if (t.get("date") or "").strip()]
         page_read = max(set(pd), key=pd.count) if pd else None
+        amb_dates = {(t.get("date") or "").strip() for t in page_tests if id(t) in ambiguous}
+        sure_dates = {(t.get("date") or "").strip() for t in page_tests if id(t) not in ambiguous}
         if page_read:
             last_read = page_read
         for t in page_tests:
             t["page"] = idx   # провенанс: страница авторитетна
             td = (t.get("date") or "").strip()
             if td:
-                t["date"], t["date_source"] = td, "read"
+                t["date"], t["date_source"] = td, ("ambiguous_order" if id(t) in ambiguous else "read")
             elif page_read:
-                t["date"], t["date_source"] = page_read, "read"
+                # дата страницы взята только у неоднозначных строк — и наследник неоднозначен
+                t["date"], t["date_source"] = page_read, (
+                    "ambiguous_order" if page_read in amb_dates and page_read not in sure_dates else "read")
             elif last_read:
                 t["date"], t["date_source"] = last_read, "inherited"
             else:

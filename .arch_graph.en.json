@@ -140,7 +140,8 @@
   ],
   "consilium_roster": [
     "_time_inject",
-    "health_db"
+    "health_db",
+    "i18n"
   ],
   "constitution_analysis": [
     "_time_inject",
@@ -681,6 +682,12 @@
     "import_status_db",
     "notify"
   ],
+  "import_withings": [
+    "health_db",
+    "notify",
+    "region_pack",
+    "withings_api"
+  ],
   "ingest_lan": [
     "daemon_liveness",
     "infra_config"
@@ -735,12 +742,14 @@
     "proposals_db",
     "pubmed_client",
     "quarantine_db",
+    "region_pack",
     "safety_net",
     "secrets_paths",
     "security_sensors",
     "signal_family",
     "stderr_watch",
     "time_contract_sensor",
+    "treatment_db",
     "triage_agent",
     "visual_db",
     "weekly_digest"
@@ -753,7 +762,8 @@
     "lab_oracles",
     "lab_recognizer",
     "lab_specimen",
-    "labs_db"
+    "labs_db",
+    "llm_client"
   ],
   "lab_backfill_report": [
     "health_db"
@@ -780,6 +790,7 @@
   "lab_intake_watcher": [
     "_time_inject",
     "daemon_liveness",
+    "doc_triage",
     "genome_intake",
     "hai_core",
     "health_db",
@@ -790,6 +801,7 @@
     "lab_backfill",
     "lab_recognizer",
     "link_fetch",
+    "llm_client",
     "notify",
     "plist_env_liveness",
     "secrets_paths"
@@ -807,7 +819,8 @@
   ],
   "lab_recognizer": [
     "hai_core",
-    "lab_canon"
+    "lab_canon",
+    "lab_specimen"
   ],
   "lab_reconcile": [
     "_time_inject",
@@ -872,13 +885,15 @@
     "health_db",
     "hypothesis_semantic_check",
     "i18n",
-    "llm_client"
+    "llm_client",
+    "notify"
   ],
   "llm_admission": [
     "doc_translation",
     "hai_core",
     "health_db",
     "i18n",
+    "lab_canon",
     "lab_recognizer",
     "llm_client",
     "notify",
@@ -886,7 +901,6 @@
   ],
   "llm_client": [
     "api_spend_log",
-    "hai_core",
     "llm_translate",
     "secret_guard"
   ],
@@ -1123,7 +1137,8 @@
   ],
   "profile_reconciler": [
     "_time_inject",
-    "health_db"
+    "health_db",
+    "import_all"
   ],
   "promethease_context": [
     "_time_inject",
@@ -1132,9 +1147,11 @@
   "proposals_db": [
     "_fmt_helpers",
     "_time_inject",
+    "gp_context",
     "health_db",
     "i18n",
-    "problems_db"
+    "problems_db",
+    "profile_reconciler"
   ],
   "propose_uc": [
     "_time_inject"
@@ -1240,7 +1257,8 @@
     "health_db",
     "hypothesis_semantic_check",
     "i18n",
-    "llm_client"
+    "llm_client",
+    "notify"
   ],
   "symptom_intake": [
     "hai_core",
@@ -1363,6 +1381,10 @@
   "wellness_pipeline": [
     "i18n",
     "traits_pipeline"
+  ],
+  "withings_api": [
+    "_time_inject",
+    "secrets_paths"
   ],
   "workouts_db": [
     "health_db"

@@ -116,6 +116,32 @@ def test_failure_is_loud_once_and_not_retried(db, inbox, monkeypatch):
     assert len(told) == 1 and "endo.pdf" in told[0]
 
 
+def test_empty_key_is_waiting_not_failed(db, inbox, monkeypatch):
+    """Нить lab-intake-retry (05.10): пустой баланс поставщика — не провал документа. Мутации:
+    писать .events.failed (навсегда), говорить человеку (это делает разбор анализов, один раз),
+    повторять каждый проход."""
+    import import_medical_events as ime
+    d, told = inbox
+    calls = []
+
+    class Quota(Exception):
+        status_code = 429
+
+    def empty(n, t):
+        calls.append(n)
+        raise Quota("insufficient_quota")
+    monkeypatch.setattr(ime, "llm_extract", empty)
+    ime.process_incoming(d)
+    ime.process_incoming(d)
+    assert calls == ["endo.pdf"] and not told
+    assert not (d / "endo.pdf.events.failed").exists() and (d / "endo.pdf.events.waitkey").exists()
+    import os, time
+    old = time.time() - ime.KEY_RETRY_SEC - 1
+    os.utime(d / "endo.pdf.events.waitkey", (old, old))
+    ime.process_incoming(d)
+    assert calls == ["endo.pdf", "endo.pdf"]
+
+
 def test_tenant_route_never_reads_owner_cr(db, inbox, monkeypatch, tmp_path):
     import import_medical_events as ime
     d, _ = inbox

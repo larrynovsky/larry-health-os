@@ -188,6 +188,31 @@ is not caught → bad conclusions reach the user.
 
 ---
 
+### Why a test waits for its threads before fixture teardown (2026-10-05)
+
+A test's database substitution (`monkeypatch`, a temporary `DB_PATH`) lives exactly until fixture
+teardown. A thread started by the test does not know that: if it outlives the test, its late write
+follows the path that has already been restored. At night that path is the owner's live database.
+
+That is what happened from 30.08 to 04.10. The background-consilium test waited for the consilium
+to be *called*, not for the thread to finish. The thread wrote the verdict into the live database —
+into the `memory` row with the same number as the hypothesis in the test database (the number is
+shared by all categories) — and created tasks for the owner from the `test` field. The test was green.
+The `query_only` guard (thread treatment-homes) stopped the writes, but even then the nightly log held
+a single warning line that nobody read.
+
+What is in place now (tests/conftest.py, block `thread_guard`; pytest.ini):
+- a call-phase hook waits for threads born in the test — in the call phase, i.e. BEFORE fixture
+  teardown; a fixture cannot do this: its teardown would run after the substitution is undone;
+- a thread that did not finish — the test is red with the thread's name;
+- an exception in a thread is an error, not a warning (`filterwarnings`);
+- boundary: the idle AnyIO pool worker (dashboard TestClient) is excluded by name — the response has
+  already been returned by then; stand measurement: 69 dashboard tests were red only because of it;
+- the hypothesis resolver writes only to rows with `category='hypothesis'`.
+
+The nightly chronicle (`run_checks.sh`) names ERROR (fixture or teardown failure) as well as FAILED:
+otherwise a red guard in a fixture would pass as "the set did not change".
+
 ## Contract tests for public APIs (pattern validated 2026-05-10)
 
 A pattern that proved valuable after the 2026-05-10 regression:

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:823daf5ced1e -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:dd3c30836114 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](first_install.md)
@@ -38,7 +38,7 @@ bash install.sh --check    # только проверка, ничего не м
 bash install.sh            # установка; повторный запуск — обновление
 ```
 
-The script asks which model provider you use — for this tutorial press Enter (Anthropic).
+The script asks which model provider you use — for this tutorial press Enter (Anthropic); with an OpenAI or Gemini key, 2 or 3. If you paste a key of another provider, the script recognises it and offers to switch; to change the choice later: `bash install.sh --provider openai` (or `gemini`, `anthropic`).
 Keys are entered without echo and are validated with Telegram and Anthropic before being written. Then go to step 8. The tutorial below explains what the script does and is needed if it stopped on something unclear.
 
 ## 1. Install Docker
@@ -104,7 +104,7 @@ grep 'TZ=' .env
 The bot is your only interface to the system. Without `telegram_token` and `telegram_chat_id` it will not start; without `anthropic_key` reports will not be written.
 
 1. In Telegram, open `@BotFather` and send `/newbot`. It will ask for a name (any) and a username that must end in `bot` (for example `my_health_bot`). The response will include a link `t.me/<username>` — by which you will later find your bot — and a token of the form `123456:ABC…`.
-2. Find your numeric id: message `@userinfobot`; it will reply with a line `Id: 12345678`.
+2. Find your numeric id: search Telegram for the bot `@userinfobot`, press “Start” — it replies with a line `Id: 12345678`. Only the digits are needed.
 3. Get the Anthropic API key at console.anthropic.com: top up your balance (Billing section) — without funds the key is issued but reports are not written — then create a key (API Keys) and copy it immediately: it will not be shown again.
 
 Place the keys in a `secrets` subdirectory of the launch directory:

@@ -57,7 +57,9 @@ def test_watcher_keeps_operator_and_person_channels():
     text = src.read_text(encoding="utf-8")
     # 02.10 (нить llm-tails): +1 служебный — «чтение анализов не допущено у поставщика установки»,
     # +1 сбой — «человек не получил это сообщение».
-    assert text.count("notify.notify_operator(") == 2
+    # 05.10 (нить lab-intake-retry): +1 служебный — «ключ или баланс поставщика пуст» у тенанта
+    # не-владельца: ключ установки чинит оператор, человек тенанта этого сделать не может.
+    assert text.count("notify.notify_operator(") == 3
     assert "notify.notify(" in text and "fallback=False" in text
 
 

@@ -1,55 +1,59 @@
-<!-- translation-of: docs/explanation/multitenancy.md sha256:1bcb7fb4b593 -->
+<!-- translation-of: docs/explanation/multitenancy.md sha256:6c3056e3d679 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](multitenancy.md)
 
-# Multi-tenancy: tenant isolation: why data does not leak
+# Multi-tenancy: tenant isolation: why every patient has their own boundary
 
 ## What changed
 
-- **The subsystem intent was changed.** The anchor fixes an intent edit — this is the only confirmed change. The specific wording has been clarified; the direction of drift has not been determined programmatically.
+- **The wording about digest gate behavior across different runtimes has been clarified.** The claim that the system blocks sending when a tenant verdict is absent has been adjusted — specific wording has changed, but the direction of the edit cannot be determined programmatically. Whether the guarantee became stricter or softer does not follow from the anchor; read this as a clarification, not as a strengthening or softening of any guarantee.
 
 **Updated:** 2026-09-24
+
+**Updated:** 2026-10-05
 
 
 ## Why it exists
 
-Imagine: a single phone with a single app keeps medical records for two people — say, the device owner and their partner. Convenient, but risky. If the system confuses whose data is whose even once, that is not just a bug. That is a leak of someone else's medical history.
+Imagine: one computer, one application — but two patients living inside it. The device owner and their partner both keep medical records, both receive notifications, both histories stored side by side. Convenient. Also dangerous.
 
-That is exactly what happened once: one part of the system "knew" the owner's secrets and used them by default — even when acting on behalf of the partner. As a result, health hypotheses about the partner were sent to the owner. Not out of malice — simply because nobody required the system to state explicitly who the intended recipient was.
+Medical data is perhaps the most intimate thing that exists about you. Diagnostic hypotheses, symptoms, patterns — all of it belongs to a specific person and to no one else. When that information accidentally reaches another patient, it is not a technical failure in the ordinary sense. It is a breach of trust that cannot be rolled back.
 
-The tenant isolation subsystem exists so that this no longer happens silently.
+This has already happened: at one point, a partner's hypotheses were sent to the owner. Not through malicious intent — simply because code in one place did not ask "whose is this?" and instead took whatever was closest. The tenant isolation subsystem grew out of that specific lesson: defaults cannot be trusted, every piece of data and every secret must be explicitly tied to its patient.
 
-## What it does, in plain words
+## What it does, in plain terms
 
-Each patient has their own database and their own secrets (for example, tokens for sending messages). These are physically separated. But separating folders is not enough: you also need to ensure that no process reaches into someone else's space "out of habit".
+The subsystem holds one core rule: **nothing is taken "by default"**.
 
-The subsystem rests on several principles.
+When a process wants to retrieve data or secrets for a specific patient, it must explicitly state whose. If it does not, the system does not guess and does not take "the first available." It stops loudly. Not quietly, not invisibly — loudly, so that it is impossible to miss.
 
-**Silence is forbidden.** If a process is running in multi-tenant mode but has not stated explicitly whose data it is working with, it will receive nobody's data. It will fail loudly, with an error. That is better than silently taking someone else's data.
+This works in two directions.
 
-**Secrets are closed by default.** If a tenant's secrets folder is not configured, the system will refuse rather than fall back to the owner's secrets. It will not guess, it will not find the nearest match — it will refuse.
+**On the data side:** if the system is running in multi-tenant mode and a process has not specified which patient's data it is working with, it fails with an error. It does not continue operating on some random patient's data — it fails. Inconvenient? Yes. But incomparably better than a silent leak.
 
-**Data origin and access rights are separate questions.** The system can answer the question "whose data is this?" — for example, to determine who owns a record. But that answer never opens access to another person's tokens or secrets. At one point these two questions were mixed together — that is exactly what caused the incident. They are now separated deliberately.
+**On the secrets side** (tokens, chat identifiers, everything that allows the bot to send a message to exactly the right person): if the tenant's secrets folder is not specified explicitly, the system refuses — and does not fall back on another patient's secrets as a "backup option." A closed refusal is better than open access to the wrong place.
 
-**Message delivery is verified.** Every delivery channel — every bot, every message — takes the recipient from the tenant resolver: the system that knows which chat belongs to which patient. This leak point has already been closed and verified.
+There is one more important principle, born from that same incident: the question "whose data is this?" and the question "what are the access rights?" are two separate questions, and they are kept separate deliberately. Previously they were mixed together: code determined the origin of the data and used that same determination to decide who to send what to. That conflation is exactly where the error hid. Now, answering "whose data" never opens access to another patient's tokens or secrets.
 
-**A sensor looks for traces of foreign data.** A dedicated tool periodically scans databases and checks whether a fingerprint of one patient's data has appeared in another patient's database. If contamination is present, the system will report it rather than stay silent.
+To verify that the boundary holds not only in theory, the system runs a sensor: it periodically scans both patients' databases looking for traces of one inside the other. If anything has leaked through — the sensor will notice and raise an alert, not stay silent.
 
-**A boundary the system does not guard.** If two people work on the same computer, files on that computer are not isolated between them. The partner's bot can read a file the owner sent to their own bot — if the file path is physically accessible. This is a known and deliberate decision: people who share one machine already trust each other at the operating-system level. Tenant isolation protects data and secrets inside the system, but not the computer's file system.
+Message delivery is also structured this way: every message takes its recipient from the tenant resolver — a mechanism that knows which chat identifier belongs to which patient. The system leaves no direct paths that bypass this mechanism.
 
-## What to say honestly about its limits
+**A separate note about files on the machine.** There is one boundary the system consciously does not close: if the partner sends the bot a path to a file on the shared machine, the bot may read the owner's file as well — because at the operating-system level it has the necessary permissions. This is a known and accepted boundary. Isolation holds on data and secrets inside the system, not on the computer's file system. People who share a machine trust each other at that level by definition — that decision was made by the owner.
 
-Most of the described mechanisms work and have been verified. But there is one area that remains open.
+## What is honest to say about its limits
 
-**The shared weekly digest** is a text that concerns both patients at once. The intent is that it should only be sent after each tenant process has given explicit consent ("pass") through its verdict file. If at least one has not given a verdict, the digest waits. If at least one has blocked it, nobody receives it.
+Most of the rules described hold and have been verified. But one place remains honestly open, and it is important to say so plainly.
 
-The mechanism is built and has been working since 2026-09-05, but the invariant is left open: tests guard the decision function itself ("send or wait"), and the fact that the bot actually calls it before sending is guarded only by a check for its presence in the code. The rule also names a scenario for revision: with three or more people, one crashed bot will silently delay the digest for everyone. So "open" here means "holds, but not proven end to end", not "not built".
+**The weekly digest and the boundary between runtimes.** When the system prepares the combined weekly text, it checks whether all tenants have given approval through their verdict files. If any tenant's verdict is blocked or corrupted, the text does not go to anyone. This is correct.
+
+The problem arises in a specific configuration: since late September the owner runs in a container, and the partner runs on the host. These are two different runtimes, and they do not see each other's verdict files directly. The tenant from the other runtime simply does not place its verdict file where the system expects it. The system in this case does not wait and does not block — it moves forward. The decision was made by the owner consciously ("do not wait; if there are problems, we will deal with them"), but it means: full digest isolation between runtimes is not currently guaranteed. This is an open limitation, not a plugged hole.
+
+Additionally, isolation at the machine's file-system level is not part of this subsystem and is not planned to be addressed by it. This is not an oversight — it is a boundary set by agreement.
 
 ## Where this lives in the system
 
-The isolation logic is concentrated in **`secrets_paths.py`** — that is where the rules live about where to look for each tenant's secrets and what to do if the required path is not configured. This file is what implements the "refuse, don't guess" principle.
+The isolation rules live primarily in **`secrets_paths.py`** — it describes how the system locates the secrets folder for a specific tenant and what it does when it cannot find one (refuses, does not guess). The separation between "whose data" and "whose rights" is also established there.
 
-The subsystem's intentions as a whole — why it is structured exactly this way — are described in **`subsystem_intent.yaml`**. This is not code but an explanation of intent: why these particular boundaries were chosen and what is considered impermissible.
-
-Context about the file-system boundary — why a bot can read someone else's file and why this is a deliberate choice — lives in the **`document_intake`** discussion.
+The overall intent of the subsystem — why it exists, what problems it solves, and which principles are considered load-bearing — is recorded in **`subsystem_intent.yaml`**. This is not code; it is an explanation for people: why exactly this way and not another.

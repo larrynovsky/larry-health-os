@@ -189,13 +189,18 @@ ROLE_MODELS = {
     "consult_coordinator":   "opus",    # wellally_consult координатор
     "lifestyle":             "opus",    # lifestyle-мнение (оба движка)
     "checkin":               "haiku",   # вечерний чек-ин
+    "treatment_extraction":  "haiku_pinned",  # схемы лечения из документа; у Anthropic — task_tiers профиля
 }
 
 
 def model_for(task_role: str) -> str:
     """Модель для семантической роли задачи (ROLE_MODELS → get_model(tier)).
+    Поставщик может переназначить роль данными (llm_providers.json: <поставщик>.task_tiers) —
+    04.10 лечение у Anthropic отдано sonnet по замеру на эталоне.
     Неизвестная роль → KeyError (явная ошибка, не тихий дефолт)."""
-    return get_model(ROLE_MODELS[task_role])
+    tier = ROLE_MODELS[task_role]
+    override = (llm_client.profiles().get(llm_client.provider()) or {}).get("task_tiers") or {}
+    return get_model(override.get(task_role, tier))
 
 
 # ── Профиль пациента ────────────────────────────────────────────────────────
@@ -253,8 +258,6 @@ def _build_system_prompt() -> str:
 - НЕ ДЕЛАЙ уверенных медицинских утверждений на устаревших источниках без
   явной пометки даты — это противоречит TESTING_CONTRACTS §1.
 """
-    ident = profile.get("identity", {})
-
     # Профиль пациента — единый рантайм-источник из БД (hardcode-migration Ф2).
     # Никаких литералов диагноза/ВСР/роста/химии в коде; всё из patient_profile.
     import patient_context as pc
@@ -281,7 +284,7 @@ def _build_system_prompt() -> str:
         location_str = f"Текущее местоположение: {loc.get('city')}, {loc.get('country','')} (обновлено {loc.get('updated','?')})."
 
     return f"""{FORMAT_RULES}
-Ты — личный health copilot {ident.get('name', '[пациент]').split()[0]}. Thinking partner по здоровью, не врач.
+Ты — личный health copilot. Thinking partner по здоровью, не врач.
 Сейчас: {datetime_str}
 {location_str}
 {profile_text}{memory_text}

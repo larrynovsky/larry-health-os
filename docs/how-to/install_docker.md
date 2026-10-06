@@ -1,4 +1,4 @@
-<!-- install-provenance: sha256:9c46f05089ec -->
+<!-- install-provenance: sha256:98a2e61064dc -->
 [English](install_docker.en.md) · **Русский**
 
 # Как поставить систему в Докере
@@ -36,7 +36,7 @@ cd health_scripts
 python3 scripts/install.py --docker --tz Europe/Berlin
 ```
 
-Строка итога: `cron 25, service 3, env 1, host 5, none 3 (всего 37)`. В `build/docker/`
+Строка итога: `cron 26, service 3, env 1, host 5, none 3 (всего 38)`. В `build/docker/`
 появятся `compose.yaml` и `.env`, в корне — `.dockerignore`. Всё это генерируется; руками не правят.
 
 ## 2. Собрать образ

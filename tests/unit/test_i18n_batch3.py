@@ -78,7 +78,8 @@ def test_k8_dictionary_snapshot_placeholders_and_person_vocabulary():
     snapshot = json.dumps(ru, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     # Original literals preserved except the forbidden constitution term in the notice.
     # 29.09, приёмка: «Ревью алертов … Домены» → «Разбор предупреждений … Разделы» (внутренняя лексика).
-    assert hashlib.sha256(snapshot.encode()).hexdigest() == "4ea25ac729777d4f257054cad82ba98d1cb57e84796df3249372f05212c9ddc3"
+    # 04.10, think-return: «не ответил за 90 секунд» → срок из замера модели (90 с больше не литерал).
+    assert hashlib.sha256(snapshot.encode()).hexdigest() == "c7712143bf7135b45d4bfc6ee0cf00a13b5fd519a18d60ed915ad12493758cfc"
     for key in _K8_KEYS:
         fields = [sorted((field, spec, conv) for _, field, spec, conv
                          in Formatter().parse(tables[lang][key]) if field is not None)

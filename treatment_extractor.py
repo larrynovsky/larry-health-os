@@ -77,7 +77,7 @@ def extract_regimens(text: str, event_id: int) -> list:
     try:
         client = _get_client()
         resp = client.messages.create(task="treatment_extractor.extract_regimens",
-            model=hai_core.get_model("haiku_pinned"),
+            model=hai_core.model_for("treatment_extraction"),
             max_tokens=700,
             temperature=0,
             system=EXTRACTION_PROMPT,
@@ -139,21 +139,29 @@ def process_treatment(event_id: int, text: str, effective_date: str) -> int:
             cyc = int(cyc) if cyc is not None else None
         except (ValueError, TypeError):
             cyc = None
-        db.upsert_medication(
-            name=name,
-            modality=r.get("modality"),
-            intent=r.get("intent"),
-            cycles_completed=cyc,
-            agents=r.get("agents") if isinstance(r.get("agents"), list) else None,
-            indication_problem_id=problem_id,
-            prescribing_event_id=event_id,
-            start_date=(r.get("start_date") or effective_date),
-            end_date=r.get("end_date"),
-            status=r.get("status") or "completed",
-            source=f"extractor:{event_id}",
-            confirmation="proposed",
-            notes=r.get("dose"),
-        )
+        try:
+            db.upsert_medication(
+                name=name,
+                modality=r.get("modality"),
+                intent=r.get("intent"),
+                cycles_completed=cyc,
+                agents=r.get("agents") if isinstance(r.get("agents"), list) else None,
+                indication_problem_id=problem_id,
+                prescribing_event_id=event_id,
+                # Дата документа ≠ дата начала лечения: подстановка превращала дату визита в
+                # начало курса (замер 04.10). Документ и так связан prescribing_event_id.
+                start_date=r.get("start_date"),
+                end_date=r.get("end_date"),
+                status=r.get("status") or "completed",
+                source=f"extractor:{event_id}",
+                confirmation="proposed",
+                notes=r.get("dose"),
+            )
+        except ValueError as e:
+            # Статус вне словаря (treatment_db.MED_STATUSES): режим не пишем и говорим громко,
+            # остальные режимы документа пишутся.
+            log.error(f"  treatment: «{name}» пропущен — {e} (encounter #{event_id})")
+            continue
         n += 1
         log.info(f"  treatment: {name} ({r.get('modality')}) cyc={cyc} ← encounter #{event_id}")
     return n

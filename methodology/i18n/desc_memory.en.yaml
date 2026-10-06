@@ -619,9 +619,6 @@
 4ac33a3b7276:
   ru: 'Чистая логика датчика: строки канона МОЛОЖЕ фенса, где число есть, а единицы нет.'
   en: 'Pure sensor logic: canon rows YOUNGER than the fence where a number is present but unit is absent.'
-4b12f5f51df2:
-  ru: 'даты терапии: periods ↔ problem_list'
-  en: 'therapy dates: periods ↔ problem_list'
 4b4a30585a9a:
   ru: 'канон CPIC засеян и консистентен (A2-full: 3 проекции, один seed_version)'
   en: 'CPIC canon is seeded and consistent (A2-full: 3 projections, one seed_version)'
@@ -796,6 +793,9 @@
 59696d57988e:
   ru: профиль генотипа тенанта в публичной зоне
   en: tenant genotype profile in public zone
+599666a3c53e:
+  ru: Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках),
+  en: Therapy dates in `periods` (primary) vs `problem_list` (copies in fields and headers),
 59d5a252648e:
   ru: живость гейта одноразовости (§14/§15)
   en: idempotency gate liveness (§14/§15)
@@ -832,6 +832,9 @@
 5d98d326487e:
   ru: ночной цикл жив (§14)
   en: nightly cycle is alive (§14)
+5ded07578717:
+  ru: 'WARN: дневное давление разошлось с замерами Withings (нить bp-withings-owner, 06.10).'
+  en: 'WARN: daily blood pressure diverged from Withings measurements (thread bp-withings-owner, 06.10).'
 5e38158d51fb:
   ru: Есть ли в медкарте приём этой даты и специальности — ключ идемпотентности импортёров.
   en: Whether the medical record contains an appointment for this date and specialty — idempotency key for importers.
@@ -883,6 +886,9 @@
 642b43994ce0:
   ru: 'Каждый лабораторный порог обязан ВСТРЕЧАТЬ данные: имя = канон lab_canon.normalize,'
   en: 'Every lab threshold must MEET data: name = canon lab_canon.normalize,'
+64a8fad909a3:
+  ru: Документы медкарты, которые отвечают на утверждение «нет / не зафиксировано» в тексте.
+  en: Medical record documents that answer the statement with 'no / not recorded' in the text.
 64e688b5089f:
   ru: нормы не просрочены (next_review)
   en: norms not expired (next_review)
@@ -1117,6 +1123,9 @@
 7bb45401b99f:
   ru: Импортирует один файл из папки biochemical/. Возвращает кол-во импортированных строк.
   en: Imports one file from the biochemical/ folder. Returns the number of imported rows.
+7c0fac050951:
+  ru: 'давление: дневное значение — среднее замеров Withings, второго писателя нет'
+  en: 'blood pressure: daily value is the mean of Withings measurements, no second writer'
 7c3fcdb4601c:
   ru: frozen-relative → transient (Ф1/Ф2)
   en: frozen-relative → transient (F1/F2)
@@ -1612,6 +1621,9 @@ afcfa87ab899:
 b0633fd07f1d:
   ru: 'Окно памяти о снятых задачах в днях: из system_config; нет ключа → seed пишется.'
   en: 'Memory window for dismissed tasks in days: from system_config; key absent → seed is written.'
+b07ce28de3d4:
+  ru: 'даты терапии: periods ↔ problem_list, medications, профиль'
+  en: 'therapy dates: periods ↔ problem_list, medications, profile'
 b0b77520015a:
   ru: Гипотезы со status='open' старше 60 дней без перехода в testing.
   en: Hypotheses with status='open' older than 60 days without transition to testing.
@@ -1888,6 +1900,9 @@ cb3834978ec6:
 cc485d2653b3:
   ru: 'F-03: `main()` не имеет ни одного return — успех неотличим от любого исхода. Зелёным станет в Фазе C — тогда XPASS(strict) заставит снять пометку.'
   en: 'F-03: `main()` has no return statement at all — success is indistinguishable from any other outcome. Will go green in Phase C — then XPASS(strict) will force removal of the mark.'
+cc9582cd9745:
+  ru: ЧИСТАЯ функция. meds — подтверждённые строки medications (id,name,modality,start_date,
+  en: PURE function. meds — confirmed rows from medications (id, name, modality, start_date,
 ccb59a12ec1d:
   ru: 'F-03: `__main__` зовёт `main()` без SystemExit — shell всегда видит 0. Зелёным станет в Фазе C.'
   en: 'F-03: `__main__` calls `main()` without SystemExit — shell always sees 0. Will go green in Phase C.'
@@ -1897,9 +1912,6 @@ ccc4abee298b:
 ccdf32b6d080:
   ru: пороги safety_net выведены из документа (не набраны)
   en: safety_net thresholds are derived from the document (not typed in)
-ccf1b53e7887:
-  ru: Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках).
-  en: Therapy dates in `periods` (primary) vs `problem_list` (copies in fields and headings).
 cd74a02c0515:
   ru: Плоская строка ВСЕГО контекста, что видит модель (system + все ходы) — для
   en: Flat string of ALL context visible to the model (system + all turns) — for

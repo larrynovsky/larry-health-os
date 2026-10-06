@@ -12,7 +12,6 @@ MDT-участие: generate_mdt_opinion() — async метод для deliberat
 """
 
 import llm_client
-import asyncio
 import hai_core
 import logging
 import sys
@@ -150,14 +149,12 @@ class LifestyleAgent:
 
         user_message = "\n\n".join(msg_parts)
 
-        response = await asyncio.wait_for(
-            client.messages.create(task="lifestyle_agents.generate_mdt_opinion",
+        response = await client.messages.create(task="lifestyle_agents.generate_mdt_opinion",
                 model=hai_core.model_for("lifestyle"),
                 max_tokens=500,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
-            ),
-            timeout=45.0,
+                deadline="measured",   # срок — из замера модели (llm_client.call_timeout)
         )
         return _guarded_text(llm_client.answer_text(response), self.agent_name)
 

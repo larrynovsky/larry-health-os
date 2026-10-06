@@ -191,5 +191,29 @@ def test_field_outside_schema_refuses(db):
             " VALUES (?,?,?,?,?,?,?)",
             (RUN, "sqlite:daily_metrics", "2018-03-05",
              "sleep_deep = 0 WHERE 1=1 --", "0.0", "null", "r"))
-    with pytest.raises(ValueError, match="вне схемы"):
+    with pytest.raises(ValueError, match="outside table schema"):
         db.revert_repairs(RUN)
+
+
+def test_memory_and_tasks_rows_are_reversible(db):
+    """05.10.2026: ремонт следов потока теста — строка memory и задача по номеру строки."""
+    with db.get_conn() as conn:
+        conn.executescript("""
+            CREATE TABLE memory (id INTEGER PRIMARY KEY, category TEXT, value TEXT);
+            CREATE TABLE tasks (id INTEGER PRIMARY KEY, status TEXT, resolved_text TEXT);
+            INSERT INTO memory VALUES (1, 'profile_update', 'junk');
+            INSERT INTO tasks VALUES (7, 'open', NULL);
+        """)
+        for home, ent, field, old, new in (("sqlite:memory", "1", "value", "junk", "orig"),
+                                           ("sqlite:tasks", "7", "status", "open", "dismissed"),
+                                           ("sqlite:tasks", "7", "resolved_text", None, "made by a test")):
+            db.log_repair(conn, run_id=RUN, home=home, entity=ent, field=field,
+                          old_value=old, new_value=new, reason="test thread leak")
+        conn.execute("UPDATE memory SET value='orig' WHERE id=1")
+        conn.execute("UPDATE tasks SET status='dismissed', resolved_text='made by a test' WHERE id=7")
+
+    assert db.revert_repairs(RUN) == 3
+    with db.get_conn() as conn:
+        assert conn.execute("SELECT value FROM memory WHERE id=1").fetchone()[0] == "junk"
+        assert tuple(conn.execute("SELECT status, resolved_text FROM tasks WHERE id=7").fetchone()) == ("open", None)
+

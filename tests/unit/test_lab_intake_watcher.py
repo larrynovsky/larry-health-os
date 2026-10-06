@@ -267,7 +267,14 @@ def test_file_refusal_reaches_person_once(env, monkeypatch, case):
     for _ in range(3):
         w.process_once()
     assert len(told) == 1 and f.name in told[0]
-    assert "оригинальный PDF" in told[0] and "чёткое фото" in told[0]
+    # Три разных правды (нить lab-intake-retry, 05.10). До неё все четыре случая звучали
+    # «пришлите почётче» — и на «не бланк», и на сбой у нас, где файл ни при чём.
+    if case == "notlab":
+        assert "не похож на бланк" in told[0] and "ещё раз" in told[0]
+    elif case == "zero":
+        assert "оригинальный PDF" in told[0] and "чёткое фото" in told[0]
+    else:
+        assert "на моей стороне" in told[0] and "чёткое фото" not in told[0]
 
 
 def test_long_pdf_refused_once_without_partial_staging(env, monkeypatch):
@@ -381,3 +388,67 @@ def _no_side_routes(monkeypatch):
     import genome_intake, import_medical_events
     monkeypatch.setattr(genome_intake, "process_pending", lambda *a, **k: 0)
     monkeypatch.setattr(import_medical_events, "process_incoming", lambda *a, **k: 0)
+
+
+# ── нить lab-intake-retry (05.10): пустой ключ, повтор после отказа ──────────────
+
+class _Quota(Exception):
+    """Как openai.RateLimitError на пустом балансе: 429 и код insufficient_quota в тексте."""
+    status_code = 429
+
+
+def test_empty_key_waits_tells_once_and_resumes(env, monkeypatch):
+    """Мутации: проглотить отказ в «0 строк» (lab_backfill), писать .failed, говорить каждый повтор,
+    не повторять после пополнения. Отказ идёт из распознавателя — через настоящий run_backfill."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "lab__0f1e2d3c4b5a6978.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    def empty_key(*a, **k):
+        raise _Quota("Error code: 429 - {'error': {'code': 'insufficient_quota'}}")
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize", empty_key)
+    w.process_once()
+    wk = inbox / "lab__0f1e2d3c4b5a6978.pdf.waitkey"
+    assert wk.exists() and not (inbox / "lab__0f1e2d3c4b5a6978.pdf.failed").exists()
+    assert not (inbox / "lab__0f1e2d3c4b5a6978.pdf.norows").exists()
+    assert len(told) == 1 and "баланс" in told[0] and "«lab.pdf»" in told[0]   # имя без хеша
+    w.process_once()                       # рано: повтора нет
+    _age(wk, w.KEY_RETRY_SEC + 1)
+    w.process_once()                       # повтор, ключ всё ещё пуст — молча
+    assert len(told) == 1 and wk.exists()
+    _age(wk, w.KEY_RETRY_SEC + 1)
+    monkeypatch.setattr(w.lab_backfill, "run_backfill", lambda *a, **k: {"rows": 0})
+    w.process_once()                       # баланс пополнен: файл разобран без новой присылки
+    assert not wk.exists() and (inbox / "lab__0f1e2d3c4b5a6978.pdf.norows").exists()
+
+
+def test_resend_after_refusal_requeues_and_clean_duplicate_does_not(env, monkeypatch):
+    """Мутации: не снимать сайдкар; оставить файл в notlab (гейт снова отвергнет); считать повтор
+    разобранного файла отказом."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    failed = inbox / "a.pdf"; failed.write_bytes(b"x")
+    (inbox / "a.pdf.failed").write_text("boom")
+    (inbox / "a.pdf.events.failed").write_text("boom")
+    notlab = inbox / "b.pdf"; notlab.write_bytes(b"y")
+    w._save_state({"watermark": 0.0, "notlab": ["b.pdf"]})
+    clean = inbox / "c.pdf"; clean.write_bytes(b"z")
+    assert w.retry_after_refusal(failed) is True
+    assert not (inbox / "a.pdf.failed").exists() and not (inbox / "a.pdf.events.failed").exists()
+    assert w.retry_after_refusal(notlab) is True
+    st = w._load_state()
+    assert "b.pdf" not in st["notlab"] and "b.pdf" in st["forced"]
+    assert w.retry_after_refusal(clean) is False
+
+
+def test_bot_duplicate_points_at_the_stored_file(tmp_path):
+    """Дубль обязан назвать лежащий файл, а не выдуманный `dup__…`: по нему ищется отказ."""
+    import hashlib
+    from handlers.messages import _inbox_dest
+    data = b"same bytes"
+    h = hashlib.sha256(data).hexdigest()[:16]
+    stored = tmp_path / f"report__{h}.pdf"; stored.write_bytes(data)
+    (tmp_path / f"report__{h}.pdf.failed").write_text("x")
+    dest, dup = _inbox_dest(tmp_path, "renamed.pdf", data)
+    assert dup and dest == stored

@@ -259,6 +259,24 @@ def attach_reference(conn: sqlite3.Connection) -> None:
     conn.execute("ATTACH DATABASE ? AS ref", (str(LOINC_DB_PATH),))
 
 
+def _test_run_on_live_db() -> bool:
+    """Прогон тестов смотрит в ЖИВУЮ базу тенанта → коннект только на чтение.
+
+    conftest кладёт в HEALTH_TEST_LIVE_DB путь живой базы, когда HEALTH_DATA_DIR задан явно
+    (утренний прогон владельца так и делает: часть тестов читает настоящие данные). Писать
+    туда тестам нельзя ни при каких условиях. Замер 2026-10-04: в medications владельца
+    нашлись строки фикстур tests/unit/test_treatment.py, записанные прогоном тестов 2026-06-22;
+    контекст консилиума с тех пор показывал режимы дважды.
+    Сравнение по устройству+inode (как on_canonical_db): фикстура `db` с tmp-базой не задета.
+    Граница: прямые sqlite3.connect мимо get_conn этим не закрыты.
+    """
+    live = os.environ.get("HEALTH_TEST_LIVE_DB")
+    if not live:
+        return False
+    mine = _file_identity(Path(DB_PATH))
+    return mine is not None and mine == _file_identity(Path(live))
+
+
 def get_conn(read_only: bool = False) -> sqlite3.Connection:
     """
     Возвращает SQLite-коннект.
@@ -278,7 +296,7 @@ def get_conn(read_only: bool = False) -> sqlite3.Connection:
         conn = sqlite3.connect(DB_PATH, factory=_ClosingConn)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
-        if read_only:
+        if read_only or _test_run_on_live_db():
             conn.execute("PRAGMA query_only=ON")
         return conn
     # Non-primary: НЕ открывать молчаливо устаревшую iCloud-копию (split-brain,
@@ -367,6 +385,25 @@ def _migrate_blood_pressure():
                 conn.execute(f"ALTER TABLE daily_metrics ADD COLUMN {col} {dtype}")
             except Exception:
                 pass  # уже существует
+
+
+def _migrate_bp_readings():
+    """Отдельные замеры давления со временем (нить withings-bp, 04.10). Дневные колонки
+    daily_metrics.bp_* остаются у HAE (один писатель); эту таблицу пишет только Withings —
+    и по ней сторож видит, что замер у прибора есть, а у HAE-пути пропал.
+    measured_at — момент замера, unix-время UTC."""
+    with get_conn() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bp_readings (
+                measured_at INTEGER PRIMARY KEY,
+                systolic    REAL NOT NULL,
+                diastolic   REAL NOT NULL,
+                pulse       REAL,
+                grpid       INTEGER,
+                source      TEXT NOT NULL DEFAULT 'withings',
+                imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
 
 
 def _migrate_consultation_sessions():
@@ -2382,6 +2419,7 @@ def init_db():
     _ensure_memory_table()          # 2026-09-26: дашборд и отчёты читают её на пустой установке (dashboard-tidy)
     migrate_v2()
     _migrate_blood_pressure()
+    _migrate_bp_readings()
     _migrate_review_dates()
     _migrate_tasks()
     _migrate_consultations_and_resolution()
@@ -2899,6 +2937,14 @@ def log_repair(conn, *, run_id, home, entity, field, old_value, new_value, reaso
     )
 
 
+# Таблицы, чьи строки чинятся через журнал: таблица → ключ строки (entity в журнале).
+# Ремонт фактов о лечении 04.10.2026 (нить treatment-homes) — канон владельца, §13: откат обязан
+# быть исполнимым, а не заявленным.
+# memory и tasks — с 05.10.2026 (нить test-thread-leak): ремонт следов потока теста в живой базе.
+_ROW_REPAIR_HOMES = {"medications": "id", "patient_profile": "key", "problem_list": "problem_id",
+                     "memory": "id", "tasks": "id"}
+
+
 def revert_repairs(run_id: str) -> int:
     """Возвращает прежние значения по журналу прогона. Возвращает число откаченных записей.
 
@@ -2909,7 +2955,8 @@ def revert_repairs(run_id: str) -> int:
     Поддерживаемые дома: `sqlite:daily_metrics` и `json:daily_metrics`. Незнакомый дом —
     отказ, а не пропуск: молча не откатить хуже, чем упасть.
     """
-    _KNOWN_HOMES = ("sqlite:daily_metrics", "json:daily_metrics", "sqlite:daily_metrics.raw")
+    _KNOWN_HOMES = ("sqlite:daily_metrics", "json:daily_metrics", "sqlite:daily_metrics.raw",
+                    *(f"sqlite:{t}" for t in _ROW_REPAIR_HOMES))
     done = 0
     with get_conn() as conn:
         rows = conn.execute(
@@ -2925,8 +2972,11 @@ def revert_repairs(run_id: str) -> int:
         # но это граница доверия между двумя запусками — на ней не экономим.
         cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_metrics)")}
         bad = {r[3] for r in rows if r[1] == "sqlite:daily_metrics"} - cols
+        for table in _ROW_REPAIR_HOMES:
+            tcols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+            bad |= {r[3] for r in rows if r[1] == f"sqlite:{table}"} - tcols
         if bad:
-            raise ValueError(f"revert_repairs: в журнале поля вне схемы daily_metrics: {sorted(bad)}")
+            raise ValueError(f"revert_repairs: journal fields outside table schema: {sorted(bad)}")
 
         for rid, home, entity, field, old_json in rows:
             old = json.loads(old_json)
@@ -2934,6 +2984,10 @@ def revert_repairs(run_id: str) -> int:
                 conn.execute(
                     f"UPDATE daily_metrics SET {field} = ? WHERE date = ?", (old, entity)
                 )
+            elif home.startswith("sqlite:") and home[7:] in _ROW_REPAIR_HOMES:
+                table = home[7:]
+                conn.execute(f"UPDATE {table} SET {field} = ? WHERE {_ROW_REPAIR_HOMES[table]} = ?",
+                             (old, entity))
             elif home == "sqlite:daily_metrics.raw":
                 row = conn.execute(
                     "SELECT raw FROM daily_metrics WHERE date = ?", (entity,)).fetchone()
@@ -3310,6 +3364,24 @@ def _migrate_medications_treatment():
             "CREATE INDEX IF NOT EXISTS idx_medications_confirmation "
             "ON medications(confirmation)"
         )
+        _ensure_medication_status_trigger(conn)
+
+
+def _ensure_medication_status_trigger(conn) -> None:
+    """Нативный страж словаря статуса (нить treatment-homes, 04.10.2026).
+
+    Словарь живёт в treatment_db.MED_STATUSES; триггер пересобирается из него на каждом
+    init_db, поэтому второго дома у словаря нет. CHECK потребовал бы пересборки таблицы.
+    Писатель мимо treatment_db.upsert_medication (прямой SQL, ручная правка) тоже упрётся."""
+    from treatment_db import MED_STATUSES
+    allowed = ",".join(f"'{s}'" for s in MED_STATUSES)
+    for event in ("INSERT", "UPDATE OF status"):
+        name = "medications_status_vocab_" + event.split()[0].lower()
+        conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+        conn.execute(
+            f"CREATE TRIGGER {name} BEFORE {event} ON medications "
+            f"WHEN NEW.status NOT IN ({allowed}) "
+            f"BEGIN SELECT RAISE(ABORT, 'medications.status outside vocabulary'); END")
 
 
 # Синонимы схем лечения ТЕНАНТА — данные (methodology/regimens.yaml, приватная зона: набор схем

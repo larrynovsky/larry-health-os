@@ -84,8 +84,31 @@ def _collect_candidates(window_days: int, check_rejected: bool) -> list[dict]:
     return candidates
 
 
+def _verdict(call, who: str) -> tuple[bool, int | None, str]:
+    """Ответ судьи → (дубль?, id, причина). Ошибка и неразборчивый ответ — «не дубль»: гипотеза сохранится."""
+    try:
+        text = llm_client.answer_text(call()).strip()
+        import re
+        m = re.search(r"\{[^{}]*\}", text, re.DOTALL)
+        if not m:
+            return (False, None, f"{who} parse failed: {text[:120]}")
+        parsed = json.loads(m.group(0))
+        existing_id = parsed.get("existing_id")
+        reason = str(parsed.get("reason", ""))[:200]
+        if parsed.get("is_duplicate") and existing_id:
+            return (True, int(existing_id), reason)
+        return (False, None, reason or f"{who} says not duplicate")
+    except Exception as e:
+        log.warning(f"_haiku_compare {who} error: {e}")
+        return (False, None, f"{who} compare error: {e}")
+
+
 def _haiku_compare(candidate_obs: str, existing: list[dict]) -> tuple[bool, int | None, str]:
-    """Один Haiku-вызов: сравнить candidate с list of existing."""
+    """Дубль — только если ДВА судьи независимо назвали дублем одну и ту же гипотезу
+    (решение владельца 05.10). Замер 04–05.10: один судья на пограничном случае флипал
+    (одна и та же пара формулировок — дубль и не дубль в разных прогонах), а haiku без думания до 04.10
+    склеил зря 34 из 62. Ложная склейка молча выбрасывает гипотезу, лишний повтор владелец
+    видит и отклоняет — поэтому при расхождении гипотеза сохраняется."""
     if not existing:
         return (False, None, "no existing hypotheses to compare against")
 
@@ -103,30 +126,23 @@ def _haiku_compare(candidate_obs: str, existing: list[dict]) -> tuple[bool, int 
         "is_duplicate=true только если КАНДИДАТ говорит о том же явлении что один из EXISTING. "
         "Если разные домены (sleep vs cardio) или разные паттерны (decline vs improvement) — false."
     )
-
-    try:
-        client = get_client()
-        resp = client.messages.create(task="hypothesis_semantic_check._haiku_compare",
-            model=hai_core.get_model("haiku"),
-            max_tokens=400,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = llm_client.answer_text(resp).strip()
-        # Грубый JSON-extract
-        import re
-        m = re.search(r"\{[^{}]*\}", text, re.DOTALL)
-        if not m:
-            return (False, None, f"haiku parse failed: {text[:120]}")
-        parsed = json.loads(m.group(0))
-        is_dup = bool(parsed.get("is_duplicate"))
-        existing_id = parsed.get("existing_id")
-        reason = parsed.get("reason", "")[:200]
-        if is_dup and existing_id:
-            return (True, int(existing_id), reason)
-        return (False, None, reason or "haiku says not duplicate")
-    except Exception as e:
-        log.warning(f"_haiku_compare error: {e}")
-        return (False, None, f"compare error: {e}")
+    client = get_client()
+    first = _verdict(lambda: client.messages.create(task="hypothesis_semantic_check._haiku_compare",
+        model=hai_core.get_model("haiku"),
+        max_tokens=400,
+        messages=[{"role": "user", "content": prompt}],
+    ), "haiku")
+    if not first[0]:
+        return first
+    second = _verdict(lambda: client.messages.create(task="hypothesis_semantic_check._second_opinion",
+        model=hai_core.get_model("sonnet"),
+        max_tokens=400,
+        messages=[{"role": "user", "content": prompt}],
+    ), "sonnet")
+    if second[0] and second[1] == first[1]:
+        return (True, first[1], first[2])
+    log.info(f"dedup: судьи разошлись (haiku → #{first[1]}, sonnet → {second[1]}) — сохраняю")
+    return (False, None, f"judges disagree: haiku #{first[1]}, sonnet {second[1]}: {second[2]}")
 
 
 def check(candidate_observation: str) -> tuple[bool, int | None, str]:

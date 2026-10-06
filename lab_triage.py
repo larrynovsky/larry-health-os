@@ -106,7 +106,7 @@ def _classify(r: dict, canon_keys: set, canon_values: dict | None = None) -> tup
     if r.get("value_agreement") != "agree":
         return ("review", "модели разошлись/single")
     if r.get("date_source") != "read":
-        return ("review", "дата не read (inherited/fallback)")
+        return ("review", "дата не read (inherited/fallback/ambiguous_order)")
     return ("gold", "agree+канон+ново+read")
 
 

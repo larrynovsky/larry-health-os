@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/llm_thinking.md sha256:beae07665c44 -->
+<!-- translation-of: docs/reference/llm_thinking.md sha256:5974f0a5cbb5 -->
 **English** · [Русский](llm_thinking.md)
 
 # Model thinking: the data the system decides by
@@ -25,6 +25,7 @@ answer; do not think where the answer comes from careful reading.
 | key | model name; a dated snapshot (`claude-haiku-4-5-20251001`) finds its entry by prefix |
 | `think` | the parameter that turns thinking on; `"{reserve}"` is replaced by the reserve |
 | `no_think` | the parameter that turns it off, or `null` if the model does not think without a parameter |
+| `temperature` | `"rejected"` — the model rejects `temperature` (400), the wrapper drops it; no field — passed as is |
 | `measured` | date and what the measurement showed |
 
 State on 2026-10-04:
@@ -40,10 +41,26 @@ State on 2026-10-04:
 For a model without an entry the system neither turns thinking on nor off. An admitted model without
 an entry is a red test: `test_admitted_model_that_thinks_by_default_must_say_how_to_stop`.
 
-## Thinking reserve — `methodology/llm_admission_table.json`, `reasoning_reserve_tokens`
+## Thinking reserve and call deadline — `methodology/llm_thinking_measured.json`
 
-The number of tokens the wrapper adds to the answer limit when a task thinks. It is written by the
-model admission measurement, never set by hand. No number — the task does not think.
+Model properties from a measurement. Written by `llm_admission.py --record-thinking <measure.jsonl>`, not edited by hand.
+
+| Field | Meaning |
+|---|---|
+| `reserve_tokens` | thinking reserve: the model's largest thinking on `think` tasks in the measurement. No number — the task does not think |
+| `latency_sec`, `sec_per_token` | the line "time ≈ latency + tokens × seconds per token" over all of the model's calls |
+| `slack_sec` | the measurement's worst upward deviation from that line |
+| `calls`, `date` | how many calls were measured and when |
+
+There is no extra factor on the reserve: if thinking runs short, the wrapper retries the call with
+double the reserve (point 4 below).
+
+The call deadline (`deadline="measured"` on an async call) is the time of the first attempt and the
+retry at their full limit (answer + thinking) along the line plus the deviation
+(`llm_client.call_timeout`). A literal deadline around a model call is a red test
+`test_no_literal_timeout_around_a_model_call`: on 04.10 a 45 s deadline chosen without thinking cut
+off 9 of 17 specialist opinions. A thinking profile without a measurement is a red test
+`test_every_thinking_profile_has_a_measurement`.
 
 ## What the wrapper (`llm_client`) does
 

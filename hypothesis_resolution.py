@@ -56,7 +56,7 @@ def _update_hypothesis_versioned(
         cur = conn.execute(
             """UPDATE memory
                SET value=?, active=?, updated_at=datetime('now')
-               WHERE id=?
+               WHERE id=? AND category='hypothesis'
                  AND COALESCE(
                        CAST(json_extract(value, '$.version') AS INTEGER), 0
                      ) = ?""",
@@ -66,10 +66,15 @@ def _update_hypothesis_versioned(
 
 
 def _read_hypothesis_row(memory_id: int) -> dict | None:
-    """Читает строку из memory через health_db.get_conn (A++ R1/R2 guarded)."""
+    """Читает строку из memory через health_db.get_conn (A++ R1/R2 guarded).
+
+    Только category='hypothesis' — во всех трёх запросах модуля (05.10.2026). Номер строки
+    общий у всех категорий memory: поток теста, переживший подмену базы, пять недель писал
+    вердикты в строку id=1 другой категории живой базы. Номер чужой категории — не гипотеза."""
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, key, value, confidence, source, active FROM memory WHERE id=?",
+            "SELECT id, key, value, confidence, source, active FROM memory "
+            "WHERE id=? AND category='hypothesis'",
             (memory_id,),
         ).fetchone()
         return dict(row) if row else None
@@ -366,7 +371,8 @@ def set_eval_error(memory_id: int, message: str) -> None:
     with db.get_conn() as conn:
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute(
-            "UPDATE memory SET value=?, updated_at=datetime('now') WHERE id=?",
+            "UPDATE memory SET value=?, updated_at=datetime('now') "
+            "WHERE id=? AND category='hypothesis'",
             (_json.dumps(payload, ensure_ascii=False), memory_id),
         )
 

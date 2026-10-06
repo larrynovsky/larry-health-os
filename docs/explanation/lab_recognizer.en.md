@@ -1,58 +1,53 @@
-<!-- translation-of: docs/explanation/lab_recognizer.md sha256:fbba750073fe -->
+<!-- translation-of: docs/explanation/lab_recognizer.md sha256:1d22547740b2 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](lab_recognizer.md)
 
-# Lab Results Recognizer: staging, oracles, human gate — how the system reads paper lab results and why it doesn't take its own word for it
+# Lab-Results Recognizer: staging, oracles, human gate — how it works and what it does not promise
 
 ## What changed
 
-- **Double reading (`two_model_reconciled`)** completed a run on 2026-07-30 in the staging environment (canon snapshot: real code and data, but not the production database). No confirmation existed before.
-- **Staging + human gate (`staging_then_human_gate`)** completed a run on 2026-07-30 in the same staging environment. No confirmation existed before.
-- Both confirmations are valid within staging limits: they cannot be called verification on a live system.
-- The open first-hop defect (`hop1_precision_recall_open`) remains unclosed — its status has not changed.
+- **A new open invariant `date_order_by_code` has been recorded (status `open`).** The mechanism for determining day/month order in dates on lab forms is formalized as a separate unresolved limit — not as a working protection, but as an open problem that the system explicitly acknowledges as unsolved.
 
-**Updated:** 2026-07-30
+**Updated:** 2026-10-04
 
 
 ## Why it exists
 
-Lab results rarely arrive in a convenient form. More often it is a photo of a form taken on a phone in a clinic hallway, or a scan in another language, or several pages in small print. And the task is not simply "recognize the text" — it is to transfer medical numbers to a place where they will influence decisions about your health.
+Lab results arrive in all kinds of forms: a paper printout, a phone photo, a scan with labels in German or Finnish. And almost always — columns of numbers where a single misplaced decimal point changes the meaning radically. The number 15.2 and the number 152 are not a typo with consequences — they are a completely different world clinically.
 
-This is where the real problem lies. When an ordinary model reads a scan directly, it can drop a decimal point: 15.2 becomes 152. In ordinary text this is an awkward mistake. In medical data it means a different person with a different diagnosis. A number that enters a medical record incorrectly does not simply sit there — it participates in comparisons, trends, and reminders.
-
-That is why this subsystem exists not to be smarter than one good model. It exists so that no number enters your medical history without verification — and without your explicit consent.
+When a single model reads a scan directly and immediately writes the result to the database, it can make exactly that kind of mistake — and nobody will know. The recognizer exists precisely so that such errors do not pass unnoticed. Not "read and remember," but "read, double-check, ask me — and only then remember."
 
 ## What it does, in plain terms
 
-Think of a pipeline with several checkpoints placed one after another.
+When you upload a document with lab results, several things happen — one after another, not in parallel and not bypassed.
 
-**First checkpoint: two readers instead of one.** The page is read by two independent "eyes" — two different approaches with different instructions. They do not know each other's answer in advance. Afterwards the results are compared: did they agree, and how confident is each in its reading. If the two views diverge, that is an alarm signal, not a silent acceptance of one of the variants.
+**Two views instead of one.** The page is read by two independent readers with different instructions. They compare their results with each other: how much they agreed, how confident each one was. This does not mean errors are ruled out — it means disagreement is visible rather than hidden.
 
-**Second checkpoint: plausibility oracles.** Even if both readers agreed, their result goes to independent reviewers — oracles. These look not at the text but at the meaning: does the number fall within a physiologically possible range, did an indicator jump in a way that does not happen in a living person, are the units of measurement mixed up. As a result, each document receives a label: everything is fine — or something requires attention.
+**Plausibility checking.** After reading, independent oracles take over — separate validators that look for: whether a value has gone outside a physiologically possible range, whether it has jumped between measurements in a way that does not happen, whether units are mixed up. If something is wrong, the document gets a "needs attention" flag rather than quietly passing through. The outcome is either a green light or a flag.
 
-**Third checkpoint: staging and human gate.** Even after passing both previous checkpoints, the result does not go directly into your history. It is placed in intermediate storage — staging. The canon, that is the real medical record, remains untouched. Transferring data to canon is only possible through an explicit action, and by default even that action operates in "show what would happen" mode — with no real changes. For changes to actually happen, an explicit flag is required. And anything you reject does not proceed further.
+**Staging — quarantine before canon.** What is recognized does not go directly into your real lab history. It is placed in an intermediate area — staging. Canon remains untouched until you explicitly say "yes." Even technically: by default the system only rehearses the transfer, and the real transfer requires an explicit permission and saves a snapshot of what existed before.
 
-Before changing anything in the canon, the system takes a pre-snapshot — recording how everything looked before. This means there is always something to roll back to.
+**You are the last line.** Everything that has passed both readers and the oracles still waits for your decision. What is rejected does not enter canon. You see what was recognized, you see what raised questions, and only your "yes" moves the result forward.
 
 ## What to say honestly about its limits
 
-It is important to speak plainly here, because this concerns medical data.
+It is important to be direct here, because the system works with medical data.
 
-The entire architecture described — two readers, oracles, staging, human gate — is a system of safeguards. But a safeguard does not mean the problem is solved.
+---
 
-**The first hop remains an open problem.** An audit conducted in June 2026 showed: the reliability of initial data extraction from a scan has historically been systematically violated. Extraction recall was around 50% — meaning roughly half of the indicators could be lost. Decimal point loss was recorded as a real, recurring defect. The ensemble of two readers and the oracles are precisely an attempt to catch such errors. But the residual defect is not closed and is not certified as fixed. This is not "it existed and was repaired" — this is an open limit right now.
+**Dates — an unsolved problem.** The intent is this: the order of day and month in a date should be determined by code, not by the model. The model returns the date as it is printed, and the code attempts to figure out the order from context — it looks in the document for dates where the order is unambiguous (for example, if a number is greater than 12, it must be in the day position), and if the model transposed them — it corrects. If it cannot be determined, the date is not guessed: it is marked as ambiguous and sent to you for manual review.
 
-What this means in practice: the system honestly signals suspicions, but does not guarantee it will catch everything. Your review of the result before confirmation is not a formality — it is a real part of the protection.
+But this promise is not yet fully delivered — it is in progress. This is exactly what happened in a real case: the material receipt date was printed one day before the collection date, and in staging it ended up with day and month transposed. Furthermore, even when the mechanism works, there is a boundary: it distinguishes day/month order, but does not always understand which date is being referred to — receipt of material or collection. These are different things, and if they appear separately on the form, the model may pick the wrong one. How often — unknown, there is one case. And also: if the scan contains no text layer and has no unambiguous dates that could help resolve the order — there is nothing to work with, and the row goes to a human.
 
-No other boundaries of what is proven have been declared in this version.
+---
+
+**The first hop — historically unreliable.** An audit conducted in June 2026 showed: the model that reads the document first historically lost around half of the values and dropped decimal points. The two readers and the oracles are a safeguard against this. But the residual problem is not officially closed: it exists as an open defect. This does not mean the system is bad — it means the system is honest: where it is not sure, it says so.
+
+---
+
+In short: the system is designed not to take itself at its word. Two readings, external checks, quarantine, your decision. But "not taking itself at its word" is not the same as "guaranteed to be correct." Dates are still not resolved everywhere, the first hop is not definitively verified.
 
 ## Where this lives in the system
 
-The subsystem lives in several places that work together.
-
-`lab_recognizer.py` — this is the executable core: page reading, comparison of the two readers, oracle invocation, and writing to staging all happen here.
-
-`CLAUDE.md` — the architectural document describing the design principles of the entire system and the place of this subsystem among others. If you want to understand why it is structured this way and not another way — that is where to look.
-
-`subsystem_intent.yaml` — a machine-readable declaration of intent: what the subsystem commits to doing, which invariants hold, and which are open. This is where it is recorded that `hop1_precision_recall_open` has status `open`.
+All the logic lives in `lab_recognizer.py` — that is where the pipeline runs from document upload through placement in staging and oracle validation. The intent behind the system's design and its promises are recorded in `subsystem_intent.yaml` — this is not code, but a description of what the system commits to doing and what counts as a violation. If behavior diverges from what is written there, that is not "working as intended" — that is a bug.

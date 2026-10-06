@@ -7,7 +7,7 @@
   ],
   "models_url": "https://api.anthropic.com/v1/models",
   "thinking": {
-   "_why": "Как каждая модель включает и выключает думание — у всех по-разному (замер 04.10, нить thinking-modes). think — параметр включения; no_think — параметр выключения или null (модель без него не думает). {reserve} подставляется запасом под думание из таблицы допуска. Модель без записи здесь не думает никогда, а запись с no_think обязательна для моделей, думающих по умолчанию: иначе рассуждение съедает лимит ответа (04.10 недельный отчёт: 4096 токенов рассуждения, 0 текста).",
+   "_why": "Как каждая модель включает и выключает думание — у всех по-разному (замер 04.10, нить thinking-modes). think — параметр включения; no_think — параметр выключения или null (модель без него не думает). {reserve} подставляется запасом под думание из замера (llm_thinking_measured.json). Модель без записи здесь не думает никогда, а запись с no_think обязательна для моделей, думающих по умолчанию: иначе рассуждение съедает лимит ответа (04.10 недельный отчёт: 4096 токенов рассуждения, 0 текста). temperature: \"rejected\" — модель отклоняет параметр, обёртка его убирает (замер 04.10).",
    "models": {
     "claude-sonnet-4-6": {
      "think": {
@@ -21,7 +21,8 @@
       "type": "adaptive"
      },
      "no_think": null,
-     "measured": "2026-10-04: adaptive принят, enabled — 400; без параметра не думает"
+     "measured": "2026-10-04: adaptive принят, enabled — 400; без параметра не думает; temperature без думания — 400 («deprecated for this model»), 04.10",
+     "temperature": "rejected"
     },
     "claude-haiku-4-5": {
      "think": {
@@ -38,7 +39,8 @@
      "no_think": {
       "type": "between_tools"
      },
-     "measured": "2026-10-04: думает по умолчанию; disabled — 400 («send between_tools»); enabled — 400; adaptive принят"
+     "measured": "2026-10-04: думает по умолчанию; disabled — 400 («send between_tools»); enabled — 400; adaptive принят; temperature без думания — 400 («deprecated for this model»), 04.10",
+     "temperature": "rejected"
     },
     "claude-opus-5": {
      "think": {
@@ -47,9 +49,14 @@
      "no_think": {
       "type": "disabled"
      },
-     "measured": "2026-10-04: думает по умолчанию; disabled принят; enabled — 400; adaptive принят"
+     "measured": "2026-10-04: думает по умолчанию; disabled принят; enabled — 400; adaptive принят; temperature без думания — 400 («deprecated for this model»), 04.10",
+     "temperature": "rejected"
     }
    }
+  },
+  "task_tiers": {
+   "_why": "Поставщик может отдать задачу другой роли, чем по умолчанию (hai_core.ROLE_MODELS). Замер 04.10: haiku-4-5 на эталоне лечения 0 из 3 (пропускает лечение по другому заболеванию в анамнезе), sonnet-5-5 и opus-5 — 3 из 3; решение владельца — лечение у Anthropic извлекает sonnet. У OpenAI, Gemini и DeepSeek их модель роли haiku_pinned этот эталон прошла — у них без изменений.",
+   "treatment_extraction": "sonnet"
   }
  },
  "openai": {

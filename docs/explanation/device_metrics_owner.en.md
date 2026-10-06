@@ -1,58 +1,70 @@
-<!-- translation-of: docs/explanation/device_metrics_owner.md sha256:5d6b73f0ea7e -->
+<!-- translation-of: docs/explanation/device_metrics_owner.md sha256:7cd8a2939f0a -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](device_metrics_owner.md)
 
-# Every instrument metric has an owner: explanation
+# Every device metric has an owner: how the system detects data loss that would otherwise go unnoticed
 
 ## What changed
 
-First version of this section.
+- **The claim wording for `bp_second_source` has been clarified.** The direction of the change is not determined by machine — describe it neutrally: what exactly became more precise can be read in the limits below, not in a conclusion that "it became more reliable."
 
-**Updated:** 2026-09-26
+- **Three explicit limits of what is proven for `bp_second_source` have been added:**
+  - Withings is polled twice a day (09:10 and 21:10): a measurement deleted in the app reaches the database only on the next run, not instantly.
+  - If a tenant has no Withings connection — the second path is silent in exactly the same way a non-existent device would be.
+  - Mirroring of deletions (removing measurements absent in Withings) was added on 06.10 after confirmation on 05.10; no real deletion has passed through it yet — only in tests.
+
+- **Three previous limits of `bp_second_source` have been rewritten, not removed.** The two-day delay and "the sensor does not judge the reverse side" are gone along with the old watcher: Withings now writes daily blood pressure itself, and there is nothing left to compare it against "Health." Silence without a Withings connection remains in the new wording. What is proven has not become broader as a result.
+
+- **A new invariant `bp_day_owner_withings` with status `open` has been added.** The intent is recorded: who writes the daily blood pressure and how it is calculated when a cloud-connected blood pressure monitor is present. Status `open` means this is precisely an intent — not a working mechanism.
+
+**Updated:** 2026-10-06
 
 
 ## Why it exists
 
-When an instrument sends health data, everything looks fine from the outside: the bot responds, summaries arrive, charts are drawn. Nobody notices that some measurements quietly disappear along the way. Not with an error, not with a loud failure — they simply vanish.
+When a smart device stops sending data, it is usually noticed immediately: charts disappear, summaries go empty, something is obviously broken. But there is another scenario — a quiet one, and therefore more dangerous: the device keeps sending data, the bot keeps running, the summaries look alive, yet some measurements simply never reach storage. No alert, no signal. Numbers that decisions are later made from just silently disappear.
 
-An independently invented example: a device sends a fictional `example_level` field,
-but the parser expects `example_value`. The registry marks the metric as "processed"
-although the parser silently returns an empty result. Another scenario: after an intake
-path changes, the registry keeps watching the emptied folder and stops noticing uploads.
-Both examples illustrate technical loss without describing anyone's measurement history.
+This is exactly the scenario the "Every device metric has an owner" subsystem addresses. It answers a simple question: every field the device sent — did it get somewhere, or was it lost along the way? And if it was lost — the system must be loud about it, not silent.
 
-This layer exists precisely so that such silence becomes impossible. Not "we try not to lose anything", but: if a metric arrived and did not find its place — the system knows about it and says so out loud.
+The motivation for building this kind of order came from specific findings: blood pressure measurements that exist in the app and in the cloud but never reached the final database; and a measurement that the device averaged together with another one that the owner had already deleted as erroneous. These are not hypothetical risks — these are things that already happened.
 
-## What it does, in plain words
+## What it does, in plain terms
 
-Imagine that every metric, as it enters the system, passes through a judge. The judge looks not at what is written in the registry, but at what is actually happening: did the data reach storage?
+The subsystem rests on several simple agreements that the system itself verifies.
 
-The judge delivers one of four verdicts:
+**Every field must have a fate.** When a device sends data, a dedicated intake judge looks at each field and issues one of four verdicts: "processed and stored," "decided not to take — and here is why," "parsed but did not reach storage," or "unrecognized field." The third and fourth verdicts are alerts: something was lost, or something new has appeared. The judge looks at what is actually happening with the data, not at what is written in the registry.
 
-- **"Accepted"** — the metric was parsed and saved where it should be.
-- **"Consciously not collected"** — there is a recorded decision not to collect this metric, and the reason is on file.
-- **"Lost"** — the metric was parsed but never reached storage. This is a problem.
-- **"Unknown"** — the system is seeing this metric for the first time and does not know what to do with it.
+**"Covered by another source" is verified, not taken on faith.** If a field is recorded as "not taken because this is already present in this column," the system checks: is it actually there? If the column is empty on days when this field arrived — the verdict changes to "has no owner."
 
-An important detail: if someone has written "not collecting, because it is already in another column" — the judge checks whether that column actually contains data on the days the metric arrived. If the column is empty — that is not a "conscious decision", that is a loss. Word is not taken on faith.
+**The judge itself is also watched.** There is a separate nightly sensor that checks: has the judge gone blind? If the registry has not seen incoming data for a long time even though the archive is fresh — that is also an alert. The classic case: the intake path changed, the judge is looking into an emptied old directory, sees nothing, and thinks everything is fine. The system now detects this scenario.
 
-At night a separate sensor runs that looks not at arrival events but at the overall state of the registry: are there any metrics without an owner right now. This is protection against the situation where something slipped through unnoticed.
+**An empty column is not always "no device."** If some metric is not filled in the database, it can mean two completely different things: either the device genuinely sent nothing (and then the silence is correct), or the device sent data that was lost. The system distinguishes these two cases by checking against the raw archive: if the source of this field never appeared in the archive — the silence is justified. If it did appear and the column is empty — that is a loss, and it must be reported. This is exactly why the archive is compressed rather than deleted: without it, silence cannot be distinguished from loss.
 
-And finally — the system watches the judge itself. If the registry has not seen new data for a long time, even though data exists in the archive, that too is a cry: "the judge is blind." Such a sensor detects a stale intake path.
+**Blood pressure is a special case with two paths.** Blood pressure has a second, independent path in addition to the primary device: measurements arrive directly from the blood pressure monitor's cloud. This matters for a specific reason: the primary device may average the day's data in a way that includes a measurement the owner has already deleted as erroneous. The direct path from the cloud does not do this — it sees only the measurements the owner considers real. A deleted measurement will disappear from the database on the next sync.
 
-A separate question is what an empty column means. The system considers a device absent only if the source of that metric has genuinely never appeared in the raw data — including old compressed files. If the source did appear but the column is empty, that is a loss, not silence. That is precisely why archives are compressed but not deleted: without them it is impossible to answer this question honestly.
+## What is honest to say about its limits
 
-## What to say honestly about its limits
+Some agreements are already working and verified. Some are still in progress. It is important not to conflate the two.
 
-All the invariants described here hold today. But "holds" and "verified under all conditions" are different statements, and conflating them would be dishonest.
+**What works and is verified — but not everywhere.**
 
-The rule about an empty column is valid exactly as far as the raw archive goes. If data once arrived but is not in the archive — the system will not be able to distinguish "the device was absent" from "data was lost". The boundary of what can be proven coincides with the depth of what has been preserved.
+The second blood pressure path through the monitor's cloud is confirmed on real data: three measurements with specific dates matched what the owner sees in the app. But this is a check of one specific run, not of every possible situation. A few honest caveats:
 
-The same applies to coverage checking: the system looks at the days a metric arrived and compares them against the column. That is more honest than taking someone's word for it — but it is still a check against the material that exists.
+- A measurement deleted in the blood pressure monitor's app will enter the database with a delay — it will disappear only after the next scheduled cloud poll, not instantly.
+- If a user has no blood pressure monitor with a cloud connection — this path is silent in exactly the same way a non-existent device would be. This is correct behavior, but it must be understood.
+- Deletion mirroring was added after the main path; no real deletion has passed through it under real conditions — only in tests.
 
-These limits do not make the system unreliable. They make it honest: it knows where the boundary is of what it can claim with confidence.
+**What is not yet complete and needs to be known.**
 
-## Where this lives in the system
+The agreement about who exactly writes the daily blood pressure and how exactly it is calculated is not yet fully implemented. The decision was made (26 September and 6 October), the intent is recorded, but this cannot be considered working. The substance of the intent: for users who have a cloud-connected blood pressure monitor, the daily blood pressure in the final database must be calculated only from that monitor's measurements, and the path through the primary device must set data aside as a witness rather than overwriting the result. The nightly judge must verify this every night. But for now this is precisely an intent, not a fact.
 
-The judge logic lives in **`hae_checker.py`** (`judge_payload`); it is called by the instrument intake **`dashboard_routers/api_hae_ingest.py`** on every upload. What exactly is parsed and stored — **`import_apple_health.py`** (`aggregate_metric_by_day`) and **`metrics_db.py`** (`APPLE_RAW_KEYS`). The night sensors — every metric has an owner and judge blindness (`check_hae_arrivals_have_owner`), the empty-column rule (`_hae_device_absent`) — are in **`integrity_tests.py`**. The intentions behind this entire subsystem are recorded in **`subsystem_intent.yaml`** — this is not technical documentation, but a record of why it is structured this way at all and what lessons stand behind it.
+To this are added limits that hold true even when everything is implemented:
+
+- The day is calculated according to the time zone of the installation location, not the location where the measurement was taken. On a trip, a late-night measurement may "fall" into the adjacent day.
+- For a user without a cloud-connected monitor, the primary device still writes blood pressure, and measurements deleted in it are not seen by the system.
+- Data from the primary device is set aside as a witness, but is not compared against monitor data by anyone — because the owner deliberately deletes unsuccessful measurements, and such a comparison would raise an alert every time for no good reason.
+
+## Where this is in the system
+
+The central file of the subsystem is `hae_checker.py`: it contains the intake judge and the nightly sensors. The intents and agreements the system is supposed to fulfill are recorded in `subsystem_intent.yaml` — this is not technical documentation, but specifically a record of what was decided and why, so that the next review can rely on something concrete rather than on memory.

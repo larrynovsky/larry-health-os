@@ -67,6 +67,8 @@ MONITORED: dict[str, str] = {
     # в 07:50), а morning_test_summary пишется изнутри этой же задачи. Датчика не
     # было; заведён в нити nightly-liveness.
     "com.larry.health.test-suite": "check_nightly_suite_liveness (итог ночи покрывает последний плановый запуск по живому плисту)",
+    # 2026-10-05: в контейнере задача по расписанию (placement: container), датчик был с 25.09.
+    "com.larry.health.constitutions": "check_constitutions_trigger_alive (отметка успешного прогона в system_config, все тенанты)",
     "com.larry.health.calendar-sync": "check_calendar_freshness (cache mtime vs fetcher CACHE_ERROR_AGE_H)",
     # ── 2026-08-07: реестр ОТСТАЛ, а не датчиков не было ────────────────────────
     # Все четыре датчика существовали в integrity_tests и на момент находки уже
@@ -183,8 +185,39 @@ def schedule_judged_labels(src_path: Path | None = None) -> dict[str, list[str]]
     return out
 
 
+def foreign_labels(classified: set[str], placement: dict[str, str]) -> set[str]:
+    """Ключи реестра, чьи задачи контейнер владельца НЕ исполняет, — их плиста там нет по
+    построению, и это не «реестр протух». Два класса (замер 2026-10-05):
+      • служба владельца с местом не `container`/`env` в placement.yaml (host: / none:) — её
+        плист живёт на Маке-хосте; судит его хостовый прогон;
+      • задача партнёра (`*.partner`) — партнёр живёт нативно на хосте, не в этом контейнере.
+    До этой функции контейнер судил хостовый реестр каталогом своих плистов: 10 ложных
+    «ключей без plist» каждую ночь (карточка warn:producer_registry, 2026-09-24)."""
+    # Чужой — только ДОКАЗАННО чужой: строка `host: …` / `none: …` (тот же словарь мест, что
+    # у scripts/install.py). Опечатка или null — не «чужая служба», а сломанный дом места: без
+    # этой ветки `contianer` молча снимал бы контроль протухания (ревью 721aefad, п.1).
+    out = set()
+    for k, v in placement.items():
+        if v in ("container", "env"):
+            continue
+        if not (isinstance(v, str) and v.startswith(("host: ", "none: "))):
+            raise ValueError(f"placement.yaml: у {k} место {v!r} — не container/env/host:/none:")
+        if k in classified:
+            out.add(k)
+    out |= {k for k in classified if k.endswith(".partner")}
+    return out
+
+
+def _placement() -> dict[str, str]:
+    """placement.yaml — единственный дом «куда едет служба» (читает и scripts/install.py)."""
+    import yaml
+    p = Path(__file__).with_name("templates") / "launchd" / "placement.yaml"
+    return yaml.safe_load(p.read_text(encoding="utf-8"))["services"]
+
+
 def audit_producers(scheduled_labels: list[str],
-                    judged: dict[str, list[str]] | None = None) -> list[str]:
+                    judged: dict[str, list[str]] | None = None,
+                    foreign: set[str] | None = None) -> list[str]:
     """Ратчет покрытия. Пусто = каждый scheduled-производитель классифицирован.
 
     Находки двух видов:
@@ -193,7 +226,8 @@ def audit_producers(scheduled_labels: list[str],
       3. задача покрыта вычисленно (`judged`) И записана в MONITORED руками → два дома одного
          факта, ручной снова разъедется с кодом.
     Аргументы — для инъекции в тестах; в проде через _scan_scheduled_labels и
-    schedule_judged_labels.
+    schedule_judged_labels. `foreign` — ключи, чьих плистов в этом каталоге нет по построению
+    (foreign_labels), из находки 2 исключаются.
     """
     labels = set(scheduled_labels)
     judged = judged or {}
@@ -208,7 +242,7 @@ def audit_producers(scheduled_labels: list[str],
             f"(context_gate_orphan: реши датчик или exempt)"
         )
 
-    stale = sorted(classified - labels)
+    stale = sorted(classified - labels - (foreign or set()))
     if stale:
         found.append(
             f"реестр производителей протух — ключи без plist: {', '.join(stale)} "
@@ -230,4 +264,8 @@ def collect_producer_findings(launchagents_dir: Path | None = None) -> list[str]
     d = launchagents_dir or plist_env_liveness.agents_dir()
     if not d.is_dir():
         return []
-    return audit_producers(_scan_scheduled_labels(d), schedule_judged_labels())
+    judged = schedule_judged_labels()
+    foreign = None
+    if plist_env_liveness.in_container():
+        foreign = foreign_labels(set(MONITORED) | set(EXEMPT) | set(judged), _placement())
+    return audit_producers(_scan_scheduled_labels(d), judged, foreign)

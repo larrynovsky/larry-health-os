@@ -161,6 +161,13 @@ _ABSENCE_RE = re.compile(
     r"(никогда\s+не\s+сдав\w*|не\s+сдав\w*|не\s+сдан\w*|не\s+было\s+ни\s+разу|ни\s+разу\s+не\s+\w+"
     r"|так\s+и\s+не\s+провер\w*|не\s+провер[яе]\w*|не\s+измер\w*|отсутству\w*"
     r"|нет\s+данных"
+    # «про документ» (нить treatment-tails, 04.10.2026): предложения GP в заметки проблем
+    # писали «результат … не зафиксирован в системе», «DATA GAP» — мимо словаря и мимо судьи.
+    r"|не\s+зафиксирован\w*|не\s+задокументирован\w*|нет\s+в\s+(?:системе|документах|медкарте)"
+    r"|\bdata\s+gap\b"
+    # «без подтверждённого выполнения … в документах» (05.10.2026): этой фразой GP продлил дедлайн
+    # проблемы 13.09, и предложение одобрили, хотя документ за тот месяц лежал в медкарте.
+    r"|без\s+подтвержд\w*(?:\s+\S+){0,3}\s+в\s+документах"
     r"|\b(?:never|not)\s+(?:been\s+)?(?:tested|measured|checked|done)\b"
     r"|\b(?:no\s+(?:data|results?|measurements?)|(?:is|are)\s+(?:missing|absent))\b"
     r"|\bno\s+record\s+of\b(?=[^.;\n]*\b(?:tests?|testing|measurements?)\b))",
@@ -470,6 +477,33 @@ def recommendations_without_evidence(text: str, last_dates: dict, schedule: dict
     return out
 
 
+_DOC_STOP = {"pdf", "jpg", "jpeg", "png", "scan", "doc", "docs", "file"}
+
+
+def _name_tokens(text: str) -> set:
+    """Слова ≥3 букв (латиница/кириллица), без цифр и расширений файлов."""
+    return {w for w in re.findall(r"[a-zа-яё]{3,}", (text or "").lower())} - _DOC_STOP
+
+
+def documents_answering_absence(text: str, docs: list) -> list:
+    """Документы медкарты, которые отвечают на утверждение «нет / не зафиксировано» в тексте.
+
+    docs — [(дата, имя файла-источника)]. Возвращает [(дата, имя)] документов, чьё имя
+    делит слово с клаузой, где стоит утверждение об отсутствии. Нить treatment-tails
+    (04.10.2026): GP дважды предложил в заметку проблемы «результата обследования в системе
+    нет», и предложение одобрили, не видя, что документ за тот месяц в медкарте лежит.
+    Граница: связь по слову в ИМЕНИ файла — документ, названный иначе, не найдётся."""
+    hits = []
+    for clause in _CLAUSE_SPLIT.split((text or "").lower()):
+        if not _ABSENCE_RE.search(clause):
+            continue
+        words = _name_tokens(clause)
+        for d, name in docs:
+            if (d, name) not in hits and words & _name_tokens(name):
+                hits.append((d, name))
+    return hits
+
+
 def annotate_lab_recency(text: str) -> str:
     """Дописывает к тексту задачи дату последней сдачи аналитов, которые он советует сдать.
 
@@ -564,16 +598,15 @@ def _get_patient_routine() -> dict:
 
 
 def _patient_header() -> str:
-    """ФИО + возраст + локация из patient_profile DB."""
+    """Возраст + локация из patient_profile DB. Имя в модель не уходит (нить identity-out-of-llm)."""
     from datetime import date as _d
     import health_db as _db; _db.init_db()
     ident = _db.get_profile_context().get("identity", {})
-    name  = ident.get("name") or "имя не указано"
     birth = ident.get("birth_date", "")
     loc   = ident.get("location", "")
     age_s = (f", {(_d.today() - _d.fromisoformat(birth)).days // 365} лет"
              if birth else "")
-    return f"{name}{age_s}{', ' + loc if loc else ''}"
+    return ", ".join(p for p in [age_s.lstrip(", "), loc] if p) or "возраст не указан"
 
 
 def _build_surveillance_decisions_block() -> list[str]:
@@ -744,15 +777,28 @@ def _build_freshness_block(recent_labs: list, end_date: date) -> list[str]:
     return []
 
 
+_MED_EVENTS_CAP = 60   # структура представления (§9 кл. 3): потолок строк блока, не клиника
+_MED_EVENTS_BOUNDARY = "  (показано {shown}{more}; события старше 12 мес сюда не входят — отсутствие события в этом блоке не значит, что его нет в медкарте)"
+
+
 def _build_med_events_block(end_date: date) -> tuple[list[str], list[dict]]:
     """Sprint 4 finish (2026-05-22): блок МЕДИЦИНСКИЕ СОБЫТИЯ (events с encounters/diagnostics).
     Возвращает (lines, med_events) — med_events передаётся в consultations для dedup.
     """
     import health_db as db
     try:
-        med_events = db.get_events(n=10, date_from=str(end_date - timedelta(days=365)))
+        # До 04.10.2026 здесь было n=10 без объявления обрезки: за год у владельца 21 событие,
+        # обследование из 11-го и дальше в блок не попадало, и модель писала в проблему
+        # «результата в системе нет» — такое предложение дважды прошло гейт (нить treatment-homes).
+        # Теперь блок берёт окно целиком (до _MED_EVENTS_CAP) и сам называет свою границу.
+        in_window = db.get_events(n=_MED_EVENTS_CAP + 1,
+                                  date_from=str(end_date - timedelta(days=365)))
+        med_events = in_window[:_MED_EVENTS_CAP]
         if med_events:
-            lines = ["", "МЕДИЦИНСКИЕ СОБЫТИЯ (последние 12 мес):"]
+            lines = ["", "МЕДИЦИНСКИЕ СОБЫТИЯ (последние 12 мес):",
+                     _MED_EVENTS_BOUNDARY.format(
+                         shown=len(med_events),
+                         more=f" (>{_MED_EVENTS_CAP})" if len(in_window) > _MED_EVENTS_CAP else "")]
             for e in med_events:
                 performer = e.get("performer") or "?"
                 etype     = e.get("event_type", "event")

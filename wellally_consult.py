@@ -48,11 +48,6 @@ def _calc_age(birth_date_str: str) -> int:
     return today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
 
 
-def _fmt_bday(birth_date_str: str) -> str:
-    """ISO date → 'DD.MM.YYYY'."""
-    bd = date.fromisoformat(birth_date_str)
-    return bd.strftime("%d.%m.%Y")
-
 SPEC_DIR  = Path(__file__).parent / "specialists"  # промпты в git (Ф0b), не в iCloud
 
 def _medical_specialists() -> list[str]:
@@ -297,7 +292,7 @@ def _build_data_package(
     # консилиум у человека, пропустившего дату, не собирался вовсе.
     _bd = ident.get('birth_date')
     try:
-        _age_s = f"{_calc_age(_bd)} лет (р. {_fmt_bday(_bd)})"
+        _age_s = f"{_calc_age(_bd)} лет"
     except (TypeError, ValueError):
         _age_s = "возраст не указан"
     def _t(v, suf=""):   # «None» литералом в промпт не едет
@@ -306,7 +301,6 @@ def _build_data_package(
         "=== МЕДИЦИНСКИЕ ДАННЫЕ ПАЦИЕНТА ===",
         "",
         "ПРОФИЛЬ ПАЦИЕНТА:",
-        f"  Имя: {ident.get('name') or 'не указано'}",
         # Пол — из профиля (identity.sex), не литерал: до 24.09 здесь стояло «мужской» для любого
         # тенанта (BL-SEX-LITERAL-1).
         f"  Пол: {consilium_roster.sex_label(ident.get('sex'))}, {_age_s}",
@@ -431,14 +425,12 @@ async def _call_medical_specialist_async(
             )
 
         try:
-            response = await asyncio.wait_for(
-                client.messages.create(task="wellally_consult._call_medical_specialist_async",
+            response = await client.messages.create(task="wellally_consult._call_medical_specialist_async",
                     model=hai_core.model_for("consult_specialist"),
                     max_tokens=400,
                     system=system,
                     messages=[{"role": "user", "content": content}],
-                ),
-                timeout=300.0,   # Opus медленнее; live-consult не чувствителен к задержке
+                    deadline="measured",   # срок — из замера модели (llm_client.call_timeout)
             )
             log.info(f"  {name} (Раунд {round_label}): OK")
             return {"name": name, "opinion": llm_client.answer_text(response), "ok": True}
@@ -474,12 +466,7 @@ async def _run_deliberation_round(
         async with semaphore:
             return await coro
 
-    # Медицинские специалисты
-    medical_tasks = [
-        _call_medical_specialist_async(client, name, data_package, semaphore, round_a_opinions)
-        for name in _medical_specialists()
-    ]
-
+    import consilium_roster
     # Lifestyle-коучи
     import lifestyle_agents as la
     sleep_date    = session.sleep_date    or get_today()
@@ -499,41 +486,21 @@ async def _run_deliberation_round(
                 patient_q = data_package[idx:idx+300].split("═══")[0].strip()
                 break
 
-    lifestyle_tasks = [
-        _guarded(agent.generate_mdt_opinion(
-            sleep_date=sleep_date,
-            activity_date=activity_date,
-            patient_question=patient_q,
-            round_a_opinions=round_a_opinions,
-            client=client,
-        ))
-        for agent in la.AGENTS
-    ]
+    askers = {name: (lambda name=name: _call_medical_specialist_async(
+                  client, name, data_package, semaphore, round_a_opinions))
+              for name in _medical_specialists()}
+    for agent in la.AGENTS:
+        askers[agent.agent_name] = lambda agent=agent: _guarded(agent.generate_mdt_opinion(
+            sleep_date=sleep_date, activity_date=activity_date, patient_question=patient_q,
+            round_a_opinions=round_a_opinions, client=client))
 
-    # Запускаем всё параллельно (все 13 через общий semaphore=6)
-    medical_results, *lifestyle_opinions = await asyncio.gather(
-        asyncio.gather(*medical_tasks),
-        *lifestyle_tasks,
-        return_exceptions=True,
-    )
+    # Все обязаны ответить (consilium_roster.ask_all): не ответивший — повтор, затем отказ.
+    answers = await consilium_roster.ask_all(
+        askers, lambda r: bool(r.get("ok")) if isinstance(r, dict) else bool(r),
+        f"wellally_consult round {round_label}")
+    opinions = {n: (r["opinion"] if isinstance(r, dict) else r) for n, r in answers.items()}
 
-    opinions = {}
-
-    for r in medical_results:
-        if r.get("ok"):
-            opinions[r["name"]] = r["opinion"]
-        else:
-            opinions[r["name"]] = r.get("opinion", "Нет ответа")
-
-    for agent, opinion in zip(la.AGENTS, lifestyle_opinions):
-        if isinstance(opinion, Exception):
-            log.error(f"  {agent.agent_name} (Раунд {round_label}): {opinion}")
-            opinions[agent.agent_name] = f"Ошибка: {opinion}"
-        else:
-            opinions[agent.agent_name] = opinion
-            log.info(f"  {agent.agent_name} (Раунд {round_label}): OK")
-
-    log.info(f"Раунд {round_label} завершён: {len(opinions)}/13 ответов")
+    log.info(f"Раунд {round_label} завершён: {len(opinions)}/{len(askers)} ответов")
     return opinions
 
 
@@ -603,19 +570,17 @@ async def _call_coordinator_async(
     log.info(f"Координатор: синтез {ok_count}/13 мнений...")
 
     try:
-        response = await asyncio.wait_for(
-            client.messages.create(task="wellally_consult._call_coordinator_async",
+        response = await client.messages.create(task="wellally_consult._call_coordinator_async",
                 model=hai_core.model_for("consult_coordinator"),
                 max_tokens=2048,
                 system=system,
                 messages=[{"role": "user", "content": user_content}],
-            ),
-            timeout=600.0,   # Opus-синтез 16k, задержка неважна
+                deadline="measured",   # срок — из замера модели (llm_client.call_timeout)
         )
         return llm_client.answer_text(response)
     except asyncio.TimeoutError:
-        log.error("Координатор: TIMEOUT (90s)")
-        raise RuntimeError("Координатор не ответил за 90 секунд")
+        log.error("Координатор: срок по замеру модели исчерпан")
+        raise RuntimeError("Координатор не ответил в срок, рассчитанный по замеру модели")
 
 
 # ── Main Entry Point ──────────────────────────────────────────────────────────

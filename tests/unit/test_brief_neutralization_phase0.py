@@ -133,7 +133,7 @@ def test_profile_block_shows_tenant_diagnosis(db):
     db.add_profile("medical.diagnosis", value_text="Гипертония II ст.")
     block = lp.build_profile_block()
     assert "Гипертония II ст." in block
-    assert "Тест Тестов" in block
+    assert "Тест Тестов" not in block      # имя в модель не уходит (нить identity-out-of-llm)
 
 
 # ── patient_context.build_patient_brief ──────────────────────────────────────

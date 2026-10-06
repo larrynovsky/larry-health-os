@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.larry.health.withings-import</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>{{PYTHON}} {{REPO}}/import_withings.py &gt;&gt; {{HOME}}/health_withings_import.log 2&gt;&amp;1</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>10</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/health_withings_import.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/health_withings_import_error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HEALTH_DATA_DIR</key>
+        <string>{{DATA}}</string>
+    </dict>
+</dict>
+</plist>

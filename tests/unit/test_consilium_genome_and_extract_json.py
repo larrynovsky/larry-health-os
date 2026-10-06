@@ -222,10 +222,11 @@ class TestConsiliumGenomeBlock:
         assert "данные недоступны" in pkg
         assert "ГЕНОМНЫЙ КОНТЕКСТ" in pkg
 
-    def test_coordinator_max_tokens_is_16000(self):
-        """Регресс: max_tokens координатора не должен быть меньше 16000.
+    def test_coordinator_max_tokens_is_at_least_20000(self):
+        """Регресс: max_tokens координатора не должен быть меньше 20000.
 
         Баг: 8000 приводил к truncation genome-enriched гипотез → JSON parse fail.
+        04.10 замер: текст 14.6k и 15.1k при 16000 — решение владельца поднять до 20000.
         """
         import ast, inspect
         import monthly_consilium as mc
@@ -241,6 +242,26 @@ class TestConsiliumGenomeBlock:
 
         assert max_tokens_values, "max_tokens должен быть задан в _run_coordinator"
         for val in max_tokens_values:
-            assert val >= 16000, \
-                f"max_tokens={val} в _run_coordinator слишком мало; минимум 16000 " \
+            assert val >= 20000, \
+                f"max_tokens={val} в _run_coordinator слишком мало; минимум 20000 " \
                 f"(genome-enriched гипотезы превышают 8000 токенов output)"
+
+
+def test_coordinator_cut_at_answer_limit_is_a_fault_not_an_empty_month(monkeypatch):
+    """Обрыв JSON на пределе ответа раньше выглядел как «консилиум не нашёл тем»."""
+    from types import SimpleNamespace as NS
+    import llm_client
+    import hai_core
+    import notify
+    import monthly_consilium as mc
+    cut = NS(stop_reason="max_tokens", usage=NS(output_tokens=20000),
+             content=[NS(type="text", text='{"hypotheses": [{"theme": "оборвано')])
+    monkeypatch.setattr(llm_client, "guarded_client",
+                        lambda **kw: NS(messages=NS(create=lambda **k: cut)))
+    monkeypatch.setattr(hai_core, "model_for", lambda role: "claude-opus-5")
+    monkeypatch.setattr(hai_core, "answer_language", lambda: "")
+    faults = []
+    monkeypatch.setattr(notify, "fault", lambda tech, person_key=None, **kw: faults.append((tech, person_key)))
+    out = mc._run_coordinator("pkg", [])
+    assert out == {"hypotheses": [], "no_hypotheses_reason": "answer limit reached"}
+    assert len(faults) == 1 and faults[0][1] is None and "предел ответа" in faults[0][0]

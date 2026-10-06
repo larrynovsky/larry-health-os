@@ -618,3 +618,17 @@ def test_freshness_names_old_row_by_date_not_absence(db, clock):
     assert line and "просрочен" in line[0] and "НЕТ ДАННЫХ" not in line[0], line
     critical = [l for l in block.split("\n") if l.startswith("ОТСУТСТВУЮТ")]
     assert not any("TSH" in l for l in critical), critical
+
+
+def test_med_events_block_shows_whole_window_and_declares_boundary(db, clock):
+    """Нить treatment-homes (04.10.2026): n=10 без объявления обрезки — обследование из
+    11-го события года выпадало, модель писала «в системе нет». Красный на старом коде."""
+    clock.set("2026-05-22")
+    for day in range(1, 13):
+        db.add_event(event_type="encounter", effective_date=f"2026-03-{day:02d}",
+                     performer=f"Doc{day}", location="Clinic")
+    import gp_agent
+    lines, events = gp_agent._build_med_events_block(date(2026, 5, 22))
+    assert len(events) == 12
+    assert any("Doc1:" in l for l in lines), "самое раннее событие окна обязано быть в блоке"
+    assert any("не значит, что его нет в медкарте" in l for l in lines)

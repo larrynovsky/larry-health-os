@@ -46,6 +46,7 @@
 - Установка и обновление: [поставить систему в Докере, своей сборкой](install_docker.md) ·
   [с ключом OpenAI, Gemini или DeepSeek](llm_provider.md)
 - [Подключить Google Calendar](connect_google_calendar.md)
+- [Подключить тонометр Withings](connect_withings.md) — раздел «Установка из образа Докера»
 - Бот ответил «Не получилось ответить: сбой внутри системы…» с кодом: [найти причину по коду](bot_fault.md)
 
 Остальные инструкции обслуживания пока написаны для исходной установки автора и в установке из
@@ -72,6 +73,7 @@
   [сезонная таблица](reseed_seasonal_produce.md) · [список троп](refresh_trail_list.md)
 - Каналы: [почта](email_channel.md) · [еженедельный дайджест](weekly_digest.md) ·
   [ротация журналов](rotate_logs.md)
+- [Подключить тонометр Withings](connect_withings.md) — второй источник давления
 - [Добавить второго человека](add_person.md) ·
   [перевод из нативной установки в контейнер](pilot_switch.md)
 

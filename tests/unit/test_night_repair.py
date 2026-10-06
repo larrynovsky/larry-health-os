@@ -3,6 +3,7 @@
 Studio и стенд подменены: гейт получает список ожидающих починок функцией, land — готовый каталог починки и
 прогон тестов-оракулов. Настоящий git — во временном каталоге (гейт и land читают ветку, HEAD, индекс)."""
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -19,6 +20,11 @@ def _git(cwd, *a):
 
 @pytest.fixture
 def repo(tmp_path):
+    # Предмет — ночной ремонт, а он живёт на хосте Studio (placement.yaml: host), где git есть.
+    # В контейнере владельца git нет по замыслу образа: там эти тесты судить нечем, их судит
+    # полный прогон при слиянии нити (решение владельца 05.10). Пропуск только по отсутствию git.
+    if shutil.which("git") is None:
+        pytest.skip("git нет в этой среде: ночной ремонт судится на хосте, при слиянии нити")
     bare = tmp_path / "studio.git"
     r = tmp_path / "mac"
     r.mkdir()

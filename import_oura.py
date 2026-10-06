@@ -26,14 +26,19 @@ METRICS_DIR = _HEALTH_DIR / "data" / "daily_metrics"
 # (ленивый вызов в get_token — иначе fail-closed рейзил бы на импорте). 2026-07-02.
 from secrets_paths import secrets_dir
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler(Path.home() / f"health_oura_import{_LOG_SFX}.log"),
-        logging.StreamHandler()
-    ]
-)
+def _setup_logging() -> None:
+    """Журнал скрипта — только при запуске скрипта (нить treatment-tails, 04.10.2026).
+    До этого basicConfig стоял на уровне модуля: любой импорт (тесты, бот) создавал
+    ~/health_oura_import{суффикс}.log и перехватывал корневое логирование импортёра;
+    у Studio в домашней папке накопилось 392 пустых файла на модуль от прогонов тестов."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[
+            logging.FileHandler(Path.home() / f"health_oura_import{_LOG_SFX}.log"),
+            logging.StreamHandler()
+        ]
+    )
 log = logging.getLogger(__name__)
 
 
@@ -369,6 +374,7 @@ def import_oura(start: date, end: date):
 
 
 if __name__ == "__main__":
+    _setup_logging()
     if len(sys.argv) > 1 and "-" in sys.argv[1]:
         # start=YYYY-MM-DD
         start = date.fromisoformat(sys.argv[1])

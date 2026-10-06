@@ -5,7 +5,21 @@
 следующую ДОПУЩЕННУЮ модель цепочки роли (`system_config model.<role>`, см.
 hai_core.model_chain). Цепочка из одной модели переключаться не умеет — преемник
 появляется только здесь: модель прогоняется через корпус задач роли, и прошедшая
-дописывается в КОНЕЦ цепочки (первая модель не меняется: это меняло бы поведение сегодня).
+дописывается в КОНЕЦ цепочки.
+
+ЧЛЕНЫ ЦЕПОЧЕК ТОЖЕ ПОД СУДОМ (нить admission-incumbents, решение владельца 05.10, вариант «В»).
+До 05.10 судились только новички, а запасные модели цепочек (haiku-4-5, sonnet-4-6, opus-4-7)
+не судились никогда. Член цепочки без свежего вердикта (вердикт помнит отпечатки входов
+наборов — сменились промпт, эталон, режим думания задачи → вердикт устарел) судится; провал —
+сразу повтор без кэша; провал дважды подряд — модель снимается с цепочки роли, сигнал в ночной
+разбор. Один провал — разброс модели на неоднозначной строке (RDW 02.10 прошла, 04.10 нет), а не
+приговор. Провалили ВСЕ члены роли — цепочка остаётся как была, сигнал громкий: работа без
+модели хуже работы на ошибающейся.
+
+РЕЖИМ РАБОЧЕЙ ЗАДАЧИ. Набор зовёт модель так же, как её зовёт работа: policy.work_task —
+задача набора, её режим (думать/читать) берётся из methodology/llm_task_modes.json; текстовая
+дисциплина нужна задачам обоих режимов — policy.text_modes. До 05.10 допуск судил всё в режиме
+«чтение», а распознавание по фото с 05.10 думает — вердикт был о другой модели.
 
 ЧТО ДЕЛАЕТ (одна ответственность — суд допуска):
   * кандидаты — модели из списка провайдера новее основной модели семейства роли;
@@ -18,7 +32,8 @@ hai_core.model_chain). Цепочка из одной модели перекл�
   * настоящие бланки владельца (каталог данных, llm_corpus/real) идут ТОЛЬКО провайдеру
     anthropic — туда документы и так уходят в работе; чужим — только синтетика.
 
-ЧЕГО НЕ ДЕЛАЕТ: не меняет первую модель цепочки; не выбирает провайдера; не допускает
+ЧЕГО НЕ ДЕЛАЕТ: не меняет порядок цепочки (только дописывает в конец и снимает дважды
+проваливших); не выбирает провайдера; не допускает
 модели семейства, которое не сопоставлено роли (policy.family_roles) — их просто нет в кандидатах.
 
 Запуск: из run_checks.sh ежедневно с `--weekly --notify` (раз в 7 дней по метке
@@ -124,7 +139,7 @@ def owner_real_pages() -> list[dict]:
     for it in json.loads(man.read_text(encoding="utf-8")):
         with db.get_conn() as conn:
             rows = conn.execute(
-                "SELECT id, canonical_name, value, value_op, date FROM lab_results_staging "
+                "SELECT id, canonical_name, unit, value, value_op, date FROM lab_results_staging "
                 "WHERE review_status='promoted' AND source_file LIKE ? AND page=?",
                 (it["source_like"], it["page"])).fetchall()
         gold = gold_from_promoted([dict(r) for r in rows])
@@ -142,9 +157,20 @@ def gold_from_promoted(rows: list[dict]) -> list[dict]:
     last: dict = {}
     for r in sorted(rows, key=lambda r: r["id"]):
         if r["canonical_name"] and r["value"] is not None:
-            last[(r["canonical_name"], float(r["value"]), r.get("date"))] = r
+            name = _identity(r)
+            last[(name, float(r["value"]), r.get("date"))] = dict(r, canonical_name=name)
     return [{"canonical_name": r["canonical_name"], "value": r["value"], "value_op": r["value_op"],
              **({"date": r["date"]} if r.get("date") else {})} for r in last.values()]
+
+
+def _identity(row: dict) -> str | None:
+    """Имя аналита так, как его назовёт канон при переносе (lab_promote → lab_canon.dimension_key):
+    `RDW` в фл — RDW_SD, в % — RDW. Черновая строка и ответ модели несут голое «RDW» для обеих
+    величин; без этого эталон настоящей страницы владельца требовал от «RDW» значение в фл (это
+    RDW_SD), а модели, верно прочитавшие RDW в %, проваливали допуск (05.10: sonnet-5-5, opus-5-5)."""
+    import lab_canon
+    name = row.get("canonical_name")
+    return lab_canon.dimension_key(name, str(row.get("unit") or "")) if name else name
 
 
 # ── разбор ответов (точный эталон) ───────────────────────────────────────────
@@ -190,8 +216,8 @@ def judge_lab(text: str, gold: list[dict], complete: bool = False, page_date: st
         return str(r.get("date") or "").strip() or page_read or page_date
 
     pool: dict = {}
-    for r in rows:
-        pool.setdefault(r.get("canonical_name"), []).append(r)
+    for r in rows:   # имя — по правилу канона, как у эталона (gold_from_promoted)
+        pool.setdefault(_identity(r), []).append(r)
     errs = []
     for g in gold:
         want = g.get("date") or page_date
@@ -278,7 +304,8 @@ def judge_text(text: str, item: dict) -> list[str]:
 
 # ── прогон ───────────────────────────────────────────────────────────────────
 def _call(client, model: str, *, prompt: str, image: bytes | None, system: str | None,
-          max_tokens: int, temperature: float | None, ledger: Ledger, reserve_extra: int = 0) -> tuple[str, str]:
+          max_tokens: int, temperature: float | None, ledger: Ledger, reserve_extra: int = 0,
+          mode: str = "read") -> tuple[str, str]:
     est_in = len(prompt) // 2 + len(system or "") // 2 + (1700 if image else 0)
     ledger.reserve(est_in, max_tokens + reserve_extra)   # чужой провайдер: + запас на рассуждение
     content = []
@@ -291,7 +318,10 @@ def _call(client, model: str, *, prompt: str, image: bytes | None, system: str |
         kw["system"] = system
     if temperature is not None:
         kw["temperature"] = temperature
-    r = client.messages.create(task="llm_admission._call", **kw)
+    if mode == "think":   # обёртка llm_client: думание с замеренным запасом, как у рабочей задачи
+        r = client.messages.create(task="llm_admission._call_think", **kw)
+    else:
+        r = client.messages.create(task="llm_admission._call", **kw)
     ledger.charge(r.usage.input_tokens, r.usage.output_tokens,
                   cache_read_input_tokens=getattr(r.usage, "cache_read_input_tokens", 0),
                   cache_creation_input_tokens=getattr(r.usage, "cache_creation_input_tokens", 0))
@@ -309,11 +339,15 @@ def run_suite(client, model: str, suite: str, corpus: dict, ledger: Ledger, prov
     вызовы вердикт не меняют, только тратят бюджет владельца ('stopped_early': True)."""
     errors, ids, n = [], set(), 0
     REPS, MAX_TOKENS = corpus["policy"]["reps"], corpus["policy"]["max_tokens"]
+    import llm_client
     extra = 0
     if provider != "anthropic":
-        import llm_client
         extra = int(llm_client.profiles()[provider].get("reasoning_reserve_tokens", 0))
-    jobs = []      # (prompt, image, system, temperature, judge)
+    modes = suite_modes(suite, corpus["policy"], provider)
+    # С думанием обёртка прибавляет к лимиту ответа запас и при «голодном» ответе повторяет с
+    # двойным: в худшем случае 1 + 2 запаса сверх max_tokens. Учёт обязан их резервировать.
+    think_extra = 3 * llm_client.reasoning_reserve(model) if provider == "anthropic" else extra
+    jobs = []      # (prompt, image, system, temperature, judge, mode)
     if suite.startswith("lab_vision"):
         import lab_recognizer as lr
         p1, p2 = lr.recognition_prompts()
@@ -326,23 +360,25 @@ def run_suite(client, model: str, suite: str, corpus: dict, ledger: Ledger, prov
             jobs += [(prompt, p["image_bytes"], None, None,
                       lambda t, p=p: [f"{p['key']}: {e}" for e in judge_lab(
                           t, p["gold"], complete=not p.get("real"), page_date=p.get("date"),
-                          history=p.get("history"))])
-                     ] * REPS[suite]
+                          history=p.get("history"))], m)
+                     for m in modes] * REPS[suite]
     elif suite == "treatment":
         import treatment_extractor as te
         spec = corpus["treatment"]
         jobs += [(f"ДОКУМЕНТ:\n{spec['text']}", None, te.EXTRACTION_PROMPT, 0,
-                  lambda t: judge_treatment(t, spec))] * REPS[suite]
+                  lambda t: judge_treatment(t, spec), m) for m in modes] * REPS[suite]
     elif suite == "text":
         from epistemic_skill import loader
         system = loader.load_skill().text
         for it in corpus["text"]:
-            jobs += [(it["prompt"], None, system, None, lambda t, it=it: judge_text(t, it))] * REPS[suite]
+            jobs += [(it["prompt"], None, system, None, lambda t, it=it: judge_text(t, it), m)
+                     for m in modes] * REPS[suite]
     else:
         raise KeyError(suite)
-    for prompt, image, system, temp, judge in jobs:
+    for prompt, image, system, temp, judge, mode in jobs:
         text, mid = _call(client, model, prompt=prompt, image=image, system=system,
-                          max_tokens=MAX_TOKENS[suite], temperature=temp, ledger=ledger, reserve_extra=extra)
+                          max_tokens=MAX_TOKENS[suite], temperature=temp, ledger=ledger,
+                          reserve_extra=think_extra if mode == "think" else extra, mode=mode)
         n += 1
         ids.add(mid)
         errors += judge(text)
@@ -400,15 +436,47 @@ def admit_to_chain(role: str, model: str) -> list[str]:
     return chain
 
 
+def suite_modes(suite: str, pol: dict, provider: str = "anthropic") -> list[str]:
+    """Режимы, в которых набор зовёт модель: режим рабочей задачи набора (policy.work_task;
+    «спорно» работает как чтение) или policy.text_modes для текстовой дисциплины. Чужой провайдер
+    режимов задач не знает (его обёртка снимает ключ задачи) — один режим «чтение»."""
+    if provider != "anthropic":
+        return ["read"]
+    import llm_client
+    task = (pol.get("work_task") or {}).get(suite)
+    if task:
+        return ["think" if llm_client.task_mode(task) == "think" else "read"]
+    return list(pol["text_modes"])
+
+
+def role_suites(pol: dict, provider: str = "anthropic") -> dict[str, list[str]]:
+    """Наборы ролей с учётом переназначения задачи поставщиком (llm_providers.json task_tiers):
+    04.10 лечение у Anthropic извлекает sonnet — набор treatment судит sonnet, а не haiku_pinned.
+    Роль, на которую переназначено, обязана быть в политике — иначе KeyError."""
+    import llm_client
+    tiers = (llm_client.profiles().get(provider) or {}).get("task_tiers") or {}
+    out = {r: list(s) for r, s in pol["role_suites"].items()}
+    for suite, task_role in (pol.get("suite_task_role") or {}).items():
+        to = tiers.get(task_role)
+        if not to:
+            continue
+        for r in out:
+            if suite in out[r]:
+                out[r].remove(suite)
+        out[to].append(suite)
+    return out
+
+
 def _judge_role(client, model: str, role: str, corpus: dict, ledger: Ledger, provider: str,
-                cache: dict) -> dict:
+                cache: dict, required: list[str] | None = None, reuse: bool = True) -> dict:
     """Наборы роли по порядку; первый провал останавливает роль. Результат набора для
-    модели переиспользуется ролями с тем же набором (haiku и haiku_pinned делят text)."""
+    модели переиспользуется ролями с тем же набором (haiku и haiku_pinned делят text).
+    reuse=False — повтор после провала: готовый результат недели не берётся, набор гонится заново."""
     suites = {}
-    for s in corpus["policy"]["role_suites"][role]:
+    for s in required or corpus["policy"]["role_suites"][role]:
         if (model, s) not in cache:
             key, fp = _suite_key(model, s, provider), _suite_fingerprint(s, corpus, provider)
-            stored = _stored_suite(key, fp, ledger.now)
+            stored = _stored_suite(key, fp, ledger.now) if reuse else None
             if stored is None:
                 stored = run_suite(client, model, s, corpus, ledger, provider)
                 _put(key, value_json=dict(stored, corpus=corpus["version"], fingerprint=fp,
@@ -436,6 +504,7 @@ def _suite_fingerprint(suite: str, corpus: dict, provider: str) -> str:
     import llm_client
     h.update(json.dumps(llm_client.profiles().get(provider), ensure_ascii=False, sort_keys=True).encode())
     h.update(Path(__file__).read_bytes())   # судьи и прогон — в этом файле; правка кода = новый замер
+    h.update(json.dumps(suite_modes(suite, corpus["policy"], provider)).encode())   # режим задачи сменился — новый замер
     if suite.startswith("lab_vision"):
         import lab_recognizer as lr
         h.update("\x00".join(lr.recognition_prompts()).encode())
@@ -475,6 +544,72 @@ def _role_passed(suites: dict, required: list[str]) -> bool:
     return set(suites) == set(required) and all(not s["errors"] for s in suites.values())
 
 
+def _verdict_fresh(v_role: dict | None, required: list[str], fps: dict) -> bool:
+    """Вердикт роли вынесен на тех же входах, что сегодня: те же наборы, те же отпечатки.
+    Вердикт без отпечатков (до 05.10, всё в режиме «чтение») — не свежий."""
+    got = (v_role or {}).get("fingerprints") or {}
+    return set(got) == set(required) and all(got[s] == fps[s] for s in required)
+
+
+def stale_members(chains: dict[str, list[str]], fresh: dict) -> list[tuple[str, str]]:
+    """[(model, role)] — члены цепочек без свежего вердикта по своей роли, в порядке цепочки
+    (основная модель первой: от неё зависит сегодняшняя работа)."""
+    out = []
+    for role, chain in chains.items():
+        for m in chain:
+            if (m, role) not in out and not ((fresh.get(m) or {}).get("roles") or {}).get(role):
+                out.append((m, role))
+    return out
+
+
+def _drop_failed_members(client, results: list[dict], fresh: dict | None = None) -> list[dict]:
+    """Снять с цепочки роли членов, проваливших допуск дважды подряд (вариант «В», 05.10).
+    Пишется только цепочка базы (base_chain): запасные таблицы выпуска уходят сами — вердикт
+    провала попадает в таблицу через --export-anthropic. Провалили все члены роли — цепочка
+    остаётся как была: без модели функция не работает вовсе. Снять можно, только если новая
+    первая модель цепочки ПРОШЛА допуск (в этом прогоне или свежим вердиктом): прогон, оборванный
+    бюджетом до суда следующей, иначе переключил бы работу на непроверенную модель
+    (инвариант switch_only_to_admitted). Каждое снятие и отказ снять — notify.fault в ночной
+    разбор, с прежней цепочкой для отката."""
+    import hai_core
+    import notify
+    # Провал дважды — из этого прогона или свежим вердиктом прошлого: прогон, оборванный после
+    # вердиктов, иначе не снял бы никого, а следующий счёл бы вердикты свежими и не судил заново.
+    stale_fail = {(m, role) for m, v in (fresh or {}).items() for role, x in (v.get("roles") or {}).items()
+                  if x.get("passed") is False and (x.get("attempts") or 1) >= 2}
+    stale_fail |= {(r["model"], r["role"]) for r in results if r.get("member") and not r["passed"]}
+    stale_fail -= {(r["model"], r["role"]) for r in results if r["passed"]}
+    out = []
+    for role in sorted({r for _, r in stale_fail}):
+        failed = {m for m, r in stale_fail if r == role}
+        before = hai_core.base_chain(role)
+        keep = [m for m in before if _canonical_id(client, m) not in failed]
+        if keep == before:
+            continue
+        if not keep:
+            notify.fault(f"llm_admission: роль {role} — все модели цепочки {before} провалили допуск "
+                         f"дважды; цепочка оставлена как была (без модели функция не работает). "
+                         f"Вердикты: system_config llm.admission.<модель>", person_key=None)
+            out.append({"role": role, "before": before, "after": before, "all_failed": True})
+            continue
+        head = _canonical_id(client, keep[0])
+        admitted = any(r["model"] == head and r["role"] == role and r["passed"] for r in results) or \
+            bool((((fresh or {}).get(head) or {}).get("roles") or {}).get(role, {}).get("passed"))
+        if not admitted:   # снятие только на проверенную: следующая не судилась — не снимаю
+            notify.fault(f"llm_admission: роль {role} — {sorted(failed)} провалили допуск дважды, но "
+                         f"следующая модель цепочки {keep[0]} не прошла допуск в этом прогоне "
+                         f"(не судилась или провалила); цепочка {before} оставлена как была", person_key=None)
+            out.append({"role": role, "before": before, "after": before, "all_failed": False,
+                        "next_not_admitted": True})
+            continue
+        _put(f"model.{role}", value_json=keep)
+        notify.fault(f"llm_admission: роль {role} — сняты с цепочки после двух провалов допуска подряд: "
+                     f"{sorted(failed & {_canonical_id(client, m) for m in before})}; было {before}, стало {keep}. "
+                     f"Откат: system_config model.{role} = {json.dumps(before)}", person_key=None)
+        out.append({"role": role, "before": before, "after": keep, "all_failed": False})
+    return out
+
+
 def run_admission(force: bool = False, dry_run: bool = False, notify: bool = False, client=None,
         provider: str = "anthropic", now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)  # time-inject: ok
@@ -493,38 +628,60 @@ def run_admission(force: bool = False, dry_run: bool = False, notify: bool = Fal
     listed = [{"id": m.id, "created_at": str(getattr(m, "created_at", ""))} for m in client.models.list(limit=100)]
     corpus = load_admission_corpus()
     pol = corpus["policy"]
-    chains = {r: [_canonical_id(client, m) for m in hai_core.model_chain(r)] for r in pol["role_suites"]}
+    suites_of = role_suites(pol, provider)
+    chains = {r: [_canonical_id(client, m) for m in hai_core.model_chain(r)] for r in suites_of}
+    fps = {s: _suite_fingerprint(s, corpus, provider) for s in {x for v in suites_of.values() for x in v}}
     verdicts = {}
-    for m in listed:
-        v = _cfg(f"llm.admission.{m['id']}")
+    for m in {x["id"] for x in listed} | {m for c in chains.values() for m in c}:
+        v = _cfg(f"llm.admission.{m}")
         if isinstance(v, dict):
-            verdicts[m["id"]] = v
-    todo = admission_candidates(listed, chains, verdicts, pol["family_roles"])
-    report = {"candidates": todo, "results": [], "stopped": None}
+            verdicts[m] = v
+    fresh = {m: {"roles": {r: x for r, x in (v.get("roles") or {}).items()
+                           if r in suites_of and _verdict_fresh(x, suites_of[r], fps)}}
+             for m, v in verdicts.items()}
+    members = stale_members(chains, fresh)
+    todo = admission_candidates(listed, chains, fresh, pol["family_roles"])
+    report = {"members": members, "candidates": todo, "results": [], "removed": [], "stopped": None}
     if dry_run:
         return report
     ledger, cache = Ledger(b, now), {}
-    for model, role in todo:
+    for model, role, member in [(m, r, True) for m, r in members] + [(m, r, False) for m, r in todo]:
         if ledger.cap - ledger.used < float(pol.get("min_usd_to_start_role", 0)):
             report["stopped"] = (f"на роль целиком не хватит: осталось {ledger.cap - ledger.used:.2f} $, "
                                  f"порог {pol['min_usd_to_start_role']} $ — прерванный прогон тратит без вердикта")
             break
+        need = suites_of[role]
         try:
-            suites = _judge_role(client, model, role, corpus, ledger, provider, cache)
+            suites = _judge_role(client, model, role, corpus, ledger, provider, cache, need)
+            attempts, first_errors = 1, sum(len(s["errors"]) for s in suites.values())
+            if member and not _role_passed(suites, need):   # вариант «В»: один провал — ещё раз, без кэша
+                retry = {}
+                suites = _judge_role(client, model, role, corpus, ledger, provider, retry, need, reuse=False)
+                cache.update(retry)
+                attempts = 2
         except BudgetExhausted as e:
             report["stopped"] = str(e)
             break
-        passed = _role_passed(suites, pol["role_suites"][role])
+        except Exception as e:   # сбой вызова (400 и т.п.) — не вердикт модели и не повод терять весь прогон
+            import notify
+            report.setdefault("errors", []).append({"model": model, "role": role, "error": f"{type(e).__name__}: {e}"[:300]})
+            notify.fault(f"llm_admission: {model} ({role}) — сбой вызова, не вердикт: {type(e).__name__}: {str(e)[:200]}",
+                         person_key=None)
+            continue
+        passed = _role_passed(suites, need)
         v = verdicts.get(model) or {"model": model, "roles": {}}
         v["roles"][role] = {"passed": passed, "date": f"{now:%Y-%m-%d}", "corpus": corpus["version"],
+                            "attempts": attempts, "first_attempt_errors": first_errors,
+                            "fingerprints": {s: fps[s] for s in need},
                             "suites": {k: {"items": s["items"], "errors": s["errors"][:20],
                                            "model_ids": s["model_ids"]} for k, s in suites.items()}}
         verdicts[model] = v
         _put(f"llm.admission.{model}", value_json=v)
-        if passed:
+        if passed and not member:
             admit_to_chain(role, model)
-        report["results"].append({"model": model, "role": role, "passed": passed,
-                                  "errors": sum(len(s["errors"]) for s in suites.values())})
+        report["results"].append({"model": model, "role": role, "passed": passed, "member": member,
+                                  "attempts": attempts, "errors": sum(len(s["errors"]) for s in suites.values())})
+    report["removed"] = _drop_failed_members(client, report["results"], fresh)
     _put("llm.admission.last_run", value_text=now.isoformat(timespec="seconds"))
     report["spent_month_usd"] = round(ledger.used, 2)
     if notify and report["results"]:
@@ -583,6 +740,38 @@ def run_provider_admission(provider: str, force: bool = False, dry_run: bool = F
                                   "errors": sum(len(s["errors"]) for s in suites.values())})
     report["spent_month_usd"] = round(ledger.used, 2)
     return report
+
+
+_MEASURED_FILE = Path(__file__).parent / "methodology" / "llm_thinking_measured.json"
+
+
+def record_thinking(rows: list[dict], date: str) -> dict:
+    """Замер думания → свойства моделей (methodology/llm_thinking_measured.json; читает
+    llm_client.measured). Строка замера: model, mode, out (токены выхода), sec, think_tok.
+    reserve_tokens — наибольшее думание модели на задачах think; время — прямая
+    sec = latency + sec_per_token·out по всем вызовам модели и худшее отклонение вверх
+    (slack). Числа только из строк: модель без строк не получает записи."""
+    import statistics
+    import llm_client
+    profiles = (llm_client.profiles()["anthropic"].get("thinking") or {}).get("models") or {}
+    by: dict = {}
+    for r in rows:
+        key = max((k for k in profiles if r["model"] == k or r["model"].startswith(k + "-")), key=len, default=None)
+        if key:
+            by.setdefault(key, []).append(r)
+    out = {}
+    for key, rs in sorted(by.items()):
+        x, y = [float(r["out"]) for r in rs], [float(r["sec"]) for r in rs]
+        if len(set(x)) < 2:
+            continue                     # прямую по одной точке не провести
+        b, a = statistics.linear_regression(x, y)
+        a = max(a, 0.0)                  # отрицательная задержка — артефакт прямой; отклонение — от неё же
+        out[key] = {"date": date, "calls": len(rs),
+                    "reserve_tokens": max([max(int(r.get("think_tok") or 0), 0) for r in rs
+                                           if r.get("mode") == "think"], default=0),
+                    "latency_sec": round(a, 2), "sec_per_token": round(b, 5),
+                    "slack_sec": round(max(yy - (a + b * xx) for xx, yy in zip(x, y)), 1)}
+    return out
 
 
 def export_anthropic_verdicts(verdicts: dict) -> dict:
@@ -733,6 +922,8 @@ if __name__ == "__main__":
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--notify", action="store_true")
     ap.add_argument("--set-budget", type=float, metavar="USD_MONTH")
+    ap.add_argument("--record-thinking", metavar="MEASURE_JSONL",
+                    help="замер думания → methodology/llm_thinking_measured.json (запас, скорость моделей)")
     ap.add_argument("--export-anthropic", action="store_true",
                     help="раздел anthropic таблицы выпуска из вердиктов владельца (stdout, JSON)")
     ap.add_argument("--reference", action="store_true", help="пересобрать docs/reference/llm_providers(.en).md из таблицы")
@@ -745,6 +936,16 @@ if __name__ == "__main__":
             ap.error("--set-budget требует --price-ceiling IN OUT")
         set_admission_budget(a.set_budget, *a.price_ceiling)
         print("бюджет допуска:", admission_budget())
+        sys.exit(0)
+    if a.record_thinking:
+        rows = [json.loads(line) for line in Path(a.record_thinking).read_text(encoding="utf-8").splitlines()
+                if line.strip() and '"task"' in line]
+        doc = {"_why": ("Замеренные свойства моделей Anthropic: запас под думание и скорость выдачи. "
+                        "Пишет llm_admission --record-thinking из замера, руками не правится. "
+                        "Читает llm_client.measured: запас — reasoning_reserve, срок вызова — call_timeout."),
+               "models": record_thinking(rows, f"{datetime.now(timezone.utc):%Y-%m-%d}")}  # time-inject: ok
+        _MEASURED_FILE.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(json.dumps(doc["models"], ensure_ascii=False, indent=1))
         sys.exit(0)
     if a.export_anthropic:
         print(json.dumps(export_anthropic_verdicts(owner_verdicts()), ensure_ascii=False, indent=1))

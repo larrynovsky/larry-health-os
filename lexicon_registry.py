@@ -47,6 +47,10 @@ REGISTERED: dict[str, dict] = {
     "cpic_reference_db._ADJUST_MARKERS": {
         "verdict": "structural", "oracle": "инженер",
         "note": "маркеры коррекции дозы в английском тексте рекомендаций CPIC — разбор формата документа, не данные пациента"},
+    "llm_client._ACCOUNT_MARKERS": {
+        "verdict": "structural", "oracle": "инженер",
+        "note": "подстроки текстов ошибок SDK поставщиков (квота, баланс) — разбор формата чужого "
+                "API, не данные пациента (нить lab-intake-retry, 05.10)"},
     "hai_context._FULL_CONTEXT_KEYWORDS": {
         "verdict": "structural", "oracle": "инженер",
         "note": "триггеры полного контекста — системное поведение, не данные пациента"},

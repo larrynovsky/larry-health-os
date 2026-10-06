@@ -232,7 +232,10 @@ def test_end_to_end_pass_lands_in_chain_and_fail_does_not(store, monkeypatch):
     store["model.opus"] = ["claude-opus-4-7"]
     store["model.sonnet"] = ["claude-sonnet-4-6"]
     rep = la.run_admission(force=True, client=_FakeClient(LISTED[:5]), now=NOW)
-    assert {(r["model"], r["passed"]) for r in rep["results"]} == {("claude-opus-5-5", True), ("claude-sonnet-5", True)}
+    assert {(r["model"], r["passed"]) for r in rep["results"] if not r["member"]} == \
+        {("claude-opus-5-5", True), ("claude-sonnet-5", True)}
+    assert {r["model"] for r in rep["results"] if r["member"]} >= {"claude-opus-4-7", "claude-sonnet-4-6"}, \
+        "члены цепочек без вердикта не судились"
     assert store["model.opus"] == ["claude-opus-4-7", "claude-opus-5-5"]
     assert store["llm.admission.claude-opus-5-5"]["roles"]["opus"]["passed"] is True
     assert 0 < store["llm.admission.spend.2026-10"] < 10
@@ -245,6 +248,7 @@ def test_end_to_end_pass_lands_in_chain_and_fail_does_not(store, monkeypatch):
     rep = la.run_admission(force=True, client=_FakeClient(LISTED[:5], wrong_text=True), now=NOW)
     assert all(not r["passed"] for r in rep["results"])
     assert store["model.opus"] == ["claude-opus-4-7"], "непрошедшая попала в цепочку"
+    assert all(x["all_failed"] for x in rep["removed"]), "провалили все — цепочка обязана остаться"
 
 
 def test_real_owner_pages_go_only_to_anthropic(monkeypatch, store):
@@ -504,6 +508,8 @@ class _VisionCounter(_FakeClient):
     def create(self, model, messages, **kw):
         if messages[0]["content"][0]["type"] == "image":
             self.vision = getattr(self, "vision", 0) + 1
+            self.by_model = getattr(self, "by_model", {})
+            self.by_model[model] = self.by_model.get(model, 0) + 1
         return super().create(model, messages, **kw)
 
 
@@ -528,9 +534,10 @@ def test_rerun_after_a_killed_run_does_not_pay_again(store, monkeypatch):
     monkeypatch.setattr(la, "run_suite", real)
     second = _VisionCounter(LISTED[:5])
     la.run_admission(force=True, client=second, now=NOW)
-    # первый кандидат: зрение оплачено в первом прогоне, во втором — из базы; второй кандидат
-    # платит за своё зрение впервые. Без кэша второй прогон заплатил бы за зрение дважды.
-    assert second.vision == first.vision
+    # чьё зрение оплачено в первом прогоне — во втором берётся из базы; остальные платят впервые.
+    # Без кэша второй прогон заплатил бы за то же зрение дважды.
+    paid = set(first.by_model)
+    assert paid and not paid & set(second.by_model), (first.by_model, second.by_model)
 
 
 @pytest.mark.parametrize("change", ["gold", "image", "cache_date"])
@@ -777,3 +784,183 @@ def test_reference_marks_a_provider_that_is_not_offered():
     md = la.admission_reference_md({})
     for p in hidden:
         assert "не предлагается" in md.split(f"## {p}", 1)[1].split("\n## ", 1)[0]
+
+
+# ── члены цепочек под судом (нить admission-incumbents, 05.10, вариант «В») ──
+class _Flaky(_FakeClient):
+    """Портит ответ trend_n1: `always` — всем попыткам модели, `once` — только первой."""
+    def __init__(self, listed, always=(), once=()):
+        super().__init__(listed)
+        self.always, self.once, self.spoiled, self.tasks = set(always), set(once), set(), []
+
+    def create(self, model, messages, **kw):
+        self.tasks.append((model, kw.get("task"), messages[0]["content"][0]["type"]))
+        prompt = messages[0]["content"][-1]["text"]
+        trend = next((i for i in CORPUS["text"] if i["id"] == "trend_n1"), {})
+        if prompt == trend.get("prompt") and (model in self.always or (model in self.once and model not in self.spoiled)):
+            self.spoiled.add(model)
+            return _Msg(json.dumps({"trend": "down"}), model)
+        return super().create(model, messages, **kw)
+
+
+@pytest.fixture
+def faults(monkeypatch):
+    import notify
+    got = []
+    monkeypatch.setattr(notify, "fault", lambda msg, person_key=None: got.append(msg))
+    return got
+
+
+def _chains(store):
+    store["model.opus"] = ["claude-opus-4-7", "claude-opus-4-6"]
+    store["model.sonnet"] = ["claude-sonnet-4-6"]
+    store["model.haiku"] = ["claude-haiku-4-5"]
+    store["model.haiku_pinned"] = ["claude-haiku-4-5"]
+
+
+def test_member_failing_twice_leaves_the_chain_and_once_stays(store, monkeypatch, faults):
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    _chains(store)
+    listed = [m for m in LISTED if m["id"] in ("claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6")]
+    rep = la.run_admission(force=True, now=NOW,
+                           client=_Flaky(listed, always={"claude-opus-4-7"}, once={"claude-sonnet-4-6"}))
+    assert store["model.opus"] == ["claude-opus-4-6"], "дважды провалившая осталась в цепочке"
+    assert store["model.sonnet"] == ["claude-sonnet-4-6"], "один провал (разброс) снял модель"
+    v = store["llm.admission.claude-sonnet-4-6"]["roles"]["sonnet"]
+    assert v["passed"] and v["attempts"] == 2 and v["first_attempt_errors"] == 1
+    assert rep["removed"] == [{"role": "opus", "before": ["claude-opus-4-7", "claude-opus-4-6"],
+                               "after": ["claude-opus-4-6"], "all_failed": False}]
+    assert len(faults) == 1 and "model.opus" in faults[0] and "claude-opus-4-7" in faults[0], faults
+
+
+def test_all_members_failing_keep_the_chain_and_say_so(store, monkeypatch, faults):
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    _chains(store)
+    rep = la.run_admission(force=True, now=NOW, client=_Flaky([], always={"claude-sonnet-4-6"}))
+    assert store["model.sonnet"] == ["claude-sonnet-4-6"]
+    assert rep["removed"] == [{"role": "sonnet", "before": ["claude-sonnet-4-6"],
+                               "after": ["claude-sonnet-4-6"], "all_failed": True}]
+    assert any("sonnet" in f and "оставлена" in f for f in faults), faults
+
+
+def test_suite_calls_the_model_in_its_work_task_mode(store, monkeypatch):
+    """Допуск судит ту модель, что работает: зрение — режимом lab_recognizer._vision_call,
+    текст — в обоих режимах; думающий вызов резервирует запас думания (1 + 2 на повтор)."""
+    import llm_client
+    _budget(store)
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    pol = CORPUS["policy"]
+    assert la.suite_modes("lab_vision_p1", pol) == ["think"]           # с 05.10 (lab-vision-think)
+    assert la.suite_modes("treatment", pol) == ["read"]
+    assert la.suite_modes("text", pol) == ["read", "think"]
+    assert la.suite_modes("text", pol, "openai") == ["read"]
+    reserved = []
+    real_reserve = la.Ledger.reserve
+    monkeypatch.setattr(la.Ledger, "reserve", lambda self, i, o: (reserved.append(o), real_reserve(self, i, o))[1])
+    c = _Flaky([])
+    la.run_suite(c, "claude-opus-5", "lab_vision_p1", CORPUS, la.Ledger(store["llm.admission.budget"], NOW), "anthropic")
+    assert {t for _, t, kind in c.tasks if kind == "image"} == {"llm_admission._call_think"}
+    assert reserved[0] == pol["max_tokens"]["lab_vision_p1"] + 3 * llm_client.reasoning_reserve("claude-opus-5") \
+        > pol["max_tokens"]["lab_vision_p1"]
+    c = _Flaky([])
+    la.run_suite(c, "claude-opus-5", "text", CORPUS, la.Ledger(store["llm.admission.budget"], NOW), "anthropic")
+    assert {t for _, t, _ in c.tasks} == {"llm_admission._call", "llm_admission._call_think"}
+
+
+def test_fresh_verdict_is_not_rejudged_and_a_mode_change_makes_it_stale(store, monkeypatch, faults):
+    import llm_client
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    _chains(store)
+    la.run_admission(force=True, now=NOW, client=_Flaky([]))
+    rep = la.run_admission(force=True, dry_run=True, now=NOW, client=_Flaky([]))
+    assert rep["members"] == [] and rep["candidates"] == []
+    real = llm_client.task_mode
+    monkeypatch.setattr(llm_client, "task_mode",
+                        lambda t: "read" if t == "lab_recognizer._vision_call" else real(t))
+    rep = la.run_admission(force=True, dry_run=True, now=NOW, client=_Flaky([]))
+    assert {m for m, r in rep["members"]} == {"claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"}, \
+        "режим задачи зрения сменился — вердикты зрения устарели, а текстовые нет"
+
+
+def test_treatment_suite_follows_the_providers_task_tier():
+    """04.10: лечение у Anthropic извлекает sonnet (task_tiers) — набор treatment судит sonnet."""
+    got = la.role_suites(CORPUS["policy"], "anthropic")
+    assert "treatment" in got["sonnet"] and "treatment" not in got["haiku_pinned"]
+    assert "treatment" in la.role_suites(CORPUS["policy"], "openai")["haiku_pinned"]
+
+
+def test_failed_head_is_not_dropped_onto_an_unjudged_next(store, monkeypatch, faults):
+    """Бюджет кончился до суда следующей модели: снять провалившую — значит переключить работу
+    на непроверенную (switch_only_to_admitted). Не снимаем, говорим."""
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    _chains(store)
+    results = [{"model": "claude-opus-4-7", "role": "opus", "passed": False, "member": True}]
+    out = la._drop_failed_members(_FakeClient([]), results, {})
+    assert store["model.opus"] == ["claude-opus-4-7", "claude-opus-4-6"]
+    assert out[0]["next_not_admitted"] and any("не прошла допуск" in f for f in faults), faults
+    passed_next = results + [{"model": "claude-opus-4-6", "role": "opus", "passed": True, "member": True}]
+    la._drop_failed_members(_FakeClient([]), passed_next, {})
+    assert store["model.opus"] == ["claude-opus-4-6"]
+
+
+
+# ── имя аналита по правилу канона (нить admission-gold-identity, 05.10) ──────
+def test_rdw_in_fl_is_rdw_sd_in_gold_and_in_the_answer():
+    """Бланк печатает RDW дважды — в % и в фл. Черновик зовёт обе «RDW», канон — RDW и RDW_SD.
+    Эталон страницы требовал «RDW = 40.5» и валил модели, верно прочитавшие RDW 12.7 %."""
+    gold = la.gold_from_promoted([
+        {"id": 1, "canonical_name": "RDW", "unit": "фл", "value": 40.5, "value_op": None, "date": "2026-09-15"},
+        {"id": 2, "canonical_name": "RDW", "unit": "%", "value": 12.7, "value_op": None, "date": "2026-09-15"}])
+    assert {(g["canonical_name"], g["value"]) for g in gold} == {("RDW_SD", 40.5), ("RDW", 12.7)}
+    both = json.dumps({"tests": [{"canonical_name": "RDW", "unit": "%", "value": 12.7},
+                                 {"canonical_name": "RDW", "unit": "фл", "value": 40.5}]})
+    assert la.judge_lab(both, gold, page_date="2026-09-15") == []
+    only_cv = json.dumps({"tests": [{"canonical_name": "RDW", "unit": "%", "value": 12.7}]})
+    assert la.judge_lab(only_cv, gold, page_date="2026-09-15") == ["RDW_SD: пропущен"]
+    sd_as_cv = json.dumps({"tests": [{"canonical_name": "RDW", "unit": "%", "value": 40.5},
+                                     {"canonical_name": "RDW", "unit": "фл", "value": 40.5}]})
+    assert la.judge_lab(sd_as_cv, gold, page_date="2026-09-15") == ["RDW: 40.5 вместо 12.7"]
+
+
+
+# ── хвосты прогона 05.10 (нить admission-crash-tails) ────────────────────────
+def test_a_failing_call_does_not_lose_the_run(store, monkeypatch, faults):
+    """05.10: 400 у кандидата уронил весь прогон — без отметки last_run и без снятия провалов."""
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    _chains(store)
+
+    class Boom(_Flaky):
+        def create(self, model, messages, **kw):
+            if model == "claude-opus-4-6":
+                raise RuntimeError("400 thinking.type.disabled is not supported")
+            return super().create(model, messages, **kw)
+    rep = la.run_admission(force=True, now=NOW, client=Boom([], always={"claude-sonnet-4-6"}))
+    assert [e["model"] for e in rep["errors"]] == ["claude-opus-4-6"]
+    assert "opus" not in (store.get("llm.admission.claude-opus-4-6") or {}).get("roles", {}), "сбой вызова записан как вердикт"
+    assert store["llm.admission.last_run"], "прогон потерян"
+    assert any("сбой вызова" in f for f in faults)
+
+
+def test_failed_twice_before_a_crash_is_dropped_on_the_next_run(store, monkeypatch, faults):
+    """Вердикт «провал дважды» пережил обрыв прогона; следующий прогон его не судит (свежий), но снять обязан."""
+    _budget(store)
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(la, "owner_real_pages", lambda: [])
+    _chains(store)
+    la.run_admission(force=True, now=NOW, client=_Flaky([]))
+    v = store["llm.admission.claude-opus-4-7"]
+    v["roles"]["opus"].update(passed=False, attempts=2)
+    store["model.opus"] = ["claude-opus-4-7", "claude-opus-4-6"]
+    rep = la.run_admission(force=True, now=NOW, client=_Flaky([]))
+    assert rep["members"] == []
+    assert store["model.opus"] == ["claude-opus-4-6"]

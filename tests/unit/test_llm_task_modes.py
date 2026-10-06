@@ -247,3 +247,113 @@ def test_real_async_sdk_create_is_seen_as_async():
     bound = types.MethodType(msgs.AsyncMessages.create, NS(stream=lambda **k: None))
     assert inspect.iscoroutinefunction(llm_client._streamed(bound))
     assert not llm_client._is_async(types.MethodType(msgs.Messages.create, NS(stream=None)))
+
+
+# ── Замер модели: запас под думание и срок вызова (think-return, 04.10) ──────────
+
+def _measured(monkeypatch, tmp_path, models):
+    f = tmp_path / "measured.json"
+    f.write_text(json.dumps({"models": models}), encoding="utf-8")
+    monkeypatch.setattr(llm_client, "_MEASURED_FILE", f)
+
+
+M5 = {"reserve_tokens": 1000, "latency_sec": 2.0, "sec_per_token": 0.01, "slack_sec": 5.0}
+
+
+def test_reserve_comes_from_measurement_including_dated_model_id(monkeypatch, tmp_path):
+    _measured(monkeypatch, tmp_path, {"claude-haiku-4-5": M5})
+    assert llm_client.reasoning_reserve("claude-haiku-4-5-20251001") == 1000
+    assert llm_client.reasoning_reserve("claude-unknown") == 0, "не замерена — не думает"
+
+
+def test_call_timeout_covers_both_attempts_of_a_thinking_task(monkeypatch, tmp_path):
+    _measured(monkeypatch, tmp_path, {"claude-opus-5": M5})
+    # думает: первая попытка 400+1000, повтор 400+2000 → (2+14+5) + (2+24+5)
+    assert llm_client.call_timeout("claude-opus-5", "monthly_consilium._run_coordinator", 400) == 52.0
+    # читает: одна попытка на 400 → 2+4+5
+    assert llm_client.call_timeout("claude-opus-5", "weekly_digest._judge_leaks", 400) == 11.0
+    assert llm_client.call_timeout("claude-unknown", "monthly_consilium._run_coordinator", 400) is None
+
+
+def test_measured_deadline_cuts_a_slow_async_call_and_passes_a_fast_one(monkeypatch, tmp_path):
+    _measured(monkeypatch, tmp_path, {"claude-opus-5": {**M5, "sec_per_token": 0.0, "slack_sec": 0.0,
+                                                         "latency_sec": 0.05}})
+
+    class Slow:
+        def __init__(self, delay):
+            self.delay = delay
+
+        async def create(self, **kw):
+            await asyncio.sleep(self.delay)
+            return TEXT
+    kw = dict(task="weekly_digest._judge_leaks", model="claude-opus-5", max_tokens=5, messages=[],
+              deadline="measured")
+    with pytest.raises(llm_client.DeadlineExceeded):
+        asyncio.run(llm_client._GuardedMessages(Slow(1.0), "anthropic").create(**kw))
+    assert asyncio.run(llm_client._GuardedMessages(Slow(0.0), "anthropic").create(**kw)) is TEXT
+    with pytest.raises(ValueError):   # у синхронного клиента срок не поддержан — не молча
+        llm_client._GuardedMessages(FakeMessages([TEXT]), "anthropic").create(**kw)
+
+
+def test_no_literal_timeout_around_a_model_call():
+    """Литерал срока у вызова модели не знает ни думания, ни скорости модели: 04.10 45 с
+    отрезали 9 мнений из 17. Срок — deadline="measured" (llm_client.call_timeout)."""
+    import git_facts
+    bad = []
+    for f in git_facts.tracked("*.py"):
+        if f.startswith(("tests/", "plans/", "logs/")):
+            continue
+        src = (ROOT / f).read_text(encoding="utf-8")
+        if "wait_for" not in src:
+            continue
+        for node in ast.walk(ast.parse(src)):
+            if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "wait_for" and node.args:
+                inner = node.args[0]
+                if isinstance(inner, ast.Call) and getattr(inner.func, "attr", None) in ("create", "stream") \
+                        and getattr(inner.func.value, "attr", None) == "messages":
+                    bad.append(f"{f}:{node.lineno}")
+    assert not bad, f"срок вызова модели литералом через wait_for: {bad} — используй deadline=\"measured\""
+
+
+def test_every_thinking_profile_has_a_measurement():
+    """Профиль без замера = запас 0 = модель молча не думает и вызов без срока."""
+    models = json.loads((ROOT / "methodology/llm_providers.json").read_text(encoding="utf-8"))
+    names = models["anthropic"]["thinking"]["models"]
+    missing = [m for m in names if not llm_client.measured(m).get("sec_per_token")]
+    assert not missing, f"модель с профилем думания без замера: {missing} — llm_admission --record-thinking"
+
+
+def test_record_thinking_takes_numbers_only_from_rows():
+    import llm_admission
+    rows = [{"model": "claude-opus-5", "mode": "think", "out": 1000, "sec": 12.0, "think_tok": 700},
+            {"model": "claude-opus-5", "mode": "read", "out": 3000, "sec": 32.0, "think_tok": 2500},
+            {"model": "claude-opus-5", "mode": "think", "out": 2000, "sec": 25.0, "think_tok": -7}]
+    m = llm_admission.record_thinking(rows, "2026-10-04")["claude-opus-5"]
+    assert m["reserve_tokens"] == 700, "запас — по задачам think; отрицательный подсчёт — ноль"
+    assert m["calls"] == 3 and m["sec_per_token"] > 0 and m["slack_sec"] >= 0
+    assert llm_admission.record_thinking(rows[:1], "2026-10-04") == {}, "по одной точке прямой нет"
+
+
+def test_temperature_is_dropped_only_where_the_model_rejects_it():
+    """Замер 04.10: sonnet-5-5, opus-5, opus-4-7 без думания отвечают 400 на temperature."""
+    for m in ("claude-sonnet-5-5", "claude-opus-5", "claude-opus-4-7"):
+        first, _ = llm_client._thinking_plan({"model": m, "max_tokens": 10, "temperature": 0}, "weekly_digest._judge_leaks")
+        assert "temperature" not in first, m
+    first, _ = llm_client._thinking_plan({"model": "claude-haiku-4-5-20251001", "max_tokens": 10, "temperature": 0},
+                                         "weekly_digest._judge_leaks")
+    assert first.get("temperature") == 0, "haiku temperature принимает — не трогать"
+
+
+def test_lab_vision_thinks_on_both_passes():
+    """Gold run 04.10: opus-5 (pass 1) without thinking added a stray Glucose row twice, 7/7 with it."""
+    for m in ("claude-opus-5", "claude-sonnet-5-5"):
+        first, _ = llm_client._thinking_plan({"model": m, "max_tokens": 4000}, "lab_recognizer._vision_call")
+        assert first["max_tokens"] == 4000 + llm_client.reasoning_reserve(m) > 4000, m
+
+
+
+def test_a_newer_model_does_not_inherit_an_older_models_profile(monkeypatch, tmp_path):
+    """05.10: claude-opus-5-5 брала профиль и запас claude-opus-5 по префиксу и падала 400."""
+    _measured(monkeypatch, tmp_path, {"claude-opus-5": M5})
+    assert llm_client.reasoning_reserve("claude-opus-5-5") == 0
+    assert llm_client.reasoning_reserve("claude-opus-5-20260101") == 1000, "датированный снимок — та же модель"

@@ -46,8 +46,7 @@ def build_chat_payload(user_message: str, include_data: bool = True) -> tuple[st
 
     if include_data:
         ctx          = build_smart_context(user_message, target=None)
-        _name        = db.get_profile_context().get("identity", {}).get("name", "[пациент]").split()[0]
-        full_message = ctx + chr(10) + chr(10) + "---" + chr(10) + f"Сообщение от {_name}: " + user_message
+        full_message = ctx + chr(10) + chr(10) + "---" + chr(10) + "Сообщение пациента: " + user_message
     else:
         full_message = user_message
 

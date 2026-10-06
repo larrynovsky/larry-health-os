@@ -384,8 +384,12 @@ def run_backfill(run_id: str, max_docs: int | None = None,
         except Exception as e:
             # Роль чтения анализов не допущена у поставщика установки — предел установки, а не
             # сбой документа: проглоченный, он выглядел бы для приёмника как «0 строк» (замер 02.10).
+            # Тот же класс — отказ поставщика по ключу или счёту: проглоченный, он становился
+            # «0 строк» и сайдкаром .norows навсегда (нить lab-intake-retry, 05.10).
             import hai_core
-            if isinstance(e, (hai_core.ModelNotAdmitted, lab_recognizer.PageLimitExceeded)):
+            import llm_client
+            if isinstance(e, (hai_core.ModelNotAdmitted, lab_recognizer.PageLimitExceeded)) \
+                    or llm_client.is_account_problem(e):
                 raise
             summary["errors"] += 1
             log.error(f"ERROR {source_file}: {e}")

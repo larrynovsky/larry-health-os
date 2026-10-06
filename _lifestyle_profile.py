@@ -18,7 +18,6 @@ def build_profile_block() -> str:
             age = (get_today() - _date.fromisoformat(_bd)).days // 365 if _bd else None
         except Exception:
             age = None
-        name  = ident.get("name") or "[пациент]"
         dx    = (med.get("diagnosis") or "").strip()
 
         with _db.get_conn() as c:
@@ -47,7 +46,7 @@ def build_profile_block() -> str:
         # NEUTRAL: строка собирается только из данных текущего тенанта.
         # Персональные умолчания удалены; отсутствующее поле опускается.
         # Базовые уровни ВСР/сна берутся из per-tenant daily_metrics.
-        head = name
+        head = "Пациент"
         if age is not None:
             head += f", {age} лет"
         if dx:

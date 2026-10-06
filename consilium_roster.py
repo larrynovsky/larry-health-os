@@ -100,3 +100,47 @@ def lifestyle_prompt(domain_key: str, patient_brief: str = "") -> str:
                 "Анализируй строго по своей области, отвечай по-русски, конкретно.")
     txt = p.read_text(encoding="utf-8")
     return txt.replace("%%PATIENT_PROFILE%%", patient_brief or "(профиль недоступен)")
+
+
+# ── Все участники обязаны ответить (решение владельца 04.10) ───────────────────
+# «Кому нужен неполный консилиум»: до 04.10 не ответивший специалист выпадал, итог писался
+# по оставшимся (замер: 8 мнений из 17 — и «ok»). Теперь не ответившего спрашивают ещё раз;
+# молчит и после повтора — консилиума нет: исключение, а не урезанный вывод.
+
+class ConsiliumIncomplete(RuntimeError):
+    """Не все участники ответили и после повтора. str() — человеческая строка."""
+
+    def __init__(self, label: str, missing: list[str], total: int):
+        import i18n
+        self.label, self.missing, self.total = label, list(missing), total
+        super().__init__(i18n.t("consilium.error.incomplete", missing=len(missing), total=total))
+
+
+async def ask_all(askers: dict, answered, label: str) -> dict:
+    """askers: {участник: функция без аргументов → корутина ответа}; answered(ответ) → bool.
+    Возвращает {участник: ответ} только если ответили ВСЕ. Исключение участника — не ответ."""
+    import asyncio
+    import logging
+    log = logging.getLogger(__name__)
+
+    async def one(name):
+        try:
+            return await askers[name]()
+        except Exception as e:  # noqa: BLE001 — участник не ответил; судит answered ниже
+            return e
+
+    def silent(res: dict) -> list[str]:
+        return [n for n, r in res.items() if isinstance(r, Exception) or not answered(r)]
+
+    names = list(askers)
+    results = dict(zip(names, await asyncio.gather(*(one(n) for n in names))))
+    missing = silent(results)
+    if missing:
+        log.warning("%s: не ответили %s из %s — спрашиваю ещё раз: %s",
+                    label, len(missing), len(names), ", ".join(missing))
+        results.update(zip(missing, await asyncio.gather(*(one(n) for n in missing))))
+        missing = silent(results)
+    if missing:
+        log.error("%s: не ответили и после повтора: %s", label, ", ".join(missing))
+        raise ConsiliumIncomplete(label, missing, len(names))
+    return results

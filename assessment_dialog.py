@@ -184,7 +184,9 @@ def _apply_sink(instrument: dict, item: dict, value) -> None:
     field = item.get("field")
     if field:
         import profile_db
-        profile_db.apply_stated(field, value, source="onboarding")
+        # Источник — опросник, из которого пришёл ответ (до 04.10 любой опросник подписывался
+        # «onboarding», и ответ medical_history 27.09 выглядел записью знакомства).
+        profile_db.apply_stated(field, value, source=instrument.get("id") or "onboarding")
         return
     sink = _TARGETS.get(item.get("target"))
     if sink:

@@ -259,3 +259,26 @@ def test_ответ_на_обычный_вопрос_клавиатуру_не_�
     upd = SimpleNamespace(message=SimpleNamespace(text="Тестер"), effective_chat=chat)
     asyncio.run(abh.handle_text_in_assessment(upd, None, ad.get_active(7)))
     assert chat.send_message.await_count == 1
+
+
+def test_реплика_о_файле_не_становится_ответом(onb):
+    """Нить lab-intake-retry (05.10): «это не дубль» в ответ боту про файл записалось проблемой со
+    здоровьем. Мутации: убрать признак цитаты; убрать метку ответа на файл; не гасить метку
+    (тогда и повторённый настоящий ответ отбивался бы)."""
+    import time
+    import assessment_bot_handlers as abh
+    ad, tid = onb
+    ad.start(chat_id=7, task_id=tid)
+    chat = SimpleNamespace(send_message=AsyncMock())
+    dup = SimpleNamespace(text="Этот файл уже получал — пропускаю дубль.")
+    upd = SimpleNamespace(message=SimpleNamespace(text="это не дубль", reply_to_message=dup),
+                          effective_chat=chat)
+    asyncio.run(abh.handle_text_in_assessment(upd, None, ad.get_active(7)))
+    assert "Записал" not in chat.send_message.await_args.args[0]
+    ctx = SimpleNamespace(chat_data={"doc_reply_at": time.time()})
+    upd = SimpleNamespace(message=SimpleNamespace(text="это не дубль"), effective_chat=chat)
+    asyncio.run(abh.handle_text_in_assessment(upd, ctx, ad.get_active(7)))
+    assert "Записал" not in chat.send_message.await_args.args[0]
+    upd = SimpleNamespace(message=SimpleNamespace(text="Тестер"), effective_chat=chat)
+    asyncio.run(abh.handle_text_in_assessment(upd, ctx, ad.get_active(7)))
+    assert "Записал: Тестер" in chat.send_message.await_args.args[0]

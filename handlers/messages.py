@@ -322,10 +322,13 @@ def _tenant_inbox() -> Path:
 
 
 def _inbox_dest(inbox: Path, filename: str, data: bytes) -> tuple[Path, bool]:
-    """(путь назначения, is_duplicate). Дедуп по sha256 содержимого — хеш в имени."""
+    """(путь назначения, is_duplicate). Дедуп по sha256 содержимого — хеш в имени.
+    У дубля путь — УЖЕ лежащий файл (сайдкары `<файл>.failed` и т.п. длиннее его имени):
+    по нему вотчер решает, был ли прошлый разбор отказом и можно ли взять файл заново."""
     h = hashlib.sha256(data).hexdigest()[:16]
-    if list(inbox.glob(f"*__{h}.*")):
-        return inbox / f"dup__{h}", True
+    seen = list(inbox.glob(f"*__{h}.*"))
+    if seen:
+        return min(seen, key=lambda p: len(p.name)), True
     safe = (filename or f"document_{h}").replace("/", "_").replace("\\", "_")
     stem = Path(safe).stem or "document"
     suffix = Path(safe).suffix or ".bin"
@@ -362,7 +365,13 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         inbox = _tenant_inbox()
         dest, is_dup = _inbox_dest(inbox, doc.file_name or "", data)
         if is_dup:
-            await update.message.reply_text(i18n.t("documents.reply.duplicate"))
+            # Повтор после отказа (не бланк, сбой, пустой ключ) — единственный способ человека
+            # сказать «попробуй ещё»; до 05.10 он упирался в «пропускаю дубль» навсегда.
+            from lab_intake_watcher import retry_after_refusal
+            again = await asyncio.to_thread(retry_after_refusal, dest)
+            _mark_doc_reply(context)
+            await update.message.reply_text(
+                i18n.t("documents.reply.retry" if again else "documents.reply.duplicate"))
             return
         paused = await asyncio.to_thread(_intake_down_note)
         dest.write_bytes(data)
@@ -378,7 +387,17 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(await asyncio.to_thread(
                 notify.fault, f"handlers/messages.py:handle_document: {type(e).__name__}: {e}", person_key="documents.error.save_failed"))
         return
+    _mark_doc_reply(context)
     await update.message.reply_text(receipt)
+
+
+def _mark_doc_reply(context) -> None:
+    """Метка «бот только что ответил на файл»: следующая реплика человека — скорее о файле, и
+    открытое знакомство не должно записать её ответом (assessment_bot_handlers._aside)."""
+    import time
+    data = getattr(context, "chat_data", None)
+    if isinstance(data, dict):
+        data["doc_reply_at"] = time.time()
 
 
 BOT_DOWNLOAD_LIMIT = 20 * 1024 * 1024

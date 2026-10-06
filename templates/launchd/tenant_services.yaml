@@ -16,6 +16,7 @@ services:
   literature-read: ready
   literature-search: ready
   oura-import: ready
+  withings-import: ready           # нет выдачи токена у тенанта — тихий выход 0
   assessment-scheduler: ready      # свой каталог опросников: <DATA>/data/instruments
   survivorship: ready              # свой каталог и конфиг
   reminders-sync: ready            # свой список Reminders «Health (<имя>)»

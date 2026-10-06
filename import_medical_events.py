@@ -15,7 +15,7 @@ Dry-run: --dry-run покажет что было бы импортирован�
 # INTENT: document_intake — приём документов и генома; модель только предлагает.
 #          Замысел и инварианты — subsystem_intent.yaml, раздел document_intake.
 import llm_client   # был строкой ВЫШЕ шебанга (24.09 вернул шебанг первой строкой)
-import sys, os, json, re, argparse, sqlite3
+import sys, os, json, re, argparse, sqlite3, time
 import hai_core
 import i18n
 from pathlib import Path
@@ -41,6 +41,7 @@ DOC_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
 # (нить llm-provider: шесть таких модулей). Роль: haiku_pinned.
 TEXT_LIMIT = 12000
 OCR_MIN_CHARS = 80   # меньше — OCR ничего внятного не прочёл, сверять не с чем
+KEY_RETRY_SEC = 30 * 60   # ключ/баланс пуст — повтор не чаще (как у разбора анализов)
 PER_POLL = 5          # не больше стольких новых документов за проход вотчера
 
 SKIP_PATTERNS = [
@@ -303,7 +304,7 @@ def process_pdf(pdf_path: Path, dry_run: bool = False) -> bool:
 
 
 def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) -> str:
-    """Один документ → 'imported' | 'skipped' | 'failed'. root — от чего считать путь-источник:
+    """Один документ → 'imported' | 'skipped' | 'failed' | 'waiting' (ключ/баланс поставщика). root — от чего считать путь-источник:
     CR/ владельца (по умолчанию) или каталог данных тенанта для его входящих."""
     rel = str(pdf_path.relative_to(root or CR_DIR.parent))  # "CR/<визит>.pdf" | "incoming/…"
 
@@ -339,6 +340,11 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) ->
             print(f"     текст: {len(text)} симв. → LLM...")
             data = llm_extract(pdf_path.name, text)
     except Exception as e:
+        if llm_client.is_account_problem(e):
+            # Ключ/баланс поставщика — не провал документа: после пополнения он пройдёт
+            # (нить lab-intake-retry, 05.10). Человеку об этом говорит разбор анализов, один раз.
+            print(f"  … ждёт ключа/баланса поставщика: {e}")
+            return "waiting"
         print(f"  ✗ извлечение данных: {e}")
         return "failed"
 
@@ -487,7 +493,9 @@ def _propose_from(data: dict, text: str | None, rel: str, date: str | None,
         dose = f" {m['dose']}" if m.get("dose") else ""
         mid = treatment_db.upsert_medication(
             name=f"{str(m['name']).strip()}{dose}"[:200], status="active", source="document",
-            confirmation="proposed", prescribing_event_id=event_id, start_date=date,
+            # start_date не дата документа (нить treatment-homes): упоминание в заключении
+            # не говорит, когда начали; документ связан prescribing_event_id.
+            confirmation="proposed", prescribing_event_id=event_id,
             notes=(f"«{str(m.get('quote') or '').strip()[:300]}» — {rel}"
                    + ("" if ok else _UNVERIFIED[ok is False])))
         nm += 1 if mid else 0
@@ -509,7 +517,14 @@ def process_incoming(inbox: Path) -> int:
     for f in files:
         if done >= PER_POLL:
             break
+        wait = f.with_name(f.name + ".events.waitkey")
+        if wait.exists() and time.time() - wait.stat().st_mtime < KEY_RETRY_SEC:
+            continue   # ключ/баланс поставщика пуст: пробуем не чаще KEY_RETRY_SEC
         status = _process(f, root=root)   # уже импортированный → 'skipped' внутри, без модели
+        if status == "waiting":
+            wait.write_text("ключ или баланс поставщика")
+        else:
+            wait.unlink(missing_ok=True)
         if status == "failed":
             f.with_name(f.name + ".events.failed").write_text("разбор документа не удался")
             try:

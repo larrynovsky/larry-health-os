@@ -34,10 +34,16 @@ The file is overwritten atomically. Tenant verdict files are **not** overwritten
 `outputs/weekly_digest/2026-W36.gate.*.json`, or the bots will consider the old verdict valid.
 If the week is already marked as delivered, the bot will not send it again (`due` → `done`).
 
-## Why it did not arrive — three reasons
+## Why it did not arrive — four reasons
 
+0. **The bot cannot see the generator's folder.** The generator lives on the host (it needs git); the
+   owner's bot has lived in a container since 30.09. The `outputs/weekly_digest` folder reaches it as a
+   volume from `scripts/install.py --owner-override`. Check:
+   `docker --context colima-health exec health-bot-1 ls /app/outputs/weekly_digest` — empty or
+   "No such file" while the host has the file = no volume: re-render the override and run
+   `scripts/deploy_container.sh`. This is how week W40 was lost for the owner on 04.10 (thread digest-container).
 1. **No `<неделя>.json` file** — the generator did not run. Check `launchctl list | grep weekly-digest`,
-   log `logs/weekly_digest.log` / `_err.log`.
+   log `logs/weekly_digest.log` / `_err.log`. Since 05.10 a bot that sees the folder alerts the operator on Sunday after 09:00.
 2. **`text: null`** — the gate blocked both versions. In `gate.kind`: `lexicon` (term/number/date —
    `hits_class` gives the class), `judge` (a fact about a person), `fidelity` (a paragraph misrepresents the thread), `guard`
    (the `llm_client` secret guard or API). The operator received `notify_operator` directly from the generator (Saturday 22:xx) and on the bot's first tick.

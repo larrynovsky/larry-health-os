@@ -1532,13 +1532,13 @@ async def weekly_digest_outbox(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     # Алерт — сразу, не с отсрочкой (замечание владельца 05.09): blocked известен с первого
     # тика после генерации (сб 22:xx); wait без вердикта соседа — с первого тика после 09:00 вс.
-    alert_now = (decision == "blocked" and digest is not None) or (
-        decision == "wait" and digest is not None and now.isoweekday() == 7 and now.hour >= wd.SEND_HOUR)
-    if alert_now:
+    # «Текста недели нет» при живой папке генератора — тоже алерт (digest-container 05.10).
+    if wd.alarm(decision, now, digest, wd.OUT_DIR.is_dir()):
         if _cfg.get_config(_DIGEST_ALERT_KEY) != week:
             from notify import fault
             missing = [t for t, v in verd.items() if v is None]
-            fault(f"weekly_digest: {decision}; missing verdicts={len(missing)}", person_key=None)
+            what = "no digest file" if digest is None else f"missing verdicts={len(missing)}"
+            fault(f"weekly_digest: {decision} {week}; {what}", person_key=None)
             _cfg.upsert_config(_DIGEST_ALERT_KEY, value_text=week, category="digest",
                                source="weekly_digest_outbox")
 

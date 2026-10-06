@@ -224,14 +224,12 @@ async def _call_eval_specialist_async(
             )
 
         try:
-            response = await asyncio.wait_for(
-                client.messages.create(task="hypothesis_consilium_eval._call_eval_specialist_async",
+            response = await client.messages.create(task="hypothesis_consilium_eval._call_eval_specialist_async",
                     model=hai_core.get_model("haiku"),
                     max_tokens=400,
                     system=system,
                     messages=[{"role": "user", "content": content}],
-                ),
-                timeout=45.0,
+                    deadline="measured",   # срок — из замера модели (llm_client.call_timeout)
             )
             log.info(f"  {name} eval (Раунд {round_label}): OK")
             return {"name": name, "opinion": llm_client.answer_text(response), "ok": True}
@@ -264,44 +262,24 @@ async def _run_eval_round(
         async with semaphore:
             return await coro
 
-    medical_tasks = [
-        _call_eval_specialist_async(client, name, data_package, semaphore, round_a_opinions)
-        for name in medical_names
-    ]
-
     eval_question = (
         f"Оцените гипотезу: «{hypothesis.get('observation', '')}». "
         f"Предсказание: «{hypothesis.get('prediction', '')}». "
         "Подтвердились ли лабораторные данные с точки зрения вашей специализации?"
     )
-    lifestyle_tasks = [
-        _guarded(agent.generate_mdt_opinion(
-            sleep_date    = get_today(),
-            activity_date = get_today(),
-            patient_question   = eval_question,
-            round_a_opinions   = round_a_opinions,
-            client        = client,
-        ))
-        for agent in la.AGENTS
-    ]
+    askers = {name: (lambda name=name: _call_eval_specialist_async(
+                  client, name, data_package, semaphore, round_a_opinions))
+              for name in medical_names}
+    for agent in la.AGENTS:
+        askers[agent.agent_name] = lambda agent=agent: _guarded(agent.generate_mdt_opinion(
+            sleep_date=get_today(), activity_date=get_today(), patient_question=eval_question,
+            round_a_opinions=round_a_opinions, client=client))
 
-    medical_results, *lifestyle_opinions = await asyncio.gather(
-        asyncio.gather(*medical_tasks),
-        *lifestyle_tasks,
-        return_exceptions=True,
-    )
-
-    opinions: dict = {}
-    for r in medical_results:
-        opinions[r["name"]] = r.get("opinion", "Нет ответа")
-
-    for agent, opinion in zip(la.AGENTS, lifestyle_opinions):
-        if isinstance(opinion, Exception):
-            log.error(f"  {agent.agent_name} eval (Раунд {round_label}): {opinion}")
-            opinions[agent.agent_name] = f"Ошибка: {opinion}"
-        else:
-            opinions[agent.agent_name] = opinion
-            log.info(f"  {agent.agent_name} eval (Раунд {round_label}): OK")
+    # Все обязаны ответить (consilium_roster.ask_all): не ответивший — повтор, затем отказ.
+    answers = await consilium_roster.ask_all(
+        askers, lambda r: bool(r.get("ok")) if isinstance(r, dict) else bool(r),
+        f"hypothesis_consilium_eval round {round_label}")
+    opinions: dict = {n: (r["opinion"] if isinstance(r, dict) else r) for n, r in answers.items()}
 
     log.info(f"Eval Раунд {round_label} завершён: {len(opinions)}/{n_participants}")
     return opinions
@@ -337,18 +315,16 @@ async def _call_eval_coordinator_async(
     log.info(f"Eval координатор: синтез {ok_count}/{len(opinions_b)} мнений...")
 
     try:
-        response = await asyncio.wait_for(
-            client.messages.create(task="hypothesis_consilium_eval._call_eval_coordinator_async",
+        response = await client.messages.create(task="hypothesis_consilium_eval._call_eval_coordinator_async",
                 model=hai_core.get_model("sonnet"),
                 max_tokens=2048,
                 system=system,
                 messages=[{"role": "user", "content": user_content}],
-            ),
-            timeout=90.0,
+                deadline="measured",   # срок — из замера модели (llm_client.call_timeout)
         )
         return llm_client.answer_text(response)
     except asyncio.TimeoutError:
-        log.error("Eval координатор: TIMEOUT (90s)")
+        log.error("Eval координатор: срок по замеру модели исчерпан")
         raise RuntimeError(i18n.t("hypothesis_consilium.error.timeout"))
 
 

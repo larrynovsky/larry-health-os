@@ -210,7 +210,6 @@ def build_patient_brief() -> str:
     med     = profile.get("medical",  {})
     routine = profile.get("routine",  {})
 
-    name = ident.get("name", "Пациент")
     age  = _age_suffix(ident.get("birth_date"))
     loc  = ident.get("location") or (profile.get("current_location") or {}).get("city") or ""
     loc_s = f", {loc}" if loc else ""
@@ -261,7 +260,7 @@ def build_patient_brief() -> str:
 
     return (
         _bhdr +
-        f"Пациент: {name}{age}{loc_s}.\n"
+        f"Пациент{age}{loc_s}.\n"
         f"{dx_line}"
         f"{onco_line}"
         f"{appt_line}"

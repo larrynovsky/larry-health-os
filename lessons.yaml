@@ -3235,3 +3235,115 @@ lessons:
   status: observation
   evidence: ['tests/unit/test_symptom_case_ttl.py']
   owner: владелец
+- id: C-152
+  date: '2026-10-04'
+  thread: async-stream
+  modules: [llm_client.py]
+  event: 'Думающий вызов пустили потоком (thinking-stream) и выбирали async-ветку по inspect.iscoroutinefunction(create). У SDK AsyncMessages.create обёрнут синхронным декоратором required_args — проверка давала False, асинхронный поток шёл через `with` и падал. Тесты были зелёными: фейк объявлял `async def create`. Нашёл замер, а не тест; в проде не стреляло только потому, что запас под думание был 0.'
+  cost: 'спящий дефект, который уронил бы консилиум при включении запасов; один отчёт молча проглотил упавшую консультацию'
+  cause: 'фейк воспроизводил интерфейс в идеальной форме, а не в форме настоящей библиотеки; зелёный был от фейка (§20)'
+  address: {kind: runtime, ref: llm_client._is_async}
+  subject: [test_stand, llm_output]
+  outcome: {kind: rule, text: 'свойство, по которому ветвится код (асинхронность, тип), проверяется на настоящем объекте библиотеки, не на фейке; если клиент создавать нельзя — берётся функция с класса'}
+  status: observation
+  evidence: ['tests/unit/test_llm_task_modes.py']
+  owner: владелец
+- id: C-153
+  date: '2026-10-04'
+  thread: think-return
+  modules: [hypothesis_consilium_eval.py, lifestyle_agents.py, wellally_consult.py, llm_client.py]
+  event: 'Полный замер думания: специалисты оценки гипотез (haiku) с думанием давали 8 мнений из 17 — остальные отрезал asyncio.wait_for(timeout=45.0); без думания в августе было 17 из 17. Координатору дано 90 с, а сообщение об ошибке у соседнего консилиума писало «90 секунд» при сроке 600. Отчёт при этом говорил ok.'
+  cost: 'консилиум молча терял половину специалистов при включении думания'
+  cause: 'срок вызова — литерал, подобранный под ответ без думания; то же, что лимит токенов в коде, только в секундах — число-копия свойства модели и задачи'
+  address: {kind: runtime, ref: llm_client.call_timeout}
+  subject: [llm_output, measurement_path]
+  outcome: {kind: rule, text: 'срок вызова модели выводится из замера модели (задержка + токены × сек/токен + отклонение) на полный лимит с повтором; литерал срока у вызова — красный ратчет'}
+  status: observation
+  evidence: ['tests/unit/test_llm_task_modes.py']
+  owner: владелец
+- id: C-154
+  date: '2026-10-04'
+  thread: treatment-homes
+  modules: [health_db.py, tests/conftest.py]
+  event: 'В medications владельца с 22.06 лежали строки фикстур tests/unit/test_treatment.py: утренний pytest идёт с HEALTH_DATA_DIR = живая база (часть тестов читает настоящие данные), conftest явную переменную уважал, тест без фикстуры db записал свои строки в канон. Ночной датчик дат лечения при этом был зелёным — он сверял одну пару из пяти домов.'
+  cost: 'история лечения в контексте консилиума и GP шла с каждой схемой дважды, счёт курсов завышен в 2.5 раза; 3.5 месяца без сигнала'
+  cause: 'один признак окружения («явный HEALTH_DATA_DIR») значил сразу «читай настоящие данные» и «пиши куда угодно» — права на запись у прогона тестов не было отдельного ограничения'
+  address: {kind: runtime, ref: health_db.get_conn}
+  subject: [test_stand, duplicate_data]
+  outcome: {kind: check, text: 'прогон тестов открывает базу, объявленную живой (HEALTH_TEST_LIVE_DB), только на чтение — query_only в get_conn и перехватчик sqlite3.connect в conftest; оракул tests/unit/test_live_db_readonly.py, мутация «снять страж» краснеет'}
+  status: adopted
+  adopted_on: '2026-10-04'
+  change: 'git:1e78e8a'
+  evidence: ['git:90daf84', 'git:1e78e8a']
+  owner: владелец
+- id: C-155
+  date: '2026-10-04'
+  thread: treatment-homes
+  modules: [treatment_db.py, treatment_extractor.py]
+  event: 'Отчёт и план старта назвали причиной дублей в medications выдуманные моделью ссылки на проблемы и слепой гейт подтверждения; под это в плане стоял этап «карточка гейта с контекстом». Строки родились одной секундой, с 99 циклами и ссылками p1/p2 — значения дословно из фикстуры теста; это нашлось grep-ом по tests/ уже после показа плана владельцу.'
+  cost: 'один этап плана построен на неверной причине и снят; владелец согласовывал план с ложной посылкой'
+  cause: 'в разборе подозрительных строк нет шага «сверить значения с фикстурами тестов» — писатель назначался по смыслу полей, а не по провенансу пачки'
+  address: {kind: ritual, ref: letitbe}
+  subject: [hypothesis_before_fact, writers_readers]
+  outcome: {kind: rule, text: 'прежде чем назвать писателя подозрительных строк — сверить их пачку (created_at, значения) с фикстурами tests/ и с источником данных; совпадение с фикстурой = утечка теста, а не дефект конвейера'}
+  status: observation
+  evidence: ['docs/handoff/treatment-homes/LATEST.md']
+  owner: владелец
+- id: C-156
+  date: '2026-10-04'
+  thread: treatment-homes
+  modules: [gp_context.py, proposals_db.py]
+  event: 'Блок «Медицинские события» в контексте GP отдавал 10 событий из 21 за год, не объявляя обрезки; документ обследования оказался за срезом, модель предложила в заметку проблемы «результата в системе нет», и предложение дважды прошло гейт владельца — карточка не показывала, что документ в медкарте есть.'
+  cost: 'ложная задача владельцу с дедлайном по закрытому вопросу; верное предложение того же агента отклонено'
+  cause: 'срез между базой и промптом без объявления границы (тот же класс, что report_absence_claims.context_declares_its_boundary) плюс карточка гейта без доказательства из медкарты'
+  address: {kind: runtime, ref: gp_context._build_med_events_block}
+  subject: [context_horizon, measurement_path]
+  outcome: {kind: check, text: 'блок берёт окно целиком и объявляет границу (test_gp_context_blocks::test_med_events_block_shows_whole_window_and_declares_boundary); карточка предложения называет документ, опровергающий «нет в системе» (tests/unit/test_absence_against_documents.py)'}
+  status: adopted
+  adopted_on: '2026-10-04'
+  change: 'git:1e78e8a'
+  evidence: ['git:90daf84', 'git:1e78e8a']
+  owner: владелец
+- id: C-157
+  date: '2026-10-05'
+  thread: digest-container
+  modules: [weekly_digest.py, jobs/scheduled.py, scripts/install.py]
+  event: 'Владельцу не пришёл дайджест недели W40 (вс 04.10). Генератор остался на хосте (placement: none — нужен git) и написал файл в ~/health_scripts/outputs/weekly_digest; бот владельца с 30.09 в контейнере, папка туда не проброшена — outbox видел «дайджеста нет» и молчал (алерт стоял только при digest is not None). Партнёру доставлен. Тот же класс, что C-135 (02.10), — урок-текст повтора не остановил.'
+  cost: 'неделя W40 владельцу потеряна насовсем (outbox читает только текущую неделю); 6 дней правило «блок любого — блок всем» исполнялось наполовину, W40 ушёл партнёру без вердикта владельца'
+  cause: 'переезд рантайма сменил дом читателя, а писатель остался на хосте; «что контейнер читает у хостовой службы» нигде не было вопросом — placement.yaml говорил только «куда едет служба»'
+  address: {kind: runtime, ref: templates/launchd/placement.yaml}
+  subject: [message_delivery, tenant]
+  outcome: {kind: check, text: 'placement.yaml::host_outputs — каждая host:/none: служба отвечает, что у неё читает контейнер; каждый путь — том в render_owner_override (test_docker_render::test_сторож_переезда_контейнер_видит_всё_что_читает_у_хостовых_служб); бот зовёт оператора, когда текста недели нет при живой папке генератора (test_weekly_digest::test_alarm_table)'}
+  status: adopted
+  adopted_on: '2026-10-05'
+  change: 'git:7b8fd9a'
+  evidence: ['git:12101b4', 'git:b257c89', 'git:7b8fd9a', 'plans/PLAN_digest_container_2026-10-05.md']
+  owner: владелец
+- id: C-158
+  date: '2026-10-05'
+  thread: staging-orphan
+  modules: [scripts/test_on_studio.sh]
+  event: 'Управляющий процесс полного прогона на MacBook погиб посреди прогона (совпало с подвисанием связи с Маком); ловушка EXIT удалила каталог стенда на Studio, а pytest там продолжал ~10 минут: 72 failed, 6118 errors FileNotFoundError …/tests/fixtures/health_schema.sql. Прогон нити producer-registry-container сгорел, его пришлось повторять.'
+  cost: 'один полный прогон (~13 мин процессора Studio) впустую и ~15 мин ожидания; мусор — три каталога run.* на Studio, пересозданные сиротой'
+  cause: 'ssh без tty не передаёт удалённой стороне смерть местной, а уборка удаляла каталог, не останавливая процесс, который в нём работает; номер удалённого процесса нигде не хранился'
+  address: {kind: runtime, ref: scripts/test_on_studio.sh}
+  subject: [test_stand, shell_scripts]
+  outcome: {kind: check, text: 'удалённые команды пишут pid в $STAGING/.run.pid и стартуют через exec; cleanup_staging гасит pid до rm -rf; HUP/INT/TERM → exit (tests/unit/test_staging_cleanup_stops_run.py, мутация «уборка только rm» — красный)'}
+  status: adopted
+  adopted_on: '2026-10-05'
+  change: 'git:84cc07d'
+  evidence: ['git:84cc07d', 'git:ec8b0ac']
+  owner: владелец
+- id: C-159
+  date: '2026-10-05'
+  thread: digest-tails
+  modules: [scripts/thread_finish.sh]
+  event: 'Днём 05.10 нити закрывали ≥5 сессий одновременно; зелёный полный прогон двух нитей (producer-registry-container, digest-tails) дважды отбит кодом 13 «main сдвинулся, пока шёл прогон», каждая слилась со второй-третьей попытки.'
+  cost: 'два лишних полных прогона по ~15 мин и ~1 ч ожидания слияния; повторы вёл самодельный цикл вокруг thread_finish'
+  cause: 'замок главной копии берётся только на слияние, а прогон (≈15 мин) идёт без него; при N закрывающих сессиях каждое чужое слияние обнуляет текущий прогон — очередь без порядка, у кого прогон дольше окна между чужими слияниями, тот не сливается'
+  address: {kind: runtime, ref: scripts/thread_finish.sh}
+  subject: [run_version, concurrency]
+  outcome: {kind: rule, text: 'код 13 — повтор отвязанным циклом (nohup, retry только по 13); кандидат в устройство — очередь закрытий, держащая порядок на время прогона, когда ждущих ≥2; решать при повторе'}
+  status: observation
+  evidence: ['git:aa79f28', 'git:48c36bb']
+  owner: владелец

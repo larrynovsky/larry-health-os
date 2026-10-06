@@ -443,6 +443,29 @@ if __name__ == "__main__":
 
 # ── W5A-INT-8: flatten CBCR payload → legacy save_hypothesis fields ─────────
 
+def _text(x) -> str:
+    """Строка как есть; у словаря — первое непустое строковое значение."""
+    if isinstance(x, str):
+        return x.strip()
+    if isinstance(x, dict):
+        return next((v.strip() for v in x.values() if isinstance(v, str) and v.strip()), "")
+    return ""
+
+
+def _reasoning_steps(lor) -> tuple[list[str], str]:
+    """Шаги и направление к специалисту из line_of_reasoning. Манифест форму не задаёт, и модели
+    пишут её по-разному (замер 05.10): opus-4-7 — нет поля, sonnet-4-6 — словарь
+    {next_step_immediate, next_tests, specialist_referral}, sonnet-5-5 — список шагов. До 05.10
+    читался только словарь с immediate_next_steps: список ронял разбор, гипотеза терялась."""
+    if isinstance(lor, list):
+        return [t for t in map(_text, lor) if t], ""
+    if isinstance(lor, dict):
+        raw = next((lor[k] for k in ("immediate_next_steps", "next_step_immediate", "next_tests") if lor.get(k)), [])
+        ref = next((lor[k] for k in ("specialist_referral_trigger", "specialist_referral") if lor.get(k)), "")
+        return [t for t in map(_text, raw if isinstance(raw, list) else [raw]) if t], _text(ref)
+    return ([lor.strip()] if isinstance(lor, str) and lor.strip() else []), ""
+
+
 def flatten_cbcr_payload(hyp: dict) -> dict:
     """Извлекает плоские поля observation/mechanism/prediction/test из CBCR JSON.
 
@@ -473,13 +496,9 @@ def flatten_cbcr_payload(hyp: dict) -> dict:
     fals = hyp.get("falsification") or {}
     prediction = str(fals.get("etiological_confirmation") or "").strip()
 
-    # test — immediate_next_steps[0] → specialist_referral_trigger → prediction (fallback)
-    lor = hyp.get("line_of_reasoning") or {}
-    steps = lor.get("immediate_next_steps") or []
-    if steps and isinstance(steps, list) and isinstance(steps[0], str):
-        test = steps[0].strip()
-    else:
-        test = str(lor.get("specialist_referral_trigger") or "").strip()
+    # test — первый шаг хода рассуждения → направление к специалисту → prediction (fallback)
+    steps, referral = _reasoning_steps(hyp.get("line_of_reasoning"))
+    test = steps[0] if steps else referral
     if not test:
         # prediction содержит измеримое предсказание — достаточно как actionable тест
         test = prediction

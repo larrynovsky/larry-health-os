@@ -4191,7 +4191,12 @@ def check_weekly_digest_delivered():
     from datetime import datetime as _dtm
     last_week = _wd.current_week(_dtm.combine(today - _td(days=1), _dtm.min.time()))
     d = _wd.read_digest(last_week)
-    assert d is not None, f"нет файла дайджеста {last_week} — генератор не бежал (launchd weekly-digest)"
+    # Две разные причины одного «файла нет» (digest-container 05.10): папки нет у ЭТОГО читателя —
+    # он не видит генератора вовсе (контейнер без тома); папка есть, файла нет — генератор не бежал.
+    assert d is not None, (f"нет файла дайджеста {last_week}: " + (
+        "генератор не бежал (launchd weekly-digest на хосте)" if _wd.OUT_DIR.is_dir() else
+        f"у этого читателя нет папки {_wd.OUT_DIR} — генератор живёт на хосте, том не проброшен "
+        "(контейнер владельца: scripts/install.py --owner-override)"))
     assert d.get("text"), (f"дайджест {last_week} без текста: gate={d.get('gate', {}).get('kind')} "
                           f"— заблокирован, тенанты ничего не получили")
     missing = []
@@ -4936,6 +4941,65 @@ def check_hae_arrivals_have_owner():
 
 
 check("метрики прибора: у каждой есть хозяин (HAE)", check_hae_arrivals_have_owner)
+
+
+def check_bp_day_is_withings():
+    """WARN: дневное давление разошлось с замерами Withings (нить bp-withings-owner, 06.10).
+
+    Решение владельца 06.10: у кого Withings подключён, дневное bp_systolic/bp_diastolic — среднее
+    всех замеров дня из bp_readings, и пишет его только import_withings. Судья пересчитывает
+    среднее сам, не через код писателя (§17): иначе ошибка писателя прошла бы обоих. Ловит
+    второго писателя (путь «Здоровья» снова пишет давление) и недописанный пересчёт: день с
+    замерами без значения или с другим значением, и день без замеров (начиная с первого дня
+    Withings) со значением. Нет таблицы или замеров — Withings не подключён, молчим.
+    Сиблингу — только счётчик дней, без значений давления.
+    """
+    import sqlite3 as _sq
+    from datetime import datetime as _dtm
+    from zoneinfo import ZoneInfo
+    import region_pack
+    tz = ZoneInfo(region_pack.value("timezone", "UTC"))
+    out = {}
+    for _p in _tenant_db_paths(include_current=True):
+        _tag = Path(_p).parent.parent.name
+        try:
+            con = _sq.connect(f"file:{_p}?mode=ro", uri=True)
+            sums: dict = {}
+            for t, s, d in con.execute("SELECT measured_at, systolic, diastolic FROM bp_readings"):
+                acc = sums.setdefault(_dtm.fromtimestamp(t, tz).date().isoformat(), [0.0, 0.0, 0])
+                acc[0] += s
+                acc[1] += d
+                acc[2] += 1
+            if not sums:
+                con.close()
+                continue
+            have = {r[0]: (r[1], r[2]) for r in con.execute(
+                "SELECT date, bp_systolic, bp_diastolic FROM daily_metrics WHERE date >= ?",
+                (min(sums),))}
+            con.close()
+        except _sq.Error as e:
+            if _absent_table(e):
+                continue
+            raise
+        bad = []
+        for day in sorted(set(sums) | {d for d, v in have.items() if v[0] is not None or v[1] is not None}):
+            got = have.get(day, (None, None))
+            if day in sums:
+                s, d, n = sums[day]
+                want = (round(s / n, 1), round(d / n, 1))
+                if got[0] is None or got[1] is None or abs(got[0] - want[0]) > 0.05 or abs(got[1] - want[1]) > 0.05:
+                    bad.append(day)
+            else:
+                bad.append(day)
+        out[_tag] = len(bad)
+        if bad:
+            warn(f"[{_tag}] дневное давление разошлось с замерами Withings: {len(bad)} дн.",
+                 f"последний такой день {bad[-1]} — пересчитайте import_withings.py; если повторится, "
+                 "давление пишет кто-то ещё (путь «Здоровья» в metrics_db.upsert_metrics_from_json)")
+    return out or None
+
+
+check("давление: дневное значение — среднее замеров Withings, второго писателя нет", check_bp_day_is_withings)
 
 
 RAW_ARCHIVE_STALE_DAYS = 15   # сжатие — после 14 дней (hae_checker.compress_raw_archive) + сутки запаса
@@ -6391,8 +6455,77 @@ def treatment_date_disagreements(periods: list, problems: list, tol_days: int = 
     return mismatches, unpaired
 
 
+# ── Дома фактов о лечении, кроме problem_list (нить treatment-homes, 04.10.2026) ──────────
+# Решение владельца 04.10: главный дом дат лечения — `periods`; `medications` и дата ремиссии в
+# профиле подчинены. До этой правки датчик сверял одну пару из пяти домов и был зелёным на
+# живой базе при двух статусах вне словаря, трёх дублях и режиме, «начатом» датой визита.
+_MED_FAMILY = {"chemo": ("treatment", "chemotherapy"), "chemoradiation": ("chemoradiation",),
+               "immunotherapy": ("immunotherapy",), "radiation": ("radiotherapy",)}
+_REMISSION_DATE_RE = re.compile(r"ремисс[а-я]*\s+с\s+(\d{1,2})\.(\d{4})", re.I)
+
+
+def _med_date(s):
+    """'2024-10' / '2024-10-05' / None → date (месяц без дня = первое число)."""
+    if not s:
+        return None
+    s = str(s)[:10]
+    return date.fromisoformat(s if len(s) == 10 else (s + "-01")[:10])
+
+
+def medication_fact_findings(meds: list, periods: list, statuses: tuple, today: date,
+                             diagnosis: str = "", tol_days: int = TREATMENT_DATE_TOLERANCE_DAYS):
+    """ЧИСТАЯ функция. meds — подтверждённые строки medications (id,name,modality,start_date,
+    end_date,status); periods — живые строки periods (name,type,start_date,end_date).
+    Возвращает (findings, unchecked): finding = (вид, текст). Режим внутри своего периода
+    (поддерживающая фаза внутри курса) — норма; режим вне всех периодов семьи — расхождение."""
+    tol = timedelta(days=tol_days)
+    out, unchecked = [], []
+    for m in meds:
+        tag = f"#{m['id']} {m['name']}"
+        st, s, e = m.get("status"), _med_date(m.get("start_date")), _med_date(m.get("end_date"))
+        if st not in statuses:
+            out.append(("статус", f"{tag}: status={st!r} вне словаря {statuses}"))
+        if st == "active" and e and e < today:
+            out.append(("статус", f"{tag}: active, но закончен {e}"))
+        fam = _MED_FAMILY.get(m.get("modality") or "")
+        if not fam or s is None:
+            unchecked.append(tag)
+            continue
+        mates = [p for p in periods if p["type"] in fam and _med_date(p["start_date"])]
+        inside = [p for p in mates
+                  if s >= _med_date(p["start_date"]) - tol
+                  and (e or s) <= (_med_date(p["end_date"]) or today) + tol]
+        if not inside:
+            out.append(("период", f"{tag} {s}…{e or '?'} не укладывается ни в один период "
+                                  f"{'/'.join(fam)} (главный дом дат — periods)"))
+        elif st in ("active", None) and all(_med_date(p["end_date"]) and _med_date(p["end_date"]) + tol < today
+                                            for p in inside):
+            out.append(("статус", f"{tag}: период окончен, а режим не закрыт"))
+    by_name = {}
+    for m in meds:
+        by_name.setdefault(m["name"], []).append(m)
+    for name, rows in by_name.items():
+        for i, a in enumerate(rows):
+            for b in rows[i + 1:]:
+                a0, a1 = _med_date(a.get("start_date")), _med_date(a.get("end_date"))
+                b0, b1 = _med_date(b.get("start_date")), _med_date(b.get("end_date"))
+                apart = a0 and b0 and ((a1 and a1 + tol < b0) or (b1 and b1 + tol < a0))
+                if not apart:
+                    out.append(("дубль", f"{name}: #{a['id']} и #{b['id']} — одна схема дважды "
+                                         f"с пересекающимися или неизвестными датами"))
+    m = _REMISSION_DATE_RE.search(diagnosis or "")
+    rem = [p for p in periods if p["type"] == "remission" and p.get("start_date")]
+    if m and rem:
+        stated = date(int(m.group(2)), int(m.group(1)), 1)
+        primary = max(_med_date(p["start_date"]) for p in rem)
+        if abs((stated - primary.replace(day=1)).days) > tol_days:
+            out.append(("ремиссия", f"профиль: ремиссия с {stated:%m.%Y}, periods: с {primary}"))
+    return out, unchecked
+
+
 def check_treatment_dates_agree():
-    """Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках)."""
+    """Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках),
+    `medications` (подтверждённые режимы) и даты ремиссии в профиле."""
     with db.get_conn() as conn:
         periods = [dict(r) for r in conn.execute(
             "SELECT name, type, start_date, end_date FROM periods "
@@ -6400,6 +6533,23 @@ def check_treatment_dates_agree():
             _THERAPY_PERIOD_TYPES).fetchall()]
         problems = [dict(r) for r in conn.execute(
             "SELECT problem_id, title, first_seen, resolved_date FROM problem_list").fetchall()]
+        all_periods = [dict(r) for r in conn.execute(
+            "SELECT name, type, start_date, end_date FROM periods WHERE deleted_at IS NULL")]
+        meds = [dict(r) for r in conn.execute(
+            "SELECT id, name, modality, start_date, end_date, status FROM medications "
+            "WHERE COALESCE(confirmation,'proposed') IN ('confirmed','manual')")]
+        dx = conn.execute("SELECT value_text FROM patient_profile "
+                          "WHERE key='medical.diagnosis'").fetchone()
+    from treatment_db import MED_STATUSES
+    facts, med_unchecked = medication_fact_findings(
+        meds, all_periods, MED_STATUSES, today, diagnosis=(dx[0] if dx else "") or "")
+    if facts:
+        warn(f"факты о лечении расходятся с главным домом periods ({len(facts)})",
+             "; ".join(f"[{k}] {t}" for k, t in facts)
+             + ". Главный дом — periods (решение владельца 04.10); копия чинится через log_repair")
+    if med_unchecked and not JSON_OUTPUT:
+        print(f"     ℹ режимы без даты начала или семьи — НЕ сверены ({len(med_unchecked)}): "
+              f"{', '.join(med_unchecked)}")
     mism, unpaired = treatment_date_disagreements(periods, problems)
     if mism:
         lines = [f"{m[0]} ↔ {m[1]} [{m[2]}]: period {m[3]} vs problem {m[4]} (Δ{m[5]}д)" for m in mism]
@@ -6409,10 +6559,10 @@ def check_treatment_dates_agree():
         # Не WARN (это не расхождение), но и не молчание: «не сверено» ≠ «сошлось».
         print(f"     ℹ терапии без пары в problem_list по названию ({len(unpaired)}): "
               f"{', '.join(unpaired)} — датчик их НЕ сверяет")
-    return len(mism)
+    return len(mism) + len(facts)
 
 
-check("даты терапии: periods ↔ problem_list", check_treatment_dates_agree)
+check("даты терапии: periods ↔ problem_list, medications, профиль", check_treatment_dates_agree)
 
 
 def check_treatment_history_extracted():

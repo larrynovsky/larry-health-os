@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/add_llm_call.md sha256:c618b18c39c9 -->
+<!-- translation-of: docs/how-to/add_llm_call.md sha256:42e9858ab6e2 -->
 **English** · [Русский](add_llm_call.md)
 
 # How to add a new model call
@@ -16,6 +16,8 @@
 
    `max_tokens` is the answer length. Do not add room for thinking: the wrapper adds it.
    Take the text only through `llm_client.answer_text` — the first block of an answer can be reasoning.
+   An async call that needs a deadline passes `deadline="measured"`, not `asyncio.wait_for` with a
+   number: the deadline is computed from the model's measurement and includes thinking.
 3. Add the task to `methodology/llm_task_modes.json`:
 
    ```json

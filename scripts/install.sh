@@ -369,13 +369,18 @@ if [ -z "$PROVIDER" ]; then
   if [ "$ENV_FRESH" = 1 ] && [ "$INTERACTIVE" = 1 ]; then choose_provider
   else PROVIDER="$(sed -n 's/^HEALTH_LLM_PROVIDER=//p' .env | tail -n1)"; fi
 fi
-if [ -n "$PROVIDER" ] && ! grep -qx "HEALTH_LLM_PROVIDER=${PROVIDER}" .env; then
+save_provider() {  # выбор поставщика — в .env, чтобы обновление его не повторяло
+  [ -n "$PROVIDER" ] && ! grep -qx "HEALTH_LLM_PROVIDER=${PROVIDER}" .env || return 0
   if grep -q '^HEALTH_LLM_PROVIDER=' .env; then
     sed "s#^HEALTH_LLM_PROVIDER=.*#HEALTH_LLM_PROVIDER=${PROVIDER}#" .env > .env.part && mv .env.part .env
   else printf 'HEALTH_LLM_PROVIDER=%s\n' "$PROVIDER" >> .env; fi
-fi
+}
+save_provider
 PROVIDER="${PROVIDER:-anthropic}"
 ok "поставщик моделей: ${PROVIDER}" "model provider: ${PROVIDER}"
+# Повтор установки вопроса не задаёт — и человек не знал, как сменить выбор (отчёт с Windows 05.10).
+[ "$ENV_FRESH" = 1 ] || say "  сменить: bash install.sh --provider anthropic|openai|gemini" \
+                            "  to change: bash install.sh --provider anthropic|openai|gemini"
 # Приём с телефона в домашней Wi-Fi: compose берёт адрес порта 8011 из .env (HEALTH_INGEST_BIND).
 # Как с поставщиком: не названо — выбор прошлой установки сохраняется.
 if [ -n "$LAN_INGEST" ]; then
@@ -452,7 +457,10 @@ while ! has_secret telegram_token; do
   put_secret telegram_token "$t"
 done
 while ! has_secret telegram_chat_id; do
-  say "Ваш числовой id: напишите @userinfobot." "Your numeric id: message @userinfobot."
+  say "Ваш числовой id в Telegram: найдите в Telegram бота @userinfobot, нажмите «Start» (или пошлите ему любое" \
+      "Your numeric Telegram id: find the bot @userinfobot in Telegram, press “Start” (or send it any message);"
+  say "  сообщение) — он ответит строкой «Id: 123456789». Введите эти цифры." \
+      "  it replies with a line “Id: 123456789”. Type those digits."
   c="$(ask_secret "$ENV_ID" "Ваш id" "Your id" 0)"; ENV_ID=""
   if ! printf '%s' "$c" | grep -Eq '^-?[0-9]+$'; then
     warn "id — только цифры" "the id is digits only"
@@ -460,6 +468,7 @@ while ! has_secret telegram_chat_id; do
   fi
   put_secret telegram_chat_id "$c"
 done
+key_vars() {  # файл, имя и подсказка ключа выбранного поставщика
 case "$PROVIDER" in
   anthropic) KF=anthropic_key; KV="$ENV_AK"; KN="Anthropic"
              KH_RU="Ключ Anthropic: console.anthropic.com → API Keys (и пополните баланс)."
@@ -474,10 +483,33 @@ case "$PROVIDER" in
              KH_RU="Ключ DeepSeek: platform.deepseek.com → API keys (и пополните баланс)."
              KH_EN="DeepSeek key: platform.deepseek.com → API keys (and top up the balance)." ;;
 esac
+}
+key_vendor() {  # чей ключ по началу строки; пусто — не узнать. Только предлагаемые поставщики
+  case "$1" in
+    sk-ant-*) echo anthropic ;;
+    sk-*) echo openai ;;
+    AIza*) echo gemini ;;
+  esac
+}
+key_vars
 ENV_AK=""; ENV_LK=""
 while ! has_secret "$KF"; do
   say "$KH_RU" "$KH_EN"
   k="$(ask_secret "$KV" "Ключ ${KN} (не будет виден)" "${KN} key (input hidden)" 1)"; KV=""
+  # Ключ другого поставщика (отчёт с Windows 05.10: выбран Anthropic, вставлен ключ OpenAI, «не
+  # принял ключ» — и всё; как сменить поставщика, не было сказано нигде).
+  kv="$(key_vendor "$k")"
+  if [ -n "$kv" ] && [ "$kv" != "$PROVIDER" ]; then
+    warn "это похоже на ключ ${kv}, а выбран поставщик ${PROVIDER}" "this looks like a ${kv} key, but the chosen provider is ${PROVIDER}"
+    [ "$INTERACTIVE" = 1 ] || die "Ключ не того поставщика. Запустите с --provider ${kv}." "Key of another provider. Run with --provider ${kv}."
+    printf '%s [Y/n]: ' "$(say "Переключить установку на ${kv}?" "Switch the installation to ${kv}?")" >&2
+    read -r a
+    case "$a" in
+      n|N|н|Н) continue ;;
+      *) PROVIDER="$kv"; save_provider; key_vars; KV="$k"
+         ok "поставщик моделей: ${PROVIDER}" "model provider: ${PROVIDER}"; continue ;;
+    esac
+  fi
   if [ "$VERIFY" = 1 ]; then
     case "$(key_check "$PROVIDER" "$k")" in
       ok) ok "ключ ${KN} принят (баланс так не проверить — пополните его)" "${KN} key accepted (the balance cannot be checked this way — top it up)" ;;

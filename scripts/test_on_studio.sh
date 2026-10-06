@@ -53,12 +53,25 @@ STAGING=""          # заполняется после sanity — до неё �
 STAGING_SECRETS=""
 # Уборка только СВОЕГО каталога — чужие прогоны не трогаем. Путь проверяется на
 # принадлежность корню: пустая или неожиданная переменная не должна дать rm -rf /.
+# Сначала ОСТАНОВИТЬ свой прогон, потом удалить каталог (нить staging-orphan, 05.10). ssh без tty
+# не шлёт удалённой стороне сигнал, когда умирает местная: 05.10 управляющий процесс на MacBook
+# погиб посреди прогона, ловушка удалила каталог, а pytest на Studio ещё 10 минут гонял тесты в
+# пустоте — 6118 ошибок FileNotFoundError и занятый процессор. Каждая удалённая команда пишет свой
+# pid в $STAGING/.run.pid (exec — pid остаётся pid'ом самой команды); уборка гасит его до rm.
+# --- cleanup_staging: begin (тест вырезает функцию по этим меткам) ---
 cleanup_staging() {
   case "$STAGING" in
-    "$STAGING_ROOT"/run.*) ssh "$STUDIO" "rm -rf '$STAGING'" >/dev/null 2>&1 || true ;;
+    "$STAGING_ROOT"/run.*) ssh "$STUDIO" "p=\$(cat '$STAGING/.run.pid' 2>/dev/null); \
+if [ -n \"\$p\" ] && kill \"\$p\" 2>/dev/null; then for _ in 1 2 3 4 5; do kill -0 \"\$p\" 2>/dev/null || break; sleep 1; done; kill -9 \"\$p\" 2>/dev/null; fi; \
+rm -rf '$STAGING'" >/dev/null 2>&1 || true ;;
   esac
 }
+# --- cleanup_staging: end ---
 trap cleanup_staging EXIT
+# Сигнал — тоже выход: без этого TERM/HUP убивали бы оболочку мимо ловушки EXIT.
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Reference (loinc.db, 232 МБ) общий на все запуски: тесты только читают его, а
 # копировать четверть гигабайта в каждый прогон — плата без выгоды. Обновление
@@ -203,7 +216,7 @@ fi
 # то есть pytest. Отказ самого tee тоже даст rc≠0 — красный, а не ложно-зелёный.
 PYTEST_OUT="$(mktemp -t pytest_out)"
 set +e
-ssh "$STUDIO" "cd '$STAGING' && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' $PY -m pytest $TARGET -q --tb=short -m 'not slow and not requires_anthropic_key and not owner_env'" | tee "$PYTEST_OUT"
+ssh "$STUDIO" "cd '$STAGING' && echo \$\$ > .run.pid && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' exec $PY -m pytest $TARGET -q --tb=short -m 'not slow and not requires_anthropic_key and not owner_env'" | tee "$PYTEST_OUT"
 RC=$?
 set -e
 PASSED="$(grep -Eo '[0-9]+ passed' "$PYTEST_OUT" | tail -1 | grep -Eo '[0-9]+' || true)"
@@ -229,7 +242,7 @@ fi
 # (NameError/typo/импорт/сигнатура), игнорируя data-FAIL/WARN (на суточном снапшоте они ложны).
 echo "== 5/5 integrity code-guard: монитор на снапшоте, ТОЛЬКО ошибки КОДА (data-FAIL игнор) =="
 set +e
-ssh "$STUDIO" "cd '$STAGING' && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' $PY scripts/integrity_code_guard.py"
+ssh "$STUDIO" "cd '$STAGING' && echo \$\$ > .run.pid && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' exec $PY scripts/integrity_code_guard.py"
 RC_GUARD=$?
 set -e
 

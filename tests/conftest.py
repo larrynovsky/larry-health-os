@@ -93,6 +93,53 @@ def _icloud_guard(event, args):
 
 
 sys.addaudithook(_icloud_guard)
+# ── Живая база тенанта — только чтение (04.10.2026, нить treatment-homes) ──────
+# Явный HEALTH_DATA_DIR = прогон смотрит в настоящие данные (утренний run_checks владельца).
+# Читать их тестам можно, писать — нет: health_db.get_conn открывает эту базу с
+# query_only, и тест, забывший фикстуру `db`, падает громко, а не пачкает канон.
+# Повод — фикстуры test_treatment.py, 3.5 месяца жившие в medications владельца.
+if os.environ.get("HEALTH_DATA_DIR"):
+    os.environ.setdefault("HEALTH_TEST_LIVE_DB",
+                          os.path.join(os.environ["HEALTH_DATA_DIR"], "data", "health.db"))
+
+
+# Второй слой (нить treatment-tails, 04.10.2026): 37 модулей открывают базу прямым
+# sqlite3.connect, мимо get_conn и его query_only. Открытие живой базы НЕ на чтение и НЕ из
+# get_conn роняет тест громко. На чтение (mode=ro) — можно: тесты владельца читают канон.
+def _live_identity():
+    try:
+        st = os.stat(os.environ["HEALTH_TEST_LIVE_DB"])
+        return (st.st_dev, st.st_ino)
+    except (KeyError, OSError):
+        return None
+
+
+def _live_db_write_guard(event, args):
+    if event != "sqlite3.connect" or not args or not os.environ.get("HEALTH_TEST_LIVE_DB"):
+        return
+    target = os.fspath(args[0]) if isinstance(args[0], (str, bytes, os.PathLike)) else ""
+    if isinstance(target, bytes):
+        target = target.decode(errors="ignore")
+    if "mode=ro" in target:
+        return
+    path = target[5:].split("?", 1)[0] if target.startswith("file:") else target
+    try:
+        st = os.stat(path)
+    except OSError:
+        return
+    if (st.st_dev, st.st_ino) != _live_identity():
+        return
+    f = sys._getframe(1)
+    while f is not None:
+        if f.f_code.co_name == "get_conn" and f.f_globals.get("__name__") == "health_db":
+            return                      # get_conn сам ставит query_only на живую базу
+        f = f.f_back
+    raise PermissionError(
+        f"тест открыл ЖИВУЮ базу на запись мимо health_db.get_conn ({path}) — "
+        "открой её на чтение (?mode=ro) или дай тесту фикстуру `db`")
+
+
+sys.addaudithook(_live_db_write_guard)
 if not os.environ.get("HEALTH_DATA_DIR"):
     # not .get() (а не setdefault): ловим и unset, и пустую строку HEALTH_DATA_DIR=
     # Каталог — СВОЙ на каждый прогон (до 24.09 был общий /tmp/health_test_data и переживал
@@ -777,3 +824,34 @@ def _no_real_llm_providers(monkeypatch, request):
     if getattr(request.function, "llm_block_expected", False):   # позитивный контроль стража
         return
     assert not attempts, f"тест пошёл к настоящему LLM-провайдеру: {sorted(set(attempts))}"
+
+
+# ── Поток не переживает свой тест (2026-10-05, нить test-thread-leak) ───────────────────
+# Замер 05.10: тест фонового консилиума запускал поток и ждал только ВЫЗОВА консилиума, а не
+# конца работы. Поток дописывал вердикт уже после отката подмены базы — в живую базу владельца,
+# в строку с тем же номером (id=1, чужая категория), каждую ночь с 30.08. Тест был зелёным.
+# Ждём здесь, в фазе вызова: она кончается ДО разборки фикстур (monkeypatch, tmp-базы), и
+# поток, дописывающий во время ожидания, пишет ещё в базу теста. Фикстура так не может: её
+# разборка шла бы после отката подмены. Не дождались — тест красный с именем потока.
+# --- thread_guard begin ---
+_THREAD_JOIN_S = 10.0
+# Пул AnyIO (TestClient панели): простаивающий рабочий живёт ~10 с после ответа и чужой работы не
+# несёт — ответ отдан, фоновые задачи TestClient дожидается сам. Замер стенда 05.10: 69 тестов
+# панели краснели ТОЛЬКО на нём. Исключение по имени — граница сторожа, названная здесь.
+_POOL_IDLE_NAMES = ("AnyIO worker thread",)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    before = set(_threading.enumerate())
+    try:
+        return (yield)
+    finally:
+        born = [t for t in _threading.enumerate() if t not in before and t.is_alive()
+                and not t.name.startswith(_POOL_IDLE_NAMES)]
+        for t in born:
+            t.join(timeout=_THREAD_JOIN_S)
+        alive = [t.name for t in born if t.is_alive()]
+        if alive:
+            pytest.fail(f"thread outlived its test: {alive}", pytrace=False)
+# --- thread_guard end ---

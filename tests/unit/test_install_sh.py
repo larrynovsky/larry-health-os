@@ -132,3 +132,56 @@ def test_fresh_install_asks_and_update_reads_env():
     text = SH.read_text(encoding="utf-8")
     assert 'if [ "$ENV_FRESH" = 1 ] && [ "$INTERACTIVE" = 1 ]; then choose_provider' in text
     assert text.index("ENV_FRESH=1") < text.index("choose_provider\n  else")
+
+
+# ── ключ не того поставщика (нить lab-intake-retry, 05.10) ───────────────────────────────────
+# Отчёт с Windows: выбран Anthropic, вставлен ключ OpenAI — «Anthropic не принял ключ», и всё;
+# что поставщика можно сменить, установщик не говорил нигде.
+
+def _key_vendor(key: str) -> str:
+    text = SH.read_text(encoding="utf-8")
+    m = re.search(r"^key_vendor\(\) \{.*?^\}$", text, re.M | re.S)
+    assert m, "в install.sh нет функции key_vendor"
+    r = subprocess.run(["bash", "-c", m.group(0) + '\nkey_vendor "$1"', "_", key],
+                       capture_output=True, text=True, timeout=30)
+    return r.stdout.strip()
+
+
+@pytest.mark.parametrize("key,vendor", [("sk-ant-api03-xxxx", "anthropic"), ("sk-proj-xxxx", "openai"),
+                                        ("sk-xxxxxxxx", "openai"), ("AIzaSyxxxx", "gemini"), ("xyz", "")])
+def test_key_vendor_by_prefix(key, vendor):
+    """Мутации: спутать ключ Anthropic с OpenAI (оба начинаются с sk-); угадать по мусору."""
+    assert _key_vendor(key) == vendor
+
+
+def _key_loop(provider: str, answers: str, interactive: int = 1, env_key: str = "") -> subprocess.CompletedProcess:
+    """Исполняет НАСТОЯЩИЙ цикл ввода ключа из install.sh (от key_vars до его done) на заглушках
+    сети и секретов: ключ проверяется «ok», сохранённое печатается."""
+    text = SH.read_text(encoding="utf-8")
+    start = text.index("key_vars() {")
+    end = text.index("\ndone\n", text.index('while ! has_secret "$KF"; do')) + len("\ndone\n")
+    prelude = ('RU=0; VERIFY=1; INTERACTIVE=%d; PROVIDER=%s; ENV_AK=%s; ENV_LK=""\n'
+               'say() { printf \'%%s\\n\' "$2" >&2; }\nwarn() { say "$1" "$2"; }\nok() { say "$1" "$2"; }\n'
+               'die() { say "$1" "$2"; exit 1; }\nSAVED=""\n'
+               'has_secret() { [ -n "$(eval echo \\${S_$1:-})" ]; }\n'
+               'put_secret() { eval "S_$1=1"; echo "PUT=$1"; }\n'
+               'save_provider() { SAVED=$PROVIDER; }\nkey_check() { echo ok; }\n'
+               'ask_secret() { local v="$1"; [ -n "$v" ] || read -r v; printf \'%%s\' "$v"; }\n'
+               % (interactive, provider, env_key or '""'))
+    script = prelude + text[start:end] + 'echo "PROVIDER=$PROVIDER SAVED=$SAVED"\n'
+    return subprocess.run(["bash", "-c", script], input=answers, capture_output=True, text=True, timeout=30)
+
+
+def test_wrong_vendor_key_switches_provider_on_yes():
+    """Мутации: не переключать; переключить, но сохранить ключ под старым именем файла."""
+    r = _key_loop("anthropic", "sk-proj-abc\n\n")
+    assert "PUT=openai_key" in r.stdout and "PROVIDER=openai SAVED=openai" in r.stdout, r.stderr
+    assert "PUT=anthropic_key" not in r.stdout
+
+
+def test_wrong_vendor_key_refused_on_no_and_named_without_questions():
+    """«Нет» — ключ спрашивается снова под выбранным поставщиком; без вопросов — отказ с именем флага."""
+    r = _key_loop("anthropic", "sk-proj-abc\nn\nsk-ant-xyz\n")
+    assert "PUT=anthropic_key" in r.stdout and "PROVIDER=anthropic SAVED=" in r.stdout, r.stderr
+    r = _key_loop("anthropic", "", interactive=0, env_key="sk-proj-abc")
+    assert r.returncode == 1 and "--provider openai" in r.stderr and "PUT=" not in r.stdout

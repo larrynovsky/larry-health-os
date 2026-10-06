@@ -210,3 +210,25 @@ def test_crash_id_is_new_then_silent(tmp_path):
     assert "НОВОЕ: pytest-не-запустился" in out
     out, _ = _run(state, ["pytest-не-запустился"], tmp_path)
     assert out == ""
+
+
+def test_error_lines_are_named_too(tmp_path):
+    """05.10.2026: пять ERROR каждую ночь шли без имени — набор строился только из FAILED."""
+    out = "FAILED tests/a.py::t1 - boom\nERROR tests/b.py::t2 - fixture\n"
+    assert _ids(out, tmp_path) == ["tests/a.py::t1", "tests/b.py::t2"]
+    assert _ids("ERROR tests/b.py::t2 - x\n", tmp_path) == ["tests/b.py::t2"]
+
+
+def test_nightly_summary_lists_errors():
+    """Без E в -r сводка pytest ERROR не перечисляет — функции нечего прочитать."""
+    src = (ROOT / "run_checks.sh").read_text(encoding="utf-8")
+    m = re.search(r"\$PY -m pytest tests/ [^>]*-r(\w+)", src)
+    assert m and "E" in m.group(1) and "f" in m.group(1), m and m.group(0)
+
+
+def test_tenant_start_line_goes_to_tenant_log():
+    """05.10.2026: строка старта проверки партнёра писалась в журнал владельца до смены LOG."""
+    src = (ROOT / "run_checks.sh").read_text(encoding="utf-8")
+    assert '[[ "$SCHEDULED" == "true" ]] || _start_line' in src
+    i_switch = src.index('LOG="$TLOGS/run_checks.log"')
+    assert src.index("_start_line", i_switch) - i_switch < 80

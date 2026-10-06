@@ -32,7 +32,7 @@ def _seed_profile():
 def test_brief_from_db(db):
     _seed_profile()
     brief = pc.build_patient_brief()
-    assert "Тест Пациентов" in brief
+    assert "Тест Пациентов" not in brief       # имя в модель не уходит (нить identity-out-of-llm)
     assert "лет" in brief                      # возраст вычислен из birth_date
     assert "Исландия" in brief
     assert "Диагноз X" in brief
@@ -76,7 +76,7 @@ def test_missing_keys_no_literals(db):
     тенанту). Это строже, чем '—': болезнь-рамка вообще не навязывается."""
     health_db.upsert_profile("identity.name", value_text="Кто-то", category="identity")
     brief = pc.build_patient_brief()
-    assert "Кто-то" in brief
+    assert "Кто-то" not in brief      # имя в модель не уходит (нить identity-out-of-llm)
     # онко/диагноз-рамка отсутствует при пустых полях (движок нейтрален)
     assert "Онкостатус" not in brief
     assert "PET-CT" not in brief

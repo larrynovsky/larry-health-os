@@ -132,6 +132,27 @@ def is_model_not_found(exc: BaseException) -> bool:
     return code == 404 or type(exc).__name__ == "NotFoundError"
 
 
+# Подстроки отказа по счёту у трёх SDK — по известным текстам ошибок, НЕ замер на живом пустом
+# ключе (05.10): OpenAI — 429 с кодом insufficient_quota, Anthropic — 400 «credit balance is too
+# low», Gemini — 429 RESOURCE_EXHAUSTED (он же бывает при частоте запросов — тогда повтор тоже прав).
+_ACCOUNT_MARKERS = ("insufficient_quota", "credit balance", "resource_exhausted", "billing")
+
+
+def is_account_problem(exc: BaseException) -> bool:
+    """Отказ из-за ключа или счёта у поставщика, а не из-за документа и не из-за кода:
+    ключ недействителен (401/403) или кончился баланс (402, 429 по квоте, 400 «credit balance»).
+
+    Чинит это только человек, пополнив баланс или сменив ключ, — и после этого тот же запрос
+    пройдёт. Поэтому такой отказ не «сбой разбора» навсегда, а ожидание с повтором
+    (нить lab-intake-retry, 05.10: на установке с нулевым балансом OpenAI человеку ответили
+    «пришлите почётче», а повтор файла бот отбил как дубль)."""
+    code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if code in (401, 402, 403):
+        return True
+    text = str(exc).lower()
+    return any(m in text for m in _ACCOUNT_MARKERS)
+
+
 def _strings(x, out: list, *, media_source=False) -> None:
     """Все строки исходящей структуры, кроме base64-данных медиа.
 
@@ -241,7 +262,7 @@ def _guard_kwargs(kw) -> None:
 # Лимит max_tokens в вызове значит ДЛИНУ ОТВЕТА. Думает ли задача — данные
 # (methodology/llm_task_modes.json), как модель включает/выключает думание — данные
 # (llm_providers.json, anthropic.thinking), запас под думание — замер допуска
-# (llm_admission_table.json, reasoning_reserve_tokens). Без замеренного запаса задача
+# (llm_thinking_measured.json — пишет llm_admission --record-thinking). Без замеренного запаса задача
 # не думает: 03–04.10 рассуждение съедало весь лимит ответа (бриф, недельный отчёт).
 # Поля и состояние моделей — docs/reference/llm_thinking.md.
 _TASK_MODES_FILE = Path(__file__).parent / "methodology" / "llm_task_modes.json"
@@ -258,18 +279,53 @@ def thinking_profile(model: "str | None") -> dict:
     """Запись модели из anthropic.thinking.models: точное имя или самый длинный префикс
     (датированный снимок claude-haiku-4-5-20251001 — та же модель). Нет записи — {}."""
     models = ((profiles().get("anthropic") or {}).get("thinking") or {}).get("models") or {}
+    return _by_model(models, model)
+
+
+def _by_model(table: dict, model) -> dict:
+    """Запись модели: точное имя или ДАТИРОВАННЫЙ снимок того же имени (claude-haiku-4-5-20251001).
+    Не любой префикс: 05.10 claude-opus-5-5 получала профиль и запас claude-opus-5 и падала 400
+    на чужом способе выключить думание («disabled» не принимает)."""
+    import re
     m = str(model or "")
-    best = max((k for k in models if m == k or m.startswith(k + "-")), key=len, default=None)
-    return models.get(best, {}) if best else {}
+    best = next((k for k in table if m == k or re.fullmatch(re.escape(k) + r"-20\d{6}", m)), None)
+    return table.get(best, {}) if best else {}
+
+
+_MEASURED_FILE = Path(__file__).parent / "methodology" / "llm_thinking_measured.json"
+
+
+def measured(model: "str | None") -> dict:
+    """Замер модели (запас под думание, скорость): llm_thinking_measured.json. Нет — {}."""
+    import json
+    try:
+        models = json.loads(_MEASURED_FILE.read_text(encoding="utf-8")).get("models") or {}
+    except FileNotFoundError:
+        return {}
+    return _by_model(models, model)
 
 
 def reasoning_reserve(model: "str | None") -> int:
-    """Запас под думание, замеренный допуском (любая роль, где у модели есть запись). 0 — не замерен."""
-    import hai_core   # поздний импорт: hai_core импортирует этот модуль
-    vals = [int(v.get("reasoning_reserve_tokens") or 0)
-            for role in (hai_core._admission_table().get("anthropic") or {}).values()
-            for m, v in role.items() if m == model]
-    return max(vals, default=0)
+    """Запас под думание: наибольшее думание модели в замере. 0 — не замерена (не думает).
+    Своего коэффициента нет: не хватило — повтор с двойным запасом (_create_with_mode)."""
+    return int(measured(model).get("reserve_tokens") or 0)
+
+
+def call_timeout(model: "str | None", task, answer_tokens: int) -> "float | None":
+    """Срок вызова в секундах — из замера модели, а не литералом у вызова: время первой
+    попытки и повтора на их ПОЛНЫЙ лимит (ответ + думание) по прямой «задержка + токены ×
+    сек/токен» плюс худшее отклонение замера. 04.10 литералы 45/90 с, подобранные без
+    думания, отрезали 9 мнений из 17. None — модель не замерена: срока нет."""
+    m = measured(model)
+    if m.get("sec_per_token") is None:
+        return None
+    first, retry = _thinking_plan({"model": model, "max_tokens": int(answer_tokens)}, task)
+    return round(sum(m["latency_sec"] + m["sec_per_token"] * p["max_tokens"] + m["slack_sec"]
+                     for p in (first, retry) if p), 1)
+
+
+class DeadlineExceeded(TimeoutError):
+    """Вызов не уложился в срок из замера модели (call_timeout)."""
 
 
 def _fill(param, reserve: int):
@@ -291,6 +347,8 @@ def _thinking_plan(kw: dict, task) -> "tuple[dict, dict | None]":
             return {**base, "thinking": _fill(prof["think"], r),
                     "max_tokens": int(kw["max_tokens"]) + r}
         return think(reserve), think(2 * reserve)
+    if prof.get("temperature") == "rejected":   # замер 04.10: 400 «deprecated for this model»
+        kw = {k: v for k, v in kw.items() if k != "temperature"}
     if prof.get("no_think"):
         return {**kw, "thinking": prof["no_think"]}, None
     return kw, None
@@ -379,6 +437,27 @@ def _create_with_mode(create, kw: dict, task):
     return resp
 
 
+def _with_deadline(call, deadline, kw, task):
+    """deadline="measured" — асинхронный вызов ограничен сроком из замера модели."""
+    if deadline is None:
+        return call
+    import inspect
+    if deadline != "measured" or not inspect.isawaitable(call):
+        raise ValueError(f"deadline={deadline!r}: поддержан только 'measured' и только у асинхронного клиента")
+    secs = call_timeout(kw.get("model"), task, kw["max_tokens"])
+
+    async def _run():
+        import asyncio
+        try:
+            return await asyncio.wait_for(call, timeout=secs)
+        except asyncio.TimeoutError as e:
+            import logging
+            logging.getLogger(__name__).error("срок вызова %s (%s) по замеру модели — %s с — исчерпан",
+                                              task, kw.get("model"), secs)
+            raise DeadlineExceeded(f"{task}: не уложился в {secs} с по замеру модели") from e
+    return _run()
+
+
 class _GuardedMessages:
     def __init__(self, inner, prov: str = "anthropic"):
         self._inner = inner
@@ -386,10 +465,13 @@ class _GuardedMessages:
 
     def create(self, **kw):
         task = kw.pop("task", None)
+        deadline = kw.pop("deadline", None)
         _guard_kwargs(kw)
         if self._prov == "anthropic":
-            return _create_with_mode(self._inner.create, kw, task)
-        return self._inner.create(**kw)
+            call = _create_with_mode(self._inner.create, kw, task)
+        else:
+            call = self._inner.create(**kw)
+        return _with_deadline(call, deadline, kw, task)
 
     def stream(self, **kw):
         # До 01.10 stream уходил через __getattr__ без гарда; вызывающих нет,

@@ -69,6 +69,24 @@ def _clip(v, n: int = 400) -> str:
     return t if len(t) <= n else t[:n - 1] + "…"
 
 
+def _documents_against(conn, text: str) -> list:
+    """[(дата, имя)] документов медкарты, отвечающих на «нет / не зафиксировано» в тексте."""
+    import gp_context
+    import profile_reconciler
+    if not text.strip():
+        return []
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
+    if not {"effective_date", "notes"} <= cols:
+        return []          # медкарты нет (свежая установка) — отвечать нечем
+    att = "attachments" if "attachments" in cols else "NULL"
+    docs = []
+    for r in conn.execute(f"SELECT effective_date, notes, {att} FROM events"):
+        name = profile_reconciler.document_name(r[1], r[2])
+        if name:
+            docs.append((r[0], name))
+    return sorted(gp_context.documents_answering_absence(text, docs), reverse=True)  # свежие первыми
+
+
 def format_proposal_card(prop: dict) -> str:
     """Текст карточки предложения — ПРОСТОЙ текст, без разметки. Один дом для outbox и /report.
 
@@ -134,6 +152,13 @@ def format_proposal_card(prop: dict) -> str:
                     lines.append(i18n.t("proposals.proposed", whole=whole, value=proposed))
             if ch.get("reason"):
                 lines.append(i18n.t("proposals.reason", reason=_clip(ch['reason'], 300)))
+            # Утверждение «документа нет», на которое медкарта отвечает документом, — человек
+            # видит доказательство до решения (нить treatment-tails, 04.10.2026).
+            claim = f"{ch.get('new_value') or ''}\n{ch.get('reason') or ''}"
+            found = _documents_against(conn, claim)
+            if found:
+                lines.append(i18n.t("proposals.docs_exist",
+                                    docs="; ".join(f"{n} ({d})" for d, n in found[:3])))
     if lit:
         lines += ["", i18n.t("proposals.lit.buttons")]
     return "\n".join(lines)

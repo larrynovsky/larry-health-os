@@ -177,6 +177,9 @@ def _execute_hypothesis(finding, decision):
         flat = cbcr.flatten_cbcr_payload(cbcr_dict)
     except Exception as e:
         log.warning(f"CBCR failed: {e}")
+        import notify   # гипотеза потеряна — в инженерную очередь, не только в лог (05.10)
+        notify.fault(i18n.t("hypotheses.fault.cbcr_failed", "ru", source="survivorship_curator",
+                            error=f"{type(e).__name__}: {e}"[:300]), person_key=None)
         return None
     if not flat.get("observation") or not flat.get("mechanism"):
         return None

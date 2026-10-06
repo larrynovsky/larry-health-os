@@ -183,7 +183,7 @@ fi
     # не всякую джобу можно ронять на каждом коммите), и именно поэтому его
     # полноту стережёт ратчет integrity_tests.check_deploy_restart_completeness:
     # завёл новую долгоживущую джобу и не вписал сюда — ночной монитор краснеет.
-    ssh "$STUDIO" 'for s in com.larry.health.lab-intake com.larry.health.watcher.partner; do launchctl kickstart -k gui/$(id -u)/$s 2>/dev/null || true; done' \
+    ssh "$STUDIO" 'for s in com.larry.health.lab-intake com.larry.health.lab-intake.partner; do launchctl kickstart -k gui/$(id -u)/$s 2>/dev/null || true; done' \
       && echo "$(date): intake watcher restart triggered (owner+partner)" \
       || echo "$(date): WARN watcher restart не удался (вход может ехать на старом коде)"
     fi

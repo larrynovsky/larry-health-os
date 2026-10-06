@@ -165,6 +165,10 @@
    "mode": "think",
    "why": "суждение: между входом и ответом есть вывод"
   },
+  "hypothesis_semantic_check._second_opinion": {
+   "mode": "read",
+   "why": "второй судья дедупа гипотез; замер 04.10 на эталоне: sonnet-5-5 без думания 48 из 48"
+  },
   "import_medical_events.llm_extract": {
    "mode": "disputed",
    "why": "спорно: решает замер на эталонах (пока как чтение)"
@@ -182,8 +186,8 @@
    "why": "спорно: решает замер на эталонах (пока как чтение)"
   },
   "lab_recognizer._vision_call": {
-   "mode": "disputed",
-   "why": "спорно: решает замер на эталонах (пока как чтение)"
+   "mode": "think",
+   "why": "замер 04.10 на эталонах lab_vision: opus-5 (проход 1) с думанием 7 из 7, без думания — лишняя строка Glucose (дважды); sonnet-5-5 (проход 2) — та же ошибка RDW в обоих режимах"
   },
   "lab_schedule_extractor.extract_monitoring_rules": {
    "mode": "disputed",
@@ -199,7 +203,11 @@
   },
   "llm_admission._call": {
    "mode": "read",
-   "why": "режим берётся из проверяемой роли — этап 4 нити thinking-modes"
+   "why": "допуск в режиме рабочей задачи «чтение» (policy.work_task / text_modes); думающая задача идёт через llm_admission._call_think"
+  },
+  "llm_admission._call_think": {
+   "mode": "think",
+   "why": "допуск в режиме рабочей задачи «думать»: судится та модель, что работает (нить admission-incumbents 05.10)"
   },
   "memory_consolidation.propose": {
    "mode": "think",
@@ -266,8 +274,8 @@
    "why": "суждение: между входом и ответом есть вывод"
   },
   "treatment_extractor.extract_regimens": {
-   "mode": "disputed",
-   "why": "спорно: решает замер на эталонах (пока как чтение)"
+   "mode": "read",
+   "why": "замер 04.10 на эталоне лечения: sonnet-5-5 и opus-5 без думания 3 из 3 — думание не нужно"
   },
   "weekly_digest._judge_fidelity": {
    "mode": "read",

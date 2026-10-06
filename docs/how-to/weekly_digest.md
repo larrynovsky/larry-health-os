@@ -33,10 +33,16 @@ python3.11 weekly_digest.py --week 2026-W36
 `outputs/weekly_digest/2026-W36.gate.*.json`, иначе боты сочтут старый вердикт действительным.
 Если неделя уже помечена доставленной — повторно бот не отправит (`due` → `done`).
 
-## Почему не пришёл — три причины
+## Почему не пришёл — четыре причины
 
+0. **Бот не видит папку генератора.** Генератор живёт на хосте (ему нужен git), бот владельца с
+   30.09 — в контейнере. Папка `outputs/weekly_digest` попадает туда томом из
+   `scripts/install.py --owner-override`. Проверка:
+   `docker --context colima-health exec health-bot-1 ls /app/outputs/weekly_digest` — пусто или
+   «No such file» при файле на хосте = тома нет: перегенерировать override и `scripts/deploy_container.sh`.
+   Так 04.10 владельцу не пришла неделя W40 (нить digest-container).
 1. **Нет файла `<неделя>.json`** — генератор не бежал. `launchctl list | grep weekly-digest`,
-   лог `logs/weekly_digest.log` / `_err.log`.
+   лог `logs/weekly_digest.log` / `_err.log`. С 05.10 бот, видящий папку, зовёт оператора в вс после 09:00.
 2. **`text: null`** — гейт заблокировал оба варианта. В `gate.kind`: `lexicon` (термин/число/дата —
    `hits_class` даёт класс), `judge` (факт о человеке), `fidelity` (абзац искажает нить), `guard`
    (гард секретов `llm_client` или API). Оператор получил `notify_operator` сразу из генератора (сб 22:xx) и с первого тика бота.

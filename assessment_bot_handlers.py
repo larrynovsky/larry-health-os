@@ -222,6 +222,28 @@ async def _cb_assessment_answer(update, context, data, chat_id):
 # Устаревшая кнопка cb_* уходит в «unknown callback data» и лог, человеку — ничего.
 
 
+ASIDE_SEC = 120   # системная механика: столько после ответа бота на файл текст считается репликой о файле
+
+
+def _aside(update, context, item: dict) -> bool:
+    """Текст — реплика о другом, а не ответ на пункт опроса (нить lab-intake-retry, 05.10).
+
+    Живой случай: бот ответил на файл «уже получал — пропускаю дубль», человек написал «это не
+    дубль», и знакомство, ждавшее ответа про здоровье, записало «это не дубль» проблемой со
+    здоровьем. Два признака: ответ (reply) на сообщение бота, которое не этот вопрос; или текст
+    пришёл вскоре после ответа бота на присланный файл (метку ставит handle_document)."""
+    msg = getattr(update, "message", None)
+    quoted = getattr(getattr(msg, "reply_to_message", None), "text", None)
+    question = i18n.pick(item.get("text", "")) or ""
+    if quoted and question and question not in quoted:
+        return True
+    import time
+    data = getattr(context, "chat_data", None)
+    # pop: метка гасит ОДНУ реплику — повторённый ответ на вопрос уже принимается
+    at = data.pop("doc_reply_at", None) if isinstance(data, dict) else None
+    return bool(at) and time.time() - at < ASIDE_SEC
+
+
 async def handle_text_in_assessment(update, context, active_session):
     """Свободный текст при активной сессии.
 
@@ -237,6 +259,12 @@ async def handle_text_in_assessment(update, context, active_session):
         if text.endswith("?") and item.get("target") != "problems":
             await update.effective_chat.send_message(i18n.t(
                 "onboarding.reply.question_deferred", question=i18n.pick(item.get("text", ""))),
+                reply_markup=actions.keyboard([
+                    actions.button(i18n.t("actions.onboarding.stop"), "ob_stop", "")]))
+            return
+        if _aside(update, context, item):
+            await update.effective_chat.send_message(i18n.t(
+                "onboarding.reply.aside_deferred", question=i18n.pick(item.get("text", ""))),
                 reply_markup=actions.keyboard([
                     actions.button(i18n.t("actions.onboarding.stop"), "ob_stop", "")]))
             return

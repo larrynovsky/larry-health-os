@@ -71,17 +71,44 @@ def _reconcile_port(conn: sqlite3.Connection) -> tuple[str, str] | None:
 
 def _reconcile_pet(conn: sqlite3.Connection) -> tuple[str, str] | None:
     """Последний PET-CT: только дата. Результат остаётся мануальным."""
-    row = conn.execute("""
-        SELECT effective_date
+    # До 04.10.2026 бралось ПОСЛЕДНЕЕ событие, где «PET» встречался хоть где-то в notes, —
+    # туда попадал и пересказ расчётного листа страховой. Теперь обследованием считается
+    # событие, у которого PET в имени САМОГО документа и документ не финансовый
+    # (import_all.is_financial — существующий дом признака). Нет такого — профиль не трогаем.
+    from import_all import is_financial
+    has_att = "attachments" in {r[1] for r in conn.execute("PRAGMA table_info(events)")}
+    rows = conn.execute(f"""
+        SELECT effective_date, notes, {'attachments' if has_att else 'NULL'}
         FROM events
         WHERE event_type LIKE '%PET%' OR event_type LIKE '%pet-ct%'
            OR notes LIKE '%PET%' OR notes LIKE '%ПЭТ%'
+           {"OR attachments LIKE '%PET%'" if has_att else ''}
         ORDER BY effective_date DESC
-        LIMIT 1
-    """).fetchone()
-    if not row:
-        return None
-    return "medical.last_pet_ct", row[0]
+    """).fetchall()
+    for edate, notes, attachments in rows:
+        name = document_name(notes, attachments)
+        if name and ("pet" in name.lower() or "пэт" in name.lower()) \
+                and not is_financial(Path(name)):
+            return "medical.last_pet_ct", edate
+    return None
+
+
+def document_name(notes, attachments) -> str | None:
+    """Имя файла-источника события: attachments.source_file, иначе notes, если это путь."""
+    import json
+    att = attachments
+    for _ in range(2):  # attachments бывает JSON внутри JSON-строки
+        if isinstance(att, str):
+            try:
+                att = json.loads(att)
+            except ValueError:
+                break
+    if isinstance(att, dict) and att.get("source_file"):
+        return str(att["source_file"])
+    n = (notes or "").strip()
+    if "/" in n and "\n" not in n and n.lower().endswith((".pdf", ".jpg", ".jpeg", ".png")):
+        return n
+    return None
 
 
 def _reconcile_weight(conn: sqlite3.Connection) -> tuple[str, str] | None:

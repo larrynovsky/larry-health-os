@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3 as _sqlite3
 import os
 import logging
 from datetime import date, timedelta
@@ -247,6 +248,15 @@ APPLE_RAW_KEYS = frozenset({
 # кто первым записал день, тот и прав; два пути не спорят за одно значение.
 APPLE_FILL_ONLY = frozenset({"body_fat_pct", "bmi"})
 APPLE_BIO_INPUTS = frozenset({"hrv", "resting_heart_rate", "sleep", "spo2", "respiratory_rate"})
+_APPLE_BP_KEYS = ("bp_systolic", "bp_diastolic", "bp_systolic_max", "bp_diastolic_max")
+
+
+def _bp_owned_by_withings(conn) -> bool:
+    """Есть хоть один замер Withings — дневное давление его (import_withings), не «Здоровья»."""
+    try:
+        return conn.execute("SELECT 1 FROM bp_readings LIMIT 1").fetchone() is not None
+    except _sqlite3.OperationalError:            # таблицы ещё нет — Withings не было никогда
+        return False
 
 
 def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
@@ -403,6 +413,15 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
         # Записываем Apple Health биометрику под отдельным ключом
         if apple_bio:
             existing_raw["apple_health"] = apple_bio
+        # Давление: у кого подключён Withings, хозяин дневного давления — он (решение владельца
+        # 06.10; пишет import_withings). «Здоровье» хранит удалённые в Withings замеры и подмешивало
+        # их в среднее дня (живой случай 08.07). Значения «Здоровья» не теряются — уходят свидетелем.
+        if source == "AppleHealth" and _bp_owned_by_withings(conn):
+            witness = {k: incoming.pop(k) for k in _APPLE_BP_KEYS if k in incoming}
+            for k in ("bp_systolic", "bp_diastolic"):
+                values.pop(k, None)
+            if witness:
+                existing_raw["apple_health_bp"] = witness
         existing_raw.update(incoming)
         values["raw"] = json.dumps(existing_raw, ensure_ascii=False)
 

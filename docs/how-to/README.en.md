@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:41f65c815263 -->
+<!-- translation-of: docs/how-to/README.md sha256:b821da81d96b -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -49,6 +49,7 @@ A terminal on the machine where the system is installed is required. Use the rul
 - Installation and updates: [install the system in Docker from an image](install_docker.md) ·
   [with an OpenAI, Gemini or DeepSeek key](llm_provider.md)
 - [Connect Google Calendar](connect_google_calendar.md)
+- [Connect a Withings blood-pressure monitor](connect_withings.md) — section "Docker image install"
 - The bot replied “I couldn't answer: something failed inside the system…” with a code: [find the cause by the code](bot_fault.md)
 
 The other maintenance guides are still written for the author's original installation and do not
@@ -76,6 +77,7 @@ from the image need them.
   [seasonal table](reseed_seasonal_produce.md) · [trail list](refresh_trail_list.md)
 - Channels: [email](email_channel.md) · [weekly digest](weekly_digest.md) ·
   [log rotation](rotate_logs.md)
+- [Connect a Withings blood-pressure monitor](connect_withings.md) — a second blood-pressure source
 - [Add a second person](add_person.md) ·
   [migrating from a native install to a container](pilot_switch.md)
 

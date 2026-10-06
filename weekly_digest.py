@@ -410,10 +410,20 @@ def expected_tags() -> list[str]:
 
 
 def verdicts(week: str, tags: list[str]) -> dict[str, str | None]:
+    """Вердикты ожидаемых тенантов (нет файла → None = ждём) ПЛЮС любой вердикт-файл недели в папке.
+    С 30.09 тенанты живут в двух рантаймах (владелец — контейнер, партнёр — хост), и expected_tags
+    каждого видит только себя; общая папка дайджеста (том, digest-container 05.10) несёт вердикты
+    обоих. Чужой файл с blocked → блок всем («блок любого — блок всем», shared_text_gate_fail_closed).
+    Чего это НЕ возвращает: ожидания соседа, чей файл ещё не лёг, — его тег здесь неизвестен."""
     out = {}
+    for vp in sorted(OUT_DIR.glob(f"{week}.gate.*.json")):
+        try:
+            out[vp.name[len(week) + len(".gate."):-len(".json")]] = json.loads(
+                vp.read_text(encoding="utf-8"))["verdict"]
+        except (ValueError, KeyError, OSError):   # битый чужой вердикт — не pass: fail-closed
+            out[vp.name] = "blocked"
     for t in tags:
-        vp = _verdict_path(week, t)
-        out[t] = json.loads(vp.read_text(encoding="utf-8"))["verdict"] if vp.exists() else None
+        out.setdefault(t, None)
     return out
 
 
@@ -437,6 +447,19 @@ def due(now: datetime, digest: dict | None, verd: dict[str, str | None], last_se
     if any(v is None for v in verd.values()):
         return "wait"
     return "send"
+
+
+def alarm(decision: str, now: datetime, digest: dict | None, out_dir_exists: bool) -> bool:
+    """Звать ли оператора на этом тике (раз в неделю — решает вызывающий меткой alerted_week).
+    blocked — сразу; wait после 09:00 вс — когда текст есть, а вердикта соседа нет, ИЛИ когда
+    текста нет, хотя папка генератора у этого читателя есть (генератор не бежал / не дописал).
+    Папки нет — у установки нет генератора (посторонний контейнер), молчание законно; том
+    владельца стережёт test_docker_render. До 05.10 «текста нет» молчало всегда — W40 потерян."""
+    if decision == "blocked":
+        return digest is not None
+    if decision != "wait" or now.isoweekday() != 7 or now.hour < SEND_HOUR:
+        return False
+    return digest is not None or out_dir_exists
 
 
 def current_week(now: datetime | None = None) -> str:

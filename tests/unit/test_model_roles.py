@@ -40,3 +40,18 @@ def test_engines_use_model_for_not_direct_haiku():
         src = (root / fn).read_text(encoding="utf-8")
         assert "model_for(" in src, f"{fn} не использует model_for"
         assert 'get_model("haiku")' not in src, f"{fn} откатился на get_model('haiku')"
+
+
+def test_treatment_extraction_goes_to_sonnet_only_where_measured(monkeypatch):
+    """Замер 04.10: haiku-4-5 на эталоне лечения 0/3, sonnet-5-5 3/3 → у Anthropic лечение
+    у sonnet (task_tiers профиля). У чужих поставщиков их haiku_pinned эталон прошёл — без изменений."""
+    import llm_client
+    seen = []
+    monkeypatch.setattr(hai_core, "get_model", lambda tier: seen.append(tier) or tier)
+    monkeypatch.setattr(llm_client, "provider", lambda: "anthropic")
+    assert hai_core.model_for("treatment_extraction") == "sonnet"
+    for prov in ("openai", "gemini", "deepseek"):
+        monkeypatch.setattr(llm_client, "provider", lambda prov=prov: prov)
+        assert hai_core.model_for("treatment_extraction") == "haiku_pinned", prov
+    src = (Path(__file__).resolve().parents[2] / "treatment_extractor.py").read_text(encoding="utf-8")
+    assert 'model_for("treatment_extraction")' in src, "извлечение лечения мимо роли"

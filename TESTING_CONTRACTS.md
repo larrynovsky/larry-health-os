@@ -114,7 +114,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 
 <!-- BEGIN AUTOGEN: integrity-sensors (gen_testing_contracts.py) -->
 
-### Реестр датчиков целостности (185 шт., генерируется)
+### Реестр датчиков целостности (186 шт., генерируется)
 
 > Источник: `integrity_tests.py`. Таблица построена из AST — не редактировать руками, менять код. launchd 07:50 → triage 08:00.
 
@@ -191,6 +191,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | пороги safety_net выведены из документа (не набраны) | `check_threshold_source_is_document` | Инвариант threshold_derived_from_document (реестр norm_from_documents): набранных |
 | живость reschedule брифа (местный tz) | `check_reschedule_liveness` | WARN: 12ч-job пересчёта местного пояса брифа (reschedule_local) молчит у тенанта. |
 | метрики прибора: у каждой есть хозяин (HAE) | `check_hae_arrivals_have_owner` | WARN: у метрики, которую прибор реально присылает, нет хозяина (решение владельца 26.09). |
+| давление: дневное значение — среднее замеров Withings, второго писателя нет | `check_bp_day_is_withings` | WARN: дневное давление разошлось с замерами Withings (нить bp-withings-owner, 06.10). |
 | архив сырья HAE сжат (ротатор, старше 15 дней) | `check_hae_raw_archive_compressed` | FAIL: в архиве сырья HAE лежат несжатые выгрузки старше 15 дней (решение владельца 26.09). |
 | weekly_digest: доставлен всем тенантам (понедельник) | `check_weekly_digest_delivered` | Нить weekly-digest (2026-09-05). Понедельник: файл дайджеста ПРОШЛОЙ недели есть и |
 | clinical_kb населён (пол/рамка еды не вырождены, Ф2) | `check_clinical_kb_populated` | FAIL: clinical_kb ПУСТ → medical_frame вырождается в standard-рамку И assert_floor молчит → |
@@ -241,7 +242,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | расписание GP monthly | `check_gp_schedule` | GP monthly ≤35д. |
 | review_date проблем и протоколов | `check_review_dates` | Проблемы и протоколы с просроченным review_date. |
 | актуальность клинических периодов | `check_periods_expiry` | Клинические периоды: фазы watchful_waiting с истёкшей датой без next phase. |
-| даты терапии: periods ↔ problem_list | `check_treatment_dates_agree` | Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках). |
+| даты терапии: periods ↔ problem_list, medications, профиль | `check_treatment_dates_agree` | Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках), |
 | лечение извлечено из документов | `check_treatment_history_extracted` | Лечение — производное из документов (medications), не ручная строка. |
 | нет зашитого диагноза в промпт-билдерах (нить diagnosis-hardcode) | `check_no_hardcoded_diagnosis` | FAIL: снятый онко-литерал вернулся в промпт-билдер (нить diagnosis-hardcode). |
 | классификатор документов: per-tenant сид засеян (A3 liveness) | `check_doc_classifier_seeded` | WARN: tenant_doc_patterns.yaml есть, но его паттерны НЕ в doc_patterns — per-tenant |

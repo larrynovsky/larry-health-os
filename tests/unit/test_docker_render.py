@@ -235,8 +235,10 @@ def test_override_владельца_имя_машины_слой_только_�
         assert s["hostname"] == "host-a.local"                        # иначе запись запрещена
         vols = s["volumes"]
         backups = f"/Users/o/{install.OWNER_BACKUPS_REL}:{install.DOCKER_VALUES['DATA']}/backups"
+        digest = f"{repo}/outputs/weekly_digest:{install.DIGEST_DIR}"
         assert backups in vols                                        # бэкапы — вне ВМ Colima (30.09)
-        assert all(v.endswith(":ro") for v in vols if v != backups)   # слой владельца и секреты — только чтение
+        assert digest in vols                                         # дайджест с хоста (digest-container 05.10)
+        assert all(v.endswith(":ro") for v in vols if v not in (backups, digest))  # остальное — только чтение
         assert f"{repo}/private/region.yaml:/app/private/region.yaml:ro" in vols
         assert not any(v.startswith(f"{repo}/private/infra.yaml") for v in vols)   # адреса машин не едут
         assert f"{repo}/build/docker/host/infra.yaml:/app/private/infra.yaml:ro" in vols
@@ -250,6 +252,34 @@ def test_override_владельца_имя_машины_слой_только_�
                                           "HEALTH_HOST_LOGS": install.HOST_LOGS}
     assert svc["caldav"]["ports"] == ["127.0.0.1:5232:5232"]           # наружу — только tailscale serve
     assert f"radicale[bcrypt]=={install.RADICALE_VERSION}" in svc["caldav"]["command"][-1]  # пароль — хешем
+
+
+def test_том_дайджеста_ведёт_туда_где_бот_ищет_файл_недели():
+    """Том смотрит в weekly_digest.OUT_DIR образа (ROOT=/app): переименуй папку в модуле — том
+    уедет в пустоту, и бот снова будет молча ждать (так терялась W40, 04.10)."""
+    import weekly_digest as wd
+    assert install.DIGEST_DIR == "/app/" + wd.OUT_DIR.relative_to(wd.ROOT).as_posix()
+
+
+def test_сторож_переезда_контейнер_видит_всё_что_читает_у_хостовых_служб(tmp_path):
+    """Каждая служба, оставшаяся вне контейнера (host:/none:), отвечает в placement.yaml::host_outputs,
+    что контейнер у неё читает; каждый такой путь едет томом в override владельца. Новая хостовая
+    служба без ответа или путь без тома — красное здесь, а не тишина у получателя (W40, 04.10)."""
+    import yaml
+    doc = yaml.safe_load((install.TPL / "launchd" / "placement.yaml").read_text(encoding="utf-8"))
+    outside = {k for k, v in doc["services"].items() if isinstance(v, str) and v.startswith(("host: ", "none: "))}
+    shares = doc.get("host_outputs") or {}
+    assert set(shares) == outside, (f"без ответа «что читает контейнер»: {sorted(outside - set(shares))}; "
+                                    f"лишние: {sorted(set(shares) - outside)}")
+    repo = tmp_path / "repo"
+    (repo / "private").mkdir(parents=True)
+    out = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin")
+    svc = yaml.safe_load(out["compose.override.yaml"])["services"]
+    for label, paths in shares.items():
+        for rel in paths:
+            for name in ("bot", "cron"):
+                assert any(v.startswith(f"{repo}/{rel}:") for v in svc[name]["volumes"]), \
+                    f"{label} пишет {rel}, контейнер ({name}) его читает, тома нет"
 
 
 def test_каталог_логов_данных_создаётся_до_первой_задачи():

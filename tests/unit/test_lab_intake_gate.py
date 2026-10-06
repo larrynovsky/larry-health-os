@@ -202,3 +202,34 @@ def _no_side_routes(monkeypatch):
     import genome_intake, import_medical_events
     monkeypatch.setattr(genome_intake, "process_pending", lambda *a, **k: 0)
     monkeypatch.setattr(import_medical_events, "process_incoming", lambda *a, **k: 0)
+
+
+def test_words_miss_is_asked_of_the_model_not_refused(wat, monkeypatch, tmp_path):
+    """Нить lab-intake-retry (05.10). На новой установке словарь слов пуст (`docs.type_markers` = '{}'),
+    и русский бланк получал «не бланк», не дойдя до модели. Мутации: вернуть отказ по словам; звать
+    модель, когда слова уже сказали «да» (лишний вызов); судить не по ответу модели."""
+    import fitz
+    import config_db
+    import doc_triage
+    import import_all
+    p = tmp_path / "анализы крови.pdf"
+    with fitz.open() as doc:
+        doc.new_page()
+        doc.save(str(p))
+    # Пример ВЫДУМАН: русская биохимия без английской шапки и латинских сокращений.
+    ru = ("ИНВИТРО Результаты исследований\nИсследование Результат Единицы Референсные значения\n"
+          "Глюкоза 5.1 ммоль/л 4.1-5.9\nАЛТ 22 Ед/л <41\nФерритин 120 мкг/л 30-400\n") * 3
+    monkeypatch.setattr(import_all, "extract_text", lambda path: ru)
+    monkeypatch.setattr(config_db, "doc_type_markers", lambda conn=None: {})
+    asked = []
+    answer = {"label": doc_triage.LAB}
+    monkeypatch.setattr(doc_triage, "classify_image",
+                        lambda img, mt="image/jpeg", client=None: asked.append(mt) or
+                        {**answer, "fallback": False})
+    assert import_all.classify(p, ru) != "lab"           # предпосылка: слова промахиваются
+    assert wat._is_lab(p) is True and len(asked) == 1     # модель спрошена и решила
+    answer["label"] = doc_triage.REPORT
+    assert wat._is_lab(p) is False                         # «заключение» — не бланк
+    asked.clear()
+    monkeypatch.setattr(import_all, "extract_text", lambda path: "Laboratory tests\n" + ru)
+    assert wat._is_lab(p) is True and asked == []          # слова сказали «да» — модель не нужна

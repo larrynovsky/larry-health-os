@@ -1,0 +1,45 @@
+{
+ "_why": "Замеренные свойства моделей Anthropic: запас под думание и скорость выдачи. Пишет llm_admission --record-thinking из замера, руками не правится. Читает llm_client.measured: запас — reasoning_reserve, срок вызова — call_timeout.",
+ "models": {
+  "claude-haiku-4-5": {
+   "date": "2026-10-04",
+   "calls": 61,
+   "reserve_tokens": 9759,
+   "latency_sec": 2.75,
+   "sec_per_token": 0.00818,
+   "slack_sec": 9.9
+  },
+  "claude-opus-4-7": {
+   "date": "2026-10-04",
+   "calls": 149,
+   "reserve_tokens": 1216,
+   "latency_sec": 7.58,
+   "sec_per_token": 0.01658,
+   "slack_sec": 14.1
+  },
+  "claude-opus-5": {
+   "date": "2026-10-04",
+   "calls": 187,
+   "reserve_tokens": 4910,
+   "latency_sec": 5.03,
+   "sec_per_token": 0.0105,
+   "slack_sec": 16.5
+  },
+  "claude-sonnet-4-6": {
+   "date": "2026-10-04",
+   "calls": 19,
+   "reserve_tokens": 23785,
+   "latency_sec": 0.0,
+   "sec_per_token": 0.01683,
+   "slack_sec": 40.2
+  },
+  "claude-sonnet-5-5": {
+   "date": "2026-10-04",
+   "calls": 42,
+   "reserve_tokens": 9827,
+   "latency_sec": 1.44,
+   "sec_per_token": 0.00726,
+   "slack_sec": 6.2
+  }
+ }
+}

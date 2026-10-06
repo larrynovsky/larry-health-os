@@ -762,6 +762,42 @@
           "verdict": "ПОКРАСНЕЛ"
         }
       ]
+    },
+    "check_bp_day_is_withings": {
+      "harness": "plans/mutate_bp_day_withings_2026-10-06.sh",
+      "ran_at": "2026-10-06",
+      "mutations": [
+        {
+          "tag": "deleted-kept",
+          "statement": "замер, удалённый в Withings, остаётся здесь",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "empty-wipes",
+          "statement": "пустой ответ Withings стирает историю",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "first-not-mean",
+          "statement": "день — первый замер, а не среднее всех",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "apple-still-writes",
+          "statement": "путь «Здоровья» пишет давление при подключённом Withings",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sensor-stray-blind",
+          "statement": "сторож не видит день со значением без замеров",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sensor-mean-blind",
+          "statement": "сторож не сверяет значение со средним",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
     }
   },
   "_harm": "Кого задевает поломка, которую ловит датчик (нить repair-order, решение владельца 02.10): person — человек получает неверное или не получает нужное (совет, отчёт, бриф, ответ бота); data — портятся или устаревают данные, на которых всё строится; system — только внутренняя кухня (гейты, документы, журналы, тесты). Читатель — night_repair.pick_cards: первое место ночи самой вредной карточке, второе — старейшей. Новый датчик приходит с пометкой: tests/consistency/test_sensor_harm_declared.py краснеет на датчике без неё. Разметка 02.10 — суждение по имени и метке датчика; спорные отнесены к system и перечислены в записке нити.",
@@ -810,6 +846,7 @@
       "check_assessments_freshness",
       "check_backup_freshness",
       "check_belief_fresh_vs_data",
+      "check_bp_day_is_withings",
       "check_build_context",
       "check_calendar_freshness",
       "check_canon_naming_debt",

@@ -26,6 +26,7 @@ services:
   com.larry.health.longitudinal: container
   com.larry.health.night-cycle: container
   com.larry.health.oura-import: container
+  com.larry.health.withings-import: container
   com.larry.health.owner-nag: container
   com.larry.health.owner-weekly: container
   com.larry.health.pgs-discovery: container
@@ -47,3 +48,19 @@ services:
   com.larry.healthbot.morningwake: "host: caffeinate держит Мак бодрым к утреннему циклу; в контейнере смысла нет"
   com.larry.health.import-poll: "none: приём из папки iCloud владельца; iCloud в контейнер не едет — решение владельца 29.09: в контейнере документы — только через бота (incoming → lab-intake)"
   com.larry.health.watcher: "none: приём из папки iCloud владельца; iCloud в контейнер не едет — решение владельца 29.09: в контейнере документы — только через бота (incoming → lab-intake)"
+
+# Что контейнер владельца ЧИТАЕТ у служб, оставшихся вне него (host: / none:), — пути от корня репозитория
+# на хосте (нить digest-tails, 05.10). Каждая host:/none: служба обязана иметь строку; пустой список —
+# «контейнер у неё ничего не читает». Каждый путь обязан ехать томом в scripts/install.py::render_owner_override.
+# Сторож переезда — tests/unit/test_docker_render.py: новая хостовая служба без строки или путь без тома — красное.
+# Зачем: дважды за неделю переезд рантайма оставлял читателя без данных писателя (журнал сбоев хоста,
+# 02.10 — урок C-135; дайджест недели W40, 04.10 — владельцу не пришёл). Урок-текст повтора не остановил.
+host_outputs:
+  com.larry.health.weekly-digest: [outputs/weekly_digest]   # бот: файл недели + вердикты тенантов
+  com.larry.health.machine-check: [logs]                    # check_machine_judge_alive (HEALTH_HOST_LOGS)
+  com.larry.health.uncommitted-watchdog: [logs]             # heartbeat сторожа (HEALTH_HOST_LOGS)
+  com.larry.health.night-repair: []        # стол читает сама через docker exec; контейнер её не видит
+  com.larry.health.code-watcher: []        # мастерская разработчика
+  com.larry.healthbot.morningwake: []      # caffeinate, данных нет
+  com.larry.health.import-poll: []         # в Докере не существует (iCloud не едет)
+  com.larry.health.watcher: []             # в Докере не существует (iCloud не едет)

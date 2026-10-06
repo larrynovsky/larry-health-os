@@ -1,0 +1,62 @@
+{
+  "module": "import_withings",
+  "public": [
+    "run"
+  ],
+  "contract": {
+    "run": "run() -> int. init_db; data dir = parent of health_db.DB_PATH. withings_access_token(data_dir) is None -> prints 'not connected', returns 0 (no device is not a failure). Otherwise fetches the WHOLE Withings history and mirrors it into bp_readings (upsert by measured_at; readings absent from Withings are deleted — the owner deletes failed readings in the app). An empty answer while bp_readings is non-empty raises WithingsError instead of wiping. Then rewrites daily_metrics.bp_systolic/bp_diastolic as the mean of all readings of the local day (region timezone) and raw bp_systolic_max/bp_diastolic_max as the day peak, marked raw.bp_source='withings'; from the first Withings day on, a day without readings is cleared. Returns 0. WithingsError propagates to the script entry, which prints the reason, writes notify.fault (person_key=None) and exits 1.",
+    "limits": "Owner decision 06.10: when Withings is connected it is the only writer of daily blood pressure; metrics_db.upsert_metrics_from_json keeps Apple Health pressure only as raw.apple_health_bp witness while bp_readings is non-empty. Days before the first Withings reading keep their Apple Health values. Day = region timezone, not the timezone of the place of measurement."
+  },
+  "depends_on": [
+    {
+      "module": "withings_api",
+      "uses": [
+        "WithingsError",
+        "fetch_bp",
+        "withings_access_token"
+      ],
+      "why": "credentials and measures",
+      "legacy": ""
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "init_db",
+        "get_conn",
+        "DB_PATH"
+      ],
+      "why": "canonical database and its single-writer guard",
+      "legacy": "ядро базы до гейта одноразовости; контракт не заводился"
+    },
+    {
+      "module": "notify",
+      "uses": [
+        "fault"
+      ],
+      "why": "fault journal read by the night cycle",
+      "legacy": "журнал сбоев до гейта одноразовости; контракт не заводился"
+    },
+    {
+      "module": "region_pack",
+      "uses": [
+        "value"
+      ],
+      "why": "installation timezone for the local day of a reading",
+      "legacy": ""
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "One responsibility: Withings readings -> bp_readings mirror and the daily pressure derived from them.",
+      "D2": "One entry point run(); _mirror/_days/_write_days private.",
+      "D3": "Public functions of withings_api, health_db, notify only.",
+      "D4": "About 110 lines.",
+      "D5": "tests/unit/test_withings_bp.py: mirror with deletion, refusal to wipe, day mean, foreign value overwrite, Apple witness; plans/mutate_bp_day_withings_2026-10-06.sh.",
+      "D6": "Ownership (Withings writes bp_readings and daily bp_* when connected; Apple Health only before/without Withings) is stated in import_withings docstring, metrics_db._bp_owned_by_withings and the device_metrics_owner registry entry."
+    },
+    "rationale": "Thin glue between a contracted client and one table.",
+    "date": "2026-10-06",
+    "oracle": "tests/unit/test_withings_bp.py"
+  }
+}

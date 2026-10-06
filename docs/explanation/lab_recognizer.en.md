@@ -1,53 +1,65 @@
-<!-- translation-of: docs/explanation/lab_recognizer.md sha256:1d22547740b2 -->
+<!-- translation-of: docs/explanation/lab_recognizer.md sha256:80cd582294e7 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](lab_recognizer.md)
 
-# Lab-Results Recognizer: staging, oracles, human gate — how it works and what it does not promise
+# Lab Results Recognizer: staging, oracles, human gate — how the system reads paper lab results and why it does not do this alone
 
 ## What changed
 
-- **A new open invariant `date_order_by_code` has been recorded (status `open`).** The mechanism for determining day/month order in dates on lab forms is formalized as a separate unresolved limit — not as a working protection, but as an open problem that the system explicitly acknowledges as unsolved.
+- **The `date_order_by_code` invariant has been moved from `open` to `holds`.** This means "confirmed within the named limits", not "closed completely" — the limits are described below.
 
-**Updated:** 2026-10-04
+- **The boundaries of what is proven have been recorded (run 06.10.2026).** Re-recognition of 22 documents from staging (21 processed — 683 rows, 1 did not pass due to the page limit): out of 473 rows with a printed date, 352 matched the printed date, 121 received `ambiguous_order` status and were sent to a human, erroneous — 0. All 21 forms in the sample print the day first and contain an unambiguous clue; the sample is limited to exactly that.
+
+- **Every fourth row with a date goes to a human.** 121 out of 473 rows (26%) are scans without a text layer: the unambiguous clue is physically present on the form, but the model returns only the dates of the result rows, not the header. This is a deliberate choice by the system, not a failure — but it is a queue for manual review.
+
+- **An incorrect date remains visible under inattentive review.** A row with `ambiguous_order` status has the model's guess in the `date` field — for example, 12 January instead of 1 December. The source annotation is there, but if the reviewer looks only at the date, they see a potentially incorrect number.
+
+- **The `open` status in the old version reflected that the mechanism had not yet been verified.** Now it has been verified — on a specific sample, with specific limits. "Holds" and "proven across everything possible" remain different claims.
+
+**Updated:** 2026-10-06
 
 
 ## Why it exists
 
-Lab results arrive in all kinds of forms: a paper printout, a phone photo, a scan with labels in German or Finnish. And almost always — columns of numbers where a single misplaced decimal point changes the meaning radically. The number 15.2 and the number 152 are not a typo with consequences — they are a completely different world clinically.
+Medical lab results arrive in many forms: a paper form, a phone photo, a clinic scan — sometimes in German, sometimes in Finnish, sometimes with a stamp over the numbers. And the first, obvious impulse is simply to hand it to a model so it reads and records everything into the database.
 
-When a single model reads a scan directly and immediately writes the result to the database, it can make exactly that kind of mistake — and nobody will know. The recognizer exists precisely so that such errors do not pass unnoticed. Not "read and remember," but "read, double-check, ask me — and only then remember."
+The problem is that the model sometimes drops a decimal point. 15.2 becomes 152. In everyday text this is a curiosity. In medical numbers it is a different value, a different range, potentially a different conclusion. And the model does not signal this: it is confident, it simply made a mistake.
 
-## What it does, in plain terms
+That is why the subsystem is structured not as "read and write" but as a pipeline with several checkpoints, where the canon — what is considered the final record of your health — is not touched until you yourself have said "yes".
 
-When you upload a document with lab results, several things happen — one after another, not in parallel and not bypassed.
+## What it does, in plain language
 
-**Two views instead of one.** The page is read by two independent readers with different instructions. They compare their results with each other: how much they agreed, how confident each one was. This does not mean errors are ruled out — it means disagreement is visible rather than hidden.
+When a document with lab results enters the system, several things happen in sequence.
 
-**Plausibility checking.** After reading, independent oracles take over — separate validators that look for: whether a value has gone outside a physiologically possible range, whether it has jumped between measurements in a way that does not happen, whether units are mixed up. If something is wrong, the document gets a "needs attention" flag rather than quietly passing through. The outcome is either a green light or a flag.
+**Two sets of eyes, not one.** The page is read by two independent passes — with different instructions, different approaches. Then they are compared: did they agree, how confident was each. This is not caution for its own sake — it is a way to catch exactly those errors that one pass cannot see, because it was that same pass that made them.
 
-**Staging — quarantine before canon.** What is recognized does not go directly into your real lab history. It is placed in an intermediate area — staging. Canon remains untouched until you explicitly say "yes." Even technically: by default the system only rehearses the transfer, and the real transfer requires an explicit permission and saves a snapshot of what existed before.
+**Plausibility oracles.** Before a result goes anywhere, independent checkers look at it: is this even physiologically possible? Is the number within an acceptable range? Did it jump in a single day to something implausible? Do the units at least resemble something real? If anything looks suspicious, the row is flagged. The whole document receives a final status: either everything is fine, or there are questions.
 
-**You are the last line.** Everything that has passed both readers and the oracles still waits for your decision. What is rejected does not enter canon. You see what was recognized, you see what raised questions, and only your "yes" moves the result forward.
+**Draft first, then canon.** What was recognized does not fall directly into your medical history. It goes to an intermediate store — staging. There it sits and waits. The canon lives separately and does not change at this point.
 
-## What to say honestly about its limits
+**You decide.** Moving a result from staging to canon is only possible through your explicit "yes". And even then, the system first shows exactly what will change, takes a snapshot of the state before — and only after that, with a separate confirmation, makes the change. Rejected items remain rejected and do not pass into canon.
 
-It is important to be direct here, because the system works with medical data.
+**The date is a separate story.** It is easy to transpose the day and month digits in a lab date: 04.10 or 10.04 — they look similar, they mean different things. Models handle this poorly, especially when the form is in another language. Therefore, the order of day and month is determined not by the model but by code — based on clues in the document itself: if there is a date somewhere in which the number is unambiguously greater than twelve, then that is the day, and the order is clear. If there is no clue, the date is not guessed — it is sent to a human for review.
 
----
+## What to honestly say about its limits
 
-**Dates — an unsolved problem.** The intent is this: the order of day and month in a date should be determined by code, not by the model. The model returns the date as it is printed, and the code attempts to figure out the order from context — it looks in the document for dates where the order is unambiguous (for example, if a number is greater than 12, it must be in the day position), and if the model transposed them — it corrects. If it cannot be determined, the date is not guessed: it is marked as ambiguous and sent to you for manual review.
+It is important to speak plainly here, because this is medicine.
 
-But this promise is not yet fully delivered — it is in progress. This is exactly what happened in a real case: the material receipt date was printed one day before the collection date, and in staging it ended up with day and month transposed. Furthermore, even when the mechanism works, there is a boundary: it distinguishes day/month order, but does not always understand which date is being referred to — receipt of material or collection. These are different things, and if they appear separately on the form, the model may pick the wrong one. How often — unknown, there is one case. And also: if the scan contains no text layer and has no unambiguous dates that could help resolve the order — there is nothing to work with, and the row goes to a human.
+**The first hop is still in question.** Historically, the accuracy and completeness of data extraction in the first step has been a persistent problem — an audit from mid-2026 showed that roughly half of rows were being lost, and dropping a decimal point was a real problem, not a hypothetical one. Two passes and oracles are a safeguard, but they do not definitively close the defect. Work on it continues, and the honest status now is: it is not verified that the problem is fully resolved. This is not fine print — it is something that must be kept in mind until confirmation appears.
 
----
+**On dates: verified on a specific sample, not everywhere.** The logic for determining day-and-month order was tested on just over twenty real documents from staging — all forms in that sample printed the day first, and the code handled them without errors. But this is a specific sample, specific forms. "Holds" and "verified across everything possible" are different claims, and the second one is not true here.
 
-**The first hop — historically unreliable.** An audit conducted in June 2026 showed: the model that reads the document first historically lost around half of the values and dropped decimal points. The two readers and the oracles are a safeguard against this. But the residual problem is not officially closed: it exists as an open defect. This does not mean the system is bad — it means the system is honest: where it is not sure, it says so.
+**Every fourth document with a date still goes to a human.** Roughly a quarter of rows with a printed date receive "unclear" status — because the scan has no text layer and the code cannot find an unambiguous clue, even though it is physically present on the form. This is not a failure, it is a deliberate choice: better to send to a human than to guess. But it means a queue for manual review.
 
----
+**An incorrect date remains visible if you are not looking carefully.** When a row goes to "unclear", the date field still contains what the model read — its version, which may be incorrect. The source annotation is nearby, but if the reviewer looks only at the date and does not notice the annotation, they see a potentially incorrect number.
 
-In short: the system is designed not to take itself at its word. Two readings, external checks, quarantine, your decision. But "not taking itself at its word" is not the same as "guaranteed to be correct." Dates are still not resolved everywhere, the first hop is not definitively verified.
+**The receipt date and the collection date are different things.** There was a case where the model took the date the laboratory received the sample, not the date the sample was actually collected. This is a different error, unrelated to day-and-month order, and how frequently it occurs is currently unknown.
+
+**A scan without clues is a dead end.** If a scan contains no text layer and the model found no unambiguous date in it, the code cannot determine the order. Those rows also go to a human — there is no automatic answer.
 
 ## Where this lives in the system
 
-All the logic lives in `lab_recognizer.py` — that is where the pipeline runs from document upload through placement in staging and oracle validation. The intent behind the system's design and its promises are recorded in `subsystem_intent.yaml` — this is not code, but a description of what the system commits to doing and what counts as a violation. If behavior diverges from what is written there, that is not "working as intended" — that is a bug.
+The core logic of the subsystem lives in `lab_recognizer.py`. Intentions and invariants — what the system promises to comply with — are described in `subsystem_intent.yaml`. The verifiable promises and their current status are recorded there as well, including those that remain open.
+
+The subsystem stands between the outside world (forms, photos, scans) and the canon — your medical history. Its job is to not let an error pass unnoticed, and to not let anything enter the canon without your knowledge.

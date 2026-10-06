@@ -75,3 +75,21 @@ def test_unparsable_file_is_reported_not_silent(tmp_path, capsys):
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_translation_pair_selects_form_check():
+    """06.10.2026: правка документа с парой перевода выбирает проверку формы перевода — в обе стороны."""
+    assert (at.ROOT / at._TRANSLATION_TEST).exists()
+    for changed in (["docs/explanation/test_architecture.md"], ["docs/explanation/test_architecture.en.md"]):
+        hits, _ = at.select(changed)
+        assert at._TRANSLATION_TEST in hits, changed
+
+
+def test_doc_without_pair_does_not_pull_form_check(tmp_path, monkeypatch):
+    monkeypatch.setattr(at, "ROOT", tmp_path)
+    monkeypatch.setattr(at, "TESTS", tmp_path / "tests")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "solo.md").write_text("x", encoding="utf-8")
+    hits, _ = at.select(["solo.md"])
+    assert at._TRANSLATION_TEST not in hits
+

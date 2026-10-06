@@ -269,10 +269,9 @@ def test_file_refusal_reaches_person_once(env, monkeypatch, case):
     assert len(told) == 1 and f.name in told[0]
     # Три разных правды (нить lab-intake-retry, 05.10). До неё все четыре случая звучали
     # «пришлите почётче» — и на «не бланк», и на сбой у нас, где файл ни при чём.
-    if case == "notlab":
-        assert "не похож на бланк" in told[0] and "ещё раз" in told[0]
-    elif case == "zero":
-        assert "оригинальный PDF" in told[0] and "чёткое фото" in told[0]
+    if case in ("notlab", "zero"):
+        # Анализы ничего не дали, и разбор документов тоже (по умолчанию фикстуры): «ничего».
+        assert "ни значений анализов, ни текста" in told[0] and "чёткое фото" in told[0]
     else:
         assert "на моей стороне" in told[0] and "чёткое фото" not in told[0]
 
@@ -388,6 +387,9 @@ def _no_side_routes(monkeypatch):
     import genome_intake, import_medical_events
     monkeypatch.setattr(genome_intake, "process_pending", lambda *a, **k: 0)
     monkeypatch.setattr(import_medical_events, "process_incoming", lambda *a, **k: 0)
+    # Итог по файлу (file-outcome, 06.10) ждёт и разбор документов. По умолчанию здесь он «ничего
+    # не нашёл» — тогда судится чистый разбор анализов; иной исход задают тесты итога ниже.
+    monkeypatch.setattr(import_medical_events, "doc_outcome", lambda p: {"status": "failed"})
 
 
 # ── нить lab-intake-retry (05.10): пустой ключ, повтор после отказа ──────────────
@@ -452,3 +454,250 @@ def test_bot_duplicate_points_at_the_stored_file(tmp_path):
     (tmp_path / f"report__{h}.pdf.failed").write_text("x")
     dest, dup = _inbox_dest(tmp_path, "renamed.pdf", data)
     assert dup and dest == stored
+
+
+# ── нить file-outcome (06.10): итог по файлу — после обоих разборщиков ──────────────────────
+# Заключение врача стороннего пользователя ушло в распознаватель анализов (0 строк), и он
+# услышал «не удалось прочитать ни одного значения анализов; в базу ничего не добавлено» — при том,
+# что разбор документов этот же файл читает. Говорил только один разборщик и говорил за весь файл.
+
+def _doc(monkeypatch, outcomes):
+    """Исход разбора документов по проходам: список, последний повторяется."""
+    import import_medical_events
+    seq = list(outcomes)
+    monkeypatch.setattr(import_medical_events, "doc_outcome",
+                        lambda p: seq.pop(0) if len(seq) > 1 else seq[0])
+
+
+@pytest.mark.parametrize("gate", ["zero_rows", "not_lab"])
+def test_conclusion_is_told_as_document_after_both_readers(env, monkeypatch, gate):
+    """Мутации: говорить по итогу анализов, не дождавшись документов; «ничего не добавлено» при
+    принятом документе; журнал сбоев при принятом документе; повтор итога каждый проход."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "кардио__0f1e2d3c4b5a6978.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told, faults = [], []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append(a))
+    if gate == "not_lab":
+        monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    else:
+        monkeypatch.setattr(w.lab_backfill, "run_backfill", lambda *a, **k: {"rows": 0})
+    _doc(monkeypatch, [None, {"status": "imported", "date": "2026-04-06",
+                              "diagnoses": 2, "medications": 1}])
+    w.process_once()
+    assert not told and not faults, "разбор документов не закончен — молчим"
+    w.process_once(); w.process_once()
+    assert len(told) == 1 and not faults
+    t = told[0]
+    assert "«кардио.pdf»" in t and "медкарту" in t and "2026-04-06" in t
+    assert "диагнозов — 2" in t and "лекарств — 1" in t
+    assert "ничего не добавлено" not in t
+    # «пришлите ещё раз как анализы» — только при расхождении разборщиков (06.10: на
+    # заключениях без расхождения подсказка была шумом)
+    assert "ещё раз" not in t
+
+
+def test_nothing_from_both_is_told_once_and_logged(env, monkeypatch):
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "blank.jpg"; f.write_bytes(b"x"); _age(f, 999)
+    told, faults = [], []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append(a))
+    monkeypatch.setattr(w.lab_backfill, "run_backfill", lambda *a, **k: {"rows": 0})
+    w.process_once(); w.process_once()
+    assert len(told) == 1 and "ничего не добавлено" in told[0]
+    assert len(faults) == 1 and "no rows recognized" in faults[0][0]
+
+
+def test_resend_of_document_already_in_record_says_so(env, monkeypatch):
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "letter.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    _doc(monkeypatch, [{"status": "imported", "date": "unknown", "diagnoses": 0, "medications": 0}])
+    w.process_once()
+    assert len(told) == 1 and "в самом документе я её не нашёл" in told[0] and "подтверждение" not in told[0]
+    assert w.retry_after_refusal(f) is True               # спорит: «это анализы»
+    monkeypatch.setattr(w, "_is_lab", lambda p: True)
+    monkeypatch.setattr(w.lab_backfill, "run_backfill", lambda *a, **k: {"rows": 0})
+    _doc(monkeypatch, [{"status": "already"}])
+    w.process_once()
+    assert len(told) == 2 and "уже в вашей медкарте" in told[1] and "ещё раз" not in told[1]
+
+
+def test_rejected_files_before_rollout_are_not_told_again(env, monkeypatch):
+    """Первый проход с итогом по файлу: старые отвергнутые файлы — уже сказанное; иначе выкат
+    разослал бы по сообщению на каждый старый файл."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    old = inbox / "old.pdf"; old.write_bytes(b"%PDF"); _age(old, 999)
+    w._save_state({"watermark": 0.0, "notlab": ["old.pdf"]})          # состояние до выката
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    w.process_once(); w.process_once()
+    assert not told
+
+
+@pytest.mark.parametrize("doc_ready", [True, False])
+def test_letter_with_marker_prose_tells_both_parts(env, monkeypatch, doc_ready):
+    from pathlib import Path
+    """Замер 06.10 на письме врача («пришлите как анализы»): распознаватель вынул упомянутый
+    в тексте маркер, человек услышал только «распознано значений — 2», про медкарту — ничего.
+    Мутации: молчать о документе при найденных анализах; повторять «результат анализа» у бланка;
+    показывать нулевой счёт предложений."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "letter.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "notify_operator", lambda *a, **k: "telegram")
+    staged = set()                                   # как staging: разобранный не берётся снова
+    monkeypatch.setattr(w, "_processed", lambda: set(staged))
+    monkeypatch.setattr(w.lab_backfill, "run_backfill",
+                        lambda run, a1, a2, path, *r: staged.add(Path(path).name) or {"rows": 2, "pending": 2})
+    done = {"status": "imported", "kind": "encounter", "date": "2026-05-10",
+            "diagnoses": 0, "medications": 2}
+    _doc(monkeypatch, [done] if doc_ready else [None, done])
+    w.process_once(); w.process_once(); w.process_once()
+    text = "\n".join(told)
+    assert "распознано значений — 2" in text and "медкарту" in text and "2026-05-10" in text
+    assert "лекарств — 2" in text and "диагнозов" not in text
+    assert len(told) == (1 if doc_ready else 2)
+    assert "Кроме чисел" in text, "часть про документ — продолжение того же файла, не новый файл"
+
+
+def test_lab_blank_is_not_retold_as_document(env, monkeypatch):
+    from pathlib import Path
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "cbc.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "notify_operator", lambda *a, **k: "telegram")
+    staged = set()                                   # как staging: разобранный не берётся снова
+    monkeypatch.setattr(w, "_processed", lambda: set(staged))
+    monkeypatch.setattr(w.lab_backfill, "run_backfill",
+                        lambda run, a1, a2, path, *r: staged.add(Path(path).name) or {"rows": 20, "pending": 0})
+    _doc(monkeypatch, [None, {"status": "imported", "kind": "lab_result", "date": "2026-04-03"}])
+    w.process_once(); w.process_once(); w.process_once()
+    assert len(told) == 1 and "медкарту" not in told[0]
+
+
+
+# ── нить file-outcome-3 (06.10): временный отказ поставщика — повтор, а не «пришлите заново» ──
+
+def _sdk_errors():
+    """Настоящие классы исключений SDK (C-152): свойство, по которому ветвится код, проверяется
+    на объекте библиотеки, а не на самодельном."""
+    import httpx, openai, anthropic
+    req = httpx.Request("POST", "https://api.example/v1")
+    resp = lambda code: httpx.Response(code, request=req)
+    return {
+        "openai_conn": openai.APIConnectionError(request=req),
+        "openai_timeout": openai.APITimeoutError(request=req),
+        "openai_500": openai.InternalServerError("boom", response=resp(500), body=None),
+        "openai_rate": openai.RateLimitError("slow down", response=resp(429), body=None),
+        "openai_quota": openai.RateLimitError("insufficient_quota", response=resp(429),
+                                              body={"code": "insufficient_quota"}),
+        "openai_bad": openai.BadRequestError("bad image", response=resp(400), body=None),
+        "anthropic_conn": anthropic.APIConnectionError(request=req),
+        "anthropic_529": anthropic.APIStatusError("overloaded", response=resp(529), body=None),
+        "anthropic_credit": anthropic.BadRequestError("Your credit balance is too low",
+                                                      response=resp(400), body=None),
+    }
+
+
+def test_transient_is_told_apart_from_account_and_document_errors():
+    import llm_client
+    e = _sdk_errors()
+    transient = {k for k, v in e.items() if llm_client.is_transient(v)}
+    assert transient == {"openai_conn", "openai_timeout", "openai_500", "openai_rate",
+                         "anthropic_conn", "anthropic_529"}
+    assert llm_client.is_account_problem(e["openai_quota"])      # квота — человеку, не повтор
+    assert llm_client.is_transient(TimeoutError()) and not llm_client.is_transient(ValueError("x"))
+
+
+def test_cause_text_masks_key_tail():
+    import llm_client
+    t = llm_client.safe_cause(RuntimeError("Incorrect API key provided: sk-proj-abcd****wxyz. "
+                                           "Find your key at …"))
+    assert "sk-proj" not in t and "wxyz" not in t and "‹ключ›" in t and "RuntimeError" in t
+
+
+def test_transient_failure_retries_silently_then_gives_up_with_cause(env, monkeypatch):
+    """Мутации: писать .failed с первого обрыва; говорить человеку на каждом повторе; повторять
+    без потолка; терять причину. Отказ идёт из распознавателя — через настоящий run_backfill."""
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "scan.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told, calls = [], []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    err = _sdk_errors()["openai_conn"]
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize",
+                        lambda *a, **k: calls.append(1) or (_ for _ in ()).throw(err))
+    rt = inbox / "scan.pdf.waitretry"
+    w.process_once()
+    assert rt.exists() and not (inbox / "scan.pdf.failed").exists() and not told
+    w.process_once()
+    assert len(calls) == 1, "до срока повтора файл не берётся"
+    for i in range(len(w.RETRY_BACKOFF_MIN)):
+        _age(rt, w.RETRY_BACKOFF_MIN[i] * 60 + 1)
+        w.process_once()
+    assert len(calls) == 1 + len(w.RETRY_BACKOFF_MIN)
+    assert not rt.exists() and (inbox / "scan.pdf.failed").exists()
+    assert "APIConnectionError" in (inbox / "scan.pdf.failed").read_text()
+    assert len(told) == 1 and "на моей стороне" in told[0] and "пробовал несколько часов" in told[0]
+
+
+def test_transient_failure_then_recovery_needs_no_resend(env, monkeypatch):
+    from pathlib import Path
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "cbc.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "notify_operator", lambda *a, **k: "telegram")
+    err = _sdk_errors()["anthropic_529"]
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize",
+                        lambda *a, **k: (_ for _ in ()).throw(err))
+    w.process_once()
+    staged = set()
+    monkeypatch.setattr(w, "_processed", lambda: set(staged))
+    monkeypatch.setattr(w.lab_backfill, "run_backfill",
+                        lambda run, a1, a2, path, *r: staged.add(Path(path).name) or {"rows": 5})
+    _age(inbox / "cbc.pdf.waitretry", 10 * 60)
+    w.process_once()
+    assert len(told) == 1 and "распознано значений — 5" in told[0]
+    assert not (inbox / "cbc.pdf.waitretry").exists()
+
+
+def test_backfill_failure_carries_its_cause(env, monkeypatch):
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "odd.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize",
+                        lambda *a, **k: (_ for _ in ()).throw(_sdk_errors()["openai_bad"]))
+    w.process_once()
+    text = (inbox / "odd.pdf.failed").read_text()
+    assert "BadRequestError" in text and "bad image" in text
+
+
+@pytest.mark.parametrize("doc,hint", [
+    ({"status": "imported", "kind": "encounter", "date": "2026-05-10"}, False),
+    ({"status": "imported", "kind": "lab_result", "date": "2026-05-10"}, True),
+    ({"status": "failed"}, True),
+])
+def test_as_lab_hint_only_when_readers_disagree(env, monkeypatch, doc, hint):
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "x.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    _doc(monkeypatch, [doc])
+    w.process_once()
+    assert len(told) == 1 and ("ещё раз" in told[0]) == hint

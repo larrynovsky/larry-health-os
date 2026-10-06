@@ -60,11 +60,11 @@ def test_routes_transient_devfix_owner(env):
     assert s == {"ran_at": s["ran_at"], "seen": 3, "parked": 2, "suppressed": 1,
                  "warn_seen": 0, "warn_parked": 0, "warn_standing": 0, "warn_unready": 0,
                  "defaults_applied": 0, "defaults_dropped": 0, "off_desk_retired": None,
-                 # Третий и четвёртый источники (нити без движения; возврат красного) в
+                 # Третий и четвёртый источники (нити без движения; упорно красные тесты) в
                  # сводке ЕСТЬ и при пустом входе: нули отличают «производитель отработал
                  # вхолостую» от «его не позвали».
                  "stalled_seen": 0, "stalled_new": 0, "stalled_mailed": None, "stalled_retired": 0,
-                 "red_nights": 0, "red_returned": False}
+                 "red_parked": 0, "red_retired": 0}
     kinds = {g["id"]: g["kind"] for g in pd.list_open()}
     assert "dev_fix" in kinds.values() and "owner_decision" in kinds.values()
     assert len(kinds) == 2, "транзиент не паркуется"

@@ -18,11 +18,16 @@ pytestmark = pytest.mark.unit
 
 
 @pytest.mark.parametrize("printed, order", [
-    (["Date of Birth: 25/03/1990", "07/11/2025"], "dmy"),   # 25 стоит только на месте дня
+    (["Date of Birth: 31/12/1999", "07/11/2025"], "dmy"),   # 31 стоит только на месте дня (даты выдуманы)
     (["12/24/2024"], "mdy"),
-    (["25.03.1990", "12/24/2024"], None),                  # документ противоречит себе — не решаем
+    (["31.12.1999", "12/24/2024"], None),                  # документ противоречит себе — не решаем
     (["07/11/2025", "04/10/2025"], None),                  # одни неоднозначные — нечем решить
     ([], None),
+    # Референсный интервал — не дата (замер 06.10, бланк химии крови: интервал «8.50-10» ссорил
+    # документ с однозначной датой рождения, и 23 строки уходили человеку зря).
+    (["31.12.1999", "Normal 8.50-10", "07.11.2025"], "dmy"),
+    (["13.2-17", "07/11/2025"], None),                     # «13.2-17» не улика «день первым»
+    (["40.0-75", "07/11/2025"], None),                     # ноль и >31 — не календарь
 ])
 def test_date_order(printed, order):
     assert lr._date_order(printed) == order
@@ -32,12 +37,13 @@ def test_date_order(printed, order):
     ("07/11/2025", "dmy", ("2025-11-07", "by_order")),
     ("07/11/2025", "mdy", ("2025-07-11", "by_order")),
     ("07/11/2025", None, (None, "ambiguous")),
-    ("25/03/1990", None, ("1990-03-25", "unambiguous")),
+    ("31/12/1999", None, ("1999-12-31", "unambiguous")),
     ("12/24/2024", None, ("2024-12-24", "unambiguous")),
     ("05.05.23", None, ("2023-05-05", "unambiguous")),     # день = месяц: порядок не важен
     ("31/02/2024", "dmy", (None, "unparsed")),              # такой даты нет — не выдумываем
     ("2025-11-07", "dmy", (None, "unparsed")),              # ISO не трогаем: модель уже права по форме
     (None, "dmy", (None, "unparsed")),
+    ("8.50-10", "dmy", (None, "unparsed")),                 # интервал, не дата
 ])
 def test_printed_iso(printed, order, expected):
     assert lr._printed_iso(printed, order) == expected
@@ -55,7 +61,7 @@ ROW = {"canonical_name": "Glucose", "raw_name": "Glucose", "value": 5.0, "unit":
 
 
 def test_swapped_date_fixed_by_unambiguous_date_in_same_document(monkeypatch, tmp_path):
-    t = _recognize(monkeypatch, tmp_path, [ROW], ["Date of Birth : 25/03/1990   Date received : 07/11/2025"])[0]
+    t = _recognize(monkeypatch, tmp_path, [ROW], ["Date of Birth : 31/12/1999   Date received : 07/11/2025"])[0]
     assert t["date"] == "2025-11-07" and t["date_source"] == "read"
     assert json.loads(t["field_evidence"])["date"] == ["2025-07-11", "07/11/2025"]
 

@@ -16,6 +16,7 @@
 live:
   - "*.en.md"   # английские версии документов корня: класс перевода = класс оригинала (29.09, finish-prep)
   # Root-level reference + правила
+  - AGENTS.md   # public development contract for contributors and coding agents
   - ARCH_SNAPSHOT.md
   - CLAUDE.md
   - CONSTITUTION_RULES.md

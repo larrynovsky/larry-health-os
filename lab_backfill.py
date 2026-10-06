@@ -388,10 +388,13 @@ def run_backfill(run_id: str, max_docs: int | None = None,
             # «0 строк» и сайдкаром .norows навсегда (нить lab-intake-retry, 05.10).
             import hai_core
             import llm_client
+            # И временный отказ поставщика (обрыв, перегрузка): проглоченный, он становился
+            # .failed навсегда, а человека просили прислать файл заново (нить file-outcome, 06.10).
             if isinstance(e, (hai_core.ModelNotAdmitted, lab_recognizer.PageLimitExceeded)) \
-                    or llm_client.is_account_problem(e):
+                    or llm_client.is_account_problem(e) or llm_client.is_transient(e):
                 raise
             summary["errors"] += 1
+            summary.setdefault("first_error", llm_client.safe_cause(e))   # причина — в сайдкар
             log.error(f"ERROR {source_file}: {e}")
     return summary
 

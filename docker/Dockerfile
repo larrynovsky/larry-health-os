@@ -10,7 +10,9 @@ FROM python:3.11.15-slim AS wheels
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt /tmp/requirements.txt
-RUN pip wheel --no-cache-dir -w /wheels -r /tmp/requirements.txt
+# Таймаут pip по умолчанию — 15 с на чтение. Индекс aiohttp весит 6,4 МБ, и на медленной сети (06.10:
+# 33 с внутри контейнера) pip бросал его и врал «нет таких версий» — сборка падала 4 раза подряд.
+RUN pip wheel --no-cache-dir --timeout 120 --retries 10 -w /wheels -r /tmp/requirements.txt
 
 # ── Рабочий образ ─────────────────────────────────────────────────────────────────────────
 FROM python:3.11.15-slim

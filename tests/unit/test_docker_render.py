@@ -303,3 +303,31 @@ def test_every_service_renders_the_schedule_it_is_pointed_at():
     blind = [n for n, s in services.items()
              if "scripts/install.py --docker" not in " ".join(s["command"])]
     assert not blind, f"службы без каталога расписаний: {blind}"
+
+
+def test_override_mcp_только_по_выбору_и_наружу_только_funnel_на_mcp(tmp_path):
+    """Сервер MCP (нить mcp-gateway, 06.10): без адреса — ни одной новой службы; с адресом —
+    у mcp нет портов хоста, а публичная точка узла mcp-funnel ровно одна: 443 → mcp:8765.
+    Мутация «Funnel на дашборд» или «порт mcp на хост» краснеет здесь."""
+    import json as _json
+    import yaml
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    off = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin")
+    assert "mcp" not in yaml.safe_load(off["compose.override.yaml"])["services"] and "mcp_serve.json" not in off
+    out = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin", "https://health-mcp.example.ts.net")
+    svc = yaml.safe_load(out["compose.override.yaml"])["services"]
+    assert "ports" not in svc["mcp"] and "ports" not in svc["mcp-funnel"]
+    assert svc["mcp"]["environment"]["MCP_PUBLIC_BASE"] == "https://health-mcp.example.ts.net"
+    assert svc["mcp-funnel"]["hostname"] == "health-mcp"
+    assert svc["mcp-funnel"]["environment"]["TS_HOSTNAME"] == "health-mcp"   # иначе `up` отказывает
+    assert svc["mcp-funnel"]["environment"]["TS_AUTH_ONCE"] == "true"
+    assert "tag:mcp" in svc["mcp-funnel"]["environment"]["TS_EXTRA_ARGS"]
+    # вход узла живёт в томе Docker: на каталоге хоста он не сохранялся (замер 06.10)
+    assert f"{install.MCP_TS_VOLUME}:/var/lib/tailscale" in svc["mcp-funnel"]["volumes"]
+    assert yaml.safe_load(out["compose.override.yaml"])["volumes"] == {install.MCP_TS_VOLUME: {"external": True}}
+    serve = _json.loads(out["mcp_serve.json"])
+    assert serve["TCP"] == {"443": {"HTTPS": True}}
+    (site, cfg), = serve["Web"].items()
+    assert cfg == {"Handlers": {"/": {"Proxy": "http://mcp:8765"}}}
+    assert serve["AllowFunnel"] == {site: True}

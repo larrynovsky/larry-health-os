@@ -66,6 +66,36 @@ def _esc(x) -> str:
     return escape("" if x is None else str(x))
 
 
+def _name_cell(printed, canonical) -> str:
+    """Имя строки для сверки (нить file-outcome, 06.10): человек сверяет с БЛАНКОМ, поэтому крупно —
+    как напечатано в бланке, мелко рядом — международное имя, под которым значение ляжет в базу.
+    До 06.10 при найденном международном имени напечатанное пряталось: русский бланк сверяли с «HGB»."""
+    if not canonical:
+        return f'<i>{_esc(printed)}</i> ⚠'
+    if not printed or str(printed).strip().casefold() == str(canonical).strip().casefold():
+        return _esc(canonical)
+    return f'{_esc(printed)}<br><small style="color:#666">{_esc(canonical)}</small>'
+
+
+def _num(x) -> str:
+    try:
+        return f"{float(x):g}"
+    except (TypeError, ValueError):
+        return str(x)
+
+
+def _ref_text(low, high) -> str:
+    """Норма так, как её печатает бланк: «a – b», «< b», «> a». До 06.10 одна граница рисовалась
+    как «–0.2», и норма «< 0.2» выглядела распознанной наполовину."""
+    if low is not None and high is not None:
+        return f"{_num(low)} – {_num(high)}"
+    if high is not None:
+        return f"< {_num(high)}"
+    if low is not None:
+        return f"> {_num(low)}"
+    return ""
+
+
 @router.get("/lab-review/{run_id}", response_class=HTMLResponse)
 def lab_review(run_id: str, tenant: str = "", show: str = "waiting"):
     c = _ro(tenant)
@@ -88,9 +118,9 @@ def lab_review(run_id: str, tenant: str = "", show: str = "waiting"):
     trs = []
     for i, r in enumerate(rows):
         flag = {"disagree": "🔴", "single": "🔵"}.get(r["value_agreement"], "")
-        canon = _esc(r["canonical_name"]) if r["canonical_name"] else f'<i>{_esc(r["raw_line"])}</i> ⚠'
+        canon = _name_cell(r["raw_line"], r["canonical_name"])
         val = "" if r["value"] is None else _esc(r["value"])
-        ref = f'{_esc(r["ref_low"])}–{_esc(r["ref_high"])}' if r["ref_low"] is not None or r["ref_high"] is not None else ""
+        ref = _esc(_ref_text(r["ref_low"], r["ref_high"]))
         vval = "" if r["value"] is None else r["value"]
         payload = f'{r["source_file"]}|||{r["canonical_name"] or r["raw_line"]}|||{vval}'
         if r["canonical_name"] is None:

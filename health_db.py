@@ -277,6 +277,25 @@ def _test_run_on_live_db() -> bool:
     return mine is not None and mine == _file_identity(Path(live))
 
 
+def _frozen_copy() -> bool:
+    """Нативная копия тенанта, переехавшего в контейнер, заморожена: вне контейнера — только чтение.
+
+    Решение владельца 29.09: документы владельца — только через бота в контейнер; его нативные
+    приёмы из папки iCloud сняты (placement.yaml: import-poll, watcher — none). Но get_conn на
+    хосте открывал ~/health/data/health.db на запись без вопроса (замер 06.10): ручной или
+    случайно загруженный старый импорт молча писал бы документы в мёртвую копию, которую никто
+    не читает. Чтение не запрещено: хостовый weekly_digest читает из неё настройки модели, и
+    глухой отказ сломал бы дайджест. Запись падает громко (SQLITE_READONLY). Метка —
+    secrets_paths.moved_to_container; в контейнере (HEALTH_RUNTIME=container) стор живой."""
+    if os.environ.get("HEALTH_RUNTIME") == "container":
+        return False
+    import secrets_paths
+    if secrets_paths.moved_to_container(Path(DB_PATH).parent.parent):
+        log.warning("%s: frozen copy (tenant runs in the container) — opened read-only", DB_PATH)
+        return True
+    return False
+
+
 def get_conn(read_only: bool = False) -> sqlite3.Connection:
     """
     Возвращает SQLite-коннект.
@@ -296,7 +315,7 @@ def get_conn(read_only: bool = False) -> sqlite3.Connection:
         conn = sqlite3.connect(DB_PATH, factory=_ClosingConn)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
-        if read_only or _test_run_on_live_db():
+        if read_only or _test_run_on_live_db() or _frozen_copy():
             conn.execute("PRAGMA query_only=ON")
         return conn
     # Non-primary: НЕ открывать молчаливо устаревшую iCloud-копию (split-brain,

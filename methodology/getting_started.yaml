@@ -42,7 +42,7 @@ capabilities:
 
   - id: labs
     group: self
-    intent: [lab_recognizer, norm_from_documents, report_absence_claims]
+    intent: [lab_recognizer, lab_intake_gate, norm_from_documents, report_absence_claims]
     title: {ru: "Анализы", en: "Lab results"}
     benefit: {ru: "Значения с бланков, их динамика и предохранитель на опасные числа.", en: "Values from lab reports, their trends, and a safety net for dangerous numbers."}
     need: {ru: "Бланки анализов за 3 года в бот; распознанное подтвердить здесь", en: "Lab reports for the last 3 years sent to the bot; confirm what was recognised here"}

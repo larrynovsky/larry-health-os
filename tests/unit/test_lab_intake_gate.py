@@ -202,6 +202,8 @@ def _no_side_routes(monkeypatch):
     import genome_intake, import_medical_events
     monkeypatch.setattr(genome_intake, "process_pending", lambda *a, **k: 0)
     monkeypatch.setattr(import_medical_events, "process_incoming", lambda *a, **k: 0)
+    # Итог по файлу ждёт и разбор документов (file-outcome, 06.10): здесь он «ничего не нашёл».
+    monkeypatch.setattr(import_medical_events, "doc_outcome", lambda p: {"status": "failed"})
 
 
 def test_words_miss_is_asked_of_the_model_not_refused(wat, monkeypatch, tmp_path):

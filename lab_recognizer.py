@@ -445,7 +445,10 @@ def _measure_fields(a: dict | None, b: dict | None, base: dict) -> None:
 # 2024-08-12. Поэтому модель отдаёт ещё и дату как напечатана, а порядок решает код: по
 # однозначным датам того же документа (число больше 12 стоит только на месте дня). Нет
 # однозначных — дата не угадывается, строка идёт человеку (date_source=ambiguous_order).
-_PRINTED_DATE = re.compile(r"(?<!\d)(\d{1,2})[./\-](\d{1,2})[./\-](\d{4}|\d{2})(?!\d)")
+# Разделитель обязан быть одним и тем же (\2): референсный интервал «8.50-10» или «13.2-17»
+# не дата, а прежний шаблон читал его как «месяц первым» и ссорил документ с самим собой —
+# замер 06.10: 23 строки одного бланка химии крови ушли человеку из-за такого интервала.
+_PRINTED_DATE = re.compile(r"(?<!\d)(\d{1,2})([./\-])(\d{1,2})\2(\d{4}|\d{2})(?!\d)")
 
 
 def _date_order(printed: list[str]) -> str | None:
@@ -453,7 +456,9 @@ def _date_order(printed: list[str]) -> str | None:
     seen = set()
     for text in printed:
         for m in _PRINTED_DATE.finditer(text or ""):
-            a, b = int(m.group(1)), int(m.group(2))
+            a, b = int(m.group(1)), int(m.group(3))
+            if not (1 <= a <= 31 and 1 <= b <= 31):
+                continue                                   # не календарная пара — не улика
             if a > 12 >= b:
                 seen.add("dmy")
             elif b > 12 >= a:
@@ -466,7 +471,7 @@ def _printed_iso(printed: str | None, order: str | None) -> tuple[str | None, st
     m = _PRINTED_DATE.fullmatch((printed or "").strip())
     if not m:
         return None, "unparsed"
-    a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    a, b, y = int(m.group(1)), int(m.group(3)), int(m.group(4))
     y = y + 2000 if y < 100 else y
     if a == b or (a > 12 >= b):
         day, month, how = a, b, "unambiguous"

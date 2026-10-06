@@ -448,7 +448,36 @@ def unapproved_promotions(old_entries: "list[dict] | None",
                 out.append(
                     f"{e.get('id')}::{inv.get('id')}: {was.get('status')}→holds по критерию, "
                     f"автор которого — {author}. Сначала утверди критерий у владельца и "
-                    f"запиши `closes_when_by: owner` ОТДЕЛЬНЫМ коммитом (CLAUDE.md §13)")
+                    f"запиши `closes_when_by: owner` ОТДЕЛЬНЫМ коммитом раньше подъёма — "
+                    f"можно в этой же нити (CLAUDE.md §13)")
+    return out
+
+
+def promotions_in_merge(source_tree: str, root: "Path | None" = None) -> "list[str] | None":
+    """Суд подъёмов при слиянии нити — по её коммитам ПО ПОРЯДКУ (BL-OWNER-CRITERION-MERGE-1).
+
+    Прежний суд «main → итог слияния» видел критерий и подъём одной нити разом и отбивал законный
+    путь «критерий владельца отдельным коммитом, потом подъём» (уроки C-70, C-162: две нити вместо
+    одной на каждый флип). Здесь каждый коммит реестра нити судится против своего родителя.
+
+    Судим по коммитам ТОЛЬКО если реестр итога слияния (индекс) равен реестру вершины ветки: иначе
+    итог содержит правку, которой нет ни в одном коммите нити (разрешение конфликта, чужая ветка
+    в окружении), и такой итог судится прежним способом — None, вызывающий берёт HEAD → индекс.
+    None и тогда, когда дерево нити не читается."""
+    import subprocess
+    root = root or ROOT
+    def _git(*a, cwd=root):
+        r = subprocess.run(["git", *a], cwd=str(cwd), capture_output=True, text=True)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    tip = _git("rev-parse", "HEAD", cwd=source_tree)
+    if not tip or registry_at(tip, root) != registry_at(":", root):
+        return None
+    base = _git("merge-base", "HEAD", tip)
+    if not base:
+        return None
+    out = []
+    for c in _git("rev-list", "--reverse", f"{base}..{tip}", "--", "subsystem_intent.yaml").split():
+        out += [f"{c[:7]}: {v}" for v in unapproved_promotions(registry_at(f"{c}^", root), registry_at(c, root))]
     return out
 
 

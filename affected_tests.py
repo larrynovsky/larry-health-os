@@ -32,7 +32,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 TESTS = ROOT / "tests"
-SELECTION_CAP = 40          # выше потолка выбор бессмысленен — честнее сказать «гони всё»
+SELECTION_CAP = 40
+_TRANSLATION_TEST = "tests/consistency/test_doc_translations.py"          # выше потолка выбор бессмысленен — честнее сказать «гони всё»
 
 
 def _module_imports(path: Path) -> set[str]:
@@ -87,6 +88,12 @@ def select(changed: list[str]) -> tuple[list[str], str | None]:
             continue
         if _module_imports(t) & seeds or any(n in src for n in changed_names):
             hits.append(str(t.relative_to(ROOT)))
+    # Пара перевода (06.10.2026, урок C-165): форму перевода судит test_doc_translations, а он
+    # ищет пары глобом и имени файла в тексте не несёт — правка X.md при X.en.md (и обратно)
+    # его не выбирала, и красный всплыл только на полном прогоне закрытия.
+    if any(p.suffix == ".md" and (p.name.endswith(".en.md") or (ROOT / p).with_suffix(".en.md").exists())
+           for p in changed_paths) and _TRANSLATION_TEST not in hits:
+        hits.append(_TRANSLATION_TEST)
     if len(hits) > SELECTION_CAP:
         return hits, (f"затронуто {len(hits)} тестов (> {SELECTION_CAP}) — "
                       "правка широкая, выбор не сужает; гони полный набор")

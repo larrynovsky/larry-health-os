@@ -1,69 +1,71 @@
-<!-- translation-of: docs/explanation/night_cycle.md sha256:3586754a5657 -->
+<!-- translation-of: docs/explanation/night_cycle.md sha256:d0d7c7da6c15 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](night_cycle.md)
 
-# Night Decision Pipeline: a finding gets a name, a class, and a deadline
+# Nightly Decision Pipeline: A Finding Gets a Name, a Class, and a Deadline
 
-## What changed
+## What Changed
 
-- **Night repair: the night prepares the fix, the session lands it.** The invariant `night_repair_prepares_session_lands` (status=holds) has been added: each night the author works through up to two engineering-queue cards in a sandbox and the reviewer attempts to refute them; the fix lands as a patch on Studio, and the commit to main waits until the session either lands it (patch test on the stand is red without the fix and green with it), closes it (environment breakage), or rejects it. The owner takes no part in the chain.
+- **Red tests are now fixed by the nightly repair.** Since 06.10 (owner decision: "auto-repair must exist"), a test that has been red two nights in a row becomes a `test:<selector>` card in the engineering queue, and the nightly repair picks it up like any other card; a test that turns green removes its own card. Before this, red tests were never added to the queue at all. Limit: two cards per night — if the queue is long, a test card waits its turn.
 
-- **The claim about the absence of automatic application has been lifted.** The invariant `auto_fix_applier_absent` has been removed: the former declaration "the carrier of the mechanism is not built and is not being built right now" is no longer a recorded fact in the registry.
+- **The question to the owner "should auto-repair be built" has been removed.** The `fix-applier-input-returned` card is no longer created: it was answered by building the nightly repair (30.09) and the owner's word (06.10).
 
-**Updated:** 2026-09-30
+**Updated:** 2026-10-06
 
 
-## Why it exists
+## Why It Exists
 
-Imagine that every night the system looks at your health and notices something. Say, one indicator has gone slightly outside its usual range. The next night — again. And once more. If each of those observations has no name and no address, they never accumulate into a history — they look like fresh news every time. You don't know whether it is the same issue or a different one. You don't know whether anyone has already dealt with it or not.
+Imagine that every night the system notices something concerning — a sensor flickered, a test went red, a project hasn't moved in a long time — and simply sends you a message. The next day the same thing sends another message. The day after, a third. A week later you no longer know: is this one story or three different ones? You seem to have resolved one of them — but which one?
 
-That is exactly the problem the night pipeline solves: it gives a finding a stable identity. One name per subject. One home where it lives. A clear category: this the system will fix on its own, this goes into a digest, and this is a question that needs your answer. And a deadline: if no one has answered within two weeks, the card closes in silence — but only when a whole set of conditions is met, and not a single one can be skipped.
+The pipeline exists so that this doesn't happen. Its main job is to give each finding a stable identity: a name that doesn't change from night to night, a class (who is supposed to act here), and a deadline. Without this, the stream of messages is just noise in which neither progress nor anything stuck is visible.
 
-Without the pipeline, a stream of messages is noise. With the pipeline, they are managed questions with names, owners, and deadlines.
+There is another reason. The system works at night, without you, and makes some decisions on its own. That is convenient — but this is precisely where silence is most dangerous. If the autonomous part quietly elevated its own privileges and closed a medical question by itself — that looks like silence. If a card closed silently where silence should not have occurred — silence. If one subject spread across two names and one of them keeps ringing — silence. If a sensor sees nothing because it is blind, not because everything is fine — silence again. The pipeline is built so that each of these four kinds of silence is distinguishable.
 
-## What it does, in plain terms
+## What It Does, in Plain Words
 
-Every night the pipeline passes through three sources. The first — crashes and errors the system caught during the day. The second — sensor warnings. The third — silence: if there has been no movement whatsoever in some area of work for more than six days, that is also a finding, and it also needs to be named.
+Every night the pipeline collects three kinds of things: errors and warnings from sensors; signals that some project hasn't moved in a long time; results of repairs the system attempted to make on its own.
 
-Every finding gets a **name** — one, permanent, by which it can be recognised tomorrow and a month from now. It gets a **class**: the system will handle it on its own, or it goes into a specialist digest, or it is a question specifically for you. It gets a **card** — a place where the entire history is stored: what happened, what the options are, what each of them means, and who ultimately made the decision.
+The first thing it does with a finding is give it a name. One name, stable. The name and class live in one place, and only one: if they lived in two, one subject could become two, and while you close one, the other would keep ringing.
 
-By the time the card reaches your desk it is already prepared: the question is phrased in your terms, the options are listed, and each has its own cost. If even one of the three is missing — the card does not come to you; it goes to the engineering queue with a note about what is incomplete.
+Then it decides who should act, and puts the finding in the right home.
 
-Once a day the pipeline calls you — no more often. That call lists every decision that is waiting specifically for you, one line each, and the nearest deadline after which the card may close in silence. Technical findings that the system is to resolve on its own are not included in this call.
+There are three classes. The first is "mine to fix": the system will handle it on its own, without you. The second is "into the digest": this is a technical finding that the engineering queue will deal with separately; you don't need to know the details. The third is "your decision": the question is on your desk, and it will not close without you.
 
-Silence as a card outcome is a special matter. For a card to close without your answer, all of the following must hold simultaneously: it must have a ready option, a way to undo, a date, and a specific assignee who has already carried out that option. And the action must not be irreversible. And it must not touch your personal data space. If even one condition is not met — the card stays on the desk and waits for you indefinitely. The system is designed so that the right to close silently must be earned explicitly, card by card. By default, silence does not mean closed.
+Only a card that has three things reaches your desk: a question in plain words, a closed list of options, and the cost of each. If even one of the three is missing, the card goes to the engineering queue with a note: this is an unfinished diagnosis; there is no reason to put it on your desk.
 
-Every closed decision has a recorded author: you answered yourself, the card closed in silence according to the rules, or the thread was closed entirely in the registry. There is no fourth option. A month from now it will be visible who made each decision — and that is not words, that is a record in the system.
+Every morning the bell rings once. It names every waiting question in one line of plain words, states the nearest deadline, and gives one phrase that opens the full cards. Not five rings — one. Not "N questions on the desk" — but what exactly those questions are.
 
-The decision desk remembers everything that has ever been on it — cards are not deleted. If after a system migration there are fewer cards on the desk than there should be, the system does not stay silent: it reports this to you instead of the usual list.
+After two weeks of silence a card may close by default — but only if it has an option, someone has already carried it out before the decision was recorded, the action is reversible, and it does not concern your personal space. Without this, the card waits for you indefinitely. A default close is not "close quietly"; the right to close silently is granted explicitly, one card at a time.
 
-There is one more thing worth saying separately: a sensor cannot be silent out of blindness. If it cannot see what it is supposed to watch — it says so out loud. "Cannot check here" is not a question to you; it is a separate record that goes into the weekly digest. A sensor's silence and its admission of blindness are different things, and the system tells them apart.
+Every closed question has its author recorded: you yourself, default, thread closure, or "not on the desk." Without an author, "resolved" reads as your word a month later — and that may not be true.
 
-During the night, while you sleep, the system works through up to two engineering cards on its own: it looks for the cause, prepares a fix with a test, and checks it through an independent review. You are not part of that chain. The fix lands on the working machine and waits until the test confirms: red without the fix, green with it. Only then can things move forward.
+The desk does not forget what was decided. The number of cards is remembered in the database, and if one day there are fewer cards, the system will understand that the desk has lost its memory, will stop laying out cards, and will tell you directly.
 
-## What is honest to say about its limits
+A sensor that notices nothing is required to say so out loud — otherwise "no errors" and "I wasn't looking at anything" are indistinguishable. A sensor that sees its subject not in this environment (for example, a container cannot see host tasks) also says so directly — such a finding goes into the weekly digest, not to you.
 
-All of the pipeline's promises hold — but "holds" and "verified everywhere" are different claims. Here is where the line between them falls.
+The system attempts to fix the technical queue on its own, at night: it finds the cause and brings a fix with a test. The fix is accepted only if the test is red without it and green with it — the author's word is not enough for this. The autonomous cycle cannot elevate its own privileges: it can only downgrade an action to "put on the owner's desk," but never upgrade it to "do it myself." This is not a rule the system assigned to itself out of caution — it is structured so that there is simply no other path.
 
-**Silence is currently effectively disabled as an outcome.** The promise about closing in silence is correct, but the assignee registry is empty right now. While no one is in it — silence resolves nothing. The rule "silence equals delegation" is suspended until the first assignee with a test appears.
+## Honest Statement of Its Limits
 
-**"Finding disappeared" can mean two different things.** When a card is taken off the desk because the sensor no longer sees it — that may mean the problem is gone. Or it may mean the sensor itself broke and stopped looking. Against the second case stand separate liveness sensors and the requirement of a fresh artifact date, but not a hundred-percent guarantee. A check that does not run every day introduces additional complexity: if it missed its day, the card is removed and reopened on the next run, and the age resets.
+Everything described holds. But "holds" and "verified everywhere" are different claims. Here are where the limits are real, not fine print.
 
-**A fresh installation starts from zero.** The protection against desk-memory loss works from the second pass of the cycle — on the very first installation there is nothing to lose, and that is expected. But if both the desk and the database are lost simultaneously, the protection is silent.
+**Default close does not actually resolve anything yet.** The promise "silence = delegation" is formally fulfilled, but the registry of those who can execute decisions by default is currently empty. The mechanism exists; the executors do not yet.
 
-**A sensor that wrote its refusal in its own words becomes a question again.** The phrase "cannot check here" is recognised by exact text. If the sensor phrases it differently, the refusal will not be recognised as such.
+**A missing finding is not always good news.** When a card is removed from the desk because its finding is no longer present in today's check, that may mean "fixed" — or it may mean "the check broke and is silent." Against the second case stand the liveness sensors for checks and the requirement for a fresh artifact date, but not absolute protection.
 
-**An unknown finding class stays as a question for you.** The class is determined by the finding's name from a closed list. If the name is unknown to the system, the finding goes to your desk — until it is given the correct name.
+**If both the desk and the database disappear at once, the protection is silent.** The memory-loss insurance works when one thing disappears. If both disappear together, the system has nothing to push off from.
 
-**Night repair: the key lives in an environment variable.** The sandbox closes the file containing the secret, but not the variable itself. If the value ends up in the session output — other paths to exfiltrate it are not blocked. This is named, not closed.
+**A sensor that wrote "cannot check" in its own words outside the required constant will become a question again.** Refusal is recognized by the exact start of the line: a slightly different wording and the protection does not trigger.
 
-**A thread can be recorded as closed without the owner's decision.** The system sees the status `closed` in the registry but does not verify that you were the one who set it. The norm "a thread closes by the owner's decision" is upheld by the closing ritual, not by code.
+**An unknown class label remains "your decision."** If the system encounters a label it cannot recognize, the card will land on your desk — until it is named correctly.
 
-**The engineering queue has no voice about its own age.** Once a week — a line in the digest. If a card has been sitting there a long time — the system will not remind about it any more loudly on its own.
+**There is no watchdog for the age of the engineering queue.** Engineering queue cards appear in the digest once a week — in one line. How long they have been waiting there is not tracked separately.
 
-**The call waits for the cycle only at its scheduled minute.** If the cycle did not start on time — late calls do not compensate for that.
+**Nightly repair is visible only at commit time, not in real time.** The liveness of the nightly repair is checked by a label at the moment someone attempts to merge code — not by a monitor that watches continuously.
 
-## Where this lives in the system
+**The API key is in the environment, not only in the file.** The sandbox closes the secret file but not the environment variable: if the value ends up in output, the carrier will not write it down, but other paths to leak it are not blocked.
 
-The pipeline lives in `night_cycle.py` — a script that runs at night on
+**Thread closure is checked by status, not by the owner's word.** The machine sees "closed" in `INDEX` — the code does not check who set it or how. The guarantee that a thread closes only by your decision is maintained by ritual, not by code.
+
+**A thread with no row in `INDEX` remains without a card.** If a thread was renamed and the row was lost, removing

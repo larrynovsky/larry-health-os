@@ -233,3 +233,16 @@ def test_no_partner_dir_means_silence_not_verdict(monkeypatch, tmp_path):
     """Границу судим честно: нет каталога партнёра — молчим, а не выдумываем."""
     it = _scope_env(monkeypatch, tmp_path, ["telegram_token"], scope={"telegram_token": "tenant"})
     assert it.check_secret_scope_matches_reality()["partner_dir"] is False
+
+
+def test_unrestarted_daemon_is_a_failure_not_a_warning(monkeypatch):
+    """Решение владельца 06.10 «делать» (урок C-166): служба, которую деплой не перезапускает, —
+    FAIL ночного монитора, а не warn, которого шесть суток никто не читал. Мутация: вернуть warn."""
+    import daemon_liveness
+    import integrity_tests as it
+    monkeypatch.setattr(daemon_liveness, "find_unrestarted_daemons",
+                        lambda: ["com.larry.health.lab-intake.partner"])
+    before_fail, before_warn = it.FAIL, it.WARN
+    out = it.check_deploy_restart_completeness()
+    assert out == {"unrestarted": ["com.larry.health.lab-intake.partner"]}
+    assert it.FAIL == before_fail + 1 and it.WARN == before_warn

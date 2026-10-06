@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/publish_mirror.md sha256:0533db027763 -->
+<!-- translation-of: docs/how-to/publish_mirror.md sha256:efc8fdd68880 -->
 **English** · [Русский](publish_mirror.md)
 
 # How to update the public repository and accept a change from it
@@ -26,6 +26,11 @@ has been read: the project's prose easily keeps a "measured on live data" trace.
 python3 scripts/public_mirror.py --unread           # what to read: changed public files
 python3 scripts/public_mirror.py --mark-read main   # after reading and fixing; commit the mark
 ```
+
+Lines that look like a live measurement (an event date or a blood-pressure pair next to a body word) are printed
+first by `--unread`. `--mark-read` refuses while they are there: remove the live data or, having reviewed each one,
+repeat with `--cleared N`, where N is their count. The highlight catches form, not meaning: it misses a number
+without a date, so everything still has to be read.
 
 The mark is judged by the version committed in the exported commit, not by the file on disk: an uncommitted mark does not open the push.
 

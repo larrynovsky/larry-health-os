@@ -498,11 +498,13 @@ RADICALE_VERSION = "3.8.1"   # та же, что у пробы этапа 3 (Mac
 OWNER_BACKUPS_REL = "container_backups/health"   # не «health*»: иначе ~/health*-сторожа сочли бы его тенантом
 
 
+TAILSCALE_IMAGE_TAG = "v1.102.3"   # = версия Tailscale на Studio (замер 06.10)
+MCP_TS_VOLUME = "health_mcp-ts"     # состояние узла health-mcp (вход в tailnet)
 HOST_LOGS = "/app/host_logs"   # журналы хоста в контейнере владельца (только чтение)
 DIGEST_DIR = "/app/outputs/weekly_digest"   # = weekly_digest.OUT_DIR в образе (ROOT=/app)
 
 
-def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> dict[str, str]:
+def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp_base: "str | None" = None) -> dict[str, str]:
     """Настройки контейнера ВЛАДЕЛЬЦА на Studio (волна Б, этап 11): compose.override.yaml и infra.yaml
     контейнера. Не для посторонних — у них слоя владельца нет. Что и почему (замеры этапа 9):
     - имя машины = primary_host установки (решение владельца «Имя Studio»): иначе запись запрещена;
@@ -547,9 +549,47 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str) -> 
         "command": ["sh", "-c", f'pip install -q "radicale[bcrypt]=={RADICALE_VERSION}" && exec python -m radicale --config /caldav/config'],
         "volumes": [f"{home}/.health_caldav:/caldav"],
         "ports": ["127.0.0.1:5232:5232"]}
+    extra = {}
+    if mcp_base:
+        # Сервер MCP для облачных помощников (нить mcp-gateway, решения владельца 06.10: одна память,
+        # сразу облако, отдельный узел tailnet). mcp — тот же образ, наружу НИКАКИХ портов хоста;
+        # mcp-funnel — свой узел tailnet (тег tag:mcp), единственная его публичная точка — Funnel
+        # 443 → mcp:8765. Дашборд и соседи Studio этим узлом не открываются. Выключить: убрать
+        # ~/.health_mcp и перерендерить, либо `docker compose stop mcp-funnel`.
+        img = base["cron"]["image"]
+        services["mcp"] = {
+            "image": img, "hostname": primary_host, "env_file": [".env"], "restart": "unless-stopped",
+            "environment": {"HEALTH_SERVICE_LABEL": "com.larry.health.mcp", "MCP_BIND": "0.0.0.0",
+                            "MCP_PORT": "8765", "MCP_PUBLIC_BASE": mcp_base},
+            "command": ["python3", "/app/health_mcp.py"],
+            "volumes": [*base["cron"]["volumes"], *vols],
+            "depends_on": {"cron": {"condition": "service_healthy"}}}
+        services["mcp-funnel"] = {
+            "image": f"tailscale/tailscale:{TAILSCALE_IMAGE_TAG}", "hostname": mcp_base.split("//", 1)[1].split(".", 1)[0],
+            "restart": "unless-stopped",
+            # TS_HOSTNAME: вход сохранён с именем узла, и `tailscale up` без того же --hostname
+            # отказывает («all non-default settings must be specified») — контейнер падал по кругу
+            # (замер 06.10). TS_AUTH_ONCE: уже вошедший узел не логинится заново при каждом старте.
+            "environment": {"TS_STATE_DIR": "/var/lib/tailscale", "TS_USERSPACE": "true",
+                            "TS_HOSTNAME": mcp_base.split("//", 1)[1].split(".", 1)[0], "TS_AUTH_ONCE": "true",
+                            "TS_SERVE_CONFIG": "/config/serve.json", "TS_EXTRA_ARGS": "--advertise-tags=tag:mcp"},
+            # Состояние узла — в томе Docker, не в каталоге хоста: на смонтированном каталоге
+            # Studio tailscaled записал только ключ машины, вход не сохранялся, и после каждого
+            # перезапуска узел просил новую ссылку (замер 06.10: 48 перезапусков, файл 119 байт;
+            # в томе Docker — 2482 байта, вход пережил перезапуск).
+            "volumes": [f"{MCP_TS_VOLUME}:/var/lib/tailscale",
+                        f"{repo}/build/docker/mcp_serve.json:/config/serve.json:ro"],
+            "depends_on": ["mcp"]}
+        extra["mcp_serve.json"] = json.dumps({
+            "TCP": {"443": {"HTTPS": True}},
+            "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/": {"Proxy": "http://mcp:8765"}}}},
+            "AllowFunnel": {"${TS_CERT_DOMAIN}:443": True}}, indent=2)
     head = "# сгенерировано scripts/install.py --owner-override (этап 11 волны Б) — руками не править\n"
-    return {"compose.override.yaml": head + yaml.safe_dump({"services": services}, allow_unicode=True, sort_keys=False),
-            "infra.yaml": head + yaml.safe_dump({"primary_host": primary_host})}
+    doc = {"services": services}
+    if mcp_base:
+        doc["volumes"] = {MCP_TS_VOLUME: {"external": True}}   # создаётся один раз при входе узла
+    return {"compose.override.yaml": head + yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
+            "infra.yaml": head + yaml.safe_dump({"primary_host": primary_host}), **extra}
 
 
 def render_shadow_agent(home: str) -> str:
@@ -661,8 +701,14 @@ def main(argv: list[str] | None = None) -> int:
             ap.error("в private/infra.yaml нет primary_host — это не машина владельца")
         dest = ROOT / "build" / "docker"
         (dest / "host").mkdir(parents=True, exist_ok=True)
-        out = render_owner_override(str(Path.home()), ROOT, infra_config.PRIMARY_HOST, a.tz)
+        # Сервер MCP — только если владелец его завёл: каталог ~/.health_mcp держит состояние узла tailnet.
+        tn = str(getattr(infra_config, "_D", {}).get("tailnet_hostname", ""))
+        mcp_base = (f"https://health-mcp.{tn.split('.', 1)[1]}"
+                    if (Path.home() / ".health_mcp").is_dir() and "." in tn else None)
+        out = render_owner_override(str(Path.home()), ROOT, infra_config.PRIMARY_HOST, a.tz, mcp_base)
         (dest / "compose.override.yaml").write_text(out["compose.override.yaml"], encoding="utf-8")
+        if "mcp_serve.json" in out:
+            (dest / "mcp_serve.json").write_text(out["mcp_serve.json"], encoding="utf-8")
         (dest / "host" / "infra.yaml").write_text(out["infra.yaml"], encoding="utf-8")
         print(f"override владельца: {dest / 'compose.override.yaml'} (имя машины {infra_config.PRIMARY_HOST})")
         return 0

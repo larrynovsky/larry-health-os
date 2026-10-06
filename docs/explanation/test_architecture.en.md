@@ -210,6 +210,12 @@ What is in place now (tests/conftest.py, block `thread_guard`; pytest.ini):
   already been returned by then; stand measurement: 69 dashboard tests were red only because of it;
 - the hypothesis resolver writes only to rows with `category='hypothesis'`.
 
+**The nightly suite stays on the live environment (2026-10-06, owner's decision).** A run on a
+database copy was measured: a copy in another directory breaks ~60 tests that check the data
+directory against installed services, and causes a cascade of fixture errors. So the night runs
+under the guards above, not on a copy. The AnyIO pool worker is excluded from the thread guard by
+class and idleness (the `idle_workers` queue), not by name: a busy worker is waited for like any thread.
+
 The nightly chronicle (`run_checks.sh`) names ERROR (fixture or teardown failure) as well as FAILED:
 otherwise a red guard in a fixture would pass as "the set did not change".
 

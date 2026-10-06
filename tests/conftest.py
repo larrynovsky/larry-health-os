@@ -835,10 +835,14 @@ def _no_real_llm_providers(monkeypatch, request):
 # разборка шла бы после отката подмены. Не дождались — тест красный с именем потока.
 # --- thread_guard begin ---
 _THREAD_JOIN_S = 10.0
-# Пул AnyIO (TestClient панели): простаивающий рабочий живёт ~10 с после ответа и чужой работы не
-# несёт — ответ отдан, фоновые задачи TestClient дожидается сам. Замер стенда 05.10: 69 тестов
-# панели краснели ТОЛЬКО на нём. Исключение по имени — граница сторожа, названная здесь.
-_POOL_IDLE_NAMES = ("AnyIO worker thread",)
+
+
+def _pool_idle(t) -> bool:
+    """Рабочий пула AnyIO (TestClient панели), стоящий в СВОЕЙ очереди простаивающих.
+    Пул не завершает поток, а возвращает его в очередь — ждать завершения бессмысленно, ждём
+    простоя. Признак — класс из anyio и поле idle_workers, не имя (06.10.2026: «AnyIO worker
+    thread» — просто строка, её может носить любой поток). Занятый рабочий простоем не считается."""
+    return type(t).__module__.startswith("anyio.") and t in getattr(t, "idle_workers", ())
 
 
 @pytest.hookimpl(wrapper=True)
@@ -847,11 +851,16 @@ def pytest_runtest_call(item):
     try:
         return (yield)
     finally:
-        born = [t for t in _threading.enumerate() if t not in before and t.is_alive()
-                and not t.name.startswith(_POOL_IDLE_NAMES)]
+        import time as _time
+        born = [t for t in _threading.enumerate() if t not in before and t.is_alive()]
+        deadline = _time.monotonic() + _THREAD_JOIN_S
         for t in born:
-            t.join(timeout=_THREAD_JOIN_S)
-        alive = [t.name for t in born if t.is_alive()]
+            if type(t).__module__.startswith("anyio."):
+                while t.is_alive() and not _pool_idle(t) and _time.monotonic() < deadline:
+                    _time.sleep(0.01)
+            else:
+                t.join(timeout=max(0.0, deadline - _time.monotonic()))
+        alive = [t.name for t in born if t.is_alive() and not _pool_idle(t)]
         if alive:
             pytest.fail(f"thread outlived its test: {alive}", pytrace=False)
 # --- thread_guard end ---

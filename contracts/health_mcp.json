@@ -1,0 +1,54 @@
+{
+  "module": "health_mcp",
+  "public": [
+    "resource",
+    "as_metadata",
+    "pr_metadata",
+    "rpc",
+    "page",
+    "make_handler",
+    "main"
+  ],
+  "depends_on": [
+    {
+      "module": "mcp_auth",
+      "uses": [
+        "Store",
+        "AuthError",
+        "SCOPE"
+      ],
+      "why": "вход: каждый запрос к /mcp проверяется Store.verify, страницы входа зовут begin/confirm/token"
+    },
+    {
+      "module": "notify",
+      "uses": [
+        "notify"
+      ],
+      "why": "6 цифр входа уходят владельцу в Telegram; fallback=False — код не должен уйти на резервный канал",
+      "legacy": "контракта у notify пока нет; используется notify.notify(text, fallback=False) → 'telegram' | 'fallback' | 'none'"
+    },
+    {
+      "module": "mcp_tools",
+      "uses": [
+        "TOOLS",
+        "NAMES",
+        "call"
+      ],
+      "why": "инструменты чтения: список и вызов"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "Один домен — протокол: HTTP-обвязка MCP (streamable HTTP, JSON-RPC 2.0) и страницы входа. Решения о доступе принимает mcp_auth, данных здоровья на шаге 0 нет вовсе.",
+      "D2": "make_handler(store, base, notify_owner) — единственная точка сборки; rpc и метаданные — чистые функции, открыты для тестов поведения; main — запуск процесса.",
+      "D3": "mcp_auth (свой контракт) и notify.notify; тенант — переменная HEALTH_DATA_DIR процесса; остальное stdlib.",
+      "D4": "~210 строк.",
+      "D5": "tests/unit/test_mcp_auth.py поднимает настоящий сервер на случайном порту: 401 с адресом метаданных без токена и с поддельным, метаданные с S256, полный путь регистрация → код в «Telegram» (заглушка) → 302 с state → токен → tools/list. Мутация «/mcp без проверки токена» — красная.",
+      "D6": "Инвариант с mcp_auth — общий resource; инвариант с будущими инструментами шага 1 — ответ несёт источник и дату, пустота — строка «нет данных» (записан в INSTRUCTIONS и в плане; кодом стережётся с шага 1)."
+    },
+    "rationale": "Переписывается по контракту: вход — HTTP-запросы клиентов MCP, выход — ответы протокола и страницы входа.",
+    "date": "2026-10-06",
+    "oracle": "tests/unit/test_mcp_auth.py; совместимость с настоящими клиентами — живое подключение Claude и ChatGPT (ворота шага 0), машинного оракула у неё нет."
+  }
+}

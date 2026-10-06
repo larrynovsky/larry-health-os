@@ -17,7 +17,6 @@ Dry-run: --dry-run покажет что было бы импортирован�
 import llm_client   # был строкой ВЫШЕ шебанга (24.09 вернул шебанг первой строкой)
 import sys, os, json, re, argparse, sqlite3, time
 import hai_core
-import i18n
 from pathlib import Path
 from datetime import datetime
 
@@ -43,6 +42,11 @@ TEXT_LIMIT = 12000
 OCR_MIN_CHARS = 80   # меньше — OCR ничего внятного не прочёл, сверять не с чем
 KEY_RETRY_SEC = 30 * 60   # ключ/баланс пуст — повтор не чаще (как у разбора анализов)
 PER_POLL = 5          # не больше стольких новых документов за проход вотчера
+# Квитанция разбора файла (нить file-outcome, 06.10): что этот разборщик сделал с файлом. Её читает
+# итог по файлу (lab_intake_watcher._settle_outcomes) — человеку говорят ОБА разборщика вместе, а не
+# разбор анализов за весь файл. До 06.10 заключение, принятое здесь, человек слышал как «ничего не
+# добавлено»: говорил только разборщик анализов, а этот при успехе молчал.
+RECEIPT = ".events.done"
 
 SKIP_PATTERNS = [
     "invoice", "payment", "поручение", "отчет", "юним",
@@ -303,20 +307,25 @@ def process_pdf(pdf_path: Path, dry_run: bool = False) -> bool:
     return _process(pdf_path, dry_run) == "imported"
 
 
-def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) -> str:
+def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None,
+             info: dict | None = None) -> str:
     """Один документ → 'imported' | 'skipped' | 'failed' | 'waiting' (ключ/баланс поставщика). root — от чего считать путь-источник:
-    CR/ владельца (по умолчанию) или каталог данных тенанта для его входящих."""
+    CR/ владельца (по умолчанию) или каталог данных тенанта для его входящих.
+    info — если передан, сюда кладётся, ЧТО найдено (для квитанции RECEIPT) и почему пропущен."""
+    info = {} if info is None else info
     rel = str(pdf_path.relative_to(root or CR_DIR.parent))  # "CR/<визит>.pdf" | "incoming/…"
 
     # Пропуск платёжных/нерелевантных
     name_lower = pdf_path.name.lower()
     if any(p in name_lower for p in SKIP_PATTERNS):
         print(f"  ↷ SKIP (платёжный): {pdf_path.name}")
+        info["status"] = "ignored"
         return "skipped"
 
     # Идемпотентность
     if already_imported(rel):
         print(f"  ✓ уже импортирован: {pdf_path.name}")
+        info["status"] = "already"
         return "skipped"
 
     suffix = pdf_path.suffix.lower()
@@ -336,6 +345,7 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) ->
             text = extract_text(pdf_path)
             if not text.strip():
                 print(f"  ✗ пустой текст после OCR")
+                info["cause"] = "пустой текст после распознавания (OCR)"
                 return "failed"
             print(f"     текст: {len(text)} симв. → LLM...")
             data = llm_extract(pdf_path.name, text)
@@ -345,11 +355,18 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) ->
             # (нить lab-intake-retry, 05.10). Человеку об этом говорит разбор анализов, один раз.
             print(f"  … ждёт ключа/баланса поставщика: {e}")
             return "waiting"
+        if llm_client.is_transient(e):
+            # Обрыв или перегрузка у поставщика — повтор через время (нить file-outcome, 06.10).
+            info["error"] = e
+            print(f"  … временный отказ поставщика, повтор позже: {llm_client.safe_cause(e)}")
+            return "retrying"
+        info["cause"] = llm_client.safe_cause(e)
         print(f"  ✗ извлечение данных: {e}")
         return "failed"
 
     if not data:
         print(f"  ✗ LLM вернул пустой результат")
+        info["cause"] = "модель вернула пустой результат"
         return "failed"
 
     event_type     = data.get("event_type") or "encounter"
@@ -424,6 +441,7 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) ->
             except Exception as _e:
                 print(f"     ↳ treatment: ошибка экстракции — {_e}")
         # Диагнозы и лекарства — ПРЕДЛОЖЕНИЯМИ под гейт человека (owner_gate_kept), с цитатой.
+        nd = nm = 0
         try:
             nd, nm = _propose_from(data, text, rel, effective_date, event_id,
                                    ocr=suffix in (".jpg", ".jpeg", ".png", ".heic"))
@@ -432,10 +450,12 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None) ->
         except Exception as _e:
             print(f"     ↳ предложения: ошибка — {_e}")
         print(f"     ✓ сохранено")
+        info.update(status="imported", kind=event_type, date=effective_date, diagnoses=nd, medications=nm)
         return "imported"
 
     except Exception as e:
         print(f"  ✗ DB error: {e}")
+        info["cause"] = f"запись в базу: {llm_client.safe_cause(e)}"
         return "failed"
 
 
@@ -506,8 +526,9 @@ def process_incoming(inbox: Path) -> int:
     """Входящие тенанта (корень и reports/) → события медкарты + предложения. Для ЛЮБОГО
     тенанта: до 24.09 разбор заключений читал только iCloud-папку CR/ владельца, и у партнёра
     и постороннего заключение врача пропускалось молча. Зовётся из lab_intake_watcher.
-    Не больше PER_POLL документов за проход; отказ → сайдкар .events.failed + одно сообщение
-    человеку (иначе каждый проход заново платил бы за модель по тому же файлу)."""
+    Не больше PER_POLL документов за проход; отказ → сайдкар .events.failed (иначе каждый проход
+    заново платил бы за модель по тому же файлу), успех → квитанция RECEIPT. Человеку отсюда не
+    говорится ничего: итог по файлу — один, после обоих разборщиков (doc_outcome)."""
     inbox = Path(inbox)
     root = inbox.parent
     files = [f for d in (inbox, inbox / "reports") if d.is_dir() for f in sorted(d.iterdir())
@@ -520,22 +541,54 @@ def process_incoming(inbox: Path) -> int:
         wait = f.with_name(f.name + ".events.waitkey")
         if wait.exists() and time.time() - wait.stat().st_mtime < KEY_RETRY_SEC:
             continue   # ключ/баланс поставщика пуст: пробуем не чаще KEY_RETRY_SEC
-        status = _process(f, root=root)   # уже импортированный → 'skipped' внутри, без модели
+        from lab_intake_watcher import RETRY_WAIT, note_transient, retry_due
+        retry = f.with_name(f.name + ".events" + RETRY_WAIT)
+        if not retry_due(retry):
+            continue   # временный отказ поставщика: следующая попытка ещё не пришла
+        info: dict = {}
+        status = _process(f, root=root, info=info)   # уже импортированный → 'skipped' внутри, без модели
+        if status == "retrying":
+            if not note_transient(retry, info["error"]):
+                done += 1
+                continue
+            status = "failed"                          # потолок повторов исчерпан
+            info["cause"] = f"временный отказ поставщика не прошёл за все повторы: " \
+                            f"{llm_client.safe_cause(info['error'])}"
+        retry.unlink(missing_ok=True)
         if status == "waiting":
             wait.write_text("ключ или баланс поставщика")
         else:
             wait.unlink(missing_ok=True)
+        receipt = f.with_name(f.name + RECEIPT)
+        if info.get("status") and (status == "imported" or not receipt.exists()):
+            receipt.write_text(json.dumps(info, ensure_ascii=False))
         if status == "failed":
-            f.with_name(f.name + ".events.failed").write_text("разбор документа не удался")
-            try:
-                import notify
-                from link_fetch import display_filename
-                notify.notify(i18n.t("intake.document.parse_failed", name=display_filename(f.name)))
-            except Exception as e:  # silent-ok: сайдкар уже записан, повторов не будет
-                print(f"  ⚠ process_incoming: уведомление не ушло: {e}", file=sys.stderr)
+            # Человеку здесь НЕ говорим (нить file-outcome, 06.10): тот же файл читает и разбор
+            # анализов, и итог по файлу говорит lab_intake_watcher._settle_outcomes по обоим.
+            # До 06.10 отсюда шло своё «не смог разобрать документ» — второе сообщение о том же файле.
+            f.with_name(f.name + ".events.failed").write_text(
+                info.get("cause") or "разбор документа не удался")
         if status != "skipped":
             done += 1
     return done
+
+
+def doc_outcome(path: Path) -> dict | None:
+    """Чем закончился разбор файла как документа: {"status": imported|already|ignored|failed, …}.
+    None — ещё не закончился (не брался, ждёт ключа). Источник — сайдкары, которые пишет
+    process_incoming; итог по файлу у разбора анализов судит по ним."""
+    path = Path(path)
+    if path.suffix.lower() not in DOC_EXTS:
+        return {"status": "failed"}         # этот разборщик такой файл не берёт вовсе
+    receipt = path.with_name(path.name + RECEIPT)
+    if receipt.exists():
+        try:
+            return json.loads(receipt.read_text())
+        except (OSError, ValueError):
+            return {"status": "imported"}   # квитанция есть, но битая — документ всё равно принят
+    if path.with_name(path.name + ".events.failed").exists():
+        return {"status": "failed"}
+    return None
 
 
 def _guess_date_from_name(name: str) -> str | None:

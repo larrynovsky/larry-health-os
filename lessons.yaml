@@ -1829,10 +1829,13 @@ lessons:
   - git_hooks
   outcome:
     kind: check
-    text: починка запланирована (BL-OWNER-CRITERION-MERGE-1); до неё критерий — отдельным коммитом в main
-  status: in_work
+    text: 'при слиянии нити подъёмы судятся по её коммитам по порядку (intent_registry.promotions_in_merge), если итог слияния равен вершине ветки; tests/unit/test_promotion_in_merge.py, две мутации красные'
+  status: adopted
+  adopted_on: '2026-10-06'
+  change: 'git:e94e5a4'
   evidence:
   - git:8969010
+  - git:e94e5a4
   owner: владелец
 - id: C-71
   date: '2026-09-26'
@@ -2820,7 +2823,7 @@ lessons:
   address: {kind: data, ref: private/pii_terms.yaml}
   subject: [pii, sensor_perimeter]
   outcome: {kind: check, text: 'имена соседних проектов и их служб — в словарь переписи (класс neighbors): коммит, возвращающий их в публичную зону, блокируется. Мутация 01.10 (путь соседа в застейдженном how-to) — код 1; в тот же день сторож отбил коммит этой записи, где имя стояло уликой'}
-  status: adopted
+  status: failed   # 2026-10-06: C-168 — тот же класс (словарь не знал новую сущность), сторонний пользователь
   change: private/pii_terms.yaml
   adopted_on: '2026-10-01'
   evidence: ['git:a64752c', 'git:51a7a80']
@@ -2835,7 +2838,7 @@ lessons:
   address: {kind: runtime, ref: tests/conftest.py}
   subject: [test_stand, message_delivery, secrets]
   outcome: {kind: check, text: 'conftest._no_real_importers: хост api.telegram.org в argv subprocess.run или в URL urlopen — блок + красный teardown, токен в журнал не пишется. Мутация: без нейтрализатора квартальной доставки 7 тестов брифа красные с «telegram: sendDocument». Не покрыто: httpx/requests'}
-  status: adopted
+  status: failed
   change: 'git:b7bbdc4'
   adopted_on: '2026-10-01'
   evidence: ['git:b7bbdc4']
@@ -3346,4 +3349,172 @@ lessons:
   outcome: {kind: rule, text: 'код 13 — повтор отвязанным циклом (nohup, retry только по 13); кандидат в устройство — очередь закрытий, держащая порядок на время прогона, когда ждущих ≥2; решать при повторе'}
   status: observation
   evidence: ['git:aa79f28', 'git:48c36bb']
+  owner: владелец
+- id: C-160
+  date: '2026-10-06'
+  thread: borrow-botkin
+  modules: [integrity_tests.py, import_withings.py, subsystem_intent.yaml]
+  event: 'План нити C (Withings) стоял на посылке «давление с одной из летних дат перестало приходить через Apple Health, три месяца тишины никто не заметил». Под неё построены сторож check_bp_withings_reaches_hae, докстринги и claim реестра. Первый же живой ответ Withings 05.10 показал: последний замер в облаке прибора — тот же день: человек просто не мерил. Сторож снят через сутки, claim переписан.'
+  cost: 'сторож с негативным контролем построен и снят за сутки; две переписки claim реестра и страницы device_metrics_owner (перегенерация + перевод); ~4 полных прогона на Studio по 15 мин ушли на код, который потом сменился'
+  cause: 'тишина ручного, редкого измерения записана в «утверждения под решениями» как потеря данных; источник правды о самом событии (облако прибора) не опрошен до постройки — опрашивался только конвейер, который мог терять. Вопрос человеку «меряешь ли» получил ответ, который не различает «не мерил» и «мерил, не дошло»'
+  address: {kind: ritual, ref: letitbe — «Утверждения под решениями»}
+  subject: [hypothesis_before_fact, vendor_data, measurement_path]
+  outcome: {kind: rule, text: 'утверждение «данные перестали приходить» по ручному или редкому измерению помечается гипотезой, пока не сверено с записью самого прибора (облако/приложение поставщика); строить сторож потери — после этой сверки'}
+  status: observation
+  evidence: ['git:427906c', 'git:7d63da7', 'docs/handoff/borrow-botkin/2026-10-06-b91eee4.md']
+  owner: владелец
+- id: C-161
+  date: '2026-10-06'
+  thread: borrow-botkin
+  modules: [import_apple_health.py, metrics_db.py, import_withings.py]
+  event: 'Дневное давление за один летний день в daily_metrics — среднее, которое Health Auto Export посчитал по двум замерам «Здоровья», один из которых — замер другого человека на общем тонометре, удалённый в Withings. Удаление в Apple Health не доехало; пик дня мог ложно пересечь потолок тревоги. Ни одно правило не видело отдельный замер — только среднее.'
+  cost: 'дневное давление тенанта месяцами искажено чужим замером; ложный повод для тревоги; найдено случайно, при сверке живого ответа Withings с базой'
+  cause: 'дневной агрегат писал источник-посредник (Apple Health), который не видит правок владельца в источнике-первоисточнике (удаление в приложении прибора) и хранит отдельные замеры только как среднее дня; принадлежность замера человеку (общий прибор) нигде не проверялась'
+  address: {kind: data, ref: import_withings.py}
+  subject: [writers_readers, vendor_data, tenant]
+  outcome: {kind: check, text: 'Withings — единственный писатель дневного давления у подключённых (решение владельца 06.10): bp_readings — зеркало облака с удалением, замеры attrib=1 (прибор не знает чей) пропускаются, путь «Здоровья» — свидетель raw.apple_health_bp; ночной check_bp_day_is_withings пересчитывает средние сам; plans/mutate_bp_day_withings_2026-10-06.sh — 6 мутаций, все красные; тест test_ambiguous_reading_of_shared_device_is_skipped'}
+  status: adopted
+  adopted_on: '2026-10-06'
+  change: 'git:7d63da7'
+  evidence: ['git:7d63da7', 'git:1f9c8e6']
+  owner: владелец
+- id: C-162
+  date: '2026-10-06'
+  thread: borrow-botkin
+  modules: [intent_registry.py, scripts/thread_finish.sh]
+  event: '05.10 флип bp_second_source open→holds по критерию владельца отбит гейтом слияния, хотя критерий с closes_when_by: owner лежал отдельным коммитом ветки, как велит сообщение гейта. Пришлось сбросить флип с ветки, слить критерий отдельной нитью, потом флип второй. Тот же отказ описан в BL-OWNER-CRITERION-MERGE-1 (26.09) с пометкой «лечить по случаю (следующий флип)» — случай наступил, лечения не было.'
+  cost: 'один сгоревший запуск thread_finish и две нити вместо одной на каждый флип (05.10 и 06–07.10), ~15 мин прогона на каждую лишнюю нить'
+  cause: 'сообщение гейта (intent_registry.py:451) велит «отдельным коммитом», а гейт слияния сравнивает реестр main с итогом слияния и коммиты ветки по порядку не видит; правило и его исполнитель расходятся, а пункт бэклога с адресатом «по случаю» никто не поднимает, когда случай наступает'
+  address: {kind: runtime, ref: intent_registry.py}
+  subject: [intent_registry, run_version]
+  outcome: {kind: check, text: 'повтор C-70 (пункт бэклога «по случаю» не подняли, когда случай наступил); починено тем же изменением — tests/unit/test_promotion_in_merge.py'}
+  status: adopted
+  adopted_on: '2026-10-06'
+  change: 'git:e94e5a4'
+  evidence: ['git:a4f6386', 'git:b91eee4', 'BACKLOG.md']
+  owner: владелец
+- id: C-163
+  date: '2026-10-05'
+  thread: test-thread-leak
+  modules: [tests/conftest.py, hypothesis_resolution.py, tests/integration/test_dashboard_eval_background.py]
+  event: 'Поток теста фонового консилиума с 30.08 по 04.10 каждую ночь писал в живую базу владельца: строка memory.id=1 (чужая категория) затёрта вердиктами заготовки, создано три задачи «сдать ферритин» — одну владелец отметил выполненной 31.08. Тест был зелёным; запись остановил сторож query_only (C-154), и тогда в журнале осталась одна строка предупреждения.'
+  cost: '5 недель порчи живой строки памяти; 3 фальшивые задачи владельцу, одна принята за настоящую; исходное значение уцелело только в двух копиях от 30.08'
+  cause: 'подмена базы в тесте живёт до разборки фикстур, а тест ждал вызова консилиума, не конца потока — поздняя запись шла по откаченному пути; решатель гипотез читал и писал memory по номеру без категории; исключение в потоке pytest показывал предупреждением'
+  address: {kind: runtime, ref: tests/conftest.py}
+  subject: [test_stand, concurrency]
+  outcome: {kind: check, text: 'хук фазы вызова ждёт рождённые тестом потоки ДО разборки фикстур, не дождались — красный (tests/unit/test_thread_outlives_test.py, мутации «вырезать хук» и «нет ожидания» красные); filterwarnings error::PytestUnhandledThreadExceptionWarning; решатель — только category=hypothesis'}
+  status: adopted
+  adopted_on: '2026-10-05'
+  change: 'git:f61f01c'
+  evidence: ['git:f61f01c', 'docs/handoff/test-thread-leak/LATEST.md']
+  owner: владелец
+- id: C-164
+  date: '2026-10-05'
+  thread: test-thread-leak
+  modules: [run_checks.sh]
+  event: 'Ночная хроника падений строила набор только из строк FAILED, а сводка pytest шла с -rf: пять ERROR (сбой фикстуры или разборки) каждую ночь не имели имени, и «набор упавших не изменился — молчим». Красная сторожа в фикстуре прошла бы тем же путём.'
+  cost: 'не меньше двух ночей (04.10, 05.10) с пятью безымянными ошибками; их имена так и не узнаны — 06.10 они исчезли'
+  cause: 'периметр датчика задан форматом одной строки вывода (^FAILED), а класс провала шире: ERROR — тот же красный, другой префикс; -rf из командной строки перекрывал -ra из pytest.ini'
+  address: {kind: runtime, ref: run_checks.sh}
+  subject: [sensor_perimeter]
+  outcome: {kind: check, text: 'сводка -rfE, pytest_failed_ids берёт ^(FAILED|ERROR) (tests/unit/test_pytest_failed_diff.py::test_error_lines_are_named_too и ::test_nightly_summary_lists_errors, обе мутации красные)'}
+  status: adopted
+  adopted_on: '2026-10-05'
+  change: 'git:f61f01c'
+  evidence: ['git:f61f01c']
+  owner: владелец
+- id: C-165
+  date: '2026-10-05'
+  thread: test-thread-leak
+  modules: [docs/explanation/test_architecture.md]
+  event: 'Новый раздел в docs/explanation/test_architecture.md без перевода в .en.md: pre-commit выбрал 16 затронутых тестов и пропустил, полный прогон thread_finish отказал в слиянии одним красным (test_doc_translations).'
+  cost: 'один полный прогон (~14 мин) и повторное закрытие (~17 мин)'
+  cause: 'выбор затронутых тестов в pre-commit идёт по графу импорта кода; правка документа с парой .en.md к тесту формы перевода не ведёт'
+  address: {kind: runtime, ref: scripts/git-hooks}
+  subject: [git_hooks, test_stand]
+  outcome: {kind: rule, text: 'правка docs/**/X.md при наличии X.en.md — перевод в том же коммите и tests/consistency/test_doc_translations.py до коммита; кандидат в устройство — выбор затронутых тестов знает пары перевода'}
+  status: observation
+  evidence: ['git:7a9d04f']
+  owner: владелец
+- id: C-166
+  date: '2026-10-06'
+  thread: lab-intake-retry
+  modules: [scripts/git-hooks/post-commit-macbook, daemon_liveness.py]
+  event: 'Деплой нити 05.10 написал «intake watcher restart triggered (owner+partner)», а вотчер партнёра остался процессом от 30.09 12:47: хук перезапускал com.larry.health.watcher.partner, а с 28.09 (5b37d11) джоба зовётся com.larry.health.lab-intake.partner. Датчик find_unrestarted_daemons при этом возвращал её имя.'
+  cost: 'шесть суток все правки разбора документов не доходили до процесса партнёра (класс 01.08 — 16 суток, 19278 сообщений); найдено только сверкой времени старта процесса после деплоя'
+  cause: 'имя службы живёт в двух домах (плист и ручной список хука), переименование прошло по одному; «launchctl kickstart … || true» превращает «нет такой службы» в успех, и строка лога «triggered» врёт; датчик расхождения — warn без адресата, его никто не читал'
+  address: {kind: runtime, ref: scripts/git-hooks/post-commit-macbook}
+  subject: [sensor_perimeter, state_lifetime]
+  outcome: {kind: rule, text: 'после деплоя сверять ВРЕМЯ СТАРТА процесса каждой долгоживущей службы, а не строку «restart triggered»; имя исправлено (git:69e6140); кандидат в устройство — хук берёт список имён из плистов (один дом) и отказ kickstart не глотает; решать владельцу'}
+  status: observation
+  evidence: ['git:69e6140', 'docs/handoff/lab-intake-retry/2026-10-06-c21064e.md']
+  owner: владелец
+- id: C-167
+  date: '2026-10-06'
+  thread: lab-intake-retry
+  modules: [lab_intake_watcher.py, import_all.py]
+  event: 'Первая сторонняя установка: чистые текстовые PDF анализов из лаборатории получали «не удалось распознать бланк, пришлите почётче»; модель файл не видела ни разу. Замер на настоящем бланке: classify → general_medical и с пустым словарём, и со словарём владельца.'
+  cost: 'первый посторонний пользователь решил, что виноват OpenAI, и не смог загрузить ни один бланк; диагноз занял вечер'
+  cause: 'гейт «бланк или нет» судил ключевыми словами, а словарь — данные установки (docs.type_markers), на новой установке пустой; «нет» слов было окончательным, хотя безопасной стороной у соседнего суда (doc_triage) уже было «lab»'
+  address: {kind: runtime, ref: lab_intake_watcher.py}
+  subject: [classifier_rules, tenant]
+  outcome: {kind: check, text: '«нет» слов переспрашивается у doc_triage по первой странице (tests/unit/test_lab_intake_gate.py::test_words_miss_is_asked_of_the_model_not_refused — красный на коде до правки); правило: суд по словарю данных тенанта на пустом словаре не может говорить «нет» окончательно'}
+  status: adopted
+  adopted_on: '2026-10-05'
+  change: 'git:97e8845'
+  evidence: ['git:97e8845', 'docs/handoff/lab-intake-retry/2026-10-06-c21064e.md']
+  owner: владелец
+- id: C-168
+  date: '2026-10-06'
+  thread: lab-intake-retry
+  modules: [tests/unit/test_lab_intake_gate.py, private/pii_terms.yaml]
+  event: 'Тест гейта получил имя файла с настоящего скриншота стороннего пользователя — фамилия, инициалы и дата; другой тест — хеш его настоящего файла из инбокса. Коммит прошёл страж pii_census (0 находок); поймало чтение диффа четырьмя читателями перед выпуском v0.2.1.'
+  cost: 'одна ступень от публикации чужих личных данных в открытом репозитории; плюс отдельная нить вычистки и повторный полный прогон'
+  cause: 'словарь стража знает только сущности владельца и партнёра; сторонний пользователь в него не попадает, пока кто-то не впишет; тест, написанный по живому случаю, копирует литерал из него'
+  address: {kind: data, ref: private/pii_terms.yaml}
+  subject: [pii]
+  outcome: {kind: check, text: 'фамилия и номер заявки — в outside_users; проба: прежний тест даёт 1 находку; правило: при работе с данными нового человека его идентификаторы вписываются в словарь ДО первого теста по его случаю'}
+  status: adopted
+  adopted_on: '2026-10-06'
+  change: 'git:3d0cc5f'
+  evidence: ['git:3d0cc5f', 'docs/handoff/lab-intake-retry/2026-10-06-c21064e.md']
+  owner: владелец
+- id: C-169
+  date: '2026-10-06'
+  thread: borrow-botkin
+  modules: [subsystem_intent.yaml, intent_registry.py]
+  event: 'Критерий date_order_by_code записан с closes_when_by: claude; 06.10 он выполнен замером (19 документов, 0 перестановок), но коммит подъёма в holds гейт отбил: holds — только по критерию владельца (§13). Значение поля, которое гейт никогда не пропустит, лежало в реестре с 04.10 и попало в план как «закрывает Claude».'
+  cost: 'один отбитый коммит и вопрос владельцу после готового замера; нить date-order-flip висит открытой'
+  cause: 'схема реестра допускает closes_when_by: claude, а гейт подъёма такого автора не признаёт; поле и его исполнитель расходятся, и ни валидатор реестра, ни план этого не видят'
+  address: {kind: runtime, ref: intent_registry.py}
+  subject: [intent_registry]
+  outcome: {kind: rule, text: 'решение владельца: либо гейт пропускает подъём по closes_when_by: claude при живой проверке, либо валидатор реестра запрещает это значение'}
+  status: observation
+  evidence: ['subsystem_intent.yaml', 'docs/handoff/borrow-botkin/2026-10-06-ae5b7d2.md']
+  owner: владелец
+- id: C-170
+  date: '2026-10-06'
+  thread: borrow-botkin
+  modules: [build/docker/compose.yaml]
+  event: 'Сухой прогон распознавания 19 документов на Studio трижды сорвался: docker cp дал файлы, нечитаемые пользователем 1000 (18 ошибок); docker exec в health-cron-1 умер на 7-м документе, когда деплой чужой нити пересоздал контейнер; docker compose run из build/docker без -p health создал пустые тома docker_* и не нашёл базу.'
+  cost: '~25 минут повторных прогонов, лишние вызовы модели на 7 документов; два тома созданы и удалены'
+  cause: 'нет записанного пути «долгий разовый скрипт против данных тенанта в Докере»: сервисный контейнер живёт до следующего деплоя, имя проекта compose на Studio не совпадает с именем каталога, а копирование в контейнер не выставляет права'
+  address: {kind: data, ref: docs/handoff/borrow-botkin/2026-10-06-ae5b7d2.md}
+  subject: [measurement_path, test_stand]
+  outcome: {kind: rule, text: 'долгий замер — в отдельном контейнере: cd build/docker && docker compose -p health run --rm --no-deps -T -v $HOME/X:/X:ro cron python3 - < script; файлы — монтированием, не docker cp'}
+  status: observation
+  evidence: ['docs/handoff/borrow-botkin/2026-10-06-ae5b7d2.md']
+  owner: владелец
+- id: C-171
+  date: '2026-10-06'
+  thread: nightly-on-copy
+  modules: [run_checks.sh, tests/conftest.py]
+  event: 'План остатков test-thread-leak поставил владельцу развилку «ночной набор тестов — против живых данных или против копии» и получил «да, делай все до упора». Копия построена (функция, тест, документы, перевод), и только потом замерена на стенде: 62 failed и 671 errors — тесты сверяют каталог данных с установленными службами и узнают владельца по пути. Решение пришлось вернуть владельцу второй раз; он выбрал «Сторожа, без копии», построенное снято.'
+  cost: 'около двух часов (постройка, три сорванных замера в контейнере бота, бисекция каскада readonly, откат); второй вопрос владельцу по уже решённой развилке'
+  cause: 'в letitbe замер стоит в «Утверждениях под решениями», но развилка владельцу в «Открытых вопросах» задаётся до того, как утверждение, на котором держится вариант, проверено; ритуал не требует, чтобы вариант, отдаваемый на выбор, был замерен хотя бы дешёвым прогоном. Утверждение «тестов, которым нужно живое окружение, всего 5» снято по метке owner_env, а не прогоном набора в чужом каталоге'
+  address: {kind: ritual, ref: letitbe}
+  subject: [hypothesis_before_fact, test_stand]
+  outcome: {kind: rule, text: 'вариант развилки, который меняет среду прогона или данных, ставится владельцу только после дешёвого замера этого варианта (один прогон набора на стенде); число из метки или имени — гипотеза, пока набор не прогнан в новой среде'}
+  status: observation
+  evidence: ['docs/handoff/nightly-on-copy/2026-10-06-2e06e22.md', 'git:2e06e22']
   owner: владелец

@@ -81,15 +81,33 @@ def test_exception_in_thread_is_red(tmp_path):
     assert "1 failed" in r.stdout, r.stdout + r.stderr
 
 
-POOL = """
+POOL_NAME_ONLY = """
 import threading, time
-def test_pool_idle_worker():
+def test_named_like_pool():
     threading.Thread(target=time.sleep, args=(5,), name="AnyIO worker thread", daemon=True).start()
 """
 
+POOL_REAL = """
+import anyio.to_thread
+from anyio.from_thread import start_blocking_portal
+_cm = start_blocking_portal()          # цикл живёт между тестами — как у TestClient панели
+_portal = _cm.__enter__()
+box = []
+def test_real_anyio_worker_idle_after_call():
+    _portal.call(anyio.to_thread.run_sync, lambda: box.append(1))
+def test_next_sees_result():
+    assert box == [1]
+    _cm.__exit__(None, None, None)
+"""
 
-def test_library_pool_idle_worker_is_named_exception(tmp_path):
-    """Граница сторожа: простаивающий рабочий пула AnyIO не красит тест; любой другой — красит."""
-    r = _run(tmp_path, POOL)
-    assert "1 passed" in r.stdout, r.stdout + r.stderr
 
+def test_pool_name_alone_is_not_an_exception(tmp_path):
+    """Имя пула — не пропуск: обычный поток с таким именем красный (06.10.2026)."""
+    r = _run(tmp_path, POOL_NAME_ONLY)
+    assert "1 failed" in r.stdout, r.stdout + r.stderr
+
+
+def test_real_idle_anyio_worker_is_not_red(tmp_path):
+    """Настоящий рабочий AnyIO после ответа простаивает в своей очереди — это не утечка."""
+    r = _run(tmp_path, POOL_REAL)
+    assert "2 passed" in r.stdout, r.stdout + r.stderr

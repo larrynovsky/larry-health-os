@@ -465,67 +465,68 @@ def _stalled_threads(today: date) -> dict:
             "stalled_mailed": mailed, "stalled_retired": retired}
 
 
-RED_STREAM_GATE = "fix-applier-input-returned"
-"""Имя гейта возврата красного потока. Устойчиво: по нему карточка переоткрывается,
-а не плодится."""
+RED_TEST_PREFIX = "test:"
+"""Карточка инженерной очереди на один упорно красный тест: `test:<селектор pytest>`.
+
+Решение владельца 06.10 («пересмотри, должна быть автопочинка»): красный тест не
+вопрос владельцу, а вход ночного ремонта (`night_repair`, берёт `dev_fix`). До этого
+красные тесты в очередь не попадали вовсе — ремонт видел их только приложением к
+чужим карточкам; 04–06.10 одни и те же три теста были красными три ночи подряд."""
 
 RED_STREAM_NIGHTS = 2
-"""Сколько ПОДРЯД красных ночей считаются возвратом потока.
+"""Сколько ПОДРЯД красных ночей делают тест карточкой.
 
-Одна красная ночь — обычное дело (флак, свежий коммит, разовая правка). Две подряд
-означают, что чинить стало что чинить регулярно. Число здесь маленькое намеренно:
-сигнал должен разбудить решение рано, а не собрать статистику — решает всё равно
-владелец, а не порог."""
+Одна красная ночь — обычное дело (флак, свежий коммит под чужой нитью). Две подряд —
+тест сам не позеленеет, его пора чинить."""
 
 
-def _red_stream_returned() -> dict:
-    """Вернулся ли поток красных тестов — условие пересмотра решения о `fix_applier`.
+def _selector(test_id: str) -> str:
+    """`unit/tests.unit.test_x::t[p]` (id отчёта) → `tests/unit/test_x.py::t[p]` (селектор pytest).
 
-    ЗАЧЕМ. 2026-09-14 замер показал: у применителя красного нет входа — 0 красных
-    тестов за 15 ночей подряд, 1 карточка `dev_fix` за 41 день. Решение владельца:
-    не строить. Отложенное решение без названного условия возврата — это забытое
-    решение; здесь условие названо машинно, и возврат входа поднимает вопрос сам,
-    а не ждёт, пока кто-то вспомнит (CLAUDE.md §13, поправка 2026-08-03).
+    Селектор — то, что ночной ремонт может прогнать оракулом; id отчёта прогнать нельзя.
+    Незнакомая форма возвращается как есть: карточка всё равно заведётся, имя — улика."""
+    head, sep, tail = test_id.partition("::")
+    mod = head.split("/", 1)[-1]
+    if not sep or not mod.startswith("tests."):
+        return test_id
+    return mod.replace(".", "/") + ".py::" + tail
 
-    ПРЕДИКАТ КРАСНОЙ НОЧИ — `regression > 0`, а НЕ длина `regression_ids`. Список
-    имён в отчёте обрезан пятью (`morning_test_summary`: `result.critical[:5]`), и
-    считать по нему различимые предметы значило бы занизить на шестом. Имена берутся
-    только чтобы назвать их в карточке — как образец, и в карточке так и сказано.
 
-    НЕСВЕЖИЙ ВХОД = «НЕ ЗНАЮ», НЕ «ЗЕЛЕНО» (23.09, нить nightly-liveness). Итог ночи
-    пишет сама ночная задача, последним шагом. Умерла задача — новых записей нет, и
-    две последние ЗАПИСИ перестают быть двумя последними НОЧАМИ: код пересматривал
-    бы старые зелёные ночи бесконечно и молчал. Прежний текст здесь отсылал к
-    `check_suite_freshness` — замер 23.09: его отметку пишет деплойный
-    `test_on_studio.sh`, а не ночная задача, так что тот датчик смерти ночи не видел.
-    Теперь: последняя запись не покрывает последний плановый запуск → `None`.
-    Громкость — у одного дома, `check_nightly_suite_liveness` (тот же предикат
-    `morning_test_summary.summary_covers_last_run`); здесь только не выдавать
-    устаревшее за ответ. Предикат «не судим» (`None`: плиста нет) — судим по
-    записям, как раньше; о «не судим» кричит тот же датчик живости.
+def _red_tests_to_repair() -> dict:
+    """Тест красный RED_STREAM_NIGHTS ночей подряд → карточка `dev_fix` для ночного ремонта.
 
-    ЧЕГО НЕ ЛОВИТ, вслух. (1) Пропуск ВНУТРИ пары: красная, пропуск, красная —
-    две последние записи красные, карточка поднимется; это консервативно и
-    намеренно. (2) Красное вне ночного набора (ручной прогон, монитор 07:50) — сюда
-    не попадает вовсе.
+    Заменяет `_red_stream_returned` (14.09 – 06.10), который на две красные ночи спрашивал
+    владельца, строить ли автопочинку. Вопрос устарел 30.09 (ночной ремонт построен,
+    инвариант `night_repair_prepares_session_lands`), а владелец 06.10 ответил: должна быть.
 
-    ЛИВНОСТЬ §14 — общая с циклом: пульс `night_cycle_last_run.json`, его читает
-    `check_night_cycle_liveness`. Отдельного сердцебиения у производителя нет
-    намеренно: он не механизм безопасности, а вопрос владельцу."""
+    ЧТО ДЕЛАЕТ. Пересечение имён двух последних ночей → `park("test:<селектор>", "dev_fix")`
+    (повтор не плодит карточку, решённая переоткрывается рецидивом — правила `park`).
+    Открытая `test:*` карточка, чьего теста нет среди красных последней ночи, снимается
+    (`not_on_desk`): тест позеленел — починка доехала или он был флаком.
+
+    НЕСВЕЖИЙ ВХОД = «НЕ ЗНАЮ», НЕ «ЗЕЛЕНО» (23.09, нить nightly-liveness): последняя
+    запись не покрывает последний плановый запуск → `None`, ничего не паркуется и не
+    снимается. Громкость — у `check_nightly_suite_liveness`.
+
+    СНИМАТЬ МОЖНО ТОЛЬКО ПО ПОЛНОМУ СПИСКУ. До 06.10 `regression_ids` обрезался пятью;
+    в старой записи число `regression` больше длины списка — тогда не снимаем ничего
+    (живой красный тест мог не попасть в список).
+
+    ЧЕГО НЕ ЛОВИТ, вслух. Красное вне ночного набора (ручной прогон, монитор 07:50).
+    Тест, красный через ночь (красный, зелёный, красный), карточкой не станет."""
     try:
         import agent_reports_db
     except Exception as e:  # noqa: BLE001 — модуль недоступен: сказать вслух, не молчать
-        print(f"night_cycle: производитель возврата красного не запущен: {e!r}",
-              file=sys.stderr)
-        return {"red_nights": 0, "red_returned": False}
+        print(f"night_cycle: производитель красных тестов не запущен: {e!r}", file=sys.stderr)
+        return {"red_parked": None, "red_retired": None}
 
     rows = agent_reports_db.get_agent_report("morning_test_summary", n=RED_STREAM_NIGHTS)
     import morning_test_summary as _mts
     if _mts.summary_covers_last_run(rows[0].get("date") if rows else None) is False:
-        print("night_cycle: итог последней ночи тестов не записан — красная серия "
-              "не судима (check_nightly_suite_liveness)", file=sys.stderr)
-        return {"red_nights": None, "red_returned": None}
-    nights: list[tuple[str, int, list[str]]] = []
+        print("night_cycle: итог последней ночи тестов не записан — красные тесты "
+              "не судимы (check_nightly_suite_liveness)", file=sys.stderr)
+        return {"red_parked": None, "red_retired": None}
+    nights: list[tuple[int, list[str]]] = []
     for r in rows:
         try:
             s = json.loads(r.get("findings") or "{}")
@@ -533,19 +534,40 @@ def _red_stream_returned() -> dict:
             # Нераспознанный вход = отказ инструмента, не «красного нет» (§14).
             print(f"night_cycle: отчёт о тестах за {r.get('date')} не разобран: {e!r}",
                   file=sys.stderr)
-            return {"red_nights": 0, "red_returned": None}
-        nights.append((r.get("date"), int(s.get("regression") or 0),
-                       list(s.get("regression_ids") or [])))
+            return {"red_parked": None, "red_retired": None}
+        nights.append((int(s.get("regression") or 0), list(s.get("regression_ids") or [])))
+    if not nights:
+        return {"red_parked": 0, "red_retired": 0}
 
-    red = [n for n in nights if n[1] > 0]
-    if len(nights) < RED_STREAM_NIGHTS or len(red) < RED_STREAM_NIGHTS:
-        return {"red_nights": len(red), "red_returned": False}
+    last_n, last_ids = nights[0]
+    persistent = set(last_ids)
+    for _n, ids in nights[1:]:
+        persistent &= set(ids)
+    if len(nights) < RED_STREAM_NIGHTS:
+        persistent = set()
+    parked = 0
+    for tid in sorted(persistent):
+        sel = _selector(tid)
+        parked_decisions.park(
+            RED_TEST_PREFIX + sel, "dev_fix",
+            f"Тест красный {_nights(RED_STREAM_NIGHTS)} подряд в ночном наборе: {sel}. "
+            f"Найди причину и почини; оракул — сам этот тест (красный без правки, зелёный с ней).")
+        parked += 1
 
-    parked_decisions.park(
-        RED_STREAM_GATE, "owner_decision",
-        i18n.t("owner.card.auto_repair", nights=_nights(RED_STREAM_NIGHTS)),
-        ref="CLAUDE.md §13")
-    return {"red_nights": len(red), "red_returned": True}
+    retired: int | None = 0
+    if last_n != len(last_ids):
+        retired = None  # список обрезан — снимать не по чему
+    else:
+        red_now = {_selector(t) for t in last_ids}
+        today = get_now().date()
+        for g in parked_decisions.list_open(today):
+            gid = g["id"]
+            if gid.startswith(RED_TEST_PREFIX) and gid[len(RED_TEST_PREFIX):] not in red_now:
+                parked_decisions.record_decision(
+                    gid, f"снято: тест зелёный в ночном наборе ({today.strftime('%d.%m.%Y')})",
+                    by="not_on_desk")
+                retired += 1
+    return {"red_parked": parked, "red_retired": retired}
 
 
 def run() -> dict:
@@ -655,14 +677,13 @@ def run() -> dict:
         print(f"night_cycle: производитель застрявших нитей упал: {e!r}", file=sys.stderr)
         summary.update({"stalled_seen": 0, "stalled_new": 0, "stalled_mailed": f"error:{e!r}",
                         "stalled_retired": None})
-    # Четвёртый источник — тоже об отсутствии, но об отсутствии, которое КОНЧИЛОСЬ:
-    # решение «не строить fix_applier» принято по пустому входу, и возврат входа
-    # обязан поднять вопрос сам. Та же защита: отказ не роняет цикл.
+    # Четвёртый источник — упорно красные тесты: карточка ночному ремонту, не вопрос
+    # владельцу (решение 06.10). Та же защита: отказ не роняет цикл.
     try:
-        summary.update(_red_stream_returned())
+        summary.update(_red_tests_to_repair())
     except Exception as e:  # noqa: BLE001 — вслух, но не фатально
-        print(f"night_cycle: производитель возврата красного упал: {e!r}", file=sys.stderr)
-        summary.update({"red_nights": 0, "red_returned": f"error:{e!r}"})
+        print(f"night_cycle: производитель красных тестов упал: {e!r}", file=sys.stderr)
+        summary.update({"red_parked": None, "red_retired": f"error:{e!r}"})
     try:
         parked_decisions.remember_size()
     except Exception as e:  # noqa: BLE001 — вслух, но не фатально: без отметки сторож слепнет, стол цел

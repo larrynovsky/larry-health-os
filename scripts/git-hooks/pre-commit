@@ -173,8 +173,12 @@ fi
 # подъём, который всё равно будет отбит, незачем.
 if echo "$STAGED" | grep -qxE 'subsystem_intent\.yaml'; then
     PROMO=$(cd "$REPO_ROOT" && "$PYTHON" -c '
-import intent_registry as ir
-for v in ir.unapproved_promotions(ir.registry_at("HEAD"), ir.registry_at(":")):
+import os, intent_registry as ir
+src = os.environ.get("THREAD_MERGE_SOURCE")  # слияние нити: суд по её коммитам по порядку
+found = ir.promotions_in_merge(src) if src else None
+if found is None:
+    found = ir.unapproved_promotions(ir.registry_at("HEAD"), ir.registry_at(":"))
+for v in found:
     print("     " + v)
 ' 2>&1)
     promo_rc=$?

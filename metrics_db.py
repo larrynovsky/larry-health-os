@@ -415,7 +415,7 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
             existing_raw["apple_health"] = apple_bio
         # Давление: у кого подключён Withings, хозяин дневного давления — он (решение владельца
         # 06.10; пишет import_withings). «Здоровье» хранит удалённые в Withings замеры и подмешивало
-        # их в среднее дня (живой случай 08.07). Значения «Здоровья» не теряются — уходят свидетелем.
+        # их в среднее дня (живой случай, 06.10). Значения «Здоровья» не теряются — уходят свидетелем.
         if source == "AppleHealth" and _bp_owned_by_withings(conn):
             witness = {k: incoming.pop(k) for k in _APPLE_BP_KEYS if k in incoming}
             for k in ("bp_systolic", "bp_diastolic"):

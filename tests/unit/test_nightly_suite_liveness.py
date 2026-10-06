@@ -182,9 +182,9 @@ def test_красная_серия_на_несвежем_входе_не_зна�
     real = mts.summary_covers_last_run
     monkeypatch.setattr(mts, "summary_covers_last_run",
                         lambda d, now=None, la_dir=None: real(d, now=MORNING, la_dir=la))
-    assert nc._red_stream_returned() == {"red_nights": None, "red_returned": None}
+    assert nc._red_tests_to_repair() == {"red_parked": None, "red_retired": None}
     rows[:] = [_night("2026-09-23", 0), _night("2026-09-22", 0)]
-    assert nc._red_stream_returned() == {"red_nights": 0, "red_returned": False}
+    assert nc._red_tests_to_repair() == {"red_parked": 0, "red_retired": 0}
 
 
 if __name__ == "__main__":

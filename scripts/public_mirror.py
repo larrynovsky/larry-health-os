@@ -89,6 +89,73 @@ def unread_public(ref: str, root: Path = ROOT) -> list[str]:
     return sorted(f for f in changed & set(public) if not _only_machine_lines(root, base, sha, f))
 
 
+# Живой замер в прозе (C-140, C-144, C-151, pub-scrub-1006): дата СОБЫТИЯ здоровья или пара
+# давления рядом со словом про тело. Словарь такое не видит — нужна форма. Признак «событие, а
+# не нить»: дата старше коммита больше чем на две недели (метки нитей и решений — свежие).
+# Замер 06.10 по 30 дням истории: все известные утечки (даты замеров давления, пары давления,
+# «пик» давления, дата забора крови) пойманы; ~110 строк за месяц — шум, поэтому это подсветка для
+# читающего перед выгрузкой, а не блок коммита. Чего не ловит, вслух: число без даты и без
+# пары (126.5), месяц словом без числа, медицинский факт без даты.
+_HEALTH = re.compile(r"давлени|пульс|симптом|глюкоз|сахар|холестер|температур|ЧСС|сатурац|mmHg|"
+                     r"мм рт|blood pressure|systolic|diastolic|биопс|химио|лучев|диагноз|приступ|"
+                     r"боль|тонометр|кров|моч[аи]|замер|анализ|бланк|терапи|лечени", re.I)
+_DATE = re.compile(r"(?<![\d.])(0?[1-9]|[12]\d|3[01])\.(0?[1-9]|1[0-2])(?![\d.])")
+_MONTHS = ("январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр",
+           "октябр", "ноябр", "декабр")
+_DATE_WORD = re.compile(r"\b(0?[1-9]|[12]\d|3[01])\s+(январ|феврал|марта|апрел|мая|июн|июл|"
+                        r"август|сентябр|октябр|ноябр|декабр)", re.I)
+_BP_PAIR = re.compile(r"\b(1\d\d|[89]\d)/([4-9]\d|1[0-2]\d)\b")
+EVENT_AGE_DAYS = 14
+
+
+def _old_date(line: str, ref_day) -> bool:
+    import datetime as dt
+    found = [(int(m.group(1)), int(m.group(2))) for m in _DATE.finditer(line)]
+    for m in _DATE_WORD.finditer(line):
+        word = m.group(2).lower()
+        mo = next((i + 1 for i, w in enumerate(_MONTHS) if word.startswith(w)), None)
+        if mo:
+            found.append((int(m.group(1)), mo))
+    for d, mo in found:
+        try:
+            day = dt.date(ref_day.year if mo <= ref_day.month else ref_day.year - 1, mo, d)
+        except ValueError:
+            continue
+        if (ref_day - day).days > EVENT_AGE_DAYS:
+            return True
+    return False
+
+
+def suspicious_lines(ref: str, root: Path = ROOT) -> list[str]:
+    """Добавленные после отметки строки публичных файлов, похожие на живой замер — «путь:текст»."""
+    import datetime as dt
+    sha = _git(root, "rev-parse", ref).strip()
+    day = dt.date.fromisoformat(_git(root, "show", "-s", "--format=%cs", sha).strip())
+    base = _read_base(sha, root)
+    files = unread_public(ref, root)
+    out = []
+    for f in files:
+        args = ["diff", "-U0", base, sha, "--", f] if base else ["show", f"{sha}:{f}"]
+        try:
+            text = _git(root, *args)
+        except subprocess.CalledProcessError:
+            continue
+        for l in text.splitlines():
+            if base and (not l.startswith("+") or l.startswith("+++")):
+                continue
+            body = l[1:] if base else l
+            if _HEALTH.search(body) and (_BP_PAIR.search(body) or _old_date(body, day)):
+                out.append(f"{f}: {body.strip()[:200]}")
+    return out
+
+
+def _read_base(sha: str, root: Path) -> str:
+    shown = subprocess.run(["git", "-C", str(root), "show", f"{sha}:{READ_MARK}"],
+                           capture_output=True, text=True)
+    lines = [x.strip() for x in (shown.stdout if shown.returncode == 0 else "").splitlines()]
+    return next((x for x in lines if x and not x.startswith("#")), "")
+
+
 def _only_machine_lines(root: Path, base: str, sha: str, path: str) -> bool:
     """Изменение файла сводится к машинной строке версии/даты."""
     diff = _git(root, "diff", "-U0", base, sha, "--", path).splitlines()
@@ -225,17 +292,31 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--push", action="store_true")
     ap.add_argument("--unread", action="store_true", help="публичные файлы, не прочитанные с отметки")
     ap.add_argument("--mark-read", metavar="REF", help="записать: публичная зона REF прочитана целиком")
+    ap.add_argument("--cleared", type=int, metavar="N",
+                    help="с --mark-read: подозрительных строк просмотрено и признано безопасными (N)")
     ap.add_argument("--release", metavar="vX.Y.Z", help="выпуск образа: тег на GitHub, ждать release.yml")
     a = ap.parse_args(argv)
     if a.release:
         return release(a.release, Path(a.dest).expanduser())
     if a.mark_read:
+        sus = suspicious_lines(a.mark_read, ROOT)
+        if sus and a.cleared != len(sus):
+            print("\n".join(sus))
+            print(f"⛔ {len(sus)} строк похожи на живой замер (дата события или давление рядом со "
+                  f"словом про тело). Уберите живое или, просмотрев каждую, повторите с "
+                  f"--cleared {len(sus)}", file=sys.stderr)
+            return 1
         sha = _git(ROOT, "rev-parse", a.mark_read).strip()
         (ROOT / READ_MARK).write_text(f"# публичная зона прочитана целиком по этот коммит\n{sha}\n")
         print(f"отметка: {sha[:12]} — закоммитьте {READ_MARK}")
         return 0
     if a.unread or a.push:
         left = unread_public(a.ref)
+        if a.unread and left:
+            sus = suspicious_lines(a.ref, ROOT)
+            if sus:
+                print(f"⚠ ПРОЧИТАТЬ ПЕРВЫМИ — {len(sus)} строк похожи на живой замер:")
+                print("\n".join(sus) + "\n---")
         if a.unread or left:
             print("\n".join(left) or "всё прочитано")
         if left:

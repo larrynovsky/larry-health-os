@@ -89,3 +89,29 @@ def test_незакоммиченная_отметка_не_открывает_�
     _git(root, *ci, "commit", "-qam", "c2")
     (root / pm.READ_MARK).write_text(_git(root, "rev-parse", "HEAD"))   # только на диске
     assert pm.unread_public("HEAD", root) == ["a.py", "publication_zones.yaml"]
+
+
+def test_живой_замер_подсвечен_и_держит_отметку(tmp_path, monkeypatch):
+    """C-140/C-144/C-151, 06.10: дата события здоровья и пара давления — в начале списка чтения;
+    отметка не ставится, пока читающий не признал каждую строку (--cleared N)."""
+    root = _repo(tmp_path)
+    ci = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    c1 = _git(root, "rev-parse", "HEAD").strip()
+    (root / pm.READ_MARK).write_text(f"# прочитано\n{c1}\n")
+    _git(root, *ci, "add", "-A")
+    _git(root, *ci, "commit", "-qm", "mark")
+    env = dict(GIT_COMMITTER_DATE="2026-10-06T10:00:00", GIT_AUTHOR_DATE="2026-10-06T10:00:00")
+    (root / "a.py").write_text("# давление за 03.06: 151/99 — пример (выдумано)\n"
+                               "# замер 05.10 (нить x): решение владельца\n"
+                               "# тонометр: утром 146/96 — пример\n"
+                               "# симптом держался с 12 июля\n")
+    _git(root, *ci, "add", "-A")
+    subprocess.run(["git", "-C", str(root), *ci, "commit", "-qm", "c2"], check=True,
+                   env={**__import__("os").environ, **env})
+    sus = pm.suspicious_lines("HEAD", root)
+    assert [s.split(": ", 1)[1][:22] for s in sus] == ["# давление за 03.06: 1", "# тонометр: утром 146/",
+                                                         "# симптом держался с 1"]
+    monkeypatch.setattr(pm, "ROOT", root)
+    assert pm.main(["--mark-read", "HEAD"]) == 1                    # не признано — отметки нет
+    assert c1 in (root / pm.READ_MARK).read_text()
+    assert pm.main(["--mark-read", "HEAD", "--cleared", "3"]) == 0

@@ -151,7 +151,7 @@ def test_empty_column_without_device_is_silent(tmp_path, monkeypatch):
 
 
 def test_empty_column_whose_source_arrives_is_loss(tmp_path, monkeypatch):
-    """Давление: тонометр присылал (08.07 внутри архива), колонка пуста → потеря, кричим."""
+    """Давление: тонометр присылал (дата замера внутри архива), колонка пуста → потеря, кричим."""
     import integrity_tests as I
     _issues(tmp_path, monkeypatch, daily_null=("bp_systolic",))
     dbp = _with_hae(tmp_path, [("blood_pressure", "handled", "2026-07-08")])

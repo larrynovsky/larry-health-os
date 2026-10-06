@@ -85,7 +85,8 @@ def build_summary(date_str: str) -> dict:
         "auto_fixed": len(result.auto_fixed),
         "skipped": total.get("skipped", 0),
         "per_layer": suite_summary.get("per_layer", {}),
-        "regression_ids": [f.test_id for f in result.critical[:5]],
+        # Полный список: по нему night_cycle снимает карточки позеленевших тестов (06.10).
+        "regression_ids": [f.test_id for f in result.critical],
         "regression_details": [
             {
                 "test_id": f.test_id,

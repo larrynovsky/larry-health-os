@@ -1,6 +1,6 @@
 """Давление Withings: токен с ротацией, разбор мер, зеркало замеров, дневное давление и его сторож (нити withings-bp, bp-withings-owner).
 
-Значения ниже вымышленные. Зачем нить: давление через Apple Health → HAE не приходило с 08.07
+Значения ниже вымышленные. Зачем нить: давление через Apple Health → HAE не приходило с одной из летних дат
 по 04.10, и ни один датчик этого не видел; Withings — второй независимый путь и сторож первого.
 """
 from __future__ import annotations
@@ -94,6 +94,15 @@ def test_fetch_decodes_units_skips_non_bp_groups_and_pages(monkeypatch, secrets)
         (1900000000, 121.0, 79, 64), (1900000200, 133.0, 85, None)]
 
 
+def test_ambiguous_reading_of_shared_device_is_skipped(monkeypatch, secrets):
+    amb = _grp(1900000300, 142, 97, grpid=4)
+    amb["attrib"] = 1                                       # прибор не знает, чей это замер
+    mine = _grp(1900000400, 111, 81, grpid=5)
+    mine["attrib"] = 0
+    _answers(monkeypatch, [{"status": 0, "body": {"more": 0, "measuregrps": [amb, mine]}}])
+    assert [r["grpid"] for r in wa.fetch_bp("t", 0)] == [5]
+
+
 def test_more_without_new_offset_refuses_instead_of_looping(monkeypatch, secrets):
     _answers(monkeypatch, [{"status": 0, "body": {"more": 1, "measuregrps": []}}])
     with pytest.raises(wa.WithingsError, match="offset"):
@@ -147,7 +156,7 @@ def test_reading_deleted_in_withings_is_deleted_here_and_its_day_cleared(db, mon
     import import_withings as iw
     (t1, day1), (t2, day2) = _ts(5), _ts(2)
     _run(iw, monkeypatch, [_r(t1, 120.0, 80, 1), _r(t2, 142.0, 97, 2)])
-    _run(iw, monkeypatch, [_r(t1, 120.0, 80, 1)])            # удалённый владельцем замер
+    _run(iw, monkeypatch, [_r(t1, 120.0, 80, 1)])            # удалённый в приложении замер
     with _hdb().get_conn() as c:
         assert [r[0] for r in c.execute("SELECT measured_at FROM bp_readings")] == [t1]
     s, d, raw = _day(None, day2)

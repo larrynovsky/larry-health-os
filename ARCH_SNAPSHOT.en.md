@@ -2,7 +2,7 @@
 **English** · [Русский](ARCH_SNAPSHOT.md)
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Version:** 15.364 | **Date:** 2026-10-06
+**Version:** 15.384 | **Date:** 2026-10-06
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. The line above is written by doc_agent on post-commit
      (moved from BLUEPRINT.md on 2026-08-03; that file was deleted) — do not edit manually. -->
@@ -1156,7 +1156,7 @@ telegram_bot.py  # telegram_bot.py — thin entry-point for launchd plist com.la
 
 ```
 integrity_tests              → _time_inject, agent_reports_db, assessment_importer, assessment_scheduler, belief_contract, cbcr_lookup, clinical_kb, config_db, correlation_gate, cpic_reference_db, daemon_liveness, db_regression, diagnosis_guard, doc_translation, ecg_db, finding_identity, generate_constitutions, genome_db, git_facts, google_calendar_fetcher, gp_context, hae_checker, health_db, heldout_readiness, i18n, import_medical_events, infra_config, intent_registry, lab_canon, lab_intake_watcher, lab_oracles, lab_promote, labs_db, log_rotate, loinc_match, memory_facts_db, metrics_db, morning_test_summary, norm_documents, owner_weekly, parked_decisions, pgs_reference, pii_census, plist_env_liveness, producer_registry, profile_reconciler, proposals_db, pubmed_client, quarantine_db, region_pack, safety_net, secrets_paths, security_sensors, signal_family, stderr_watch, time_contract_sensor, treatment_db, triage_agent, visual_db, weekly_digest
-health_db                    → _time_inject, agent_reports_db, alerts_db, assessments_db, checkins_db, clinical_kb, config_db, constitutions_db, consult_sessions_db, consultations_db, cpic_reference_db, doc_reviews_db, events_db, experiments_db, field_reviews_db, food_floor, generated_food_rules, genome_db, hae_db, hai_context, hypotheses_db, i18n, import_status_db, infra_config, lab_canon, labs_db, memory_db, metrics_db, norm_documents, periods_db, problems_db, profile_db, proposals_db, protocols_db, quarantine_db, rules_db, tasks_db, treatment_db, workouts_db
+health_db                    → _time_inject, agent_reports_db, alerts_db, assessments_db, checkins_db, clinical_kb, config_db, constitutions_db, consult_sessions_db, consultations_db, cpic_reference_db, doc_reviews_db, events_db, experiments_db, field_reviews_db, food_floor, generated_food_rules, genome_db, hae_db, hai_context, hypotheses_db, i18n, import_status_db, infra_config, lab_canon, labs_db, memory_db, metrics_db, norm_documents, periods_db, problems_db, profile_db, proposals_db, protocols_db, quarantine_db, rules_db, secrets_paths, tasks_db, treatment_db, workouts_db
 gp_agent                     → _fmt_helpers, _time_inject, beliefs, brief_pipeline, brief_state, brief_validator, config_db, env_context, food_rule_review, genome_context, gp_context, hai_core, hai_hypotheses, health_ai, health_db, i18n, labs_db, lifestyle_agents, llm_client, location_signal, patient_context, promethease_context, safety_net, wellally_consult
 monthly_consilium            → _time_inject, cbcr_hypothesis, consilium_roster, food_rule_generator, generated_food_rules, genome_context, gp_agent, gp_context, hai_analysis, hai_core, hai_hypotheses, health_db, hypothesis_semantic_check, i18n, llm_client, notify, patient_context, pharmaco_context, prs_context, traits_context, wellness_context
 lab_intake_watcher           → _time_inject, daemon_liveness, doc_triage, genome_intake, hai_core, health_db, i18n, import_all, import_medical_events, infra_config, lab_backfill, lab_recognizer, link_fetch, llm_client, notify, plist_env_liveness, secrets_paths
@@ -1167,7 +1167,6 @@ generate_constitutions       → _time_inject, belief_contract, config_db, corre
 gp_context                   → _fmt_helpers, _time_inject, belief_contract, clinical_kb, correlation_gate, ecg_db, genome_context, health_db, i18n, lab_canon, labs_db, lifestyle_agents, patient_context
 brief_pipeline               → _time_inject, brief_cards, brief_gate, calendar_client, env_context, food_profile, genome_context, health_ai, health_db, location_signal, safety_net, trails
 getting_started              → _time_inject, brief_gate, food_quarterly, generate_constitutions, google_calendar_fetcher, health_db, i18n, labs_db, metrics_db, release_notice, secrets_paths, signal_family
-import_medical_events        → config_db, hai_core, health_db, i18n, infra_config, lab_schedule_extractor, link_fetch, llm_client, notify, problems_db, treatment_db, treatment_extractor
 longitudinal_analysis        → _time_inject, belief_contract, correlation_gate, git_facts, health_db, i18n, lab_canon, metrics_db, notify, quarantine_db, secrets_paths, signal_family
 night_cycle                  → _fmt_helpers, _time_inject, agent_reports_db, finding_identity, i18n, morning_test_summary, night_investigator, notify, owner_gate, owner_nag, parked_decisions, weekly_digest
 doc_agent                    → _time_inject, doc_translation, git_facts, hai_core, i18n, intent_registry, llm_client, notify, pii_census, secret_guard, secrets_paths
@@ -1175,6 +1174,7 @@ hai_context                  → _fmt_helpers, _time_inject, calendar_client, ge
 hypothesis_consilium_eval    → _time_inject, consilium_roster, hai_core, health_db, i18n, lab_canon, labs_db, lifestyle_agents, llm_client, patient_context, wellally_consult
 wellally_consult             → _fmt_helpers, _time_inject, consilium_roster, genome_context, hai_core, health_db, labs_db, lifestyle_agents, llm_client, patient_context, treatment_summary
 hai_reports                  → _fmt_helpers, _time_inject, clinical_kb, gp_context, hai_core, health_db, infra_config, llm_client, pubmed_client, wellally_consult
+import_medical_events        → config_db, hai_core, health_db, infra_config, lab_intake_watcher, lab_schedule_extractor, llm_client, problems_db, treatment_db, treatment_extractor
 food_profile                 → clinical_kb, food_floor, food_genome, food_staples, generated_food_rules, health_db, i18n, repertoire, taste
 food_rule_generator          → _time_inject, clinical_kb, food_floor, food_genome, food_profile, food_staples, generated_food_rules, hai_core, llm_client
 hai_chat                     → _time_inject, config_db, gp_context, hai_context, hai_core, hai_reports, health_db, llm_client, memory_facts_db
@@ -1215,6 +1215,7 @@ env_context                  → brief_cards, config_db, env_sources, location_s
 hae_checker                  → _time_inject, health_db, import_apple_health, infra_config, metrics_db
 hypothesis_semantic_check    → _time_inject, assessment_scheduler, hai_core, health_db, llm_client
 loinc_match                  → _time_inject, health_db, lab_canon, lab_promote, profile_db
+mcp_tools                    → labs_db, memory_facts_db, metrics_db, pii_census, problems_db
 model_health_check           → hai_core, health_db, i18n, llm_client, notify
 morning_test_summary         → _time_inject, health_db, infra_config, plist_env_liveness, test_failure_handler
 publication_reader           → _time_inject, hai_core, health_db, llm_client, patient_context
@@ -1248,6 +1249,7 @@ food_rule_review             → cbcr_hypothesis, generated_food_rules, i18n
 gen_arch_blocks              → gen_blueprint, health_db, infra_config
 genome_context               → hai_core, health_db, llm_client
 hai_analysis                 → _time_inject, health_db, metrics_db
+health_mcp                   → mcp_auth, mcp_tools, notify
 import_apple_health          → _time_inject, health_db, infra_config
 import_fitdays               → _time_inject, health_db, infra_config
 import_watchdog              → health_db, import_status_db, notify
@@ -1616,6 +1618,11 @@ BEFORE ANY WORK ON THE PROJECT:
 
 <!-- GEN:ARCH_LOG:START -->
 <!-- Generated by arch_guard.py; descriptions are machine-translated from the Russian source. -->
+- `2026-10-06` — `health_mcp` + dependency: mcp_tools; new module `mcp_tools` (depends on: labs_db, memory_facts_db, metrics_db, pii_census, problems_db)
+- `2026-10-06` — `import_medical_events` + dependency: lab_intake_watcher
+- `2026-10-06` — new module `health_mcp` (depends on: mcp_auth, notify)
+- `2026-10-06` — `health_db` + dependency: secrets_paths
+- `2026-10-06` — `import_medical_events` − dependency: i18n, link_fetch, notify
 - `2026-10-06` — `import_withings` + dependency: region_pack
 - `2026-10-05` — `lab_backfill` + dependency: llm_client; `lab_intake_watcher` + dependency: doc_triage, llm_client
 - `2026-10-05` — `llm_admission` + dependency: lab_canon

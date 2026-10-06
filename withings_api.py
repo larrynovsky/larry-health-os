@@ -1,7 +1,7 @@
 """Withings: авторизация и замеры давления — каждый со своим временем.
 
 Зачем (нить withings-bp, 2026-10-04): давление тонометра Withings шло к нам только через
-Apple Health → Health Auto Export и с 08.07 перестало приходить — три месяца тишины никто не
+Apple Health → Health Auto Export и с одной из летних дат перестало приходить — три месяца тишины никто не
 заметил. Прямой API Withings — второй источник, независимый от того пути: отдаёт каждый замер
 с временем и пульсом и позволяет сторожу увидеть «у Withings замер есть, у нас нет».
 
@@ -36,6 +36,10 @@ REDIRECT_URI = "http://localhost:9877/withings/callback"
 SCOPE = "user.metrics"
 TOKEN_NAME = "withings_oauth.json"
 SYSTOLIC, DIASTOLIC, PULSE = 10, 9, 11          # коды мер Withings; сверить живым ответом (C-28)
+# attrib группы замеров (OpenAPI Withings): 1 — снят прибором, но может принадлежать другому
+# пользователю. Тонометр общий (живой случай 06.10: замер другого человека попал в давление владельца),
+# неотнесённый замер в давление владельца не идёт; отнесённый в приложении получает attrib 0.
+AMBIGUOUS = 1
 
 
 class WithingsError(RuntimeError):
@@ -148,6 +152,8 @@ def fetch_bp(access_token: str, lastupdate: int) -> list[dict]:
         for grp in body.get("measuregrps") or []:
             vals = {m["type"]: m["value"] * 10 ** m["unit"] for m in grp.get("measures") or []
                     if isinstance(m, dict) and {"type", "value", "unit"} <= m.keys()}
+            if grp.get("attrib") == AMBIGUOUS:   # прибор общий: замер, не отнесённый к владельцу, — не его
+                continue
             if SYSTOLIC in vals and DIASTOLIC in vals:
                 out.append({"ts": int(grp["date"]), "systolic": vals[SYSTOLIC],
                             "diastolic": vals[DIASTOLIC], "pulse": vals.get(PULSE),

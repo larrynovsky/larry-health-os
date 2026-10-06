@@ -156,3 +156,23 @@ def test_own_confirmation_really_promotes_auto_rows(dashboard_client):
     assert client.post("/lab-review/person_confirm/promote", data={"execute": "1"}).status_code == 200
     assert db.fetchone("SELECT COUNT(*) FROM lab_results")[0] == 1
     assert db.fetchone("SELECT review_status FROM lab_results_staging")[0] == "promoted"
+
+
+def test_row_shows_printed_name_and_norm_as_on_the_blank(dashboard_client, tmp_path, monkeypatch):
+    """Нить file-outcome (06.10): человек сверяет с бланком. Русский бланк сверяли с «HGB», а норму
+    «< 0.2» видели как «–0.2». Мутации: прятать напечатанное имя при найденном международном;
+    рисовать одну границу через тире."""
+    client, _ = dashboard_client
+    tdb = tmp_path / "t.db"; _make_tenant_db(tdb)
+    c = sqlite3.connect(tdb)
+    c.execute("INSERT INTO lab_results_staging VALUES"
+              "('rr','doc.pdf',1,'Гемоглобин','HGB',15.0,'г/дл',13.1,17.2,'agree','green','pending')")
+    c.execute("INSERT INTO lab_results_staging VALUES"
+              "('rr','doc.pdf',1,'Базофилы, абс.','Basophils_abs',0.03,'тыс/мкл',NULL,0.2,'agree','green','pending')")
+    c.commit(); c.close()
+    import dashboard_routers.api_lab_review as m
+    monkeypatch.setattr(m, "_tenant_db", lambda tenant: tdb)
+    r = client.get("/lab-review/rr?tenant=partner")
+    assert "Гемоглобин" in r.text and "HGB" in r.text
+    assert "Базофилы, абс." in r.text and "&lt; 0.2" in r.text and "–0.2" not in r.text
+    assert "13.1 – 17.2" in r.text

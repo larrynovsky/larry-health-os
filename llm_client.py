@@ -31,6 +31,7 @@ max_tokens, не ретраит, не логирует промпты. Всё э
 # INTENT: llm_exit — один гард, один переводчик, смена модели только на проверенную: subsystem_intent.yaml
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -44,6 +45,7 @@ import secret_guard
 # путь вёл в НЕСУЩЕСТВУЮЩИЙ ~/health_scripts/.anthropic_key — LLM-тракт был
 # сломан, и это не всплывало, потому что тесты мокают клиента. Мигрированы все 19;
 # счёт держит tests/consistency/test_llm_key_single_home.py, а не эта строка.
+# Подтверждено владельцем 06.10: нативный партнёр ходит к модели с его ключом — так и задумано.
 _KEY_FILE = Path.home() / ".health_secrets" / "anthropic_key"
 
 
@@ -151,6 +153,48 @@ def is_account_problem(exc: BaseException) -> bool:
         return True
     text = str(exc).lower()
     return any(m in text for m in _ACCOUNT_MARKERS)
+
+
+# Временный отказ поставщика (нить file-outcome, 06.10): живой прогон на OpenAI — пять документов
+# подряд упали за секунды, через 40 минут те же пять прошли. SDK уже повторяет сам (max_retries=2
+# по умолчанию у openai и anthropic), значит перебой длиннее его повторов. Классы — по именам в
+# иерархии исключения, чтобы не тянуть оба SDK: APIConnectionError (и его APITimeoutError),
+# InternalServerError, RateLimitError — одинаково названы у openai и anthropic.
+_TRANSIENT_CLASSES = {"APIConnectionError", "APITimeoutError", "InternalServerError",
+                      "RateLimitError", "OverloadedError", "ServiceUnavailableError"}
+_TRANSIENT_CODES = {408, 409, 425, 429, 500, 502, 503, 504, 529}
+
+
+def is_transient(exc: BaseException) -> bool:
+    """Отказ, который проходит сам: обрыв связи, таймаут, перегрузка или частота запросов у
+    поставщика. Его лечит повтор через время, а не человек и не другой файл.
+    Ключ и счёт — НЕ временное, даже при коде 429 (квота): их чинит человек, и путать их нельзя —
+    пустой баланс стал бы вечным молчаливым повтором (см. is_account_problem)."""
+    if is_account_problem(exc):
+        return False
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    if {c.__name__ for c in type(exc).__mro__} & _TRANSIENT_CLASSES:
+        return True
+    code = getattr(exc, "status_code", None)
+    return isinstance(code, int) and code in _TRANSIENT_CODES
+
+
+_KEYISH = re.compile(r"(sk-[A-Za-z0-9_\-\*]{4,}|AIza[0-9A-Za-z_\-]{8,}|Bearer\s+\S+)")
+
+
+def safe_cause(exc: BaseException, limit: int = 300) -> str:
+    """Текст ошибки поставщика для сайдкара и журнала — без секретов. Ошибка неверного ключа у
+    OpenAI печатает его хвост («Incorrect API key provided: sk-…abcd»), а сайдкар лежит во
+    входящих тенанта и читается ночным ремонтом (модель). Маска по виду ключа + страж секретов
+    по значениям установки; находка стража — текст не пишется вовсе."""
+    text = _KEYISH.sub("‹ключ›", f"{type(exc).__name__}: {exc}")[:limit]
+    try:
+        if [h for h in secret_guard.find_secret_values(text) if not h.startswith("!")]:
+            return f"{type(exc).__name__}: текст скрыт — в нём значение секрета"
+    except Exception:   # noqa: BLE001 — без стража остаётся маска по виду ключа
+        pass
+    return text
 
 
 def _strings(x, out: list, *, media_source=False) -> None:

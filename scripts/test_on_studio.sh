@@ -166,12 +166,7 @@ ssh "$STUDIO" "
   chmod 600 '$STAGING/data/health.db'
   # Фиктивные секреты: гард secrets_dir доволен (HEALTH_SECRETS_DIR задан), но
   # реальные токены не в игре — реальный send/утечка невозможны.
-  for f in anthropic_key healthcheck_url oura_token sync_token telegram_token; do
-    printf 'STAGING_DUMMY' > '$STAGING_SECRETS/'\$f
-  done
-  printf '999999999' > '$STAGING_SECRETS/telegram_chat_id'
-  printf '{}' > '$STAGING_SECRETS/google_calendar_token.json'
-  chmod 600 '$STAGING_SECRETS'/* 2>/dev/null || true
+  sh '$STAGING/scripts/stand_secrets.sh' '$STAGING_SECRETS'   # один дом списка (06.10.2026)
   # Справочник LOINC живёт ОТДЕЛЬНЫМ общим файлом и в снапшот канона не попадает.
   # Без явного копирования тесты сопоставления шли бы на ПУСТОМ словаре и зеленели
   # бы, не проверив ничего (§12) — тот же класс, что git ls-files rc=128 в

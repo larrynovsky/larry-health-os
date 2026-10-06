@@ -580,9 +580,15 @@
     "protocols_db",
     "quarantine_db",
     "rules_db",
+    "secrets_paths",
     "tasks_db",
     "treatment_db",
     "workouts_db"
+  ],
+  "health_mcp": [
+    "mcp_auth",
+    "mcp_tools",
+    "notify"
   ],
   "heldout_readiness": [
     "i18n"
@@ -658,12 +664,10 @@
     "config_db",
     "hai_core",
     "health_db",
-    "i18n",
     "infra_config",
+    "lab_intake_watcher",
     "lab_schedule_extractor",
-    "link_fetch",
     "llm_client",
-    "notify",
     "problems_db",
     "treatment_db",
     "treatment_extractor"
@@ -937,6 +941,13 @@
     "quarantine_db",
     "secrets_paths",
     "signal_family"
+  ],
+  "mcp_tools": [
+    "labs_db",
+    "memory_facts_db",
+    "metrics_db",
+    "pii_census",
+    "problems_db"
   ],
   "memory_config": [
     "config_db"

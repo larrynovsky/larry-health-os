@@ -1,148 +1,55 @@
-<!-- translation-of: docs/explanation/model_choice.md sha256:b07a2866ef7f -->
+<!-- translation-of: docs/explanation/model_choice.md sha256:7a2eb4de2d93 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](model_choice.md)
 
-# How the System Chooses a Model and Switches It Automatically
+# Exit to the Model: One Guard, One Translator, Model Switching — Only to a Verified One
 
-## The Problem
+## What Changed
 
-Sooner or later a model provider discontinues an old model. If the system is hard-wired to a single
-name, on the day it is discontinued the analyses, chat, and consilium stop working — and a human
-finds out, not the system. The owner's decision on 01.10.2026: the system switches **on its own**,
-but **only to a verified** model, and **reports** this.
+The meaning did not change; the page was regenerated.
 
-## Roles and Chains
+**Updated:** 2026-10-06
 
-The system asks for a role, not a "model": `opus` (photo-based analyses, first pass; consilium),
-`sonnet` (second pass of analyses, chat), `haiku` (check-in), `haiku_pinned` (treatment and
-text-based analyses). Each role has a chain of models in the settings (`model.<role>`): the first
-is the active one, the rest are fallbacks. The `opus` and `sonnet` chains do not overlap: photo
-analyses are read by two different models, and if both converge on the same one, the recogniser will
-refuse rather than produce a comparison of a model against itself.
 
-## Who Notices a Discontinuation
+## Why It Exists
 
-Every morning a health check (`model_health_check --daily`) asks the provider for a list of models
-and pings each model in the chains. The result is a snapshot of "what is available" with a date.
-Model selection reads this snapshot: the first available model in the chain. If the active one has
-disappeared the next one is used, and the owner receives a card saying "the role's model has
-changed"; when it comes back — a card saying "it has returned". A snapshot older than three days is
-not trusted: in that case the first model is used, as before.
+The system calls the language model in seventy-five different places — reading lab results, assembling a brief, preparing questions for a doctor, calculating request budgets. All these places are different, but in every one of them the same quiet failure can happen: something goes wrong, and nobody finds out.
 
-## How Fallbacks Enter the Chain — Qualification
+Silent failures here have a particular shape. A provider takes a model offline — and lab results stop being recognized that very day. The person finds out first, not the system. A model is swapped for a fallback without verification — responses keep coming, look plausible, but contain errors: a number on the form is read incorrectly, and this is invisible to the eye. The translator between formats reads a truncated response as complete — a task list is lost, and no error is raised. A reasoning model counts money after the call, not before — and a single request jumps over the monthly budget.
 
-A fallback model only appears through qualification. Once a week the qualification module fetches
-models newer than the active one from the provider, runs each through the tasks of its role, and
-compares the output against an exact reference: numbers on lab-report forms, treatment cycles,
-text tasks (do not assert absence without data, do not build a trend from a single point). The pass
-rule is written before the runs: zero errors in any repeat. A model that passes is appended to the
-**end** of the chain — today the system works the same as yesterday.
+This layer exists precisely because failures of this kind do not announce themselves by nature. They need to be caught in advance — by design, not by reaction.
 
-Models already in the chain are judged too (since 05.10). A verdict remembers the inputs it was
-reached on: prompt, reference, the task's thinking mode. If any of them changes, the verdict is
-stale and the model is judged again. A suite calls the model the way the work calls it: lab-photo
-recognition thinks since 05.10, so qualification judges it with thinking. A failure triggers an
-immediate repeat; two failures in a row remove the model from the role's chain (if the next one has passed
-qualification — otherwise work would move to an unchecked model), and the night
-repair queue gets a record with the previous chain for rollback. One failure does not remove it:
-a model may err once on an ambiguous row, and removing it for that would swap the working model on
-chance. If every model of a role fails, the chain stays as it was: with no model the function
-does not work at all, which is worse than a model that erred on the reference.
+## What It Does, in Plain Terms
 
-The reference must name an analyte the way the canon does. Example from 05.10: the form prints RDW
-twice — in % and in fL; the canon stores them as RDW and RDW_SD, but the qualification reference
-was built from draft rows where the fL row was still called "RDW". Models that correctly read RDW
-in % failed qualification. Now the reference and the model's answer are named by the same rule as
-promotion into the canon.
+Everything the system wants to say to a model goes through one exit point — `llm_client.guarded_client`. Not through several parallel paths, not through an external intermediary, but through one of its own.
 
-Example from the 01.10 measurement: on a synthetic "hard" form, one of the OpenAI models read MCH
-as 29.3 instead of 29.9 three times out of three — plausible and wrong. Such a model does not pass
-qualification.
+**The guard stands first.** Before the request text goes anywhere — to Anthropic or to any other provider — it passes a secrets check. Uniformly, without exceptions. If a translator for an external provider stood before the guard, it would become a way around the protection. That is why the order is strict: guard first, then format translation, then transport.
 
-Cost: qualification spends no more than the owner's monthly budget (10 $). The count is kept
-**before** the call using a pessimistic rate and response limit: a reasoning model may consume the
-entire limit, and a single call would be enough to jump over the budget if counted after.
+**The translator is ours, one.** Anthropic speaks in its own message format; an external provider may speak in another. The translation is done by one translator of our own — not an external library, not an intermediary. This matters: if we do the translation ourselves, we also verify ourselves what it does with a truncated response. When a response is cut off at a provider's limit, the translator does not pretend the response is complete — it says "truncated", and readers in the system use that marker to distinguish incomplete JSON from complete.
 
-The owner's own forms participate in qualification only with Anthropic — they go there in normal
-operation anyway. Other providers are shown only synthetic data during qualification.
+**A model switches only to a verified one.** If the current model stops responding, the system switches on its own — but only to the next one in a pre-composed chain. A model does not simply end up in this chain: it goes through clearance — verification against real tasks. Only a model that has passed clearance can appear in the chain, and only at the end, not anywhere. The order in the chain is decided by the owner; clearance does not rearrange it.
 
-A qualified model becomes a fallback not only for the owner. The release table that ships with the
-code carries its name, date, and "passed", but no values from the forms: qualification errors
-contain lab numbers, and those do not go into the public repository. Example: on 02.10
-claude-opus-5 passed qualification for the owner — at a partner's installation the opus role chain
-became "claude-opus-4-7, then claude-opus-5", even though the partner had not verified anything
-themselves.
+The owner's own forms during the clearance process go only to Anthropic — to the same destination they go to in normal operation. An external provider during clearance sees only synthetics. If a role for an external provider has not passed clearance, it does not fail silently — the system refuses explicitly, with an intelligible reason.
 
-## Other Providers
+**Money is reserved before the call.** Before a request goes to the model, the system checks whether it fits within the budget. For reasoning models, the reasoning reserve is accounted for as well. If it does not fit — the call does not happen, and the reason is stated directly.
 
-An installation with an OpenAI or Gemini key ([recipe](../how-to/llm_provider.md)) communicates
-with the model through a translator: the system still writes the request in Anthropic format, and
-the translator on the way out converts it into a request for the provider's native library and
-converts the response back. Why a single translator rather than a middleware solution like LiteLLM:
-the translation seams (tool-call number, response truncation at the limit, Gemini's "thought
-signature") are held by our tests against recorded real-API responses; a seam that breaks silently
-is worse than a failure.
-DeepSeek is the fourth provider: its profile uses an Anthropic-compatible endpoint and the same SDK
-without a translator; the key and installation constraints are in the same recipe. This endpoint has
-a pitfall: given an unfamiliar name it may not refuse but silently respond with its own model
-(02.10 measurement: a request to "claude-opus-5" was served by deepseek-v4-pro; a completely
-unknown name it did reject). Therefore the system treats a response from a different model as the
-model being absent — otherwise qualification would record the verdict of a different model, and the
-sensor would not notice it leaving.
+**Name and date of birth do not go into the model's context.** Context assemblers — the brief, the visit header, the lifestyle profile, and others — write age and location, but not the name and not the exact date of birth. A model that reasons about health does not need a name. This does not mean the model cannot encounter a name at all — if the person wrote it in chat or it appears on a lab form, the model sees it. But the context assemblers do not deliberately place it there.
 
-With a third-party provider only the role whose model has passed qualification on synthetic data is
-available — [table](../reference/llm_providers.md). All other functions fail loudly.
+**Two passes — two different models.** Lab result photos are read twice: first by one model, then by another. If both models turn out to be the same one — the recognizer refuses to work on its own. A provider that does not have a second model for reading images is left without photo recognition — but does not get one model for both passes.
 
-## The Name Does Not Reach the Model
+## What Is Honest to Say About Its limits
 
-The model judging health does not need a person's name, but does need their age. Therefore all
-context assemblers — patient brief, family doctor header, chat, consilium package, visit
-preparation — write the model the age and city but not the name, and convert the date of birth into
-an age. Example: the chat system prompt previously began "You are the personal health copilot of
-<name>", now it begins "You are a personal health copilot". Tone does not suffer: according to the
-04.10 measurement the name appeared in one response out of a hundred.
+Everything described above holds. But "holds" and "verified everywhere" are different claims, and it is important to be honest here.
 
-04.10 measurement on the live database after deployment: the brief, doctor header, consilium
-package, and lifestyle profile contain no name or date of birth; in the chat context the name
-appeared twice — in calendar event titles, i.e. in content, not in what the system adds itself.
+**The clearance table for partners and new installations.** When someone deploys the system without their own clearance — a partner, an installation from GitHub — the system appends models from the release table, which the owner compiles on their own machine, to the chain. This works and is confirmed by measurement. But between when the owner ran clearance and when the updated table reaches a specific installation, there is a delay. The system notices this and writes it to the log — but does not close the delay on its own. This is a boundary, not fine print.
 
-A test catches new paths by which the name reaches the model: it builds contexts using a fictitious
-name and searches for it in outgoing text, and the ratchet turns red on a new name reader outside
-screens intended for humans. The boundary: the model still sees the name inside a document (the
-header of a lab-report form) and in the person's own words — the rule concerns what the system adds
-itself, not the content of documents.
+**Name in the model's context.** The check is designed to see when a context assembler reads a name by known keys, and catches that. But if a name is passed inside a structure as a whole — for example, a profile is passed into a prompt as an object — that path is caught only by a behavior test, and only for the listed assemblers. If a new assembler appears, it needs to be checked separately. A name inside documents — on a lab form, in a discharge summary — and in the words of the person themselves in chat, the model still sees: the rule is about assemblers, not about content.
 
-## Limits
+**Model substitution at an external provider.** Some providers silently serve an unknown model name with one of their own. The system catches this during a normal call and treats such a response as the absence of the requested model. But streaming calls are not covered by this check — because there are no streaming calls in the code at present. If they appear, the check will need to be extended to cover them.
 
-- A partner and a GitHub installation have no qualification of their own: they take fallback models
-  from the release table, which the owner's qualification populates when a development thread is
-  closed. Between the owner's qualification and the next release they operate with the old set of
-  fallbacks; the sensor sees the lag but does not close it.
-- Qualification judges a model on a corpus, not on every future task: a role without a complete set
-  of checks receives no successor, but a model that has passed is verified only on what is in the
-  corpus.
-- Qualification does not know the prices of third-party models: accounting is done at a pessimistic
-  rate, so actual spending is lower than accounted, and the number of checks per month is less than
-  the money would allow.
-- With a DeepSeek key, numbers from lab-report forms do not enter the laboratory canon: the
-  document recogniser refuses, the document waits and will process itself when reading is qualified.
-  The bot will describe images in chat; numbers from such a conversation can only enter memory
-  marked "not verified", not the canon. According to DeepSeek's own model list, only one of its
-  models accepts images (deepseek-flash; deepseek-v4-pro is text-only), and recognition reads a
-  page with two different models and cross-checks them: a shared error across two readings by the
-  same model would pass the cross-check. deepseek-v4-pro did not refuse a photo of a form but
-  returned numbers that are not on the form (02.10 qualification: WBC 5.2 instead of 6.82). The
-  owner's decision on 02.10: an explicit refusal is better than a weakened cross-check. The
-  boundary: if DeepSeek introduces a second image-reading model and it passes qualification, photo
-  support will work without any code changes.
+## Where This Lives in the System
 
-## What the System Does Not Do
+The central point is `llm_client.py`: this is where `guarded_client` lives, through which all calls pass, and where the guard and translator reside.
 
-- Does not reorder a chain: it only appends models that pass and removes models that fail twice;
-  if all fail, it removes none.
-- Does not qualify a model on a partial set of role tasks: a role without a complete set of checks
-  receives no successor.
-- Does not send real documents to a new provider for verification.
-- Does not assign a single model to both reading passes for a photo, even if the provider has no
-  second one.
+The intentions and decisions that led to this design — why one exit, why an in-house translator, why clearance before the chain — are described in `subsystem_intent.yaml`. This is not code and not an instruction; it is an explanation of why the system is built the way it is, and not some other way.

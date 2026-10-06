@@ -104,7 +104,9 @@ def test_image_quotes_checked_against_ocr(db, inbox, monkeypatch):
     assert "НЕ подтверждена распознаванием" in props["Сахарный диабет 2 типа"]
 
 
-def test_failure_is_loud_once_and_not_retried(db, inbox, monkeypatch):
+def test_failure_is_recorded_once_and_not_retried(db, inbox, monkeypatch):
+    """Провал — сайдкар, который читает итог по файлу; сам разбор документов человеку не пишет
+    (нить file-outcome, 06.10: до неё отсюда шло второе сообщение о том же файле)."""
     import import_medical_events as ime
     d, told = inbox
     calls = []
@@ -113,7 +115,25 @@ def test_failure_is_loud_once_and_not_retried(db, inbox, monkeypatch):
     ime.process_incoming(d)
     assert calls == ["endo.pdf"], "провал не должен повторно оплачиваться каждым проходом"
     assert (d / "endo.pdf.events.failed").exists()
-    assert len(told) == 1 and "endo.pdf" in told[0]
+    assert ime.doc_outcome(d / "endo.pdf") == {"status": "failed"}
+    assert not told
+
+
+def test_receipt_tells_what_was_taken(db, inbox):
+    """Квитанция разбора — то, что итог по файлу скажет человеку. Мутации: не писать квитанцию,
+    потерять счёт предложений, переписать «принят» на «уже был» вторым проходом."""
+    import import_medical_events as ime
+    d, _ = inbox
+    assert ime.doc_outcome(d / "endo.pdf") is None            # не брался — итога нет
+    ime.process_incoming(d)
+    got = ime.doc_outcome(d / "endo.pdf")
+    assert got == {"status": "imported", "kind": "encounter", "date": "2025-03-12",
+                   "diagnoses": 1, "medications": 1}
+    ime.process_incoming(d)
+    assert ime.doc_outcome(d / "endo.pdf")["status"] == "imported"
+    (d / "endo.pdf.events.done").unlink()                      # повтор разобранного файла
+    ime.process_incoming(d)
+    assert ime.doc_outcome(d / "endo.pdf") == {"status": "already"}
 
 
 def test_empty_key_is_waiting_not_failed(db, inbox, monkeypatch):
@@ -182,3 +202,33 @@ def test_duplicate_sources_sees_repeated_document(db, inbox, monkeypatch):
     ime._process(d / "endo.pdf", root=d.parent)
     dups = ime.duplicate_sources()
     assert len(dups) == 1 and dups[0][1] == 2
+
+
+
+def test_transient_is_retried_then_failed_with_cause(db, inbox, monkeypatch):
+    """Нить file-outcome-3 (06.10): обрыв у поставщика — не провал документа сразу. Мутации:
+    писать .events.failed с первого обрыва; повторять без потолка; терять причину."""
+    import httpx, openai, os, time
+    import import_medical_events as ime
+    import lab_intake_watcher as w
+    d, told = inbox
+    calls = []
+    req = httpx.Request("POST", "https://api.example/v1")
+    def down(n, t):
+        calls.append(n)
+        raise openai.APIConnectionError(request=req)
+    monkeypatch.setattr(ime, "llm_extract", down)
+    ime.process_incoming(d)
+    retry = d / "endo.pdf.events.waitretry"
+    assert retry.exists() and not (d / "endo.pdf.events.failed").exists()
+    assert ime.doc_outcome(d / "endo.pdf") is None            # итог по файлу ждёт
+    ime.process_incoming(d)
+    assert len(calls) == 1
+    for m in w.RETRY_BACKOFF_MIN:
+        old = time.time() - m * 60 - 1
+        os.utime(retry, (old, old)) if retry.exists() else None
+        ime.process_incoming(d)
+    assert len(calls) == 1 + len(w.RETRY_BACKOFF_MIN)
+    failed = d / "endo.pdf.events.failed"
+    assert failed.exists() and "APIConnectionError" in failed.read_text() and not retry.exists()
+    assert not told

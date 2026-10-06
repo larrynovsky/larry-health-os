@@ -8,6 +8,9 @@
 в собственный чат через notify.notify. У отдельного тенанта остаётся также
 операторская ссылка без медицинских значений; его подтверждение от неё не зависит.
 
+Замысел гейта «бланк или нет», ожидания пустого ключа и повтора — INTENT: lab_intake_gate
+(subsystem_intent.yaml).
+
 Идемпотентность: по basename в lab_results_staging. Провал → sidecar .failed
 (без ретрай-шторма) + громкое уведомление. Studio-only. launchd KeepAlive.
 """
@@ -187,8 +190,7 @@ def _stable(p: Path) -> bool:
 
 def _tell_person(key: str, **params) -> None:
     """Содержательное — в чат текущего тенанта; недоставка не выдаётся за успех."""
-    if notify.notify(i18n.t(key, **params), fallback=False) != "telegram":
-        notify.fault("lab_intake_watcher: person not reached", person_key=None)
+    _tell_person_text(i18n.t(key, **params))
 
 
 def heartbeat_path() -> Path:
@@ -258,6 +260,11 @@ def process_once() -> int:
         log.info(f"водяной знак поставлен: {datetime.fromtimestamp(state['watermark'])}; "
                  f"файлы старше него не берём")
     watermark = float(state["watermark"])
+    if "outcome_told" not in state:
+        # Первый запуск итога по файлу (06.10): всё, что УЖЕ лежит отвергнутым, считается
+        # сказанным — иначе после выката каждый старый файл получил бы новое сообщение разом.
+        state["outcome_told"] = sorted(str(f) for f in _outcome_candidates(state))
+        _save_state(state)
     notlab = set(state.get("notlab", []))
     forced = set(state.get("forced", []))   # вердикт человека, сильнее обоих гейтов
 
@@ -309,6 +316,9 @@ def process_once() -> int:
         waiting = wk.exists()
         if waiting and _age(wk) < KEY_RETRY_SEC:
             continue   # ждём ключ: повтор не чаще KEY_RETRY_SEC (пустой ключ отвечает отказом бесплатно)
+        rt = f.with_suffix(f.suffix + RETRY_WAIT)
+        if not retry_due(rt):
+            continue   # временный отказ поставщика: следующая попытка ещё не пришла
         if not _stable(f):
             continue
         human = f.name in forced
@@ -324,45 +334,54 @@ def process_once() -> int:
         try:
             lab = True if human else _is_lab(f)
             if not lab:
-                # В CR/ лежат документы разных типов; ответ нужен приславшему файл в бот.
-                # Вердикт сохраняется ДО ответа: последующие опросы не шлют его снова.
-                # Два разных ответа (05.10): «не бланк» — правда о суждении, и файл не потерян:
-                # его разбирает маршрут заключений (import_medical_events, выше в этом проходе);
-                # «не читается» — правда о файле. До 05.10 оба звучали «пришлите почётче».
+                # Не бланк (или не читается) — вердикт ГЕЙТА, а не итог по файлу: тот же файл
+                # уже читает маршрут заключений (import_medical_events, выше в этом проходе).
+                # Человеку говорит _settle_outcomes, когда закончат оба (нить file-outcome, 06.10).
                 notlab.add(f.name)
                 state["notlab"] = sorted(notlab)
-                saved = _save_state(state)
+                _save_state(state)
                 wk.unlink(missing_ok=True)
-                if saved and f.parent == _incoming():
-                    _tell_person("person.lab.not_readable" if lab is None else "person.lab.not_lab",
-                                 file=name)
+                rt.unlink(missing_ok=True)
                 log.info(f"[{tenant}] не лабораторная таблица ({lab}), пропуск: {f.name}")
                 continue
             log.info(f"[{tenant}] recognize {f.name} run={run_id}")
             summary = lab_backfill.run_backfill(run_id, None, None, str(f), None)
             rows = summary.get("rows", 0)
             wk.unlink(missing_ok=True)
+            rt.unlink(missing_ok=True)
             if rows == 0 and summary.get("errors"):
                 # Распознаватель упал, а не «прочитал и не нашёл»: run_backfill проглатывает сбой
                 # документа в счётчик errors. Это сбой у нас — ветка сбоя ниже, не «0 строк».
-                raise RuntimeError(f"lab_backfill: {summary['errors']} ошибок, 0 строк")
+                raise RuntimeError(f"lab_backfill: {summary['errors']} ошибок, 0 строк; "
+                                   f"первая — {summary.get('first_error', 'не записана')}")
             if rows == 0:
-                # РАСХОЖДЕНИЕ, а не успех. Файл попал сюда потому, что кто-то счёл его
-                # лабораторной таблицей (doc_triage или рука), а распознаватель не увидел
-                # ни одной строки. Молчаливое «0 строк, 0 на ревью» читалось бы как
-                # «документ пустой» — именно так выглядел бы промах классификатора.
+                # Ноль строк — итог РАЗБОРА АНАЛИЗОВ, не файла. Гейт при сомнении говорит «бланк»,
+                # и заключение врача с таблицей на первой странице законно попадает сюда; его
+                # читает маршрут заключений. Что сказать человеку и сбой ли это — решает
+                # _settle_outcomes по обоим разборщикам (нить file-outcome, 06.10).
                 # Сайдкар .norows обязателен: без него basename не попадает в staging,
-                # файл берётся КАЖДЫЙ поллинг, и сигнал превращается в шторм раз в минуту.
+                # файл берётся КАЖДЫЙ поллинг, и распознавание крутилось бы раз в минуту.
                 f.with_suffix(f.suffix + ".norows").write_text(f"run={run_id} rows=0")
-                notify.fault("lab_intake_watcher: no rows recognized; retry stopped", person_key=None)
-                _tell_person("person.lab.no_rows", file=name)
                 log.warning(f"[{tenant}] 0 строк на {f.name} — помечен .norows")
                 n += 1
                 continue
             from urllib.parse import quote, urlencode
             url = (f"{DASHBOARD_URL}/lab-review/{quote(run_id, safe='')}?" +
                    urlencode({"tenant": tenant, "show": "waiting"}))
-            _tell_person("person.lab.review", file=name, n=rows, url=url)
+            # Анализы нашлись — но тот же файл мог лечь в медкарту и как документ (письмо врача с
+            # маркерами в прозе: замер 06.10: из письма врача распознаватель вынул упомянутый в тексте маркер).
+            # Обе правды — в одном сообщении, если разбор документов уже закончил (обычно да: он
+            # идёт раньше в этом же проходе); иначе его часть доскажет _settle_outcomes.
+            import import_medical_events
+            doc = import_medical_events.doc_outcome(f)
+            text = i18n.t("person.lab.review", file=name, n=rows, url=url)
+            if doc is None:
+                state.setdefault("lab_told", [])
+                state["lab_told"] = sorted(set(state["lab_told"]) | {str(f)})
+                _save_state(state)
+            elif _is_document_part(doc):
+                text += "\n" + _document_text(f, doc, also=True)
+            _tell_person_text(text)
             from secrets_paths import is_owner
             if not is_owner():
                 notify.notify_operator(i18n.t("owner.card.intake",
@@ -401,16 +420,168 @@ def process_once() -> int:
                         notify.notify_operator(i18n.t("person.lab.key_problem", file=name,
                                                       provider=_provider_name()))
                 continue
+            transient = llm_client.is_transient(e)
+            if transient and not note_transient(rt, e):
+                # Обрыв, перегрузка, частота у поставщика (06.10: пять файлов OpenAI упали за
+                # секунды, через 40 минут прошли). Человек ничего не делает и ничего не слышит,
+                # пока не исчерпан потолок RETRY_BACKOFF_MIN — дальше обычный сбой ниже.
+                log.warning(f"[{tenant}] временный отказ поставщика: {f.name} — повтор позже "
+                            f"({llm_client.safe_cause(e)})")
+                continue
             wk.unlink(missing_ok=True)
+            rt.unlink(missing_ok=True)
             log.error(f"[{tenant}] recognize failed {f.name}: {e}", exc_info=True)
-            f.with_suffix(f.suffix + ".failed").write_text(str(e)[:500])
+            f.with_suffix(f.suffix + ".failed").write_text(llm_client.safe_cause(e, limit=500))
             notify.fault(f"lab_intake_watcher: recognition failed ({type(e).__name__}); retry stopped",
                          person_key=None)
-            _tell_person("person.lab.failed", file=name)
+            # После потолка повторов «пришлите через несколько часов» было бы неправдой:
+            # несколько часов уже прошли (холодное чтение 06.10: «дойдёт ли он сам?»).
+            _tell_person("person.lab.failed_after_retries" if transient else "person.lab.failed",
+                         file=name)
+    _settle_outcomes(state)
     return n
 
 
+def _outcome_candidates(state: dict) -> list[Path]:
+    """Файлы входящих, по которым разбор анализов ничего не дал (гейт «не бланк» или 0 строк),
+    и снимки из reports/ (их разбор анализов не берёт вовсе). Итог по ним зависит от разбора
+    документов."""
+    inbox = _incoming()
+    notlab = set(state.get("notlab", []))
+    out = [f for f in sorted(inbox.glob("*")) if f.is_file() and f.suffix.lower() in DOC_EXTS
+           and (f.name in notlab or f.with_suffix(f.suffix + ".norows").exists())]
+    out += [Path(p) for p in state.get("lab_told", []) if Path(p).exists()]
+    reports = inbox / "reports"
+    if reports.is_dir():
+        out += [f for f in sorted(reports.glob("*")) if f.is_file() and f.suffix.lower() in DOC_EXTS]
+    return out
+
+
+def _settle_outcomes(state: dict) -> None:
+    """ИТОГ ПО ФАЙЛУ — один на файл и после ОБОИХ разборщиков (нить file-outcome, 06.10).
+
+    Файл во входящих читают двое: разбор анализов (таблица значений) и разбор документов
+    (событие медкарты, диагнозы, лекарства). До 06.10 человеку говорил только первый — и говорил
+    за весь файл: заключение врача, принятое в медкарту вторым, человек слышал как «не удалось
+    прочитать ни одного значения анализов; в базу ничего не добавлено». Ошибка гейта «бланк или нет»
+    обязана стоить лишнего вызова модели, а не ложного ответа человеку.
+
+    Здесь — файлы, по которым анализы не дали ничего. Пока разбор документов не закончен
+    (не брался, ждёт ключа), молчим. «Ничего» звучит, только когда пусто у обоих; только тогда
+    это и сбой для журнала."""
+    import import_medical_events
+    told = set(state.get("outcome_told", []))
+    notlab = set(state.get("notlab", []))
+    for f in _outcome_candidates(state):
+        if str(f) in told:
+            continue
+        doc = import_medical_events.doc_outcome(f)
+        if doc is None:
+            continue
+        told.add(str(f))
+        state["outcome_told"] = sorted(told)
+        lab_part_told = str(f) in set(state.get("lab_told", []))
+        if lab_part_told:
+            state["lab_told"] = sorted(set(state["lab_told"]) - {str(f)})
+        if not _save_state(state):
+            return            # не записали «сказано» — не говорим: иначе повтор каждый проход
+        if lab_part_told:     # анализы уже сказаны; досказать документ, если он есть
+            if _is_document_part(doc):
+                _tell_person_text(_document_text(f, doc, also=True))
+            continue
+        _tell_person_text(_outcome_text(f, doc, gate_said_not_lab=f.name in notlab))
+        if doc.get("status") == "failed" and f.with_suffix(f.suffix + ".norows").exists():
+            notify.fault("lab_intake_watcher: no rows recognized and document reader found nothing",
+                         person_key=None)
+
+
+def _is_document_part(doc: dict) -> bool:
+    """Есть что сказать про документ РЯДОМ с анализами: документ принят, и это не сам бланк
+    (бланк разбор документов кладёт событием «результат анализа» — повторять это незачем)."""
+    return doc.get("status") == "imported" and doc.get("kind") != "lab_result"
+
+
+def _document_text(f: Path, doc: dict, also: bool = False) -> str:
+    """also — часть про документ рядом с найденными анализами: холодное чтение 06.10 приняло
+    два блока об одном файле за два разных файла, поэтому вторая часть начинается «Кроме чисел»."""
+    name = _shown(f)
+    date = doc.get("date")
+    dated = bool(date and date != "unknown")
+    if also:
+        parts = [i18n.t("person.file.document_also", date=date) if dated
+                 else i18n.t("person.file.document_also_nodate")]
+    else:
+        parts = [i18n.t("person.file.document", file=name, date=date) if dated
+                 else i18n.t("person.file.document_nodate", file=name)]
+    items = [i18n.t(key, n=doc[k]) for k, key in (("diagnoses", "person.file.prop_diagnoses"),
+                                                   ("medications", "person.file.prop_medications"))
+             if doc.get(k)]
+    if items:
+        parts.append(i18n.t("person.file.proposals", items=", ".join(items)))
+    return " ".join(parts)
+
+
+def _outcome_text(f: Path, doc: dict, gate_said_not_lab: bool) -> str:
+    name = _shown(f)
+    st = doc.get("status")
+    if st == "imported":
+        parts = [_document_text(f, doc)]
+    elif st == "already":
+        parts = [i18n.t("person.file.already", file=name)]
+    else:   # failed / ignored — ни анализов, ни документа
+        # «Пришлите этот же файл» и «пришлите другой файл» в одном тексте читались как
+        # противоречие (холодное чтение 06.10) — поэтому один текст с развилкой «если… если нет».
+        maybe_lab = gate_said_not_lab and f.parent == _incoming()
+        return i18n.t("person.file.nothing_maybe_lab" if maybe_lab else "person.file.nothing",
+                      file=name)
+    # «Пришлите как анализы» — только когда разборщики разошлись (гейт: не бланк; документы:
+    # результат анализа). Живой прогон 06.10: на 14 заключениях подсказка звучала каждый раз,
+    # а расхождений не было ни одного — это был шум.
+    disagree = st == "imported" and doc.get("kind") == "lab_result"
+    if gate_said_not_lab and f.parent == _incoming() and disagree:
+        parts.append(i18n.t("person.file.as_lab_hint"))
+    return " ".join(parts)
+
+
+def _tell_person_text(text: str) -> None:
+    if notify.notify(text, fallback=False) != "telegram":
+        notify.fault("lab_intake_watcher: person not reached", person_key=None)
+
+
 KEY_WAIT = ".waitkey"           # сайдкар «ждём ключ/баланс»; mtime — время последней попытки
+RETRY_WAIT = ".waitretry"       # сайдкар «временный отказ поставщика»: {attempts, cause}; mtime — последняя
+# Потолок повторов при временном отказе — решение владельца 06.10: шесть повторов с растущим
+# интервалом (~3 часа). Меньше — человека чаще просят прислать файл заново; больше — дольше тишина.
+RETRY_BACKOFF_MIN = (5, 10, 20, 40, 60, 60)
+
+
+def retry_due(side: Path) -> bool:
+    """Пора ли пробовать снова после временного отказа (сайдкара нет — пора)."""
+    if not side.exists():
+        return True
+    try:
+        attempts = int(json.loads(side.read_text()).get("attempts", 1))
+    except (OSError, ValueError, AttributeError):
+        return True
+    wait = RETRY_BACKOFF_MIN[min(max(attempts, 1), len(RETRY_BACKOFF_MIN)) - 1] * 60
+    return _age(side) >= wait
+
+
+def note_transient(side: Path, exc: BaseException) -> bool:
+    """Записать ещё один временный отказ. True — потолок исчерпан (сайдкар снят: дальше —
+    обычный сбой); False — ждём следующей попытки. Общий дом для разбора анализов и документов."""
+    import llm_client
+    try:
+        attempts = int(json.loads(side.read_text()).get("attempts", 0)) if side.exists() else 0
+    except (OSError, ValueError, AttributeError):
+        attempts = 0
+    attempts += 1
+    if attempts > len(RETRY_BACKOFF_MIN):
+        side.unlink(missing_ok=True)
+        return True
+    side.write_text(json.dumps({"attempts": attempts, "cause": llm_client.safe_cause(exc)},
+                               ensure_ascii=False))
+    return False
 KEY_RETRY_SEC = 30 * 60        # системная механика: как часто пробовать снова, пока ключ пуст
 
 
@@ -437,7 +608,8 @@ def _provider_name() -> str:
 # Сайдкары отказов: каждый останавливает повторы навсегда (или до своего снятия). Повторная
 # присылка того же файла — единственный способ человека сказать «попробуй ещё», поэтому их
 # список живёт здесь, рядом с теми, кто их пишет. `.events.failed` пишет маршрут заключений.
-_REFUSAL_SIDECARS = (".failed", ".norows", ".notadmitted", KEY_WAIT, ".events.failed")
+_REFUSAL_SIDECARS = (".failed", ".norows", ".notadmitted", KEY_WAIT, RETRY_WAIT, ".events.failed",
+                     ".events" + RETRY_WAIT)
 
 
 def retry_after_refusal(path: Path) -> bool:
@@ -460,6 +632,11 @@ def retry_after_refusal(path: Path) -> bool:
     if path.name in set(_load_state().get("notlab", [])):
         force_lab(path)
         cleared = True
+    st = _load_state()
+    if str(path) in set(st.get("outcome_told", [])):
+        # Итог по файлу скажется заново, когда разборщики закончат повтор (нить file-outcome).
+        st["outcome_told"] = sorted(set(st["outcome_told"]) - {str(path)})
+        _save_state(st)
     if cleared:
         log.info(f"повтор после отказа: {path.name} — снова в очереди")
     return cleared

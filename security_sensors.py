@@ -25,6 +25,7 @@ plan_agents_md_adoption_2026-07-06.md (iCloud health).
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import time
@@ -314,6 +315,79 @@ def _tailscale_exposure(ts_json: str | None) -> list[str]:
     return _parse_tailscale(ts_json)
 
 
+# ── Публичная поверхность сервера MCP (нить mcp-finish, 07.10) ───────────────
+# Узел tailnet health-mcp — единственное, что Health OS открывает в интернет (решения владельца
+# 06.10: облачные помощники, отдельный узел). Датчик выше судит Funnel самой Studio, а этот узел ему
+# не виден. Судим снаружи — тем же путём, каким ходят Claude и ChatGPT: публичный DNS → публичный
+# вход Tailscale → наш сервер. Обещание: без токена — отказ, всё кроме MCP — 404. Если завтра
+# на этот узел попадёт дашборд или вход перестанет требовать токен, датчик покраснеет.
+
+_MCP_EXPECT_404 = ("/", "/labs", "/api/health")       # дашборд и его API не должны отвечать
+
+
+def _mcp_resolve(host: str) -> list[str]:
+    """A-записи из ПУБЛИЧНОГО DNS (DNS-over-HTTPS): системный резолвер в tailnet отдал бы
+    адрес 100.x и обошёл бы Funnel — проверка была бы не про интернет."""
+    import urllib.request
+    req = urllib.request.Request(f"https://cloudflare-dns.com/dns-query?name={host}&type=A",
+                                 headers={"Accept": "application/dns-json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        data = json.loads(r.read())
+    return [a["data"] for a in data.get("Answer") or [] if a.get("type") == 1]
+
+
+def _mcp_fetch(ip: str, host: str, method: str, path: str) -> tuple[int, dict, bytes]:
+    """HTTPS к конкретному адресу с проверкой сертификата по имени узла (как curl --resolve)."""
+    import http.client
+    import socket
+    import ssl
+    sock = ssl.create_default_context().wrap_socket(
+        socket.create_connection((ip, 443), timeout=15), server_hostname=host)
+    conn = http.client.HTTPSConnection(host, timeout=15)
+    conn.sock = sock
+    try:
+        conn.request(method, path, body=b"{}" if method == "POST" else None,
+                     headers={"Content-Type": "application/json"})
+        r = conn.getresponse()
+        return r.status, {k.lower(): v for k, v in r.getheaders()}, r.read(4096)
+    finally:
+        conn.close()
+
+
+def _mcp_public_surface(base: str | None, resolve=_mcp_resolve, fetch=_mcp_fetch) -> list[str]:
+    """Пусто = снаружи отвечает только MCP, и только со входом. Сервер не заведён (нет
+    MCP_PUBLIC_BASE) — судить нечего. Граница: проверяется один публичный адрес из DNS и
+    перечисленные пути, а не всё пространство путей."""
+    if not base:
+        return []
+    host = base.split("//", 1)[-1].split("/", 1)[0]
+    ips = resolve(host)
+    if not ips:
+        return [f"{host}: публичной DNS-записи нет — облачные помощники сервер не найдут"]
+    ip, found = ips[0], []
+    st, hdr, _ = fetch(ip, host, "POST", "/mcp")
+    if st >= 500:
+        # 07.10 живьём: сразу после деплоя Funnel отдал 502 — сервер ещё поднимался. Это не дыра во
+        # входе, а недоступность; назвать её надо своими словами, иначе разбор пойдёт не туда.
+        return [f"POST /mcp → {st}: сервер не отвечает — облачные помощники сейчас не подключатся"]
+    if st != 401:
+        found.append(f"POST /mcp без токена → {st}, ждали 401: вход не требуется?")
+    elif "resource_metadata=" not in hdr.get("www-authenticate", ""):
+        found.append("POST /mcp → 401 без resource_metadata: клиенты не найдут, где входить")
+    st, _, body = fetch(ip, host, "GET", "/.well-known/oauth-authorization-server")
+    try:
+        issuer = json.loads(body).get("issuer") if st == 200 else None
+    except ValueError:
+        issuer = None
+    if issuer != base:
+        found.append(f"метаданные входа: {st}, issuer={issuer!r} — ждали {base}")
+    for path in _MCP_EXPECT_404:
+        st, _, _ = fetch(ip, host, "GET", path)
+        if st != 404:
+            found.append(f"GET {path} → {st}, ждали 404: наружу открыто не только MCP")
+    return found
+
+
 # ── Публичный интерфейс ───────────────────────────────────────────────────────
 
 def collect_security_findings(
@@ -337,6 +411,9 @@ def collect_security_findings(
         "hardcoded_tokens": lambda: _hardcoded_tokens(repo),
         "pip_audit": lambda: _pip_audit(repo),
         "tailscale_exposure": lambda: _tailscale_exposure(ts_json),
+        # Сервер MCP судится снаружи и из контейнера тоже: адрес — из окружения ночной проверки
+        # (scripts/install.py кладёт MCP_PUBLIC_BASE в службу cron, когда сервер заведён).
+        "mcp_public_surface": lambda: _mcp_public_surface(os.environ.get("MCP_PUBLIC_BASE")),
     }
     import plist_env_liveness
     if plist_env_liveness.in_container() and lsof_text is None and ts_json is None:

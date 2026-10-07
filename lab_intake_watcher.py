@@ -528,6 +528,9 @@ def _outcome_text(f: Path, doc: dict, gate_said_not_lab: bool) -> str:
         parts = [_document_text(f, doc)]
     elif st == "already":
         parts = [i18n.t("person.file.already", file=name)]
+    elif st == "ignored":
+        # Счёт, страховой лист и т.п. (07.10): не «не смог прочитать», а «прочитал — не медицина».
+        return i18n.t("person.file.not_medical", file=name)
     else:   # failed / ignored — ни анализов, ни документа
         # «Пришлите этот же файл» и «пришлите другой файл» в одном тексте читались как
         # противоречие (холодное чтение 06.10) — поэтому один текст с развилкой «если… если нет».

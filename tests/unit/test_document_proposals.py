@@ -232,3 +232,38 @@ def test_transient_is_retried_then_failed_with_cause(db, inbox, monkeypatch):
     failed = d / "endo.pdf.events.failed"
     assert failed.exists() and "APIConnectionError" in failed.read_text() and not retry.exists()
     assert not told
+
+
+
+# ── нить doc-types (07.10): эндоскопия и гистология — свои типы; счёт — не в медкарту ───────
+
+def test_invoice_by_content_stays_out_of_record_and_is_not_reasked(db, inbox, monkeypatch):
+    """Счёт, который фильтр по имени файла не узнаёт, не попадает в медкарту диагностикой.
+    Мутации: записать событие; звать модель на каждом проходе; сказать «не прочитан»."""
+    import import_medical_events as ime
+    d, _ = inbox
+    calls = []
+    monkeypatch.setattr(ime, "llm_extract",
+                        lambda n, t: calls.append(n) or {"event_type": "not_medical",
+                                                         "effective_date": "2000-01-01"})
+    ime.process_incoming(d)
+    ime.process_incoming(d)
+    assert calls == ["endo.pdf"]
+    with db.conn() as c:
+        assert c.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+    assert ime.doc_outcome(d / "endo.pdf") == {"status": "ignored"}
+
+
+@pytest.mark.parametrize("kind", ["endoscopy", "pathology"])
+def test_endoscopy_and_pathology_are_own_diagnostic_types(db, inbox, monkeypatch, kind):
+    import import_medical_events as ime
+    import events_db
+    d, _ = inbox
+    monkeypatch.setattr(ime, "llm_extract", lambda n, t: {**EXTRACTED, "event_type": kind,
+                                                          "diagnoses": [], "medications": []})
+    ime.process_incoming(d)
+    with db.conn() as c:
+        rows = c.execute("SELECT e.event_type, d.type FROM events e "
+                         "JOIN diagnostic_events d ON d.event_id = e.id").fetchall()
+    assert [tuple(r) for r in rows] == [(kind, kind)]
+    assert kind in events_db.DIAGNOSTIC_TYPES and kind in events_db.RECORD_TABS

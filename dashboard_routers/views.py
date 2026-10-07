@@ -356,13 +356,9 @@ def medical_record(request: Request,
     ungrouped_first = _newest(ungrouped) > max((_newest(ep["events"]) for ep in episodes_list),
                                                default="")
 
-    EVENT_TYPES = [
-        ("", i18n.t("dashboard.medical_record.type.all", lang)),
-        ("encounter", i18n.t("dashboard.medical_record.type.encounter", lang)),
-        ("lab_result", i18n.t("dashboard.medical_record.type.lab_result", lang)),
-        ("imaging", i18n.t("dashboard.medical_record.type.imaging", lang)),
-        ("procedure", i18n.t("dashboard.medical_record.type.procedure", lang)),
-    ]
+    import events_db
+    EVENT_TYPES = [("", i18n.t("dashboard.medical_record.type.all", lang))] + [
+        (t, i18n.t(f"dashboard.medical_record.type.{t}", lang)) for t in events_db.RECORD_TABS]
 
     return templates.TemplateResponse(request, "medical_record.html", {
         "request":        request,

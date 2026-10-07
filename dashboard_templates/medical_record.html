@@ -22,6 +22,8 @@
   {% if etype == "encounter" %}<span class="chip chip--action">приём</span>
   {% elif etype in ["lab_result", "lab"] %}<span class="chip chip--active">анализ</span>
   {% elif etype == "imaging" %}<span class="chip chip--outline">визуализация</span>
+  {% elif etype == "endoscopy" %}<span class="chip chip--outline">эндоскопия</span>
+  {% elif etype == "pathology" %}<span class="chip chip--outline">гистология</span>
   {% elif etype == "procedure" %}<span class="chip chip--warning">процедура</span>
   {% elif etype == "self_observation" %}<span class="chip chip--outline">опросник</span>
   {% else %}<span class="chip chip--outline">{{ etype }}</span>{% endif %}
@@ -127,6 +129,8 @@
             <option value="encounter">Приём / консультация</option>
             <option value="lab_result">Анализы</option>
             <option value="imaging">Визуализация / КТ / МРТ</option>
+            <option value="endoscopy">Эндоскопия</option>
+            <option value="pathology">Гистология / биопсия</option>
             <option value="procedure">Процедура</option>
           </select>
         </div>
@@ -224,7 +228,7 @@
 <script>
 (function(){
   const ENCOUNTER_TYPES = ['encounter'];
-  const DIAGNOSTIC_TYPES = ['lab_result', 'imaging', 'procedure'];
+  const DIAGNOSTIC_TYPES = ['lab_result', 'imaging', 'endoscopy', 'pathology', 'procedure'];  // = events_db.DIAGNOSTIC_TYPES
 
   window.onTypeChange = function(val) {
     const secEnc  = document.getElementById('sec-encounter');

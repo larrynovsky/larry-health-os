@@ -11,6 +11,15 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
+# Типы событий медкарты, у которых есть диагностическая часть (diagnostic_events). ОДИН дом:
+# до 07.10 тот же список жил в трёх местах (import_medical_events, api_events, шаблон медкарты).
+# Эндоскопия и гистология — свои типы с 07.10 (решение владельца): до этого промпт разбора
+# документов относил такие документы к «Визуализации».
+DIAGNOSTIC_TYPES = ("lab_result", "imaging", "endoscopy", "pathology", "procedure")
+# Вкладки медкарты, в порядке показа (подписи — i18n dashboard.medical_record.type.<тип>).
+RECORD_TABS = ("encounter", "lab_result", "imaging", "endoscopy", "pathology", "procedure")
+
+
 def save_event(
     event_type: str,
     effective_date: str,

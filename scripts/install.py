@@ -580,6 +580,8 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp
             "volumes": [f"{MCP_TS_VOLUME}:/var/lib/tailscale",
                         f"{repo}/build/docker/mcp_serve.json:/config/serve.json:ro"],
             "depends_on": ["mcp"]}
+        # ночная проверка судит публичную поверхность сервера снаружи (security_sensors, 07.10)
+        services["cron"]["environment"]["MCP_PUBLIC_BASE"] = mcp_base
         extra["mcp_serve.json"] = json.dumps({
             "TCP": {"443": {"HTTPS": True}},
             "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/": {"Proxy": "http://mcp:8765"}}}},

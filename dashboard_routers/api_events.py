@@ -49,7 +49,8 @@ def api_event_new(
         }
 
     diagnostic = None
-    if event_type in ("lab_result", "imaging", "procedure"):
+    import events_db
+    if event_type in events_db.DIAGNOSTIC_TYPES:
         diagnostic = {
             "type":                event_type,
             "modality":            modality            or None,

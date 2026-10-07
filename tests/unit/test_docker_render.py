@@ -319,6 +319,9 @@ def test_override_mcp_только_по_выбору_и_наружу_тольк�
     svc = yaml.safe_load(out["compose.override.yaml"])["services"]
     assert "ports" not in svc["mcp"] and "ports" not in svc["mcp-funnel"]
     assert svc["mcp"]["environment"]["MCP_PUBLIC_BASE"] == "https://health-mcp.example.ts.net"
+    # без адреса в cron ночной датчик публичной поверхности молчит как «сервер не заведён» (07.10)
+    assert svc["cron"]["environment"]["MCP_PUBLIC_BASE"] == "https://health-mcp.example.ts.net"
+    assert "MCP_PUBLIC_BASE" not in yaml.safe_load(off["compose.override.yaml"])["services"]["cron"]["environment"]
     assert svc["mcp-funnel"]["hostname"] == "health-mcp"
     assert svc["mcp-funnel"]["environment"]["TS_HOSTNAME"] == "health-mcp"   # иначе `up` отказывает
     assert svc["mcp-funnel"]["environment"]["TS_AUTH_ONCE"] == "true"

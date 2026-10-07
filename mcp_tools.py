@@ -30,6 +30,20 @@ MAX_POINTS = 500
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 TOOLS = [
+    {"name": "health_brief",
+     "description": ("НАЧИНАЙ С НЕГО. Тот же бриф о человеке, что видит бот Health OS перед каждым ответом: "
+                     "текущая вера (где он, что отменено), возраст, диагноз и его статус, лечение с датами, "
+                     "АКТИВНЫЕ проблемы, свежие анализы с флагами, личная норма ВСР. Закрытые проблемы сюда "
+                     "не входят — они в problems(status=resolved) и ограничением сегодня не являются."),
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "nutrition_frame",
+     "description": ("Рамка питания, которую Health OS вывел КОДОМ (не моделью) из медкарты, генома и ИМТ по "
+                     "курируемым правилам: энергия (gain — набрать/удержать вес важнее ограничений порций), "
+                     "белок, микроэлементы, ограничения (reflux_aware, dumping_aware, low_GI, lactose_free…), "
+                     "у каждого пункта — причина. Плюс правила, выведенные консилиумом системы и ещё НЕ "
+                     "одобренные владельцем, — с этой пометкой. Для любого совета о еде бери ограничения "
+                     "отсюда, а не выводи их из диагнозов сам."),
+     "inputSchema": {"type": "object", "properties": {}}},
     {"name": "lab_tests",
      "description": ("Список анализов, которые есть в Health OS: имя теста, дата последнего результата "
                      "и число результатов. Начинай с него, чтобы знать точные имена для lab_results."),
@@ -49,8 +63,9 @@ TOOLS = [
     {"name": "problems",
      "description": "Список проблем со здоровьем из медкарты Health OS: название, статус, даты, краткое описание.",
      "inputSchema": {"type": "object", "properties": {
-         "status": {"type": "string", "enum": ["active", "monitoring", "resolved"],
-                    "description": "фильтр по статусу; без него — все"}}}},
+         "status": {"type": "string", "enum": ["current", "resolved", "all"],
+                    "description": "current (по умолчанию) — действующие, в любом статусе наблюдения; "
+                                   "resolved — закрытые; all — все"}}}},
     {"name": "facts",
      "description": ("Долгие факты о владельце из памяти Health OS (без разовых событий): "
                      "что известно, с какой даты."),
@@ -171,17 +186,24 @@ def _tool_day_metrics(args: dict) -> str:
 
 
 def _tool_problems(args: dict) -> str:
-    st = args.get("status")
-    if st is not None and st not in ("active", "monitoring", "resolved"):
-        raise BadArgs("status — active | monitoring | resolved")
+    st = args.get("status") or "current"
+    if st not in ("current", "resolved", "all"):
+        raise BadArgs("status — current | resolved | all")
     import problems_db
-    rows = problems_db.get_problem_list(st)
+    # Фильтр по смыслу «закрыта / нет», а не по имени статуса: в базе живут active_monitoring и
+    # watchful_waiting (замер 07.10), и точный фильтр active/monitoring их терял.
+    # Без аргумента — только действующие, как бриф бота: 07.10 помощник подал закрытую проблему
+    # главным ограничением.
+    rows = [r for r in problems_db.get_problem_list()
+            if st == "all" or (r.get("status") == "resolved") == (st == "resolved")]
+    what = {"current": "действующих", "resolved": "закрытых", "all": ""}[st]
     if not rows:
-        return _none("проблем в медкарте" + (f" со статусом {st}" if st else "") + " нет")
+        return _none(f"{what} проблем в медкарте нет".strip())
     keep = ("title", "status", "domain", "onset_date", "first_seen", "last_updated", "resolved_date")
     out = [{**{k: r.get(k) for k in keep}, "summary": r.get("plain_summary") or r.get("description")}
            for r in rows]
-    return _envelope("медкарта (список проблем)", out)
+    note = {"current": ", только действующие; закрытые — status=resolved", "resolved": ", закрытые", "all": ""}[st]
+    return _envelope(f"медкарта (список проблем{note})", out)
 
 
 def _tool_facts(args: dict) -> str:
@@ -194,7 +216,38 @@ def _tool_facts(args: dict) -> str:
     return _envelope("память о владельце (долгие факты, разовые события исключены)", out)
 
 
-_DISPATCH = {"lab_tests": _tool_lab_tests, "lab_results": _tool_lab_results, "day_metrics": _tool_day_metrics,
+def _tool_health_brief(args: dict) -> str:
+    # Один читатель с ботом: ровно тот бриф, что get_system_prompt кладёт боту (без правил формата Telegram).
+    import patient_context
+    text = patient_context.build_patient_brief()
+    if not text or not text.strip():
+        return _none("бриф о человеке пуст")
+    return _envelope("бриф пациента, тот же, что видит бот", text)
+
+
+NOT_APPROVED = "НЕ одобрено владельцем: вывод консилиума системы, не врача и не курируемое правило"
+
+
+def _tool_nutrition_frame(args: dict) -> str:
+    import food_profile
+    import generated_food_rules
+    f = food_profile.medical_frame()
+    frame = {k: (sorted(v) if isinstance(v, (set, frozenset)) else v) for k, v in f.items()}
+    shadow = []
+    for r in generated_food_rules.get_rules(status="shadow"):
+        p = r.get("payload") or {}
+        shadow.append({"status": NOT_APPROVED,
+                       "condition": (p.get("condition") or {}).get("label"),
+                       "frame": p.get("frame"),
+                       "why": (p.get("evidence") or {}).get("why"),
+                       "evidence": {k: (p.get("evidence") or {}).get(k) for k in ("source", "weight")},
+                       "generated": r.get("created_at")})
+    return _envelope("рамка питания (код по курируемым правилам) + неодобренные правила консилиума",
+                     {"frame": frame, "not_approved_rules": shadow})
+
+
+_DISPATCH = {"health_brief": _tool_health_brief, "nutrition_frame": _tool_nutrition_frame,
+             "lab_tests": _tool_lab_tests, "lab_results": _tool_lab_results, "day_metrics": _tool_day_metrics,
              "problems": _tool_problems, "facts": _tool_facts}
 
 

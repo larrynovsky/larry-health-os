@@ -1564,6 +1564,61 @@ def ref_scale_mismatch(rows):
                     and (nhi is None or value <= nhi * 1.1)):
                 out.append((rid, canon, value, lo, hi, factor))
                 break
+    return out + _ref_scale_by_corpus(rows, {f[0] for f in out})
+
+
+def _ref_scale_by_corpus(rows, already):
+    """Вторая сторона того же дефекта: граница не в шкале значения, а значение
+    НАСТОЯЩЕ вне нормы. Первая ветка такую строку не видит — пересчитанная полоса
+    значения не охватывает (пример выдуман: ЛПНП 4,0 ммоль/л записан как 154,7 мг/дл
+    при границе «< 3,00» из бланка: 154,7 > 3,00×38,67 = 116). Читатель видит «154 при
+    норме 3» — пятидесятикратное превышение вместо полуторного. Судим здесь ГРАНИЦУ, а не значение — патологию
+    эта ветка не трогает. Признак: граница вне полосы корпуса той же сущности,
+    единицы и стороны, а она же через коэффициент — внутри. Корпус — ≥2 ДРУГИХ
+    документа: строка и её бланк сами себя не подтверждают. Нужна расширенная
+    форма строк (unit, source)."""
+    import lab_canon
+    import statistics
+    corp: dict = {}
+    for r in rows:
+        if len(r) < 7:
+            continue
+        _rid, name, _v, lo, hi, unit, source = r[:7]
+        key = (lab_canon.normalize(name or ""), lab_canon.norm_unit(unit or ""))
+        for side, val in (("lo", lo), ("hi", hi)):
+            if val:
+                corp.setdefault(key + (side,), []).append((val, source))
+    out = []
+    for r in rows:
+        if len(r) < 7 or r[0] in already:
+            continue
+        rid, name, value, lo, hi, unit, source = r[:7]
+        canon = lab_canon.normalize(name or "")
+        rules = lab_canon._TO_CONVENTIONAL.get(canon)
+        if value is None or not rules:
+            continue
+        key = (canon, lab_canon.norm_unit(unit or ""))
+        for side, b in (("lo", lo), ("hi", hi)):
+            if not b:
+                continue
+            others = [v for v, s in corp.get(key + (side,), []) if s != source]
+            if len({s for v, s in corp.get(key + (side,), []) if s != source}) < 2:
+                continue
+            m = statistics.median(others)
+            inside = lambda x: m / 2 <= x <= m * 2
+            # Граница обязана расходиться с корпусом на порядок, а не «заметно»:
+            # методы одной сущности законно расходятся в разы (СРБ высокочувствительный
+            # «< 1» против обычного «< 5» — 5×, это не ошибка шкалы). Наименьший
+            # коэффициент пересчёта — 10; порог 7 лежит между ними, с запасом на разброс
+            # границ лабораторий. Граница порога, а не точка: настоящая ошибка шкалы
+            # с коэффициентом 10 и корпусом, разошедшимся с бланком больше чем в 1,4 раза,
+            # сюда не попадёт — для неё есть первая ветка.
+            if max(b / m, m / b) < 7:
+                continue
+            hit = next((f for f, _t in rules.values() if inside(b * f) or inside(b / f)), None)
+            if hit:
+                out.append((rid, canon, value, lo, hi, hit))
+                break
     return out
 
 

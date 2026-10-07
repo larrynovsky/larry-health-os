@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.384 | **Дата:** 2026-10-06
+**Версия:** 15.392 | **Дата:** 2026-10-07
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -344,7 +344,7 @@ checkins_fts       -- виртуальная FTS5 таблица для полн
 <!-- GEN:MODULE_REGISTRY:START -->
 
 ## МОДУЛЬНЫЙ РЕЕСТР
-<!-- Авто-генерировано gen_blueprint.py 2026-10-06 -->
+<!-- Авто-генерировано gen_blueprint.py 2026-10-07 -->
 
 ### СЛОЙ ДАННЫХ
 ```
@@ -1168,9 +1168,9 @@ night_cycle                  → _fmt_helpers, _time_inject, agent_reports_db, f
 doc_agent                    → _time_inject, doc_translation, git_facts, hai_core, i18n, intent_registry, llm_client, notify, pii_census, secret_guard, secrets_paths
 hai_context                  → _fmt_helpers, _time_inject, calendar_client, genome_context, gp_context, health_db, lab_canon, labs_db, lifestyle_agents, metrics_db, patient_context
 hypothesis_consilium_eval    → _time_inject, consilium_roster, hai_core, health_db, i18n, lab_canon, labs_db, lifestyle_agents, llm_client, patient_context, wellally_consult
+import_medical_events        → config_db, events_db, hai_core, health_db, infra_config, lab_intake_watcher, lab_schedule_extractor, llm_client, problems_db, treatment_db, treatment_extractor
 wellally_consult             → _fmt_helpers, _time_inject, consilium_roster, genome_context, hai_core, health_db, labs_db, lifestyle_agents, llm_client, patient_context, treatment_summary
 hai_reports                  → _fmt_helpers, _time_inject, clinical_kb, gp_context, hai_core, health_db, infra_config, llm_client, pubmed_client, wellally_consult
-import_medical_events        → config_db, hai_core, health_db, infra_config, lab_intake_watcher, lab_schedule_extractor, llm_client, problems_db, treatment_db, treatment_extractor
 food_profile                 → clinical_kb, food_floor, food_genome, food_staples, generated_food_rules, health_db, i18n, repertoire, taste
 food_rule_generator          → _time_inject, clinical_kb, food_floor, food_genome, food_profile, food_staples, generated_food_rules, hai_core, llm_client
 hai_chat                     → _time_inject, config_db, gp_context, hai_context, hai_core, hai_reports, health_db, llm_client, memory_facts_db
@@ -1185,6 +1185,7 @@ weekly_digest                → _time_inject, config_db, diagnosis_guard, hai_c
 genome_intake                → _fmt_helpers, config_db, genome_pipeline, health_db, i18n, infra_config, link_fetch, notify
 genome_pipeline              → backfill_effect_alleles, fix_palindromic_het, generate_constitutions, genome_annotator, genome_parser, health_db, profile_reconciler, prs_pipeline
 lifestyle_agents             → consilium_roster, genome_context, gp_context, hai_core, health_db, llm_client, patient_context, promethease_context
+mcp_tools                    → food_profile, generated_food_rules, labs_db, memory_facts_db, metrics_db, patient_context, pii_census, problems_db
 checkin_agent                → _time_inject, gp_context, hai_core, health_db, llm_client, patient_context, region_pack
 hai_core                     → _time_inject, calendar_client, health_db, i18n, llm_client, patient_context, region_pack
 import_all                   → _time_inject, config_db, health_db, hypothesis_lab_linker, import_coordinator, infra_config, lab_intake_watcher
@@ -1211,7 +1212,6 @@ env_context                  → brief_cards, config_db, env_sources, location_s
 hae_checker                  → _time_inject, health_db, import_apple_health, infra_config, metrics_db
 hypothesis_semantic_check    → _time_inject, assessment_scheduler, hai_core, health_db, llm_client
 loinc_match                  → _time_inject, health_db, lab_canon, lab_promote, profile_db
-mcp_tools                    → labs_db, memory_facts_db, metrics_db, pii_census, problems_db
 model_health_check           → hai_core, health_db, i18n, llm_client, notify
 morning_test_summary         → _time_inject, health_db, infra_config, plist_env_liveness, test_failure_handler
 publication_reader           → _time_inject, hai_core, health_db, llm_client, patient_context
@@ -1613,6 +1613,8 @@ XFAIL — известные баги, документированы как `pa
 ## ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ
 
 <!-- GEN:ARCH_LOG:START -->
+- `2026-10-07` — `mcp_tools` + зависимость: food_profile, generated_food_rules, patient_context
+- `2026-10-07` — `import_medical_events` + зависимость: events_db
 - `2026-10-06` — `health_mcp` + зависимость: mcp_tools; новый модуль `mcp_tools` (зависит от: labs_db, memory_facts_db, metrics_db, pii_census, problems_db)
 - `2026-10-06` — `import_medical_events` + зависимость: lab_intake_watcher
 - `2026-10-06` — новый модуль `health_mcp` (зависит от: mcp_auth, notify)

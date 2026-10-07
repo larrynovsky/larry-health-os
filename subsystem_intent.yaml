@@ -2112,8 +2112,14 @@
       check:
         file: link_fetch.py
         present: ["class _CheckedRedirect", "100.64.0.0/10", "_max_bytes()"]
+    - id: types_by_content
+      claim: "Тип события медкарты судит модель по тексту документа, из одного списка events_db.DIAGNOSTIC_TYPES: снимки (imaging), эндоскопия (endoscopy) и гистология (pathology) — разные типы (решение владельца 07.10). Счёт, страховой или платёжный документ (not_medical) в медкарту не пишется, квитанция «ignored» гасит повторный вызов модели, человек слышит «не медицинский документ». Замер 07.10 на каноне: решения судьи о типе совпали с разбором вручную во всех спорных случаях."
+      status: holds
+      check:
+        file: import_medical_events.py
+        present: ["if event_type == \"not_medical\":", "events_db.DIAGNOSTIC_TYPES"]
   sentinel: tests/unit/test_link_fetch.py
-  last_reconciled: "2026-09-24"
+  last_reconciled: "2026-10-07"
 
 - id: log_rotation
   title: "Ротация логов: файл подрезается, а писатель не осиротеет"
@@ -3054,3 +3060,99 @@
         file: lab_intake_watcher.py
         present: ["_settle_outcomes(state)", "import_medical_events.doc_outcome(f)"]
   last_reconciled: "2026-10-06"
+- id: mcp_gateway
+  title: "Облачные помощники: одна память, вход через бот, наружу только MCP"
+  intent: >
+    Владелец спрашивает о здоровье в Claude и ChatGPT, в том числе с телефона, а отвечают они по
+    данным Health OS. Решения владельца 06.10: Health OS — одна память, бот и помощники — окна в неё
+    (вариант Б); сразу облако, без шага «только Мак»; ChatGPT тоже — данные о здоровье по запросу
+    владельца уходят и в OpenAI; отдельный узел tailnet health-mcp, чтобы публичный адрес не
+    открывал ни дашборд, ни соседей Studio; анализы читаются по веществу (LOINC), а не по названию.
+    Первый живой разговор (07.10) показал второй вид выдумки:
+    получив сырые таблицы, помощник сам вывел ограничения из диагнозов — закрытую проблему подал главным
+    ограничением, а правило питания, которое система уже вывела кодом, переоткрыл у владельца только
+    в споре. Вывод владельца 07.10: облако должно видеть то же, что бот, — один
+    читатель контекста, а не пять сырых; правила еды консилиума, ещё не одобренные владельцем, отдаются
+    с пометкой «не одобрено», а не прячутся: выдумка без источника хуже вывода системы с пометкой.
+    Главная тревога владельца — выдумка поверх данных: пустоту модель заполняет догадкой. Поэтому
+    каждый ответ ИНСТРУМЕНТА (то, что получает помощник, а не то, что он пишет человеку) несёт
+    источник и дату, а пустота — явная строка «нет данных», а не пустой список. Вход — OAuth 2.1 со
+    своим маленьким сервером на одного человека: пароля нет вовсе, код из шести цифр приходит
+    владельцу в Telegram — кто не видит его Telegram, не войдёт. Шаг 1 — только чтение; запись
+    (шаг 2) — только через «да» владельца, отдельным кодом. Граница: ответы инструментов уходят в
+    Anthropic и OpenAI и остаются у них по их правилам и настройкам аккаунта владельца — хранение,
+    история чатов, обучение решаются там, не нами; что чужая модель сделает с ответом, мы не
+    контролируем; кривизну канона (например, норму анализа, записанную не в той шкале, что
+    значение) помощник повторит как факт.
+  explanation: docs/explanation/mcp_gateway.md
+  code_anchors:
+    - health_mcp.py::make_handler
+    - health_mcp.py::rpc
+    - mcp_auth.py::Store
+    - mcp_auth.py::redirect_allowed
+    - mcp_tools.py::call
+    - mcp_tools.py::_tool_health_brief
+    - mcp_tools.py::_tool_nutrition_frame
+    - security_sensors.py::_mcp_public_surface
+  invariants:
+    - id: login_fail_closed
+      claim: "Запрос к /mcp без действующего токена этого ресурса — 401 с адресом метаданных, а не данные: чужой, просроченный, отозванный и выданный другому ресурсу токен отвергаются. Держат tests/unit/test_mcp_auth.py (test_mcp_without_valid_token_is_401_with_discovery, test_access_token_expires, test_refresh_rotates_and_revoke_kills, test_full_flow_gives_token_bound_to_resource); мутация «без проверки токена» красная (06.10)."
+      status: holds
+      check:
+        file: health_mcp.py
+        present: ["if not store.verify(tok, res):"]
+    - id: redirect_exact_list
+      claim: "Код входа уходит только на адреса возврата Claude и ChatGPT из точного списка; поддомен-двойник, http, «..» и параметры в пути отвергаются — иначе открытый редирект отдал бы код чужому. Вход требует PKCE S256 и наш resource; код одноразовый и привязан к клиенту и адресу. Тесты test_redirect_allowlist, test_code_needs_pkce_and_is_single_use, test_begin_requires_s256_registered_redirect_and_own_resource."
+      status: holds
+      check:
+        file: mcp_auth.py
+        present: ["def redirect_allowed(uri: str) -> bool:", "raise AuthError(\"invalid_request\", \"нужен PKCE S256\")"]
+    - id: owner_confirms_in_telegram
+      claim: "Доступ выдаётся только после ввода кода, который приходит владельцу в Telegram (notify без запасного канала: не дошёл — вход отказывает); пять ошибок сжигают запрос, код живёт 10 минут, одновременных запросов не больше пяти. Хранятся только хеши токенов и кодов."
+      status: holds
+      check:
+        file: health_mcp.py
+        present: ["notify.notify(text, fallback=False) == \"telegram\""]
+    - id: tenant_from_process
+      claim: "Чьи данные — решает каталог данных процесса (HEALTH_DATA_DIR), а не аргумент: ни один инструмент не принимает тенанта, базу или путь (test_no_tool_chooses_tenant_or_path); без каталога сервер не стартует."
+      status: holds
+      check:
+        file: health_mcp.py
+        present: ["нет HEALTH_DATA_DIR — чей это сервер, неизвестно"]
+    - id: source_date_or_no_data
+      claim: "Каждый ответ инструмента начинается с «Источник: Health OS — … Выдано <дата>», а пустота — строкой «нет данных: … Не достраивай значения». Читатель упал — короткий отказ без трассы, а не частичный ответ. Тесты test_empty_is_explicit_no_data, test_lab_results_carry_source_and_date_but_not_document_path, test_reader_failure_gives_no_data_and_no_trace."
+      status: holds
+      check:
+        file: mcp_tools.py
+        present: ["head = f\"Источник: Health OS — {source}. Выдано {today}.\"", "Не достраивай значения"]
+    - id: no_identity_out
+      claim: "Имя, дата рождения и идентификаторы не уходят наружу: путь бланка не отдаётся вовсе, весь текст ответа проходит словарь личных слов (pii_census, классы REDACT_CLASSES), разовые (transient) факты памяти не отдаются. Тесты test_identity_is_redacted_everywhere, test_transient_facts_do_not_leak; живой замер 06.10 на базе владельца — 0 совпадений со словарём. Граница: словарь ловит перечисленное, а не всё, что может опознать человека."
+      status: holds
+      check:
+        file: mcp_tools.py
+        present: ["REDACT_CLASSES = [\"surname\", \"identity\", \"birth_date\"", "!= \"transient\"]"]
+    - id: read_only_step_one
+      claim: "Слой инструментов ничего не пишет: в mcp_tools.py и health_mcp.py нет вызовов писателей и SQL записи (test_tools_layer_writes_nothing, мутация с save_fact красная 07.10). Запись — шаг 2, только через «да» владельца. Граница: сторож по тексту этих двух файлов; запись внутри вызванного читателя *_db он не видит."
+      status: holds
+      check:
+        file: tests/unit/test_mcp_tools.py
+        present: ["def test_tools_layer_writes_nothing"]
+    - id: one_window_with_bot
+      claim: "Облако видит тот же бриф о человеке, что бот: health_brief отдаёт patient_context.build_patient_brief — тот же текст, что get_system_prompt кладёт боту (без правил формата Telegram), а не свою сборку. Без аргумента problems отдаёт только действующие, как бриф; фильтр — по смыслу «закрыта/нет», потому что в базе живут active_monitoring и watchful_waiting (замер 07.10). Тесты test_health_brief_is_the_bots_brief, test_problems_default_hides_resolved_like_the_bot (мутация «закрытые по умолчанию» красная)."
+      status: holds
+      check:
+        file: mcp_tools.py
+        present: ["text = patient_context.build_patient_brief()", "if st == \"all\" or (r.get(\"status\") == \"resolved\") == (st == \"resolved\")"]
+    - id: unapproved_rules_marked
+      claim: "Рамка питания отдаётся из food_profile.medical_frame (код по курируемым правилам clinical_kb, без модели); правила консилиума в статусе shadow идут отдельным списком, и у каждого статус «НЕ одобрено владельцем» (решение владельца 07.10). Тест test_nutrition_frame_marks_unapproved_rules; мутация «без пометки» красная."
+      status: holds
+      check:
+        file: mcp_tools.py
+        present: ["f = food_profile.medical_frame()", "NOT_APPROVED = \"НЕ одобрено владельцем"]
+    - id: public_surface_is_mcp_only
+      claim: "Снаружи отвечает только MCP и только со входом: ночная проверка (security_sensors, категория mcp_public_surface) идёт публичным путём — DNS-over-HTTPS → публичный вход Tailscale → сервер — и краснеет, если /mcp без токена не 401, метаданные несут чужой issuer или /, /labs отвечают не 404 (дашборд на узле). Живьём 07.10: чисто; подмена ожидаемого пути на отдаваемый — красная. Граница: проверяется первый публичный адрес из DNS и перечисленные пути; пока датчик в WARN (burn-in, как вся категория SEC)."
+      status: holds
+      check:
+        file: security_sensors.py
+        present: ["def _mcp_public_surface(", "_MCP_EXPECT_404 = (\"/\", \"/labs\""]
+  last_reconciled: "2026-10-07"

@@ -63,6 +63,26 @@ def export(ref: str, dest: Path, root: Path = ROOT) -> tuple[str, int]:
     return sha, len(files)
 
 
+# Внешний вклад (PR) переносится в рабочий репозиторий руками, автор — строкой Co-authored-by.
+# Выгрузка — один коммит «Export of», и без переноса этих строк автор терялся бы на GitHub (07.10:
+# внешний вклад ушёл без имени автора). Берём только адреса GitHub noreply — они и так публичны;
+# личный адрес в строке соавтора не уедет.
+_NOREPLY = re.compile(r"^.+<[^<>@\s]+@users\.noreply\.github\.com>$")
+
+
+def _coauthors(cwd: Path, ref: str) -> set[str]:
+    out = _git(cwd, "log", "--format=%(trailers:key=Co-authored-by,valueonly)", ref)
+    return {s.strip() for s in out.splitlines() if _NOREPLY.match(s.strip())}
+
+
+def uncredited(sha: str, dest: Path, root: Path = ROOT) -> list[str]:
+    """Соавторы из истории sha, которых ещё нет ни в одном коммите зеркала."""
+    empty = subprocess.run(["git", "-C", str(dest), "rev-parse", "-q", "--verify", "HEAD"],
+                           capture_output=True).returncode != 0          # свежий клон без коммитов
+    have = set() if empty else _coauthors(dest, "HEAD")
+    return sorted(_coauthors(root, sha) - have)
+
+
 def unread_public(ref: str, root: Path = ROOT) -> list[str]:
     """Публичные файлы ref, добавленные или изменённые после отметки прочитанного.
 
@@ -329,14 +349,17 @@ def main(argv: list[str] | None = None) -> int:
     if not (dest / ".git").exists():
         dest.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "clone", "-q", REMOTE, str(dest)], check=True)
-    sha, n = export(a.ref, dest)
+    sha, n = export(a.ref, dest, ROOT)
     _git(dest, "add", "-A")
     if not _git(dest, "status", "--porcelain").strip():
         print(f"зеркало уже совпадает с {sha[:7]} — коммитить нечего")
         return 0
     # Хуки клона зеркала выключены (решение владельца 28.09, «б»): каждая строка экспорта уже
     # прошла гейты рабочего репозитория; квитанция ponytail на копию ничего не проверяет.
-    _git(dest, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", f"Export of {sha[:12]}")
+    msg = f"Export of {sha[:12]}"
+    if who := uncredited(sha, dest, ROOT):
+        msg += "\n\n" + "\n".join(f"Co-authored-by: {w}" for w in who)
+    _git(dest, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", msg)
     print(f"✅ зеркало: {n} файлов из {sha[:7]} закоммичены в {dest}")
     if a.push:
         subprocess.run(["git", "-C", str(dest), "push", "-q", "origin", "HEAD:main"], check=True)

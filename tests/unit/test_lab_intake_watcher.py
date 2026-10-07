@@ -701,3 +701,17 @@ def test_as_lab_hint_only_when_readers_disagree(env, monkeypatch, doc, hint):
     _doc(monkeypatch, [doc])
     w.process_once()
     assert len(told) == 1 and ("ещё раз" in told[0]) == hint
+
+
+
+def test_invoice_is_told_as_not_medical_not_as_unreadable(env, monkeypatch):
+    _, w, _ = env
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "bill.pdf"; f.write_bytes(b"%PDF"); _age(f, 999)
+    told = []
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
+    monkeypatch.setattr(w, "_is_lab", lambda p: False)
+    _doc(monkeypatch, [{"status": "ignored"}])
+    w.process_once()
+    assert len(told) == 1 and "не медицинский документ" in told[0]
+    assert "не смог прочитать" not in told[0] and "ещё раз" not in told[0]

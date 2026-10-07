@@ -22,6 +22,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
 import health_db as db
+import events_db
 import anthropic
 
 # ── Конфиг ────────────────────────────────────────────────────────────────────
@@ -188,8 +189,12 @@ EXTRACT_PROMPT = """\
 Дан текст медицинского документа и имя файла. Извлеки данные в JSON.
 
 Правила:
-- event_type: "encounter" (приём/консультация), "lab_result" (анализы крови/мочи), 
-  "imaging" (ПЭТ/КТ/МРТ/УЗИ/ПЭТ-КТ/биопсия/эндоскопия), "procedure"
+- event_type: "encounter" (приём/консультация), "lab_result" (анализы крови/мочи),
+  "imaging" (ПЭТ/КТ/МРТ/УЗИ/ПЭТ-КТ/рентген — снимки), "endoscopy" (гастро-, колоно-,
+  бронхоскопия), "pathology" (биопсия, гистология, цитология), "procedure" (операция,
+  манипуляция), "not_medical" — документ без медицинских сведений о пациенте: счёт, инвойс,
+  страховой или расчётный лист, платёжка, договор, реклама. Имя пациента и название
+  исследования в счёте не делают его медицинским.
 - effective_date: YYYY-MM-DD (ищи в тексте или имени файла)
 - performer: имя врача, хирурга или название лаборатории — НЕ имя пациента (пациент это получатель услуги, performer это тот кто её оказывает)
 - performer_role: специализация (онколог, радиолог, лаборатория и т.д.)
@@ -370,6 +375,13 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None,
         return "failed"
 
     event_type     = data.get("event_type") or "encounter"
+    if event_type == "not_medical":
+        # Счёт или страховая бумага (по имени файла фильтр SKIP_PATTERNS такие не узнаёт,
+        # и они попадали в медкарту диагностикой). Модель видит текст —
+        # судит она; в медкарту не пишем, квитанция «ignored» гасит повторный вызов модели.
+        print(f"  ↷ не медицинский документ (по содержанию): {pdf_path.name}")
+        info["status"] = "ignored"
+        return "skipped"
     effective_date = data.get("effective_date") or _guess_date_from_name(pdf_path.name)
     performer      = data.get("performer")
     performer_role = data.get("performer_role")
@@ -401,7 +413,7 @@ def _process(pdf_path: Path, dry_run: bool = False, root: Path | None = None,
                 "assessment":  assessment,
                 "plan":        plan,
             }
-        elif event_type in ("lab_result", "imaging", "procedure"):
+        elif event_type in events_db.DIAGNOSTIC_TYPES:
             diagnostic = {
                 "type":               event_type,
                 "interpreted_report": interpreted_report or assessment,
@@ -533,7 +545,8 @@ def process_incoming(inbox: Path) -> int:
     root = inbox.parent
     files = [f for d in (inbox, inbox / "reports") if d.is_dir() for f in sorted(d.iterdir())
              if f.is_file() and f.suffix.lower() in DOC_EXTS and not f.name.startswith(".")
-             and not f.with_name(f.name + ".events.failed").exists()]
+             and not f.with_name(f.name + ".events.failed").exists()
+             and not _ignored(f)]
     done = 0
     for f in files:
         if done >= PER_POLL:
@@ -571,6 +584,15 @@ def process_incoming(inbox: Path) -> int:
         if status != "skipped":
             done += 1
     return done
+
+
+def _ignored(f: Path) -> bool:
+    """Квитанция «не медицинский» — файл больше не отдаём модели каждый проход."""
+    receipt = f.with_name(f.name + RECEIPT)
+    try:
+        return receipt.exists() and json.loads(receipt.read_text()).get("status") == "ignored"
+    except (OSError, ValueError):
+        return False
 
 
 def doc_outcome(path: Path) -> dict | None:

@@ -662,6 +662,7 @@
   ],
   "import_medical_events": [
     "config_db",
+    "events_db",
     "hai_core",
     "health_db",
     "infra_config",
@@ -943,9 +944,12 @@
     "signal_family"
   ],
   "mcp_tools": [
+    "food_profile",
+    "generated_food_rules",
     "labs_db",
     "memory_facts_db",
     "metrics_db",
+    "patient_context",
     "pii_census",
     "problems_db"
   ],

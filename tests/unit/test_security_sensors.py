@@ -292,7 +292,8 @@ def test_collect_never_raises_reports_broken_category(tmp_path, monkeypatch):
     assert findings["db_perms"] == [] and findings["hardcoded_tokens"] == []
 
 
-def test_collect_clean_env_all_empty(tmp_path):
+def test_collect_clean_env_all_empty(tmp_path, monkeypatch):
+    monkeypatch.delenv("MCP_PUBLIC_BASE", raising=False)   # сервер MCP не заведён — судить нечего
     _write_audit(tmp_path)  # свежий чистый аудит
     findings = ss.collect_security_findings(
         home=tmp_path, repo=tmp_path,
@@ -302,6 +303,7 @@ def test_collect_clean_env_all_empty(tmp_path):
     assert findings == {
         "db_perms": [], "secrets_perms": [], "listen_ports": [],
         "hardcoded_tokens": [], "pip_audit": [], "tailscale_exposure": [],
+        "mcp_public_surface": [],
     }
 
 
@@ -339,3 +341,48 @@ def test_secrets_perms_green_when_all_tight(tmp_path):
     sub = d / "sub"; sub.mkdir(mode=0o700)
     f = sub / "inner"; f.write_text("x"); os.chmod(f, 0o600)
     assert _secrets_perms(tmp_path) == []
+
+
+# ── публичная поверхность сервера MCP (07.10) ──
+_MCP_BASE = "https://health-mcp.example.ts.net"
+
+
+def _mcp_server(**over):
+    """Синтетический публичный вход: по умолчанию ведёт себя как наш сервер."""
+    ok = {("POST", "/mcp"): (401, {"www-authenticate": 'Bearer resource_metadata="x"'}, b""),
+          ("GET", "/.well-known/oauth-authorization-server"):
+              (200, {}, json.dumps({"issuer": _MCP_BASE}).encode())}
+    ok.update(over)
+    return lambda ip, host, method, path: ok.get((method, path), (404, {}, b""))
+
+
+def test_mcp_surface_clean_when_only_mcp_with_login():
+    assert ss._mcp_public_surface(_MCP_BASE, lambda h: ["1.2.3.4"], _mcp_server()) == []
+
+
+@pytest.mark.parametrize("over, word", [
+    ({("POST", "/mcp"): (200, {}, b"{}")}, "вход не требуется"),
+    ({("POST", "/mcp"): (401, {}, b"")}, "resource_metadata"),
+    ({("GET", "/"): (200, {}, b"<html>")}, "не только MCP"),            # дашборд на узле
+    ({("GET", "/labs"): (200, {}, b"<html>")}, "не только MCP"),
+    ({("GET", "/.well-known/oauth-authorization-server"): (200, {}, b'{"issuer":"https://evil"}')}, "issuer"),
+])
+def test_mcp_surface_each_breakage_is_red(over, word):
+    found = ss._mcp_public_surface(_MCP_BASE, lambda h: ["1.2.3.4"], _mcp_server_with(over))
+    assert any(word in f for f in found), found
+
+
+def _mcp_server_with(over):
+    base = _mcp_server()
+    return lambda ip, host, method, path: over.get((method, path)) or base(ip, host, method, path)
+
+
+def test_mcp_surface_no_public_dns_is_red_and_not_installed_is_silent():
+    assert "DNS" in ss._mcp_public_surface(_MCP_BASE, lambda h: [], _mcp_server())[0]
+    assert ss._mcp_public_surface(None, lambda h: 1 / 0, lambda *a: 1 / 0) == []
+
+
+def test_mcp_surface_server_down_is_named_as_down_not_as_open_login():
+    found = ss._mcp_public_surface(_MCP_BASE, lambda h: ["1.2.3.4"],
+                                   _mcp_server_with({("POST", "/mcp"): (502, {}, b"")}))
+    assert found and "не отвечает" in found[0] and "вход не требуется" not in found[0]

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/publish_mirror.md sha256:efc8fdd68880 -->
+<!-- translation-of: docs/how-to/publish_mirror.md sha256:5c23235d8341 -->
 **English** · [Русский](publish_mirror.md)
 
 # How to update the public repository and accept a change from it
@@ -33,6 +33,11 @@ repeat with `--cleared N`, where N is their count. The highlight catches form, n
 without a date, so everything still has to be read.
 
 The mark is judged by the version committed in the exported commit, not by the file on disk: an uncommitted mark does not open the push.
+
+Carry an outside contribution (pull request) into the working repository as your own commit with a
+`Co-authored-by: Name <id+login@users.noreply.github.com>` line. An export is a single "Export of"
+commit, and it appends the co-authors from history that the mirror does not have yet. Only GitHub
+noreply addresses are taken: a private address in a co-author line does not reach GitHub.
 
 Before `--push`, also run a control search for the words of your own medical history: kinds of
 treatment, procedures, places. The guard and the `private/pii_terms.yaml` dictionary catch known

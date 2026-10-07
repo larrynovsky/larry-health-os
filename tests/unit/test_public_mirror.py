@@ -115,3 +115,26 @@ def test_живой_замер_подсвечен_и_держит_отметку
     assert pm.main(["--mark-read", "HEAD"]) == 1                    # не признано — отметки нет
     assert c1 in (root / pm.READ_MARK).read_text()
     assert pm.main(["--mark-read", "HEAD", "--cleared", "3"]) == 0
+
+
+def test_соавтор_из_PR_доезжает_до_зеркала_один_раз(tmp_path, monkeypatch):
+    """07.10: выгрузка одним коммитом теряла Co-authored-by внешнего автора."""
+    root = _repo(tmp_path)
+    (root / "a.py").write_text("print(2)\n")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam",
+         "pr\n\nCo-authored-by: Ext Dev <1+ext@users.noreply.github.com>\n"
+         "Co-authored-by: Private <me@private.example>")
+    dest = tmp_path / "mirror"
+    _git(tmp_path, "init", "-q", str(dest))
+    monkeypatch.setattr(pm, "ROOT", root)
+    monkeypatch.setattr(pm, "unread_public", lambda ref: [])
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "t"); monkeypatch.setenv("GIT_AUTHOR_EMAIL", "t@t")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "t"); monkeypatch.setenv("GIT_COMMITTER_EMAIL", "t@t")
+    assert pm.main(["--dest", str(dest)]) == 0
+    body = _git(dest, "log", "-1", "--format=%B")
+    assert "Co-authored-by: Ext Dev <1+ext@users.noreply.github.com>" in body
+    assert "private.example" not in body                    # личный адрес не уезжает
+    (root / "a.py").write_text("print(3)\n")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "next")
+    assert pm.main(["--dest", str(dest)]) == 0
+    assert "Co-authored-by" not in _git(dest, "log", "-1", "--format=%B")   # второй раз не дублируется

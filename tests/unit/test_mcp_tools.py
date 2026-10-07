@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 import types
@@ -71,7 +72,7 @@ def test_transient_facts_do_not_leak(fake_readers):
 
 @pytest.mark.parametrize("name, args", [
     ("lab_results", {}), ("lab_results", {"test_name": "x" * 101}), ("lab_results", {"test_name": "LDL", "days": "all"}),
-    ("day_metrics", {"date": "вчера"}), ("day_metrics", {"date": "2026-02-30"}), ("problems", {"status": "x"}),
+    ("day_metrics", {"date": "вчера"}), ("day_metrics", {"date": "2026-02-30"}), ("problems", {"status": "active"}),
 ])
 def test_bad_args_are_answers_not_crashes(name, args):
     text, err = mcp_tools.call(name, args)
@@ -112,3 +113,52 @@ def test_lab_results_prefer_substance_and_say_when_falling_back(fake_readers):
     fake_readers["series"] = [{"test_name": "LDL", "value": 3.1, "unit": "mmol/L", "date": "2099-01-01"}]
     text, _ = mcp_tools.call("lab_results", {"test_name": "LDL"})
     assert "БЕЗ сведения" in text and "неполным" in text
+
+
+def test_tools_layer_writes_nothing():
+    """Шаг 1 — только чтение: запись в память идёт отдельным кодом и только через «да» владельца.
+    Сторож по тексту: вызов писателя (save_*/add_*/set_*) или SQL записи в слое инструментов — красный.
+    Граница: ловит прямой вызов в этих двух файлах, а не запись внутри вызванного читателя *_db."""
+    import pathlib
+    for f in ("mcp_tools.py", "health_mcp.py"):
+        src = pathlib.Path(__file__).resolve().parents[2].joinpath(f).read_text(encoding="utf-8")
+        hits = re.findall(r"\b(?:save|add|set|upsert|delete)_\w+\(|\b(?:INSERT|UPDATE|DELETE)\s", src)
+        assert not hits, (f, hits)
+# ── 07.10: одно окно с ботом ──
+def test_health_brief_is_the_bots_brief(monkeypatch):
+    """Облако видит тот же бриф, что бот, — не второй читатель со своей сборкой."""
+    monkeypatch.setitem(sys.modules, "patient_context",
+                        types.SimpleNamespace(build_patient_brief=lambda: "Пациент, N лет.\nЛечение: X"))
+    text, err = mcp_tools.call("health_brief", {})
+    assert not err and text.startswith("Источник: Health OS") and "Пациент, N лет.\nЛечение: X" in text
+    monkeypatch.setitem(sys.modules, "patient_context", types.SimpleNamespace(build_patient_brief=lambda: " "))
+    assert mcp_tools.call("health_brief", {})[0].startswith("нет данных")
+
+
+def test_nutrition_frame_marks_unapproved_rules(monkeypatch):
+    monkeypatch.setitem(sys.modules, "food_profile", types.SimpleNamespace(medical_frame=lambda: {
+        "energy": "gain", "constraints": {"lactose_free", "low_GI"}, "reasons": ["медкарта: условие X"]}))
+    monkeypatch.setitem(sys.modules, "generated_food_rules", types.SimpleNamespace(get_rules=lambda status=None: [
+        {"payload": {"condition": {"label": "Состояние Y"}, "frame": {"energy": "gain"},
+                     "evidence": {"source": "WCRF", "weight": "strong", "why": "минимум переработанного мяса"}},
+         "created_at": "2026-10-01"}] if status == "shadow" else []))
+    text, err = mcp_tools.call("nutrition_frame", {})
+    assert not err
+    body = json.loads(text.split("\n", 1)[1])
+    assert body["frame"]["constraints"] == ["lactose_free", "low_GI"] and body["frame"]["energy"] == "gain"
+    (rule,) = body["not_approved_rules"]
+    assert rule["status"] == mcp_tools.NOT_APPROVED and "НЕ одобрено" in rule["status"]
+    assert rule["why"] == "минимум переработанного мяса"
+
+
+def test_problems_default_hides_resolved_like_the_bot(fake_readers):
+    fake_readers["problems"] = [{"title": "Проблема A (снята)", "status": "resolved"},
+                                {"title": "Проблема B", "status": "active"}]
+    text, _ = mcp_tools.call("problems", {})
+    assert "Проблема B" in text and "Проблема A" not in text and "status=resolved" in text
+    # статусы живой базы (07.10): наблюдение в любом виде — действующая проблема
+    fake_readers["problems"] = [{"title": "Наблюдение C", "status": "watchful_waiting"},
+                                {"title": "Проблема A", "status": "resolved"}]
+    assert "Наблюдение C" in mcp_tools.call("problems", {})[0]
+    assert "Проблема A" in mcp_tools.call("problems", {"status": "resolved"})[0]
+    assert "Наблюдение C" not in mcp_tools.call("problems", {"status": "resolved"})[0]

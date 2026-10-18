@@ -252,12 +252,22 @@ def _card_harm(card: dict, integrity: dict, harm: dict) -> tuple[int, int]:
     return HARM_ORDER.index("system"), 0
 
 
-def pick_cards(todo: list, integrity: dict, harm: dict, n: int = MAX_CARDS) -> list:
+def pick_cards(todo: list, integrity: dict, harm: dict, n: int = MAX_CARDS,
+               tried: dict | None = None) -> list:
     """Первое место — самой вредной (среди равных — чаще повторяющейся, потом старейшей),
-    остальные места — старейшим из оставшихся. todo уже упорядочен по возрасту."""
+    остальные места — старейшим из оставшихся. todo уже упорядочен по возрасту.
+
+    Разобранная карточка уходит в КОНЕЦ очереди (решение владельца 07.10, вариант А):
+    `warn:producer_registry` 05–07.10 трижды занимал место старейшей, трижды отклонён
+    ревьюером, и тестовые карточки (12–14-е из 15) не дошли бы никогда. Порядок: сперва
+    ни разу не разобранные по возрасту, потом разобранные — давно разобранные раньше.
+    Самая вредная выбирается среди неразобранных, пока такие есть."""
+    tried = tried or {}
+    todo = sorted(todo, key=lambda ce: tried.get(ce[0]["id"], 0))  # sorted устойчив: возраст сохранён
     if len(todo) <= n or n < 1:
         return todo[:n]
-    first = min(todo, key=lambda ce: _card_harm(ce[0], integrity, harm))
+    fresh = [ce for ce in todo if ce[0]["id"] not in tried] or todo
+    first = min(fresh, key=lambda ce: _card_harm(ce[0], integrity, harm))
     return [first] + [ce for ce in todo if ce is not first][:n - 1]
 
 
@@ -265,18 +275,21 @@ def repair_step(store: dict, integrity: dict, failed_tsv: str, state: dict, auth
                 harm: dict | None = None) -> dict:
     """Чистая по сути часть прохода: какие карточки разобрать (≤MAX_CARDS), память разборов."""
     state.setdefault("attempted", {})
+    state.setdefault("tried_at", {})
     todo = []
     for c in _open_fix_cards(store):
         ev = _evidence(c, integrity, failed_tsv)
         if state["attempted"].get(c["id"]) != _mark(c, ev):
             todo.append((c, ev))
     done = []
-    for c, ev in pick_cards(todo, integrity, _harm_of_sensor() if harm is None else harm):
+    for c, ev in pick_cards(todo, integrity, _harm_of_sensor() if harm is None else harm,
+                            tried=state["tried_at"]):
         try:
             r = _repair_one(c, ev, author, reviewer, now)
         except (subprocess.SubprocessError, OSError) as e:
             r = {"card": c["id"], "status": "harness_failed", "detail": f"{type(e).__name__}: {str(e)[:200]}"}
         state["attempted"][c["id"]] = _mark(c, ev)
+        state["tried_at"][c["id"]] = int(now)
         done.append(r)
     return {"at": int(now), "results": done, "left": len(todo) - len(done)}
 
@@ -452,9 +465,13 @@ def show_fix(rid: str) -> str:
 
 
 def _split_patch(patch: str) -> str:
-    """Только тестовая часть патча (файлы tests/**) — для прогона «без правки»."""
+    """Только тестовая часть патча — для прогона «без правки»: КОД тестов (`tests/**.py`).
+
+    Данные под tests/ (фикстуры, SQL, JSON) — это правка, а не тест: 15.10 починка 2026-10-13-3d7cba83
+    чинила tests/fixtures/health_schema.sql, прогон «без правки» шёл с этой фикстурой и был зелёным —
+    оракул объявил честную починку ничего не доказывающей."""
     chunks = re.split(r"(?m)^(?=diff --git )", patch)
-    return "".join(c for c in chunks if re.match(r"diff --git a/tests/", c))
+    return "".join(c for c in chunks if re.match(r"diff --git a/tests/\S+\.py ", c))
 
 
 def _oracle_tree(repo: Path, patch: str, sel: list[str], run_tests) -> bool:

@@ -50,16 +50,16 @@
   discovery по данным её не видит (RN-A вживую). Исправлено: страница
   перегенерирована штатно, ушла в бота; корпус пополнен (C-25).
 
-- 2026-07-23 · соседний проект · ложняк by_name: `scripts/generate_brochure_praise.py::get_conn`
+- 2026-07-23 · соседний проект · ложняк by_name: `scripts/<скрипт соседа>.py::get_conn`
   заподозрен как дубль/боковая дверь §B.7 при разметке реестра замысла
-  (запись brochure_praise) · тело оказалось тонкой обёрткой над штатным
+  (запись того скрипта) · тело оказалось тонкой обёрткой над штатным
   `models.get_conn` (hardening Фаза 1, 2026-07-02: «было sqlite3.connect
   напрямую» — исправлено тогда же) · урок: by_name-подозрение без чтения тела
   шумит (RN-подтверждение) · исправлений не требуется.
 
 - 2026-07-24 · движок (сам контур) · **проспан**: basename-ключ индекса терял
   файлы-тёзки — в соседнем проекте 5×runner.py, 4×loader.py; индекс видел ОДИН из группы,
-  discovery врал file:line (`run_supervision` → чужой runner.py). Найдено
+  discovery врал file:line (`run_<…>` → чужой runner.py). Найдено
   ВНЕШНИМ ревью по ТЗ-документу, не системой и не её контролями: юниты жили
   на плоском health-репо и коллизий не имели · урок: контроли движка обязаны
   включать структуру ЦЕЛЕВОГО репо (пакеты, тёзки) — исправлено cdefa8b
@@ -353,3 +353,4 @@
 | 2026-10-02 | `llm_admission.run_provider_admission` × `hai_core.admitted_models` × `methodology/llm_admission_table.json` | **ложняк** | Писатель и читатель одной таблицы: допуск пишет вердикты, `hai_core.get_model` на установке провайдера их читает. Второго суда допуска и второго писателя нет. |
 | 2026-10-02 | `secrets_paths.referenced_via_provider_profiles` × `llm_client.profiles` × `methodology/llm_providers.json` | **реальный, оставлен** | Второй читатель того же файла профилей. Сканер судит ДЕРЕВО по `root` (песочница теста, дерево нити), `profiles()` читает только свой каталог; импорт `llm_client` в `secrets_paths` дал бы цикл (`llm_client` → `secret_guard` → `secrets_paths`). Читает только `key_file` как улику формы чтения; поставщиков не обслуживает. `methodology/` в целом — совпадение по каталогу. |
 | 2026-10-02 | `llm_admission.owner_verdicts` × `system_config` (config_db, health_db …) | **реальный, оставлен** | Читает строки `llm.admission.claude-%` прямым SELECT мимо `config_db`: у фасада есть чтение по ключу, по префиксу — нет. Писатель тот же (`upsert_config`), значения те же; второго писателя нет. Завести `config_db` чтение по префиксу — когда появится второй такой читатель. |
+| 2026-10-15 | `integrity_tests.check_chain_models_thinking_known` × `methodology/llm_providers.json` (hai_core, llm_client, secrets_paths) | **ложняк** | Датчик файл не открывает: профили и запас читает через `llm_client.thinking_profile` / `reasoning_reserve`, цепочки — через `hai_core.model_chain`. Совпадение по данным — путь в докстринге. |

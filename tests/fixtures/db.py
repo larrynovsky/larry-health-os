@@ -117,7 +117,8 @@ class Db:
         defaults = {"description": None, "status": "active", "priority": 2,
                     "domain": None, "first_seen": today, "last_updated": today,
                     "watch_trigger": None, "watch_deadline": None,
-                    "supporting_data": "[]", "notes": None, "review_date": None}
+                    "supporting_data": "[]", "notes": None, "review_date": None,
+                    "source": "manual:test_fixture"}   # класс источника обязателен (C-173)
         defaults.update(extras)
         cols = ["problem_id", "title"] + list(defaults.keys())
         vals = [problem_id, title] + list(defaults.values())

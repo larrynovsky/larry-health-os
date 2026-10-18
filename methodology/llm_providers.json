@@ -51,6 +51,16 @@
      },
      "measured": "2026-10-04: думает по умолчанию; disabled принят; enabled — 400; adaptive принят; temperature без думания — 400 («deprecated for this model»), 04.10",
      "temperature": "rejected"
+    },
+    "claude-haiku-5-5": {
+     "think": {
+      "type": "adaptive"
+     },
+     "no_think": {
+      "type": "disabled"
+     },
+     "measured": "2026-10-15: думает по умолчанию (без параметра — блок thinking); disabled принят и выключает; adaptive принят; enabled — 400 («use adaptive»); between_tools — 400; temperature — 400 («deprecated for this model»). Модель стала единственной в цепочках haiku/haiku_pinned 13.10 (haiku-4-5 исчезла из списка доступных), без этой записи думала в режиме read и голодала на малых лимитах",
+     "temperature": "rejected"
     }
    }
   },

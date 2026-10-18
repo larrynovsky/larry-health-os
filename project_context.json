@@ -19,5 +19,11 @@
     "telegram_bot",
     "dashboard"
   ],
-  "dup_allowlist": []
+  "dup_allowlist": [],
+  "disposability": {
+    "resolved_causes": {
+      "review_harness_bound_to_artifact": "разобрано владельцем 18.10.2026 (вариант Б′): датированная проба, привязанная к артефакту (модели, спецификации, письму), — законный класс, а не долг; её жизнь стережёт носитель scripts/run_probes.sh (пульс — check_probe_liveness), а залежаться она может только в SKIPPED_PROBES, где с 18.10 у каждой строки дата пересмотра (check_skipped_probes_reviewed)",
+      "review_harness_bound_to_internals": "разобрано владельцем 18.10.2026 (вариант Б′): датированная проба, привязанная к внутренним швам проверяемого кода, — законный класс, а не долг; её жизнь стережёт носитель scripts/run_probes.sh (пульс — check_probe_liveness), а залежаться она может только в SKIPPED_PROBES, где с 18.10 у каждой строки дата пересмотра (check_skipped_probes_reviewed)"
+    }
+  }
 }

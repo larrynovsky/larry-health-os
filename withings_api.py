@@ -79,9 +79,11 @@ def _store(path: Path, token: dict):
 
 def _client() -> dict:
     out = {}
-    for field in ("client_id", "client_secret"):
+    # имена литералами: по ним check_contracts находит читателя секрета (f-строку он не видит)
+    for field, path in (("client_id", secrets_dir() / "withings_client_id"),
+                        ("client_secret", secrets_dir() / "withings_client_secret")):
         try:
-            value = (secrets_dir() / f"withings_{field}").read_text().strip()
+            value = path.read_text().strip()
         except OSError:
             raise WithingsError(f"нет файла withings_{field} в каталоге секретов") from None
         if not value:
@@ -123,7 +125,7 @@ def _exchange(fields: dict) -> dict:
 
 def withings_access_token(data_dir: Path) -> str | None:
     """None ТОЛЬКО если Withings не подключён (нет ни выдачи, ни живого токена)."""
-    seed, live = secrets_dir() / TOKEN_NAME, data_dir / TOKEN_NAME
+    seed, live = secrets_dir() / "withings_oauth.json", data_dir / TOKEN_NAME
     if not oauth_token_source(seed, live).exists():
         return None
     with _lock(data_dir):

@@ -453,6 +453,7 @@
   code_anchors:
     - rules_db.py::get_threshold
     - rules_db.py::get_absolute_thresholds
+    - services/recommendations.py::evaluate_safety_limits
     - services/recommendations.py::evaluate_domain_need
   invariants:
     - id: single_runtime_source
@@ -462,7 +463,7 @@
         file: rules_db.py
         present: ["absolute_thresholds", "get_absolute_thresholds"]
     - id: safety_net_thresholds_in_db
-      claim: "safety_net читает клинические пороги из БД (absolute_thresholds variant='safety_net'/'safety_net_rel' + lab_trend_thresholds) через loader'ы. Резерв _FALLBACK_* — только на случай недоступного источника (пустой сид / БД offline), с ГРОМКИМ алертом (fail-static, §9: не тихий литерал, а сигнал). Резерв ОБЯЗАН быть равен сиду — держит coherence-тест; с 2026-09-02 и сид, и резерв — снимок документа (CTCAE v5.0 → data/norm_docs/ctcae_lab_v5.0.json; EFLM → eflm_bv.json), прежние литералы выноса E1 2026-07-18 оказались пересказом CTCAE по памяти модели и ушли в архив variant='safety_net_legacy' (см. запись norm_from_documents). Amylase — личный порог владельца (честный source)."
+      claim: "safety_net читает клинические пороги из БД (absolute_thresholds variant='safety_net'/'safety_net_rel' + lab_trend_thresholds) через loader'ы. Резерв _FALLBACK_* — только на случай недоступного источника (пустой сид / БД offline), с ГРОМКИМ алертом (fail-static, §9: не тихий литерал, а сигнал). Резерв ОБЯЗАН быть равен сиду — держит coherence-тест; с 2026-09-02 и сид, и резерв — снимок документа (CTCAE v5.0 → data/norm_docs/ctcae_lab_v5.0.json; EFLM → eflm_bv.json), прежние литералы выноса E1 2026-07-18 оказались пересказом CTCAE по памяти модели и ушли в архив variant='safety_net_legacy' (см. запись norm_from_documents). Один лабораторный порог — личный порог владельца (честный source)."
       status: holds
       check:
         file: safety_net.py
@@ -477,7 +478,7 @@
         file: rules_db.py
         present: ["raise KeyError", "_seed_absolute_thresholds"]
     - id: fires_regardless_of_signals
-      claim: "Абсолютный пол/потолок проверяется в evaluate_domain_need после сигнального цикла — безусловно, даже когда перцентильных сигналов нет (пустой signals_def); заверено поведенческим тестом (BUG-FLOORS-ORDER). ГРАНИЦА (26.09): значение порог берёт из get_metric_percentiles, а тот пропускает метрику с историей < 14 дней из 90 — для редкой колоночной метрики порог молчит. Ключ дня без колонки (пик давления bp_*_max) читается прямо из вчерашнего дня (_raw_only_yesterday; тест test_bp_peak_ceiling_fires_without_percentile_history); колоночные sleep_total/sleep_awake оставлены на своём читателе lifestyle_agents."
+      claim: "Абсолютный пол/потолок и трендовые пороги проверяет evaluate_safety_limits — без домена и протокола; задача рекомендаций (check_recommendations_scheduled) зовёт её каждый прогон в окне и пишет пульс recommendations.limits_checked_at, ночная check_safety_limits_executed краснеет у тенанта, чей пульс старше паузы расписания. Доставка человеку — по включению у тенанта (system_config recommendations.limits_send=1; включение — решение владельца), выключенных та же проверка называет вслух. До 07.10 пол жил в evaluate_domain_need, которую задача звала только для доменов протоколов: домен пуст у всех протоколов обоих тенантов — пол не исполнялся вживую ни разу, а тесты функции были зелёные (нить floors-live). Заверитель пути задача → сообщение — test_safety_limits_live. ГРАНИЦА (26.09): значение порог берёт из get_metric_percentiles, а тот пропускает метрику с историей < 14 дней из 90 — для редкой колоночной метрики порог молчит. Ключ дня без колонки (пик давления bp_*_max) читается прямо из вчерашнего дня (_raw_only_yesterday); колоночные sleep_total/sleep_awake оставлены на своём читателе lifestyle_agents. «Уже сказано сегодня» живёт в базе тенанта (system_config recommendations.sent_today), а не в памяти процесса: перезапуск бота тревогу не повторяет; отметка ставится только за отправленное. Личный порог (norm_kind='personal') сообщением не идёт — одиночная плохая ночь не тревога, её картину несёт утренний бриф (решение владельца 18.10); клинический порог и строка без вида доставляются. ГРАНИЦА (07.10, повтор 30 дней + независимая перепроверка): свои строки — variant='' и kind='absolute'; кратные (steps 50% недели) здесь не судятся; sleep_total, sleep_awake и spo2 сюда не доходят (нет в get_metric_percentiles; spo2 — колонка spo2_avg) — их судят lifestyle_agents и safety_net."
       # Сверено 2026-07-11: early-return на пустом signals_def убран (Q-2 fix
       # 2026-05-22). Заверитель — ПОВЕДЕНЧЕСКИЙ тест test_recommendations_floors.py
       # (позитивный контроль: возврат early-return → красный, проверено). Intent-check
@@ -485,8 +486,8 @@
       # warm_guard оставлен инертным — перевзводится, если статус откатится в open.
       status: holds
       check:
-        file: tests/unit/test_recommendations_floors.py
-        present: ["test_floor_fires_with_empty_signals_def", "BUG-FLOORS-ORDER", "signals=[]"]
+        file: tests/unit/test_safety_limits_live.py
+        present: ["test_bp_peak_reaches_owner_without_any_protocol_domain", "check_recommendations_scheduled"]
       warm_guard:
         absent: ["срабатывает при любом состоянии", "гарантированно покрывает все домены", "always fires"]
         absent_en: ["fires in any state", "guaranteed to cover all domains", "always fires"]
@@ -1134,7 +1135,7 @@
         absent: ["конституции проверены исходом", "пороги гарантированно верны", "нарратив заведомо точен"]
         absent_en: ["constitutions are validated by outcome", "thresholds are guaranteed correct", "narrative is known to be accurate"]
     - id: rebuild_only_on_new_inputs
-      claim: "Конституции пересобираются только при новых вводных (решение владельца 2026-09-25: «пересборка нужна, если есть основания; дальше только по триггерам»). Недельное расписание (launchd com.larry.health.constitutions и .partner, вс 05:30/05:50) зовёт generate_constitutions --if-changed: отпечаток вводных (связи в вере, фазы в горизонте, лабораторные РЯДЫ длиной от горизонта, полные годы тренда, мед-периоды, объём генома; дрейф средних и отдельный новый забор — НЕ вводная, с 2026-09-25) хранится в system_config (constitutions.inputs_fp); совпал — пересборки нет, пишется только пульс constitutions.trigger_checked_at. Пульс старше TRIGGER_STALE_DAYS (8 дн.) краснит check_constitutions_trigger_alive в ночной целостности (негативный контроль исполнен 25.09, мутант 3/3)."
+      claim: "Конституции пересобираются только при новых вводных (решение владельца 2026-09-25: «пересборка нужна, если есть основания; дальше только по триггерам»). Недельное расписание (launchd com.larry.health.constitutions и .partner, вс 05:30/05:50) зовёт generate_constitutions --if-changed: отпечаток вводных (связи в вере, фазы в горизонте, лабораторные РЯДЫ длиной от горизонта, полные годы тренда, мед-периоды, объём генома, рамка питания — коды решений без текста причин; дрейф средних и отдельный новый забор — НЕ вводная, с 2026-09-25) хранится в system_config (constitutions.inputs_fp); совпал — пересборки нет, пишется только пульс constitutions.trigger_checked_at; сменилась только вводная одного домена (DOMAIN_ONLY_INPUTS: рамка → «Питание») — пересобирается он один, отпечаток пишется. Пульс старше TRIGGER_STALE_DAYS (8 дн.) краснит check_constitutions_trigger_alive в ночной целостности (негативный контроль исполнен 25.09, мутант 3/3)."
       # Заведено 2026-09-25 (нить family-criterion) по парку снимка document-intake@2026-09-25-08c3845 §3 в.2:
       # обещание существовало в коде и в решении владельца, но реестр о нём молчал. open — штатный
       # прогон по расписанию ещё не наблюдался ни разу (первый — вс 27.09 05:30).
@@ -1148,7 +1149,7 @@
         absent: ["конституции пересобираются каждую неделю", "пересборка по расписанию без проверки"]
         absent_en: ["constitutions are rebuilt every week", "scheduled rebuild without a check"]
     - id: horizon_year_or_longer
-      claim: "В промпт конституции идут только вводные длиной от горизонта (system_config constitutions.horizon_days, seed 365): геном, клиническая история, фазы longitudinal без поездок и без фаз короче горизонта, задевающих последний год (phase_in_horizon), годовой тренд без текущего неполного года, лабораторные ряды ≥3 точек длиной от горизонта (build_lab_history_context(horizon_days)), связи в вере. НЕ идут: самоотчёт — заметки чата (reasoning_block) и опросники (lab_results.source instrument:*; решение владельца 2026-09-27: субъективное в конституцию не идёт), recovery_vs_baseline (его current — 90 дней), текущие значения и разовые заборы, спец-панели. Вывод модели судит recent_mentions (дата моложе горизонта, срок вперёд в горизонте, фразы «за последние N дней/на прошлой неделе»): нарушение → одна попытка исправить → не сохраняется, отпечаток и пульс не пишутся."
+      claim: "В промпт конституции идут только вводные длиной от горизонта (system_config constitutions.horizon_days, seed 365): геном, клиническая история, фазы longitudinal без поездок и без фаз короче горизонта, задевающих последний год (phase_in_horizon), годовой тренд без текущего неполного года, лабораторные ряды ≥3 точек длиной от горизонта (build_lab_history_context(horizon_days)), связи в вере; домену «Питание» — рамка питания (food_profile.medical_frame: решение кода по курируемым правилам) как ограничения, которым текст не противоречит (с 07.10, нить constitution-frame; просьба в промпте, не сторож — сторож противоречия рамке ждёт решения владельца). НЕ идут: самоотчёт — заметки чата (reasoning_block) и опросники (lab_results.source instrument:*; решение владельца 2026-09-27: субъективное в конституцию не идёт), recovery_vs_baseline (его current — 90 дней), текущие значения и разовые заборы, спец-панели. Вывод модели судит recent_mentions (дата моложе горизонта, срок вперёд в горизонте, фразы «за последние N дней/на прошлой неделе»): нарушение → одна попытка исправить → не сохраняется, отпечаток и пульс не пишутся."
       limits:
         - "Оракул вывода — поиск по форме: месяц без года («в сентябре»), относительное время другими словами («недавно», «с конца лета») и число вида дд.мм, прочитанное как дата, — вне его зрения или ложная тревога."
         - "Самоописание из чата (например, «утром я всегда бодрый») конституция не видит — не предел, а правило владельца 2026-09-27 (субъективное не идёт); прежняя рамка «потеря» (BL-CONST-SELF-1) снята."
@@ -2243,13 +2244,16 @@
         - "Зеркало (удаление отсутствующих в Withings) добавлено 06.10 после подтверждения 05.10; живьём удаление ещё не проходило."
     - id: bp_day_owner_withings
       claim: "У кого Withings подключён (bp_readings непуст), дневное давление daily_metrics.bp_systolic/bp_diastolic — среднее ВСЕХ замеров местного дня (так требует домашний протокол 7-2-2), а пик дня raw bp_*_max (его читает потолок тревоги, решение 26.09) — максимум замеров; пишет только import_withings. Путь «Здоровья» (metrics_db.upsert_metrics_from_json) давление в колонки и raw bp_* не пишет, а кладёт свидетелем в raw.apple_health_bp. С первого дня Withings у дня один хозяин: день без замеров чистится, чужое значение переписывается; дни до первого замера Withings остаются за «Здоровьем». Ночной судья check_bp_day_is_withings пересчитывает средние сам и кричит о дне, где значение разошлось со средним замеров или есть без замеров. Решение владельца 06.10: главный в давлении — Withings."
-      status: open
+      status: holds
+      verified_at: "2026-10-07"
+      verified_on: "studio"
       closes_when: "после деплоя на живой базе владельца три дня давления из подтверждения 05.10 (даты — в снимке нити borrow-botkin) совпадают со средними замеров Withings, следующие приёмы «Здоровья» их не переписали, ночной сторож check_bp_day_is_withings показывает 0 дней расхождения"
       closes_when_by: owner
       check:
         file: metrics_db.py
         present: ["def _bp_owned_by_withings", "apple_health_bp"]
       limits:
+        - "Подтверждение 07.10 (только чтение, контейнер Studio): три дня из подтверждения 05.10 держат средние замеров и bp_source=withings; после деплоя пришло 7 файлов «Здоровья», последний 07.10 08:42 — дни не переписаны; свой пересчёт средних по местному дню — 0 дней расхождения и 0 значений без замеров; ночной артефакт integrity 07.10 без строки check_bp_day_is_withings среди отказов и предупреждений; import_withings 21:10 и 09:10 — строка нового формата, журнал ошибок пуст."
         - "День — по поясу установки (region_pack), не по месту замера: в поездке ночной замер может лечь соседним днём."
         - "У партнёра без Withings давление по-прежнему пишет «Здоровье» средним дня; удалённые в приборе замеры там не видны."
         - "Свидетель raw.apple_health_bp никем не судится: сверка «Здоровье» против Withings снята, потому что удаление замера в приборе — обычное действие человека и такая сверка кричала бы на каждое удаление."

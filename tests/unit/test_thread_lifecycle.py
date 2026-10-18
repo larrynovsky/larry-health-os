@@ -46,7 +46,10 @@ def _env(home: Path):
               # Метка замка закрытия: pre-commit коммита журнала гоняет эти тесты
               # ИЗНУТРИ закрытия, и метка, унаследованная песочницей, сделала бы
               # суд слепым (замерено: 1 красный при THREAD_FINISH_HOLDS_LOCK=1).
-              "THREAD_FINISH_HOLDS_LOCK", "THREAD_FINISH_LOCK_WAIT"):
+              "THREAD_FINISH_HOLDS_LOCK", "THREAD_FINISH_LOCK_WAIT",
+              # То же для очереди (07.10): закрытие csp-test гоняло эти тесты изнутри себя,
+              # THREAD_FINISH_HOLDS_QUEUE=1 сделал суд очереди слепым — 1 красный.
+              "THREAD_FINISH_HOLDS_QUEUE", "THREAD_FINISH_QUEUE_WAIT"):
         e.pop(v, None)
     # Деревья нитей живут в $HOME/.worktrees — уводим HOME в песочницу, иначе
     # тест насорил бы в настоящем каталоге владельца.
@@ -1279,3 +1282,78 @@ def test_thread_finish_dirty_tree(песочница, phase, state):
         assert not tree.exists(), "чистое дерево не убрано"
         assert _git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}",
                     home=home).returncode != 0
+
+
+# ── Очередь закрытий (07.10, нить finish-queue, решение владельца «В») ───────────────
+# 07.10 утром пять срывов закрытия подряд: прогон шёл без замка, соседи сливались в эти
+# минуты, и закрытие горело кодом 13. Очередь держится всё закрытие; журнальные файлы
+# (записки, уроки, планы .md, отметка прочтения) проходят мимо очереди.
+
+
+def _путь_очереди(repo: Path, home: Path) -> Path:
+    r = subprocess.run(["bash", str(repo / "scripts" / "git-hooks" / "finish_lock_guard.sh"),
+                        "--queue-path"], cwd=str(repo), capture_output=True, text=True,
+                       env=_env(home), timeout=30)
+    return Path(r.stdout.strip())
+
+
+def test_очередь_держит_всё_закрытие_и_ждёт_а_не_горит(песочница):
+    """Очередь занята соседом — закрытие ждёт (по таймауту — 15, ничего не тронув),
+    держатель умер — закрытие идёт. Мутация «очередь не берётся» — красный."""
+    repo, home, журнал = песочница
+    _start(repo, home, "queued")
+    _коммит_в_нити(home / ".worktrees" / РЕПО / "queued", home, "моё.txt", "работа\n")
+    main_до = _git(repo, "rev-parse", "main", home=home).stdout.strip()
+    очередь = _путь_очереди(repo, home)
+    держатель = _держатель(очередь)
+    try:
+        вывод = _finish(repo, home, "queued", THREAD_FINISH_QUEUE_WAIT="2")
+    finally:
+        держатель.kill()
+        держатель.wait()
+    assert вывод.returncode == 15 and "очередь закрытий" in вывод.stderr, (
+        f"rc={вывод.returncode}:\n{вывод.stderr}")
+    assert "tests" not in _звали(журнал)
+    assert _git(repo, "rev-parse", "main", home=home).stdout.strip() == main_до
+    assert _finish(repo, home, "queued", THREAD_FINISH_QUEUE_WAIT="2").returncode == 0
+
+
+@pytest.mark.parametrize("файл", ["lessons.yaml", "plans/план.md", "plans/publication_read.txt"])
+def test_дрейф_журнальным_файлом_сливается_без_второго_прогона(песочница, файл):
+    repo, home, журнал = песочница
+    _start(repo, home, "journal")
+    _коммит_в_нити(home / ".worktrees" / РЕПО / "journal", home, "моё.txt", "работа\n")
+    вывод = _finish(repo, home, "journal", STAND_DRIFT_REPO=str(repo), STAND_DRIFT_FILE=файл)
+    assert вывод.returncode == 0, f"дрейф {файл} отбил слияние:\n{вывод.stderr}"
+    звали = _звали(журнал)
+    assert звали.count("tests") == 1 and "affected" in звали, звали
+
+
+def test_дрейф_планом_с_кодом_по_прежнему_отбивает(песочница):
+    """Граница списка: plans/*.py — исполняемое, не журнал."""
+    repo, home, журнал = песочница
+    _start(repo, home, "plancode")
+    _коммит_в_нити(home / ".worktrees" / РЕПО / "plancode", home, "моё.txt", "работа\n")
+    вывод = _finish(repo, home, "plancode", STAND_DRIFT_REPO=str(repo),
+                    STAND_DRIFT_FILE="plans/probe.py")
+    assert вывод.returncode == 13, f"rc={вывод.returncode}"
+
+
+def test_пока_идёт_чужое_закрытие_в_главную_проходят_только_журнальные(песочница):
+    repo, home, журнал = песочница
+    держатель = _держатель(_путь_очереди(repo, home))
+    try:
+        (repo / "lessons.yaml").write_text("урок\n", encoding="utf-8")
+        _git(repo, "add", "lessons.yaml", home=home)
+        журнальный = _суд(repo, home)
+        (repo / "код.py").write_text("x = 1\n", encoding="utf-8")
+        _git(repo, "add", "код.py", home=home)
+        с_кодом = _суд(repo, home)
+        свой = _суд(repo, home, THREAD_FINISH_HOLDS_QUEUE="1")
+    finally:
+        держатель.kill()
+        держатель.wait()
+    assert журнальный.returncode == 0, журнальный.stderr
+    assert с_кодом.returncode != 0 and "[очередь закрытий]" in с_кодом.stderr, с_кодом.stderr
+    assert свой.returncode == 0, "своё закрытие отбито собственной очередью"
+    assert _суд(repo, home).returncode == 0, "очередь пережила держателя"

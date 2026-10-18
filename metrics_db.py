@@ -235,6 +235,8 @@ APPLE_RAW_KEYS = frozenset({
     "bp_systolic_max", "bp_diastolic_max",
     # Module 2 (2026-06-01)
     "exercise_min", "cycling_km", "walking_speed_avg",
+    # RMSSD — отдельная мера, не hrv (SDNN); только raw (07.10)
+    "hrv_rmssd_avg",
     "walking_step_length_avg", "walking_asymmetry_avg", "stand_min", "met_avg",
     # Эти поля импортёра сохраняются в raw. Отсутствие отдельных колонок
     # не должно приводить к потере полей; семья сигналов при этом не меняется.

@@ -41,7 +41,8 @@ from bot.filters import owner_chat_id, get_chat_id
 from secrets_paths import is_owner
 from bot.helpers import refresh_data, _send_tasks_from_report
 from bot.utils import send_long, send_md
-from services.recommendations import evaluate_domain_need
+from services.recommendations import evaluate_domain_need, evaluate_safety_limits
+from services import recommendations as _reco
 
 import region_pack
 
@@ -64,7 +65,25 @@ def _tenant_tz(default):
         except Exception:
             log.warning(f"HEALTH_TZ={name!r} невалиден — беру default")
     return default
-_RECO_SENT_KEY = "reco_last_sent"  # keyed by domain
+# «Уже сказано сегодня» — в базе тенанта, не в памяти процесса (18.10): bot_data стирался каждым
+# перезапуском бота, а деплой пересоздаёт контейнер — 18.10 одна тревога пришла шесть раз за час.
+_RECO_SENT_KEY = "recommendations.sent_today"   # system_config: {"date": <день тенанта>, "marks": {...}}
+
+
+def _load_sent(today_str: str) -> dict:
+    """Отметки «отправлено» за сегодняшний день тенанта; вчерашние не считаются."""
+    import config_db
+    v = config_db.get_config(_RECO_SENT_KEY)
+    if isinstance(v, dict) and v.get("date") == today_str and isinstance(v.get("marks"), dict):
+        return dict(v["marks"])
+    return {}
+
+
+def _save_sent(today_str: str, marks: dict) -> None:
+    """Пишется ПОСЛЕ отправки (C-130): падение между ними даст один повтор, а не потерю."""
+    import config_db
+    config_db.upsert_config(_RECO_SENT_KEY, value_json={"date": today_str, "marks": marks},
+                            category="recommendations", source="check_recommendations_scheduled")
 
 
 # ── Этап 2 (morning-brief-timing): местные расписания брифа ──────────────────
@@ -595,9 +614,11 @@ async def send_monthly_check(context: ContextTypes.DEFAULT_TYPE):
 
 async def check_recommendations_scheduled(context):
     """
-    Каждые 2 часа: проверяем все домены с активными протоколами.
-    Отправляем максимум 1 уведомление в день (required — до 2).
-    Активно только с 9:00 до 21:00 по локальному времени.
+    Каждые 2 часа (окно и интервал — services.recommendations.WINDOW_HOURS/INTERVAL_S):
+    1) пол безопасности (evaluate_safety_limits) — всегда, одно сообщение на показатель в сутки
+       (отметка в базе — переживает перезапуск); личный порог сообщением не идёт,
+       пульс LIMITS_CHECKED_KEY у исправного прогона;
+    2) домены активных протоколов — максимум 1 уведомление в день (required — до 2).
     """
     chat_id = get_chat_id()
     if not chat_id:
@@ -607,15 +628,52 @@ async def check_recommendations_scheduled(context):
     # Общий TZ модуля неверен, если у тенантов разные настройки.
     tz = _tenant_tz(TZ)
     now_h = _dt.now(tz=tz).hour
-    if now_h < 9 or now_h > 21:
+    start_h, end_h = _reco.WINDOW_HOURS
+    if now_h < start_h or now_h > end_h:
         return
+
+    today_str = str(_dt.now(tz=tz).date())
+    sent_data = _load_sent(today_str)
+
+    # Пол безопасности — раз в прогон, без протоколов (нить floors-live, 07.10): раньше он жил
+    # внутри evaluate_domain_need, а домен пуст у всех протоколов — пороги не проверялись вживую.
+    import config_db
+    limits = evaluate_safety_limits()
+    # Включение доставки — по тенанту (system_config); выключено — пол считается и пишется
+    # в лог, ночная проверка называет выключенных вслух.
+    send_on = bool(config_db.get_config(_reco.LIMITS_SEND_KEY, 0))
+    # Один показатель — раз в сутки; новые за прогон — одним сообщением (повтор 30 дней 07.10:
+    # до трёх порогов в одну плохую ночь — три сообщения подряд были бы шумом).
+    quiet = [f["metric"] for f in limits["fired"] if not f.get("push", True)]
+    if quiet:
+        log.info("Личный порог сработал — сообщением не идёт, картина в утреннем брифе: %s", quiet)
+    fresh = [f for f in limits["fired"]
+             if f.get("push", True) and not sent_data.get(f"limit:{f['metric']}_{today_str}")]
+    if fresh:
+        if send_on:
+            icon = "🚨" if any(f.get("medical") for f in fresh) else "⚠️"
+            reason = "\n".join(f["reason"] for f in fresh)
+            await send_md(context.bot.send_message, chat_id=chat_id,
+                          text=i18n.t("jobs.safety_limit.message", icon=icon, reason=reason))
+            log.info("Пол безопасности отправлен: %s", [f["metric"] for f in fresh])
+            # Отметка — только за отправленное: при выключенной доставке её не ставим, иначе
+            # включение посреди дня молча проглотило бы сегодняшнюю тревогу (отметка в базе живёт весь день).
+            for f in fresh:
+                sent_data[f"limit:{f['metric']}_{today_str}"] = 1
+            _save_sent(today_str, sent_data)
+        else:
+            log.warning("Пол безопасности сработал, доставка выключена (%s): %s",
+                        _reco.LIMITS_SEND_KEY, [f["metric"] for f in fresh])
+    if "error" not in limits:   # пульс только у исправного прогона: отказ = молчание = красный ночью
+        from datetime import timezone as _utc
+        from _time_inject import get_now
+        config_db.upsert_config(_reco.LIMITS_CHECKED_KEY,
+                                value_text=get_now(_utc.utc).isoformat(timespec="seconds"),
+                                category="recommendations", source="check_recommendations_scheduled")
 
     # Получаем уникальные домены из активных протоколов
     all_protocols = db.get_active_protocols()
     domains = list({p["domain"] for p in all_protocols if p.get("domain")})
-
-    today_str = str(_dt.now(tz=tz).date())
-    sent_data = context.bot_data.get(_RECO_SENT_KEY, {})
 
     for domain in domains:
         result = evaluate_domain_need(domain)
@@ -641,7 +699,7 @@ async def check_recommendations_scheduled(context):
         log.info(f"Рекомендация [{domain}] отправлена ({result['urgency']}): {result['reasons']}")
 
         sent_data[domain_key] = sent_today + 1
-        context.bot_data[_RECO_SENT_KEY] = sent_data
+        _save_sent(today_str, sent_data)
 
 
 # ── Pending consults на VPS — ВЫПИЛЕНО (2026-07-06, TD-09) ──────────────────
@@ -765,6 +823,7 @@ _MODALITY_KEYS = {
     "chemo": "treatment.modality.chemo", "chemoradiation": "treatment.modality.chemoradiation",
     "immunotherapy": "treatment.modality.immunotherapy", "targeted": "treatment.modality.targeted",
     "radiation": "treatment.modality.radiation",
+    "supplement": "treatment.modality.supplement", "medication": "treatment.modality.medication",
 }
 
 
@@ -784,8 +843,15 @@ async def _send_treatment_review_message(bot, med: dict) -> None:
             _al = None
         if _al:
             agents_str = i18n.t("treatment.review.agents", agents=" + ".join(str(a) for a in _al))
-    text = i18n.t("treatment.review.message", name=med.get("name"), modality=mod,
-                  cycles=cyc_str, agents=agents_str, dates=dates)
+    if med.get("source") == "conversation":
+        # Сказано в разговоре, а не найдено в документе: доза и частота — главное, что
+        # проверяет человек; дат лечения у добавки обычно нет.
+        dose = " · ".join(x for x in (med.get("dosage"), med.get("frequency")) if x) or "—"
+        text = i18n.t("treatment.review.message_stated", name=med.get("name"), modality=mod,
+                      dose=dose, since=med.get("start_date") or "—")
+    else:
+        text = i18n.t("treatment.review.message", name=med.get("name"), modality=mod,
+                      cycles=cyc_str, agents=agents_str, dates=dates)
     keyboard = [[
         InlineKeyboardButton(i18n.t("treatment.review.accept"), callback_data=f"medrev_{med['id']}_ok"),
         InlineKeyboardButton(i18n.t("treatment.review.skip"), callback_data=f"medrev_{med['id']}_skip"),
@@ -1365,7 +1431,7 @@ def register(app):
     # Рекомендации по доменам — каждые 2ч (только 09:00–21:00)
     app.job_queue.run_repeating(
         check_recommendations_scheduled,
-        interval=7200,
+        interval=_reco.INTERVAL_S,
         first=300,
         name="recommendations_check"
     )

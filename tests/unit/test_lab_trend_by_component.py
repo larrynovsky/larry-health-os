@@ -143,7 +143,7 @@ def db(tmp_path, monkeypatch):
                   "PRIMARY KEY (our_name, unit, specimen))")
         c.execute("INSERT INTO lab_name_loinc(our_name,unit,specimen,loinc_num,decided_by) "
                   "VALUES ('Vitamin_B12','pg/ml','blood','16695-9','owner')")
-        c.executemany("INSERT INTO lab_results(date,test_name,value,unit) VALUES (?,?,?,?)",
+        c.executemany("INSERT INTO lab_results(date,test_name,value,unit,source) VALUES (?,?,?,?,'doc:t.pdf')",
                       [("2040-04-09", "Vitamin_B12", 572.0, "pg/ml"),
                        ("2038-02-12", "Vitamin_B12", 386.0, None)])
         c.commit()
@@ -258,7 +258,7 @@ def test_mapping_in_si_finds_data_in_conventional(db):
                   "loinc_version) VALUES ('14814-8','Lipoprotein.beta','SCnc','Ser/Plas','2.82')")
         c.execute("INSERT INTO lab_name_loinc(our_name,unit,specimen,loinc_num,decided_by) "
                   "VALUES ('LDL','mmol/l','blood','14814-8','owner')")
-        c.executemany("INSERT INTO lab_results(date,test_name,value,unit) VALUES (?,?,?,?)",
+        c.executemany("INSERT INTO lab_results(date,test_name,value,unit,source) VALUES (?,?,?,?,'doc:t.pdf')",
                       [("2040-04-09", "LDL", 109.0, "mg/dL"),
                        ("2039-12-06", "LDL", 121.0, "mg/dL")])
         c.commit()
@@ -278,8 +278,8 @@ def test_row_in_si_is_converted_into_the_conventional_trend(db):
                   "loinc_version) VALUES ('3043-7','Triglyceride','MCnc','Bld','2.82')")
         c.execute("INSERT INTO lab_name_loinc(our_name,unit,specimen,loinc_num,decided_by) "
                   "VALUES ('Triglycerides','mg/dl','blood','3043-7','owner')")
-        c.execute("INSERT INTO lab_results(date,test_name,value,unit) "
-                  "VALUES ('2026-06-01','Triglycerides',1.7,'ммоль/л')")
+        c.execute("INSERT INTO lab_results(date,test_name,value,unit,source) "
+                  "VALUES ('2026-06-01','Triglycerides',1.7,'ммоль/л','doc:t.pdf')")
         c.commit()
     got = labs_db.get_lab_trend_by_component("Triglycerides")
     p = got["points"][0]

@@ -37,7 +37,7 @@
     <div class="card-meta">
       {% if ev.effective_date %}
         <time>{{ ev.effective_date }}</time>
-        <span class="age-suffix">({{ ev.effective_date | age_days }}д назад)</span>
+        <span class="age-suffix">({{ ev.effective_date | age_label }})</span>
       {% else %}—{% endif %}
       {% if ev.performer == "self" %} · самоотчёт{% elif ev.performer %} · {{ ev.performer }}{% if ev.performer_role %}, {{ ev.performer_role }}{% endif %}{% endif %}
       {% if ev.location %} · {{ ev.location }}{% endif %}
@@ -46,8 +46,12 @@
       {{ chip_type(etype) }}
       {% if ev.specialty %}<span class="chip chip--outline">{{ ev.specialty }}</span>{% endif %}
       {% if is_planned %}<span class="chip chip--action">запланировано</span>{% endif %}
+      {% if ev.id %}<button class="action-pill action-pill--ghost" type="button"
+              hx-post="/api/events/{{ ev.id }}/delete" hx-target="closest article" hx-swap="outerHTML"
+              hx-confirm="Удалить событие от {{ ev.effective_date or 'без даты' }}? Это для ошибочно созданных записей.">удалить</button>{% endif %}
     </div>
   </div>
+  {% if ev.id %}<div id="evmsg-{{ ev.id }}"></div>{% endif %}
   {% if ev.pro_text %}
     <h3 class="card-title">{{ ev.pro_text }}</h3>
   {% elif ev.assessment %}

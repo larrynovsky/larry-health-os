@@ -1,121 +1,123 @@
-<!-- translation-of: docs/how-to/night_cycle_respond.md sha256:df4907538e44 -->
+<!-- translation-of: docs/how-to/night_cycle_respond.md sha256:6778ec90310e -->
+<!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
+
 **English** · [Русский](night_cycle_respond.md)
 
-# How-to: respond to the nightly notification
+# How-to: respond to a night call
 
-A task procedure. You received a notification in Telegram: "🔔 Waiting for your decision: N".
-Here is what to do. For the reasoning, see `docs/explanation/night_cycle.md`.
+A recipe task. You received a Telegram call "🔔 Awaiting your decision: N".
+Here is what to do. The "why" behind this is in `docs/explanation/night_cycle.md`.
 
-Since 09-28, the notification arrives once a day and names each decision in one plain-language line;
-stalled work is named by its title. If a decision has a default-decision deadline, the notification
-names the nearest one.
+The call (since 28.09) arrives once a day and names each decision in one plain-language line;
+a stuck task — by its name. If a decision has a default deadline, the call names the nearest one.
 
-## When the notification arrives
+## When the call arrives
 
-1. Open Claude in the `health` project (desktop, so the bridge to Studio is available) and write:
-   **"разбери решения"** ("go through the decisions").
-2. The session will read the parked cards (`parked_decisions.list_open`, excluding the `dev_fix`
-   engineering queue) and show each one: the question, the options, and the cost of each.
-3. For each gate, say one of the following:
+1. Open Claude on the `health` project (desktop, so the bridge to Studio is available) and write:
+   **"parse decisions"**.
+2. The session will read the parked cards (`parked_decisions.list_open`, excluding the
+   engineering queue `dev_fix`) and show each one: the question, the options, and the cost of each.
+3. For each gate, say one of:
    - **yes / I approve** — for a work plan;
-   - **close it** — to close a stage (once you have verified it is ready);
-   - **a substantive decision** — for an owner gate (canonical/threshold/irreversible action);
-   - **defer until <date>** — to reschedule; the notification will stay silent until then.
-4. You do not need to press ANYTHING in the bot — it only rings. The decision is recorded in the session.
+   - **I'm closing** — for closing a phase (when you have verified yourself that it is ready);
+   - **decision on the merits** — for an owner gate (canon/threshold/irreversible);
+   - **postpone until <date>** — to defer; the call will go silent until the deadline.
+4. There is NOTHING to tap in the bot — it only calls. The decision is recorded in the session.
 
-The notification arrives once a day between 08:00 and 20:00 (home local time) until a decision is RECORDED.
-"I looked at it" does not count — only a recorded decision or deferral stops it.
+The call arrives once a day in the 08–20 window (local home time) until the decision is RECORDED.
+"Looked at it" does not count — only a recorded decision or a deferral silences it.
 
-## What the notification does not include — the engineering queue
+## What is not in the call — the engineering queue
 
-Since 09-23, the notification counts only what you decide. Engineering findings (update a package,
-commit a file, recalculate metrics, fix a sensor) go into a separate queue, and
-the bell does not ring for them: you are not their oracle. Once a week, they reach you
-in a Monday digest "for your information" — one line per finding and a total: "Night cycle engineering
-queue: N, oldest X days." If you want to work through it, say "work through
-the engineering queue" in the session. Engineering issues are escalated to you only when the action is irreversible or
-affects your domain (canonical lab results, normal-range thresholds).
+Since 23.09 the call counts only what you decide. Engineering findings (update a package,
+commit a file, recalculate metrics, fix a sensor) sit in a separate queue, and
+the bell does not ring for them: you are not the oracle for those. Once a week they arrive
+as a Monday digest "for your information" — each finding on its own line and a total "Engineering
+night-cycle queue: N, oldest X days". If you want to go through it — say "parse the engineering
+queue" in the session. Engineering escalates to you only when an action is irreversible or
+touches your domain (lab canon, normal thresholds).
 
-## If you stay silent
+## If you stayed silent
 
-Currently (since 09-23), silence **decides nothing**: the card waits for your answer. Your decision
-on 09-13 was "silence = delegation," but the check on 09-23 showed that nothing could execute the chosen
-option — the system would only have recorded "decided by default: Block" and
-reported an action that never happened. A default is therefore assigned only to an option
-with an executor, and none has one yet. The notification will include "If you stay silent, this will
-be decided automatically on DD.MM" again only when the first real executor exists.
+Right now (since 23.09) silence **decides nothing**: the card waits for your word. Your decision
+on 13.09 was "silence = delegation", but the check on 23.09 showed there was nothing to execute
+the chosen option — the system would only have recorded "decided by default: Block" and
+reported an action that never happened. Therefore a default is assigned only to an option that
+has an executor, and there are currently none. The line "If you stay silent — DD.MM
+it will resolve itself" will appear in the call again only alongside the first real executor.
 
-Once an executor exists, the previous mechanism will return: **the silence deadline is 14 days** after
-the card appears; when it expires, the system EXECUTES the option, records `решено умолчанием
-ДД.ММ.ГГГГ: <вариант> · откат: <как откатить>`, and informs you in a separate message.
+When an executor appears, the mechanic will revert to the previous one: **silence deadline is 14 days**
+from when the card appears; on expiry the system EXECUTES the option, records `decided by default
+DD.MM.YYYY: <option> · rollback: <how to roll back>` and notifies you in a separate message.
 
-What defaults NEVER affect, even with an executor: irreversible actions and anything that writes to
-your domain (canonical lab results, normal-range thresholds).
+What a default NEVER touches, even with an executor: anything irreversible, and anything that writes
+to your domain (lab canon, normal thresholds).
 
-## What is cleared from the desk automatically
+## What is removed from the table automatically
 
 - A card from the morning check — when its finding is absent from today's check or
-  becomes "for your information" (`standing`). The record's author is `not_on_desk`.
-- A "thread stalled — finish or close it?" card — when the thread is closed. The author is `thread_closed`.
+  it has become "for your information" (`standing`). Record author — `not_on_desk`.
+- A card "thread is stalled — finish or close?" — when the thread is closed. Author — `thread_closed`.
 
-Neither is recorded as your response.
+Neither of the above is recorded as your response.
 
-Check what is pending — the desk lives where the owner's night cycle runs. Which runtime
-that is, `cat ~/health/RUNTIME` on Studio tells:
+To check what is pending — the table is wherever the owner night cycle runs. Which runtime that is,
+`cat ~/health/RUNTIME` on Studio tells you:
 
     # container (docker-install pilot, since 30.09):
     DOCKER_CONTEXT=colima-health docker exec -w /app health-cron-1 python3 -c "import parked_decisions as p; [print(g['id'], '|', g.get('kind')) for g in p.list_open()]"
     # native:
     python3.11 -c "import parked_decisions as p; [print(g['id'], '|', g.get('kind')) for g in p.list_open()]"
 
-A decision is recorded (`record_decision`) the same way. With the container runtime the
-native desk is frozen (444, since 30.09): the container desk is the one that rings, and a
-decision written to the native one would never reach the bell. On 30.09 the container
-started with an empty desk and rang about decisions made on 10.08 and 23.08 — the desks
-were merged (the native decision wins); copies before the merge are in
+The decision is recorded (`record_decision`) via the same path. The native table is frozen
+(444, since 30.09) when the runtime is containerised: the container rings, and a decision
+recorded to the native table would not be seen by the bell. On 30.09 the container started
+with an empty table and called with decisions from 10.08 and 23.08 — the tables were merged
+(the native decision wins), pre-merge copies are at
 `~/health/backups/bell-state/` on Studio.
 
-## If you get "The decision desk lost its memory"
+## If you receive "Decision table has lost memory"
 
-The desk (the runtime's `logs/parked_decisions.json`) holds fewer cards than the database
-remembers (`system_config.parked_decisions.known_ids`) — this is what happened on 30.09 after
-the move into the container. In this state the night cycle parks nothing and the bell sends
-one line instead of the list. For the session: find the previous desk (native
-`~/health_scripts/logs/parked_decisions.json` on Studio, copies in `~/health/backups/`), merge
-it into the runtime desk under `parked_decisions._locked()` (the owner's decision wins; a
-machine retirement does not), then check `memory_lost() is None`. Never lower the mark in
-the database: it is the memory.
+The table (`logs/parked_decisions.json` of the runtime) contains fewer cards than are remembered
+in the database (`system_config.parked_decisions.known_ids`) — this happened on 30.09 after
+migration to the container. The night cycle in this state parks nothing, and the bell sends
+one line instead of a list. Session: find the previous table (native
+`~/health_scripts/logs/parked_decisions.json` on Studio, copies in `~/health/backups/`),
+merge it into the runtime table under `parked_decisions._locked()`
+(owner decision wins; machine-removed — does not), verify `memory_lost() is None`.
+Do not edit the database mark downward: it is the memory.
 
-## If there is no notification
+## If there is no call
 
 Silence = no pending decisions. This is a guarantee, not a hope: the bell has a heartbeat
-(`check_doorbell_liveness` in nightly integrity checks), and if the channel died, that sensor would fail
-instead of silently replacing the notification.
+(`check_doorbell_liveness` in the night integrity), and if the channel died — it would go red,
+not silently substitute for the call.
 
-## Activation (one time, when you say "enable")
+## Activation (one-time, your "enable")
 
-**Activated on 2026-08-03 (commit 1ad097c).** The procedure below is for
-reactivation/after cleanup. The plists in the repository (`launchd/`) are the source; the active files are COPIES in
-`~/Library/LaunchAgents/` (this is how all health jobs load, including automatic loading after reboot):
+**Activated 2026-08-03 (commit 1ad097c).** The procedure below is for re-activation /
+after a cleanup. Plists in the repo (`launchd/`) are the source; the COPIES in
+`~/Library/LaunchAgents/` are what is active (that is how all health jobs load + auto-load on reboot):
 
     cp ~/health_scripts/launchd/com.larry.health.night-cycle.plist ~/Library/LaunchAgents/
     cp ~/health_scripts/launchd/com.larry.health.owner-nag.plist   ~/Library/LaunchAgents/
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.larry.health.night-cycle.plist
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.larry.health.owner-nag.plist
 
-If you edited a plist in the repository, copy it to LaunchAgents again and run `launchctl bootout` + `bootstrap`
-again; otherwise, the old copy remains active. Check:
+If you edited the plist in the repo — copy it to LaunchAgents and run `launchctl bootout` + `bootstrap`
+again, otherwise the old copy remains active. To verify:
 
     launchctl list | grep -E "night-cycle|owner-nag"
 
-The night cycle runs at 08:00, and the bell at 08/11/14/17/20 (home local time); at 08:00, the bell waits
-for the cycle, and the cycle itself sends the day's first notification when it finishes — the count already reflects cleared cards. If the bell has already rung today, the later runs stay silent. Run manually:
-`python3.11 ~/health_scripts/night_cycle.py`. Heartbeat health is covered by the §14 sensors in nightly
-integrity checks (bell: "last run N days ago"; `via='none'` on a notification = dead delivery → FAIL).
+The night cycle runs at 08:00, the bell — 08/11/14/17/20 (local home time); at 08:00 the bell
+waits for the cycle, and the first call of the day is made by the cycle itself when it finishes —
+the count is already after removals. If the call already came today, later runs stay silent.
+To run manually:
+`python3.11 ~/health_scripts/night_cycle.py`. Heartbeat health — §14 sensors in the night
+integrity (bell "run N days ago"; `via='none'` on a call = dead delivery → FAIL).
 
-## Stage 1 boundaries
+## Phase 1 limits
 
-The cycle currently INVESTIGATES and PARKS; it does not yet prepare or apply patches (stage 2)
-— a dev fix goes into the engineering queue with a diagnosis, and a session fixes it.
-Automatic application without a console is stage 2, under a separate plan.
-
+Right now the cycle INVESTIGATES and PARKS; patch preparation and application (phase 2) it does
+not yet do — a dev fix goes into the engineering queue with a diagnosis, the session fixes it.
+Auto-application without a console — phase 2, a separate plan.

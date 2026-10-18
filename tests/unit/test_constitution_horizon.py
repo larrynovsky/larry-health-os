@@ -83,7 +83,7 @@ def db(tmp_path, monkeypatch):
 
 def _ins(db, rows):
     with db.get_conn() as c:
-        c.executemany("INSERT INTO lab_results(date,test_name,value,unit) VALUES(?,?,?,?)", rows)
+        c.executemany("INSERT INTO lab_results(date,test_name,value,unit,source) VALUES(?,?,?,?,'doc:t.pdf')", rows)
         c.commit()
 
 

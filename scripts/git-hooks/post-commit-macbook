@@ -238,6 +238,14 @@ fi
       fi
     fi
   fi
+  # Исход подоболочки = доехал ли код. Без этого хук возвращал 0 и при push, упавшем
+  # дважды, — git код post-commit игнорирует, но thread_finish.sh судит деплой ИМЕННО по
+  # нему и 17.10 напечатал «закрыта и задеплоена» при Studio, недостижимой по ssh.
+  $push_ok || exit 3
 ) 2>&1 | tee -a "$SCRIPT_DIR/logs/deploy.log"
-
+DEPLOY_RC=${PIPESTATUS[0]}
+if [ "$DEPLOY_RC" -ne 0 ]; then
+  echo "❌ post-commit: код на Studio НЕ доехал (push не прошёл) — см. logs/deploy.log" >&2
+  exit "$DEPLOY_RC"
+fi
 exit 0

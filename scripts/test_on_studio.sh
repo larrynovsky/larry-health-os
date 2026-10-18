@@ -41,6 +41,23 @@ CANON_DB="$HOME/health/data/health.db"
 REFERENCE_DB="$HOME/health_reference/loinc.db"
 PY="/opt/homebrew/bin/python3.11"
 
+# ── Связь со Studio: keepalive и различимый обрыв (18.10, урок C-178) ─────────
+# Обрыв сети посреди прогона (17–18.10, дважды) не превращался в отказ: ssh без keepalive
+# ждёт ответа мёртвого канала вечно, закрытие нити висело часами и держало очередь. Замер на
+# настоящей Studio заморозкой удалённой сессии (kill -STOP её sshd-session): без опций клиент
+# жив через 206 с, с опциями ниже — выход через 74 с, rc=255. Числа: 15 с × 4 пропуска =
+# ~60 с тишины канала — короче прогона не бывает, длиннее короткого сетевого провала.
+# Одна обёртка на ВСЕ вызовы ssh скрипта (их девять) — мимо неё не проскочит новый вызов;
+# rsync и scp получают те же опции явно.
+SSH_OPTS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+ssh() { command ssh "${SSH_OPTS[@]}" "$@"; }
+# rc=255 у ssh — обрыв канала, а не красные тесты: назвать вслух, иначе человек пойдёт чинить код.
+say_if_link_lost() {
+  [ "$1" -eq 255 ] || return 0
+  echo "⛔ СВЯЗЬ со Studio потеряна посреди прогона (ssh rc=255: канал молчал ~60 с) — это НЕ красные тесты." >&2
+  echo "   Каталог стенда мог остаться на Studio ($STAGING): уборка ходит туда же по ssh. Повтори, когда связь вернётся." >&2
+}
+
 # ── Каталог стенда: свой на КАЖДЫЙ запуск (2026-09-11) ───────────────────────
 # Было: один жёсткий $HOME/health_staging на всех. Два одновременных
 # запуска rsync'или в него по очереди, и второй перезаписывал дерево первого —
@@ -136,6 +153,7 @@ rsync -az --delete \
   --exclude '*.db' \
   --exclude '.venv/' \
   --filter=':- .gitignore' \
+  -e "ssh ${SSH_OPTS[*]}" \
   "$LOCAL_REPO"/ "$STUDIO:$STAGING/"
 
 # ФАКТЫ О GIT — БЕЗ САМОГО GIT (2026-08-10). `.git` в песочницу не едет и ехать не
@@ -144,7 +162,7 @@ rsync -az --delete \
 # а снимок pass-set писал `head_sha: unknown`. Три «разные поломки», один корень.
 # Манифест снимается в НАСТОЯЩЕМ репозитории и кладётся рядом с деревом.
 "$PY" -c "import sys; sys.path.insert(0,'$LOCAL_REPO'); import git_facts; print('  манифест git:', git_facts.write_manifest())"
-scp -q "$LOCAL_REPO/.git_facts.json" "$STUDIO:$STAGING/.git_facts.json"
+scp -q "${SSH_OPTS[@]}" "$LOCAL_REPO/.git_facts.json" "$STUDIO:$STAGING/.git_facts.json"
 
 echo "== 3/4 снапшот канона + фиктивные секреты → staging (всё остаётся на Studio) =="
 ssh "$STUDIO" "
@@ -200,6 +218,27 @@ ssh "$STUDIO" "
   echo '  snapshot size: '\$(ls -lah '$STAGING/data/health.db' | awk '{print \$5}')
 "
 
+# --- failfast_consistency: begin (C-174) ---
+# Полный прогон идёт ~13 минут, а проверки согласованности (tests/consistency, ~2 минуты)
+# краснеют на закрытии нити чаще прочих: 07.10 нить canon-provenance узнала о красном
+# consistency-тесте только в конце полного прогона и потеряла его целиком. Гоняем их первыми;
+# красные — стоп, полный прогон не запускается. Только в полном режиме: селектор — это уже
+# выбранное подмножество. Код возврата берём у ssh напрямую, без конвейера (C-40).
+if [[ "$PARTIAL" -eq 0 ]]; then
+  echo "== 4a/5 fail-fast: tests/consistency =="
+  set +e
+  ssh "$STUDIO" "cd '$STAGING' && echo \$\$ > .run.pid && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' exec $PY -m pytest tests/consistency -q --tb=short -m 'not slow and not requires_anthropic_key and not owner_env'"
+  RC_FF=$?
+  set -e
+  if [ "$RC_FF" -ne 0 ]; then
+    say_if_link_lost "$RC_FF"
+    echo
+    echo "❌ FAIL fail-fast (tests/consistency rc=$RC_FF) — полный прогон НЕ запускался. Канон не тронут."
+    exit 1
+  fi
+fi
+# --- failfast_consistency: end ---
+
 if [[ "$PARTIAL" -eq 1 ]]; then
   echo "== 4/5 pytest ЧАСТИЧНО: '$TARGET' (НЕ заменяет полный прогон) =="
 else
@@ -214,6 +253,7 @@ set +e
 ssh "$STUDIO" "cd '$STAGING' && echo \$\$ > .run.pid && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' exec $PY -m pytest $TARGET -q --tb=short -m 'not slow and not requires_anthropic_key and not owner_env'" | tee "$PYTEST_OUT"
 RC=$?
 set -e
+say_if_link_lost "$RC"
 PASSED="$(grep -Eo '[0-9]+ passed' "$PYTEST_OUT" | tail -1 | grep -Eo '[0-9]+' || true)"
 rm -f "$PYTEST_OUT"
 
@@ -240,6 +280,7 @@ set +e
 ssh "$STUDIO" "cd '$STAGING' && echo \$\$ > .run.pid && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' HEALTH_REFERENCE_DIR='$STAGING/reference' exec $PY scripts/integrity_code_guard.py"
 RC_GUARD=$?
 set -e
+say_if_link_lost "$RC_GUARD"
 
 echo
 if [ "$RC" -eq 0 ] && [ "$RC_GUARD" -eq 0 ]; then

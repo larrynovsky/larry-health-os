@@ -99,3 +99,27 @@ def test_advice_and_analyte_must_share_a_sentence(clock):
     hits = gc.recommendations_without_evidence("Повтор HGB через месяц.", {"HGB": "2040-04-09"},
                                                {"HGB": {"interval_days": 90}})
     assert [h["test"] for h in hits] == ["HGB"]      # позитивный контроль: совет в том же предложении
+
+
+def test_year_alone_is_not_a_named_date(clock):
+    """15.10 (ревью ремонта 2026-10-13-301096a6): «дата названа» засчитывалась по ГОДУ где угодно
+    в тексте. В 2026 году почти любой текст несёт «2026» — замер на живой базе: за 30 дней 7
+    отчётов прошли «с датой» только по году. Дата названа — полная (ISO или дд.мм.гггг)."""
+    import gp_context as gc
+    clock.set("2040-04-12")
+    hits = gc.recommendations_without_evidence(
+        "План на 2040 год: рекомендую сдать ферритин", {"Ferritin": "2040-04-09"}, SCHED)
+    assert [h["test"] for h in hits] == ["Ferritin"], hits
+    assert gc.recommendations_without_evidence(
+        "Рекомендую сдать ферритин (последний раз 09.04.2040)", {"Ferritin": "2040-04-09"}, SCHED) == []
+
+
+def test_each_analyte_needs_its_own_date(clock):
+    """Дата одного аналита не делает честным совет по другому (отрицательный контроль)."""
+    import gp_context as gc
+    clock.set("2040-04-12")
+    sched = {**SCHED, "TSH": {"interval_days": 365}}
+    last = {"Ferritin": "2040-04-09", "TSH": "2040-03-01"}
+    text = "Рекомендую сдать ферритин и TSH. Ferritin — 09.04.2040"
+    assert [h["test"] for h in gc.recommendations_without_evidence(text, last, sched)] == ["TSH"]
+    assert gc.recommendations_without_evidence(text + "; TSH — 01.03.2040", last, sched) == []

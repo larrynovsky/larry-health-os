@@ -192,6 +192,22 @@ def _labs_snapshot(db) -> str:
                 "данных здесь НИЧЕГО не говорит о том, сдавались анализы или нет.")
 
 
+def _bans_line() -> str:
+    """Запреты владельца «не предлагай мне X» (память, класс preference, ключ no_suggest:*).
+    Решение 07.10: запрет — часть памяти, правится на дашборде (/memory), видят все окна.
+    Бриф — одна точка раздачи: его читают бот и health_brief облаков. Сбой чтения памяти
+    не роняет бриф, но и не выдаёт «запретов нет» — строки просто нет (молчание, не ложь)."""
+    try:
+        import memory_facts_db as _mf
+        bans = [f["value"] for f in _mf.get_facts("preference")
+                if (f.get("key") or "").startswith("no_suggest:")]
+    except Exception:  # silent-ok: память недоступна — бриф без строки запретов
+        return ""
+    if not bans:
+        return ""
+    return "НЕ ПРЕДЛАГАТЬ (решение владельца, действует до отмены): " + "; ".join(bans) + ".\n"
+
+
 def build_patient_brief() -> str:
     """Компактный профиль пациента из БД для инъекции в промпты. См. docstring модуля."""
     try:
@@ -257,6 +273,7 @@ def build_patient_brief() -> str:
     onco_line = (f"Онкостатус: {pet_res} (PET-CT {pet_date}).\n"
                  f"Онколог: {oncologist}.\n") if _has_onco else ""
     appt_line = f"Следующий визит: {next_appt}.\n" if not is_unset(next_appt) else ""
+    ban_line = _bans_line()
 
     return (
         _bhdr +
@@ -264,6 +281,7 @@ def build_patient_brief() -> str:
         f"{dx_line}"
         f"{onco_line}"
         f"{appt_line}"
+        f"{ban_line}"
         f"{hrv_line}"
         f"{labs_line}"
         f"{chat_line}"

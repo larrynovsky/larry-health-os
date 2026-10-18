@@ -399,7 +399,12 @@ fi
 # Не блокирует: отбор неполон по построению (см. affected_tests docstring),
 # и делать блок из неполного признака значило бы обещать больше, чем он даёт.
 # Полное доказательство остаётся за ночным прогоном; здесь — окно обнаружения.
-_AFF=$("$PYTHON" "$REPO_ROOT/affected_tests.py" 2>/dev/null)
+_AFF_NOTE="$(mktemp -t affected_note)"
+_AFF=$("$PYTHON" "$REPO_ROOT/affected_tests.py" 2>"$_AFF_NOTE")
+# Широкая правка: отбор не сужает, но ядро (tests/consistency) всё равно гоняется — почему не всё,
+# скрипт пишет в stderr; печатаем только свою строку, прочий stderr (предупреждения разбора) — нет.
+grep '^affected_tests:' "$_AFF_NOTE" | sed 's/^/▶ pre-commit: /' || true
+rm -f "$_AFF_NOTE"
 if [[ -n "$_AFF" && "$_AFF" != affected_tests:* ]]; then
     _N=$(echo "$_AFF" | wc -l | tr -d ' ')
     echo "▶ pre-commit: затронуто тестов — $_N, гоню"

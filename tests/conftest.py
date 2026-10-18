@@ -513,7 +513,10 @@ def _no_inherited_git_env(monkeypatch):
                 "GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_QUARANTINE_PATH",
         "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_AUTHOR_DATE",
         "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "GIT_COMMITTER_DATE",
-        "GIT_EDITOR"):
+        "GIT_EDITOR", "GIT_REFLOG_ACTION"):
+        # GIT_REFLOG_ACTION (18.10): `git merge` кладёт его хукам, и тесты, гоняющие свой
+        # `git merge` во временном репозитории, внутри merge-коммита падали (4 красных при
+        # слиянии deploy-rc-truth; вне хука те же тесты зелёные).
         monkeypatch.delenv(var, raising=False)
     yield
 

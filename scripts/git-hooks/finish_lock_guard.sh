@@ -10,9 +10,13 @@
 # коммит с одним родителем, и это не было известно до замера).
 #
 # ОДИН ДОМ имени и пути замка — этот файл:
-#   --path   → печатает путь файла замка (его берёт thread_finish.sh);
+#   --path          → печатает путь файла замка (его берёт thread_finish.sh);
+#   --queue-path    → путь файла очереди закрытий (07.10);
+#   --journal-regex → список журнальных файлов, которым очередь не нужна (07.10);
 #   без арг. → суд для pre-commit: коммит в ГЛАВНОЙ копии отбит, пока замок
-#              держит чужое закрытие. Своё закрытие несёт THREAD_FINISH_HOLDS_LOCK.
+#              держит чужое закрытие; пока идёт чужое закрытие (очередь) — отбит
+#              коммит не из журнальных файлов. Своё закрытие несёт
+#              THREAD_FINISH_HOLDS_LOCK / THREAD_FINISH_HOLDS_QUEUE.
 #
 # ПОЧЕМУ flock ЯДРА, а не файл-флаг или каталог с pid: ядро снимает замок само,
 # когда умирает процесс-держатель, — упавшая сессия не запирает закрытия всем.
@@ -26,17 +30,30 @@ set -uo pipefail
 _common="$(git rev-parse --git-common-dir 2>/dev/null)" || exit 0
 _common="$(cd "$_common" && pwd)"
 LOCK="$_common/thread_finish.lock"
+# ОЧЕРЕДЬ ЗАКРЫТИЙ (07.10, нить finish-queue, решение владельца «В»). Замок выше держит
+# только отрезки, где главная копия меняется; прогон (~15 мин) шёл без замка, и сосед,
+# слившийся в эти минуты, срывал закрытие кодом 13 (07.10 утром — пять срывов подряд).
+# Очередь держится ВСЁ закрытие: второе закрытие ждёт первое, а не горит.
+QUEUE="$_common/thread_finish.queue"
+# Журнальные файлы — записи, а не код: им ждать очередь незачем. Пока закрытие идёт,
+# коммит в главную копию, целиком из таких файлов, проходит; закрытие, увидев их в
+# дрейфе, прогоняет только их затронутые тесты. Код, тесты и реестр замысла — только
+# через нить. Список ОДИН (этот), его читает thread_finish.sh через --journal-regex.
+# Пополнять — только файлами, которые ничего не исполняют или чьи тесты отбирает
+# affected_tests: иначе список станет дырой.
+JOURNAL_RE='^(docs/handoff/|lessons\.yaml$|plans/[^/]+\.md$|plans/publication_read\.txt$)'
 
-if [[ "${1:-}" == "--path" ]]; then
-    printf '%s\n' "$LOCK"
-    exit 0
-fi
+case "${1:-}" in
+    --path)          printf '%s\n' "$LOCK"; exit 0 ;;
+    --queue-path)    printf '%s\n' "$QUEUE"; exit 0 ;;
+    --journal-regex) printf '%s\n' "$JOURNAL_RE"; exit 0 ;;
+esac
 
 # Судим только главную копию: у дерева нити свой индекс и свой HEAD.
 _gitdir="$(cd "$(git rev-parse --git-dir)" && pwd)"
 [[ "$_gitdir" == "$_common" ]] || exit 0
 [[ -n "${THREAD_FINISH_HOLDS_LOCK:-}" ]] && exit 0
-[[ -e "$LOCK" ]] || exit 0
+[[ -e "$LOCK" || -e "$QUEUE" ]] || exit 0
 
 _PY=""
 for _CAND in /opt/homebrew/bin/python3.11 python3.11 python3; do
@@ -46,15 +63,30 @@ done
 # хуже дыры (закрытие без python и так не работает: thread_finish код 9).
 [[ -n "$_PY" ]] || exit 0
 
-if "$_PY" -c '
+_free() {
+    [[ -e "$1" ]] || return 0
+    "$_PY" -c '
 import fcntl, sys
 f = open(sys.argv[1], "a")
 try:
     fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
 except BlockingIOError:
     sys.exit(1)
-' "$LOCK"; then
-    exit 0
+' "$1"
+}
+if _free "$LOCK"; then
+    # Отрезок слияния свободен. Идёт ли чужое закрытие (очередь)? Тогда пропускаем только
+    # журнальные файлы — код сдвинул бы main под прогоном соседа (§12).
+    [[ -n "${THREAD_FINISH_HOLDS_QUEUE:-}" ]] && exit 0
+    _free "$QUEUE" && exit 0
+    _staged="$(git -c core.quotePath=false diff --cached --name-only)"
+    _code="$(printf '%s\n' "$_staged" | grep -Ev "$JOURNAL_RE" | grep -v '^$' || true)"
+    [[ -z "$_code" ]] && exit 0
+    echo "⛔ [очередь закрытий] идёт закрытие чужой нити; в главную копию сейчас проходят" >&2
+    echo "   только журнальные файлы (записки, уроки, планы .md, отметка прочтения)." >&2
+    echo "   Не журнальные в коммите: $(printf '%s' "$_code" | head -3 | tr '\n' ' ')" >&2
+    echo "   Код — через нить (scripts/thread_start.sh), либо подожди конца закрытия." >&2
+    exit 1
 fi
 echo "⛔ [замок закрытия] сейчас идёт закрытие чужой нити в главной копии." >&2
 echo "   Коммит сюда унёс бы её слияние или индекс в твой коммит (d15f91d, 23.09)." >&2

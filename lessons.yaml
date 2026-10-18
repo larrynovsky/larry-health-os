@@ -1023,7 +1023,8 @@ lessons:
   outcome:
     kind: rule
     text: сначала найти одно событие git, которое и есть нужный смысл, до фаз и файлов состояния
-  status: adopted
+  status: failed
+  failed_by: 'C-177 (18.10): хук деплоя кончался exit 0, новый получатель (thread_finish) судил по коду возврата — смысл события хука снова прочитан не тем'
   adopted_on: '2026-09-28'   # не позже: дата переноса корпуса
   change: scripts/git-hooks/post-commit-macbook
   evidence:
@@ -1394,7 +1395,9 @@ lessons:
   outcome:
     kind: rule
     text: путь для замера — вызовом функции потребителя (lab_intake_watcher._incoming)
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — 1.6 замер: то, что видит потребитель, — через функцию самого потребителя; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence:
   - git:43c99f9
   owner: владелец
@@ -2093,7 +2096,9 @@ lessons:
   outcome:
     kind: rule
     text: правка лаб-данных, карантина или веры — прогнать probes до закрытия
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-15'
+  change: 'docs/how-to/thread_worktree.md — «Пробы thread_finish не гоняет»; перенесено из ритуала в дом проекта по лестнице носителя (skills-mirror 1c93cdb, CHANGELOG letitbe), нить ritual-lessons-park'
   evidence:
   - git:5ff44ff
   owner: владелец
@@ -2460,7 +2465,9 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [hypothesis_before_fact, measurement_path]
   outcome: {kind: rule, text: 'план, по числам которого владелец выбирает вариант, до выдачи перепроверяет независимый агент без контекста — повторяет замеры на машине своими командами; расхождения правятся до вопроса владельцу'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — «Открытые вопросы»: числа, по которым владелец выбирает вариант, до вопроса перемеряет независимый агент на целевой машине; ставка группы hypothesis_before_fact проверяется 2026-11-15; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['plans/PLAN_docker_install_2026-09-29.md']
   owner: владелец
 - id: C-95
@@ -2486,7 +2493,9 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [vendor_data, hypothesis_before_fact]
   outcome: {kind: rule, text: 'проба доставки на устройство сначала читает лог сервера — когда устройство реально забрало данные, — и только потом ставит время срабатывания; время срабатывания — после подтверждённой выборки'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — 1.6 замер события — из его источника (устройство, облако поставщика, лог сервера) и строка «Запас» об утверждениях, родившихся по ходу; the-end full 2 — пометка таких утверждений; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['git:1802d53']
   owner: владелец
 - id: C-97
@@ -2523,7 +2532,9 @@ lessons:
   address: {kind: ritual, ref: the-end}
   subject: [test_stand]
   outcome: {kind: rule, text: 'мутацию делать на копии: cp файл /tmp/keep → sed → прогон → cp обратно; git checkout для отката мутации не использовать'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:the-end, редакция 2026-10-15 (skills-mirror 1c93cdb) — full 3(a): мутация на копии mktemp и откат копированием, не git checkout; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['git:f5dcc9d']
   owner: владелец
 - id: C-100
@@ -2958,7 +2969,9 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [hypothesis_before_fact, message_delivery]
   outcome: {kind: rule, text: 'слово «покрыто» о поведении — только со ссылкой на тест, который это поведение исполняет (не monkeypatch проверяемой функции); маркер досылки ставится после отправки (исправлено git:5cff604)'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — ворота слова «сделано»: «покрыто» — только со ссылкой на тест, исполняющий поведение; маркер досылки исправлен git:5cff604; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['git:5cff604']
   owner: владелец
 - id: C-131
@@ -3090,7 +3103,9 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [pii]
   outcome: {kind: rule, text: 'пример из данных владельца в коде и тестах — только выдуманными значениями с пометкой «значения выдуманы»; тот же класс, что C-134'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-15'
+  change: 'CLAUDE.md §23 — абзац «Тот же класс без слов-маркеров»; перенесено из ритуала в дом проекта по лестнице носителя (skills-mirror 1c93cdb, CHANGELOG letitbe), нить ritual-lessons-park'
   evidence: ['git:ad306f3']
   owner: владелец
 - id: C-141
@@ -3103,7 +3118,9 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [probes]
   outcome: {kind: rule, text: 'в шаге 1 «Новые модули» перечислять и пробы/мутации в plans/: у каждой сайдкар с negative_control, поле probe у инварианта, решение носителя — ночью или SKIPPED_PROBES с причиной'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-15'
+  change: 'docs/how-to/disposability_gate.md — «Пробы и мутации в plans/ — тоже модули»; перенесено из ритуала в дом проекта по лестнице носителя (skills-mirror 1c93cdb, CHANGELOG letitbe), нить ritual-lessons-park'
   evidence: ['git:869726d', 'docs/handoff/task-dedup/2026-10-02-built.md']
   owner: владелец
 - id: C-142
@@ -3144,7 +3161,9 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [pii]
   outcome: {kind: rule, text: 'повтор группы ritual:letitbe·pii после C-140: в шаге «Новые тексты» letitbe — пример из живого корпуса только выдуманным и с пометкой; внедрение правила в ритуал — решение владельца'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-15'
+  change: 'CLAUDE.md §23 — абзац «Тот же класс без слов-маркеров»; перенесено из ритуала в дом проекта по лестнице носителя (skills-mirror 1c93cdb, CHANGELOG letitbe), нить ritual-lessons-park'
   evidence: ['git:b8d3440']
   owner: владелец
 - id: C-145
@@ -3332,7 +3351,8 @@ lessons:
   address: {kind: runtime, ref: scripts/test_on_studio.sh}
   subject: [test_stand, shell_scripts]
   outcome: {kind: check, text: 'удалённые команды пишут pid в $STAGING/.run.pid и стартуют через exec; cleanup_staging гасит pid до rm -rf; HUP/INT/TERM → exit (tests/unit/test_staging_cleanup_stops_run.py, мутация «уборка только rm» — красный)'}
-  status: adopted
+  status: failed
+  failed_by: 'C-178 (18.10): обрыв связи с Маком посреди прогона снова — теперь закрытие висит на мёртвом ssh вечно; уборку стенда чинили, зависание — нет'
   adopted_on: '2026-10-05'
   change: 'git:84cc07d'
   evidence: ['git:84cc07d', 'git:ec8b0ac']
@@ -3346,9 +3366,11 @@ lessons:
   cause: 'замок главной копии берётся только на слияние, а прогон (≈15 мин) идёт без него; при N закрывающих сессиях каждое чужое слияние обнуляет текущий прогон — очередь без порядка, у кого прогон дольше окна между чужими слияниями, тот не сливается'
   address: {kind: runtime, ref: scripts/thread_finish.sh}
   subject: [run_version, concurrency]
-  outcome: {kind: rule, text: 'код 13 — повтор отвязанным циклом (nohup, retry только по 13); кандидат в устройство — очередь закрытий, держащая порядок на время прогона, когда ждущих ≥2; решать при повторе'}
-  status: observation
-  evidence: ['git:aa79f28', 'git:48c36bb']
+  outcome: {kind: check, text: 'очередь закрытий (flock thread_finish.queue) держится всё закрытие, включая прогон; пока она чужая, в главную копию проходят только журнальные файлы (finish_lock_guard.sh --journal-regex), их дрейф закрытие переживает затронутыми тестами. tests/unit/test_thread_lifecycle.py: очередь ждёт, журнальный дрейф сливается, plans/*.py отбивает, суд пропускает только журнальные; мутации «очередь не берётся», «журнал = только записки», «суд не видит очередь» — красные. Повтор 07.10 (пять срывов за утро) — решение владельца «В»'}
+  status: adopted
+  adopted_on: '2026-10-07'
+  change: 'docs/handoff/finish-queue/2026-10-07-start.md'
+  evidence: ['git:aa79f28', 'git:48c36bb', 'docs/handoff/finish-queue/2026-10-07-start.md']
   owner: владелец
 - id: C-160
   date: '2026-10-06'
@@ -3360,7 +3382,9 @@ lessons:
   address: {kind: ritual, ref: letitbe — «Утверждения под решениями»}
   subject: [hypothesis_before_fact, vendor_data, measurement_path]
   outcome: {kind: rule, text: 'утверждение «данные перестали приходить» по ручному или редкому измерению помечается гипотезой, пока не сверено с записью самого прибора (облако/приложение поставщика); строить сторож потери — после этой сверки'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — 1.6 замер события — из записи самого прибора или облака поставщика, не из конвейера, который мог его потерять; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['git:427906c', 'git:7d63da7', 'docs/handoff/borrow-botkin/2026-10-06-b91eee4.md']
   owner: владелец
 - id: C-161
@@ -3515,6 +3539,128 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [hypothesis_before_fact, test_stand]
   outcome: {kind: rule, text: 'вариант развилки, который меняет среду прогона или данных, ставится владельцу только после дешёвого замера этого варианта (один прогон набора на стенде); число из метки или имени — гипотеза, пока набор не прогнан в новой среде'}
-  status: observation
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — «Открытые вопросы»: вариант, меняющий среду прогона или данных, — на одном дешёвом прогоне стенда или копии, иначе «гипотеза»; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['docs/handoff/nightly-on-copy/2026-10-06-2e06e22.md', 'git:2e06e22']
+  owner: владелец
+- id: C-172
+  date: '2026-10-07'
+  thread: ref-units-polyps
+  modules: [integrity_tests.py]
+  event: 'Датчик check_lab_ref_scale (assert, оба тенанта) пять с половиной месяцев был зелёным на строке канона, где значение пересчитано в мг/дл, а граница бланка осталась в ммоль/л. Облачный помощник читал такую строку как кратное превышение нормы. Датчик ловил строку, только если пересчитанная полоса охватывает значение, — то есть только направление «ложная тревога на нормальном анализе». Настоящее превышение с забытой границей под это определение не попадало.'
+  cost: 'одна строка канона в чужой шкале ~5,5 месяцев при зелёном датчике; найдено случайно, живым вызовом помощника. Первая версия исправления без порога дала ложную находку на высокочувствительный СРБ (assert покраснел бы каждую ночь)'
+  cause: 'предикат датчика описывал подпись дефекта через одно его проявление (значение попадает в пересчитанную норму), а негативные тесты «настоящая патология не глушится» закрепили слепую сторону как замысел: двусторонний оракул проверял значение, а дефект живёт в границе'
+  address: {kind: runtime, ref: integrity_tests.py::ref_scale_mismatch}
+  subject: [sensor_perimeter]
+  outcome: {kind: check, text: 'вторая ветка _ref_scale_by_corpus судит ГРАНИЦУ по корпусу ≥2 других документов той же сущности/единицы/стороны: расходится на порядок (≥7×), а через коэффициент — внутри полосы; тесты: позитив, отрицательный контроль, другой метод (СРБ-вч, 5×) молчит, корпус из одного документа не судит; три мутанта красные'}
+  status: adopted
+  adopted_on: '2026-10-07'
+  change: git:912cf788
+  evidence: ['docs/handoff/ref-units-polyps/2026-10-07-done.md', 'git:912cf788']
+  owner: владелец
+- id: C-173
+  date: '2026-10-07'
+  thread: ref-units-polyps
+  event: 'Две разовые пачки сессии модели записали канон мимо путей с провенансом: 09.04 — две записи медкарты со слагами вместо Pxxx, дублирующие существующие (одна с уточняющими ярлыками, которых нет в первичке); затем — две строки анализов без ссылки на документ, у одной неверное значение и неверный статус. Внешний помощник сделал из ярлыка пищевое ограничение. Конвейер распознавания позже разобрал тот же бланк, но эти два аналита в канон не завёл.'
+  cost: 'четыре неверные записи канона 5,5–6 месяцев; одно ложное пищевое ограничение владельцу; один показатель месяцами шёл с неверным статусом'
+  cause: 'канон допускает запись разовым скриптом сессии: у строки не остаётся ссылки на документ (lab_results.source без doc:, problem_list вне пути предложений), и ни один датчик не судит «строка канона без документа-источника»; страж дубля стоит только на пути предложений'
+  address: {kind: registry_rule, ref: data_ingestion}
+  subject: [writers_readers, duplicate_data]
+  outcome: {kind: check, text: 'класс источника обязателен на записи: триггеры BEFORE INSERT/UPDATE OF source на lab_results и problem_list (health_db.canon_provenance_ddl), у медкарты колонка source; наследство — manual:legacy:<было>; ночной check_canon_provenance стережёт триггеры и обходы на обоих тенантах; негативный контроль plans/mutate_canon_provenance_2026-10-07.sh (4 мутации красные)'}
+  status: adopted
+  adopted_on: '2026-10-07'
+  change: git:8deb571
+  evidence: ['docs/handoff/ref-units-polyps/2026-10-07-done.md', 'docs/handoff/canon-provenance/2026-10-07-done.md']
+  owner: владелец
+- id: C-174
+  date: '2026-10-07'
+  thread: canon-provenance
+  modules: [scripts/thread_finish.sh, scripts/test_on_studio.sh]
+  event: 'Первое закрытие нити canon-provenance прогнало полный набор (13 мин) и остановилось на трёх своих красных: новый датчик без пометки вреда и без записанного негативного контроля в project_context/integrity_sensors.json, фикстура медкарты без источника. Два из трёх — сторожи согласованности, которые сами по себе бегут за секунды.'
+  cost: 'одно лишнее закрытие ~15 минут; полный прогон гонялся дважды'
+  cause: 'закрытие начинает с полного набора, а быстрые сторожи согласованности (tests/consistency, требования к новому датчику) ничем не прогоняются раньше него; обязательства нового датчика (вред, негативный контроль) нигде не подаются на старте работы'
+  address: {kind: runtime, ref: scripts/test_on_studio.sh::failfast_consistency}
+  subject: [sensor_perimeter, test_stand]
+  outcome: {kind: check, text: 'полный режим test_on_studio.sh гонит tests/consistency первым (~2 мин); красные — стоп до полного набора. Вторая половина (обязательства нового датчика): принцип подаётся уроком C-20 на старте, форму судят сторожи tests/consistency — теперь их гоняет и pre-commit при широкой правке (affected_tests: ядро выше потолка, ~13 с)'}
+  status: adopted
+  adopted_on: '2026-10-07'
+  change: scripts/test_on_studio.sh
+  evidence: ['docs/handoff/canon-provenance/2026-10-07-done.md', 'git:581bdaa', 'tests/unit/test_failfast_consistency.py', 'plans/mutate_failfast_consistency_2026-10-07.sh', 'tests/unit/test_affected_tests.py']
+  owner: владелец
+- id: C-175
+  date: '2026-10-07'
+  thread: pub-scrub-1007
+  modules: [scripts/thread_finish.sh]
+  event: 'Чтобы поставить две нити в очередь, сессия убила свой thread_finish процессом (pkill). Он стоял в пробном слиянии гейтов: главная копия осталась посреди слияния (MERGE_HEAD своей ветки) около трёх минут, пока закрывалась соседняя нить ref-units-polyps.'
+  cost: 'три минуты главной копии посреди слияния при живом соседнем закрытии; ручной merge --abort и записка соседу'
+  cause: 'у thread_finish нет обработчика прерывания на отрезке пробного слияния — merge --abort исполняется только по штатному пути'
+  address: {kind: runtime, ref: scripts/thread_finish.sh}
+  subject: [concurrency, shell_scripts]
+  outcome: {kind: rule, text: 'thread_finish не прерывать — дождаться; кандидат в устройство — trap на INT/TERM, отменяющий своё пробное слияние (как C-158 для staging)'}
+  status: observation
+  evidence: ['docs/handoff/ref-units-polyps/inbox/pub-scrub-1007.md']
+  owner: владелец
+- id: C-176
+  date: '2026-10-18'
+  thread: uc-b09-own-input
+  modules: [scripts/run_probes.sh, subsystem_intent.yaml, contracts/plans]
+  event: 'Дважды подряд вопрос владельцу о пробах стоял на ложной посылке «они мёртвые»: сначала «из восьми минимум три мёртвые по своему условию» (четыре оказались живыми датчиками носителя, 12.10 зелёные), затем «два калибратора — трупы» (это пробы ОТКРЫТОГО обещания profile_threshold_calibrated_offline с записанным путём к holds через их починку). Владелец по второй посылке разрешил удалить — удаление не исполнено, решение переспрошено.'
+  cost: 'два вопроса владельцу на ложной посылке, одно решение владельца отменено исполнителем; удали — у открытого обещания пропал бы путь к holds'
+  cause: 'условие смерти пробы живёт ПРОЗОЙ в rationale сайдкара («умрёт, когда порог выберут») и ничем не сверяется с её фактической ролью (носитель run_probes.sh, поле probe в реестре замысла); правило вопроса владельцу требует перечитать предмет из источника, но не называет, что «источник» предмета — все его ссылки, а не его паспорт'
+  address: {kind: methodology_page, ref: 'memory: feedback_owner_question_format.md'}
+  subject: [dead_code, probes]
+  outcome: {kind: rule, text: 'перед вопросом «убрать?» о модуле — git grep его имени по всему дереву + поле probe реестра замысла + списки носителя; паспорт (rationale) — не источник роли'}
+  status: observation
+  evidence: ['docs/handoff/uc-b09-own-input/2026-10-18-c43f4eb.md']
+  owner: владелец
+- id: C-177
+  date: '2026-10-18'
+  thread: uc-b09-own-input
+  modules: [scripts/git-hooks/post-commit-macbook, scripts/thread_finish.sh]
+  event: '17.10 Studio была недостижима по ssh: push упал дважды, а закрытие нити напечатало «закрыта и задеплоена». Код на Studio приехал только 18.10 ручным перезапуском хука.'
+  cost: 'сутки main впереди Studio на 8 коммитов при квитанции «задеплоено»; обнаружено только чтением лога'
+  cause: 'хук деплоя писался как post-commit, чей код возврата git игнорирует, и кончался безусловным exit 0; thread_finish позже стал судить деплой по этому же коду — получатель сменился, контракт кода возврата нет'
+  address: {kind: runtime, ref: scripts/git-hooks/post-commit-macbook}
+  subject: [git_hooks, contract_change]
+  outcome: {kind: check, text: 'tests/unit/test_post_commit_branch_guard.py::test_упавший_push_не_отчитывается_успехом — каждая ветка классификатора при упавшем push даёт ненулевой код'}
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: scripts/git-hooks/post-commit-macbook
+  evidence: ['git:fe22f4d']
+  owner: владелец
+- id: C-178
+  date: '2026-10-18'
+  thread: uc-b09-own-input
+  modules: [scripts/thread_finish.sh, scripts/test_on_studio.sh]
+  event: 'Дважды за 17–18.10 полный прогон закрытия висел без конца: сетевой сбой (тот же, что ронял мост) убил ssh-канал к Studio, pytest на Studio умер, а thread_finish на MacBook ждал мёртвый канал часами и держал очередь закрытий.'
+  cost: 'два перезапуска по ~25 минут; первый раз висел с 08:06 до ручного снятия'
+  cause: 'ssh к стенду идёт без keepalive и без общего таймаута — разрыв канала не превращается в отказ, а превращается в вечное ожидание'
+  address: {kind: runtime, ref: scripts/test_on_studio.sh}
+  subject: [test_stand, shell_scripts]
+  outcome: {kind: check, text: 'кандидат: ServerAliveInterval/ServerAliveCountMax у ssh стенда + отказ с кодом при обрыве; негативный контроль — убить ssh посреди прогона, закрытие обязано выйти ненулевым за минуты'}
+  status: observation
+  evidence: ['docs/handoff/uc-b09-own-input/2026-10-18-c43f4eb.md']
+  owner: владелец
+- id: C-179
+  date: '2026-10-18'
+  thread: ritual-compaction
+  modules:
+  - scripts/git-hooks/finish_lock_guard.sh
+  - scripts/thread_finish.sh
+  event: 'Закрытие нити ritual-lessons-adopt слило 63ddc03 (7 уроков → adopted), но merge-коммит ea3aa8b (родители e05dfd8 и 63ddc03) вышел с сообщением и индексом соседней сессии uc-b09-own-input: её коммит снимка и lessons.yaml с C-176..C-178, собранного от старой версии файла, лёг в окно настоящего слияния. В main 7 уроков снова in_work; мои строки остались staged в главной копии и два часа блокировали закрытие трёх нитей, пока сосед не убрал их в stash. Отчёт «на main adopted» был ложным: проверка читала файл рабочей копии, а не git show main:lessons.yaml.'
+  cost: 7 внедрённых уроков молча откатаны; ~2 часа блокировки трёх закрытий; ложный зелёный отчёт владельцу; повторная нить
+  cause: lessons.yaml и docs/handoff/ в списке журнальных файлов finish_lock_guard.sh проходят мимо очереди, и прямой коммит в main попадает внутрь чужого слияния (MERGE_HEAD) — git делает из него merge-коммит с чужим индексом; файл уроков при этом пишется целиком от старой копии
+  address:
+    kind: runtime
+    ref: scripts/git-hooks/finish_lock_guard.sh
+  subject:
+  - concurrency
+  - git_hooks
+  outcome:
+    kind: check
+    text: 'кандидат: журнальные файлы минуют очередь, но не окно слияния — pre-commit в главной копии отказывает, пока есть чужой MERGE_HEAD; негативный контроль — коммит lessons.yaml в main во время пробного слияния нити обязан быть отбит'
+  status: observation
+  evidence:
+  - git:ea3aa8b
   owner: владелец

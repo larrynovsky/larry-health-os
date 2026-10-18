@@ -1,8 +1,8 @@
 """tests/unit/test_recommendations_floors.py — датчик BUG-FLOORS-ORDER (BACKLOG 2026-05-22).
 
-Инвариант: абсолютные полы/потолки срабатывают ДАЖЕ когда у домена нет
-seeded signals (пустой signals_def). Регрессия, которую ловим: early return
-на пустом signals_def до floors-проверки (присутствовал до Q-2 fix).
+Инвариант: абсолютные полы/потолки срабатывают без сигналов домена и без протокола.
+С 07.10 (нить floors-live) они живут в evaluate_safety_limits, а не в evaluate_domain_need:
+путь задача → сообщение держит tests/unit/test_safety_limits_live.py.
 
 Поведенческий тест — дополняет source-presence проверку в
 tests/integration/test_uc_d_02_domain_need.py, которая порядок слоёв не ловит.
@@ -24,8 +24,8 @@ def _patch_db(monkeypatch, *, signals, pcts, floors, ceilings=None, protocols=No
     monkeypatch.setattr(rec.db, "get_active_protocols",
                         lambda domain=None: protocols if protocols is not None
                         else [{"id": 1, "name": "test-proto"}])
-    monkeypatch.setattr(rec.db, "get_active_constraints",
-                        lambda protocol_id=None: [])
+    import trend_alerts
+    monkeypatch.setattr(trend_alerts, "evaluate_trends", lambda domain=None, conn=None: [])
 
 
 def test_floor_fires_with_empty_signals_def(monkeypatch):
@@ -37,11 +37,9 @@ def test_floor_fires_with_empty_signals_def(monkeypatch):
         floors=[{"metric": "hrv", "value": 17.0,
                  "reason_template": "ВСР {val:.0f} мс — ниже абсолютного пола"}],
     )
-    out = rec.evaluate_domain_need("__domain_without_signals__")
-    assert out["needed"] is True, (
-        "floors не сработали при пустом signals_def — регрессия BUG-FLOORS-ORDER")
-    assert out["urgency"] == "required"  # pct=0 < 10 у floor-срабатывания
-    assert any("пола" in r for r in out["reasons"])
+    out = rec.evaluate_safety_limits()
+    assert any("пола" in f["reason"] for f in out["fired"]), (
+        "пол не сработал без сигналов домена — регрессия BUG-FLOORS-ORDER")
 
 
 def test_ceiling_fires_with_empty_signals_def(monkeypatch):
@@ -54,9 +52,8 @@ def test_ceiling_fires_with_empty_signals_def(monkeypatch):
         ceilings=[{"metric": "bp_systolic", "value": 140.0,
                    "reason_template": "Систолическое {val:.0f} — выше потолка"}],
     )
-    out = rec.evaluate_domain_need("__domain_without_signals__")
-    assert out["needed"] is True
-    assert any("потолка" in r for r in out["reasons"])
+    out = rec.evaluate_safety_limits()
+    assert any("потолка" in f["reason"] for f in out["fired"])
 
 
 def test_error_path_is_observable_and_loud(monkeypatch, caplog):
@@ -97,9 +94,8 @@ def test_empty_signals_and_no_breach_is_quiet(monkeypatch):
         floors=[{"metric": "hrv", "value": 17.0,
                  "reason_template": "ВСР {val:.0f} мс — ниже абсолютного пола"}],
     )
-    out = rec.evaluate_domain_need("__domain_without_signals__")
-    assert out["needed"] is False
-    assert out["blocked_by"] is None
+    out = rec.evaluate_safety_limits()
+    assert out["fired"] == [] and "error" not in out
 
 
 def test_bp_peak_ceiling_fires_without_percentile_history(monkeypatch):
@@ -117,9 +113,8 @@ def test_bp_peak_ceiling_fires_without_percentile_history(monkeypatch):
     monkeypatch.setattr(rec.db, "metric_columns", lambda: ["bp_systolic", "sleep_total"])
     monkeypatch.setattr(rec.db, "get_day",
                         lambda d: {"bp_systolic": 124.0, "bp_systolic_max": 145})
-    out = rec.evaluate_domain_need("__domain_without_signals__")
-    assert out["needed"] is True
-    assert any("145" in r for r in out["reasons"])
+    out = rec.evaluate_safety_limits()
+    assert any("145" in f["reason"] for f in out["fired"])
 
 
 def test_column_metric_without_history_stays_silent(monkeypatch):
@@ -131,5 +126,5 @@ def test_column_metric_without_history_stays_silent(monkeypatch):
     )
     monkeypatch.setattr(rec.db, "metric_columns", lambda: ["sleep_total"])
     monkeypatch.setattr(rec.db, "get_day", lambda d: {"sleep_total": 9.0})
-    out = rec.evaluate_domain_need("__domain_without_signals__")
-    assert not out.get("needed")
+    out = rec.evaluate_safety_limits()
+    assert out["fired"] == []

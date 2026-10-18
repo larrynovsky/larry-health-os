@@ -238,7 +238,7 @@ CREATE TABLE problem_list (
             supporting_data TEXT DEFAULT '[]',  -- JSON: event IDs, report IDs
             notes           TEXT,
             created_at      TEXT DEFAULT (datetime('now'))
-        , review_date TEXT, plain_summary TEXT);
+        , review_date TEXT, plain_summary TEXT, source TEXT);
 CREATE INDEX idx_problems_status   ON problem_list(status);
 CREATE INDEX idx_problems_priority ON problem_list(priority);
 CREATE INDEX idx_problems_domain   ON problem_list(domain);
@@ -1298,3 +1298,20 @@ CREATE TABLE IF NOT EXISTS analyte_norm_verdicts (
     review_at  TEXT NOT NULL CHECK (review_at > decided_on),
     created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE bot_prompts (
+    chat_id    INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    verb       TEXT NOT NULL,
+    target     TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (chat_id, message_id)
+);
+CREATE TABLE bp_readings (
+                measured_at INTEGER PRIMARY KEY,
+                systolic    REAL NOT NULL,
+                diastolic   REAL NOT NULL,
+                pulse       REAL,
+                grpid       INTEGER,
+                source      TEXT NOT NULL DEFAULT 'withings',
+                imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );

@@ -463,7 +463,10 @@ def recommendations_without_evidence(text: str, last_dates: dict, schedule: dict
         last = last_dates.get(a)
         if not last:
             continue                      # строки нет — рекомендация законна
-        if last[:4] in text or last in text:
+        # Дата названа — ПОЛНАЯ (ISO или дд.мм.гггг, как пишет annotate_lab_recency). До 15.10
+        # хватало года где угодно в тексте: в 2026 году почти любой текст несёт «2026», и замер на
+        # живой базе дал 7 отчётов за 30 дней, «честных» только по году (ремонт 2026-10-13-301096a6).
+        if last in text or date.fromisoformat(last).strftime("%d.%m.%Y") in text:
             continue                      # дата названа — текст честен
         cfg = schedule.get(a) or {}
         interval = cfg.get("interval_days")

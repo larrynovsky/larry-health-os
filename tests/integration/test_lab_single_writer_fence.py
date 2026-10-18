@@ -5,10 +5,11 @@ Primary-Based Protocol (Таненбаум §7.5): канон принадлеж
 иначе он воскрешает мусор (потеря точки + дубли _2/_594) при каждом прогоне —
 ровно инцидент 2026-07-04 05:30, когда 315 строк мусора легли поверх чистого канона.
 
-Три уровня:
-- фенс: import_biochemical_json не пишет lab_results (escape-hatch работает);
-- датчик: check_lab_single_writer краснеет на source *_chemistry.json;
+Два уровня:
+- фенс: import_biochemical_json не пишет lab_results (escape-hatch не открывает);
 - СЦЕНАРНЫЙ: чистый канон → старый путь → канон не тронут (ловит 05:30).
+Датчик check_lab_single_writer удалён 07.10: строку без класса источника теперь отбивает
+триггер канона, сценарий — в tests/unit/test_canon_provenance.py.
 """
 import json
 
@@ -25,10 +26,8 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setattr(health_db, "DB_PATH", tmp_path / "health" / "data" / "health.db")
     health_db.init_db()
     with health_db.get_conn() as c:
-        # created_at добавлен 2026-07-29: без него фикстура расходилась с боевой
-        # схемой по КОЛОНКЕ, и новый датчик рецидива ретайрнутого писателя падал на
-        # ней «no such column». Это ровно известная мина проекта — сторож дрейфа
-        # фикстуры сравнивает список ТАБЛИЦ и колонок не видит.
+        # created_at — паритет с боевой схемой по колонкам (сторож дрейфа фикстуры
+        # сравнивает список ТАБЛИЦ, колонок не видит).
         c.execute("""CREATE TABLE IF NOT EXISTS lab_results(
             id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, source TEXT,
             test_name TEXT, value REAL, value_text TEXT, unit TEXT,
@@ -91,38 +90,3 @@ def test_old_path_cannot_resurrect_garbage(db, tmp_path):
     assert len(rows) == 1
     assert rows[0]["source"].startswith("doc:")
     assert rows[0]["value"] == 13.8
-
-
-# ── датчик single-writer ──
-
-def _run_sensor(db, monkeypatch):
-    import integrity_tests
-    calls = []
-    monkeypatch.setattr(integrity_tests, "warn",
-                        lambda label, detail="": calls.append((label, detail)))
-    n = integrity_tests.check_lab_single_writer()
-    return n, calls
-
-
-def test_sensor_flags_biochemical_source(db, monkeypatch):
-    with db.get_conn() as c:
-        c.executemany("INSERT INTO lab_results(date,source,test_name,value) VALUES(?,?,?,?)", [
-            ("2020-10-14", "2020-10-14_CBC_chemistry.json", "RDW", 138.0),
-            ("2020-10-14", "2020-10-14_CBC_chemistry_2.json", "RDW", 138.0),  # дубль
-            ("2021-01-05", "doc:lab.pdf", "CEA", 2.0),                        # чистое — не в счёт
-            ("2021-02-10", "instrument:pro12", "pro12_q1", 3.0),               # опросник — не в счёт
-        ])
-        c.commit()
-    n, calls = _run_sensor(db, monkeypatch)
-    assert n == 2                       # только два *_chemistry.json
-    assert any("single-writer" in lbl for lbl, _ in calls)
-
-
-def test_sensor_silent_on_clean_canon(db, monkeypatch):
-    with db.get_conn() as c:
-        c.execute("INSERT INTO lab_results(date,source,test_name,value) "
-                  "VALUES('2021-05-20','doc:lab eng 20.05.21.pdf','RDW',14.2)")
-        c.commit()
-    n, calls = _run_sensor(db, monkeypatch)
-    assert n == 0
-    assert calls == []

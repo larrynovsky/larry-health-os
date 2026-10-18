@@ -53,6 +53,33 @@ def test_unknown_card_is_system_and_short_queue_untouched():
     assert nr._card_harm(todo[0][0], INTEGRITY, HARM) == (2, 0)
 
 
+def test_tried_card_goes_to_the_back_of_the_queue():
+    """Решение владельца 07.10 (вариант А): разобранная карточка — в конец очереди.
+
+    Замер 05–07.10: старейшая `warn:producer_registry` трижды заняла место старейшей,
+    трижды отклонена, тестовые карточки стояли 12–14-ми и не дошли бы никогда."""
+    todo = [_card("реестр производителей протух", "2026-09-24"),   # старейшая, разбиралась вчера
+            _card("совет сдать уже сданное", "2026-10-01"),         # человек, разбиралась позавчера
+            _card("находки этой больше нет", "2026-10-03"),
+            _card("календарь устарел", "2026-10-06")]
+    tried = {todo[0][0]["id"]: 200, todo[1][0]["id"]: 100}
+    picked = [c["id"] for c, _ in nr.pick_cards(todo, INTEGRITY, HARM, n=2, tried=tried)]
+    assert picked == [todo[3][0]["id"], todo[2][0]["id"]]           # вред — среди неразобранных
+    # все разобраны → давно разобранная раньше, вред снова решает первое место
+    tried.update({todo[2][0]["id"]: 300, todo[3][0]["id"]: 400})
+    picked = [c["id"] for c, _ in nr.pick_cards(todo, INTEGRITY, HARM, n=2, tried=tried)]
+    assert picked == [todo[1][0]["id"], todo[0][0]["id"]]
+
+
+def test_repair_step_remembers_when_card_was_tried(monkeypatch):
+    store = {"warn:a": {"kind": "dev_fix", "status": "open", "created": "2026-10-01", "summary": "x"}}
+    monkeypatch.setattr(nr, "_repair_one",
+                        lambda c, ev, a, r, now: {"card": c["id"], "status": "author_failed"})
+    state: dict = {}
+    nr.repair_step(store, {}, "", state, None, None, now=1234.0, harm={})
+    assert state["tried_at"] == {"warn:a": 1234}
+
+
 def test_monitor_records_which_sensor_raised_each_finding():
     """integrity_tests.check/warn пишут sensor_of — без него порядок не знает датчика."""
     src = (ROOT / "integrity_tests.py").read_text(encoding="utf-8")

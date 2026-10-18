@@ -1,12 +1,12 @@
 """
 services/recommendations.py — domain-need evaluator (без Telegram-привязки).
 
-evaluate_domain_need читает DOMAIN_SIGNALS из health.db (system_config conit),
-сверяет персональные перцентили (90д baseline) с порогами, проверяет
-ABSOLUTE_FLOORS/CEILINGS (из absolute_thresholds таблицы), учитывает
-patient_constraints (time-of-day prohibit).
+evaluate_domain_need читает DOMAIN_SIGNALS из health.db (system_config conit) и
+сверяет персональные перцентили (90д baseline) с порогами домена →
+{needed, urgency, reasons, protocols, blocked_by}.
 
-Возвращает {needed, urgency, reasons, protocols, blocked_by}.
+evaluate_safety_limits — пол безопасности без домена и протокола: абсолютные полы/потолки
+(absolute_thresholds) и трендовые пороги (trend_thresholds) → {fired, error?}.
 
 Используется в jobs/recommendations (cron каждые 2ч) и может быть переиспользована
 в handlers/ или dashboard.
@@ -17,15 +17,44 @@ from __future__ import annotations
 
 import logging
 import i18n
-from datetime import datetime as _dt
-from zoneinfo import ZoneInfo
 
 import health_db as db
 
 log = logging.getLogger(__name__)
 
-import region_pack  # noqa: E402
-TZ = ZoneInfo(region_pack.value("timezone", "UTC"))   # таймзона дома — пакет региона (BL-PUB-16 б)
+# Расписание задачи рекомендаций (jobs/scheduled.check_recommendations_scheduled) — один дом:
+# задача берёт его отсюда, ночная проверка живости пола выводит из него допустимое молчание.
+WINDOW_HOURS = (9, 21)          # местные часы, включительно
+INTERVAL_S = 7200
+LIMITS_CHECKED_KEY = "recommendations.limits_checked_at"   # пульс пола: UTC ISO, пишет задача
+LIMITS_SEND_KEY = "recommendations.limits_send"   # 1 — пол доставляется человеку; нет ключа — только лог
+
+
+def limits_max_silence_s() -> int:
+    """Самая длинная честная пауза пульса: ночь вне окна плюс два интервала задачи."""
+    start, end = WINDOW_HOURS
+    return (24 - (end + 1 - start)) * 3600 + 2 * INTERVAL_S
+
+
+def limits_silence_s(conn, now) -> float | None:
+    """Секунды с последнего пульса пола в базе тенанта conn; None — пульса нет или он не читается."""
+    import config_db
+    from datetime import datetime
+    at = config_db.get_config(LIMITS_CHECKED_KEY, conn=conn)
+    if not at:
+        return None
+    try:
+        return (now - datetime.fromisoformat(str(at))).total_seconds()
+    except ValueError:
+        log.warning("пульс пола не читается: %r", at)
+        return None
+
+
+def limits_stale(conn, now) -> bool:
+    """Пол у тенанта молчит дольше честной паузы расписания (или не бежал ни разу)."""
+    s = limits_silence_s(conn, now)
+    return s is None or s > limits_max_silence_s()
+
 
 
 def _signal_reason(metric: str, val: float, mean: float, pct: float, domain: str = "") -> str:
@@ -99,13 +128,13 @@ def evaluate_domain_need(domain: str) -> dict:
       'recommended'  — 1 сигнал
     """
     try:
-        now_h = _dt.now(tz=TZ).hour
-
         # DOMAIN_SIGNALS читаются из system_config (health.db) — единый conit.
         # Fallback: пустой список → домен не поддерживается.
         _raw_signals = db.get_domain_signals(domain)
+        # r сигнала не читается (15.10): на срабатывание он не влиял, а его копия в таблице была
+        # снимком калибровки мимо гейта; у силы связи один дом — принятая вера (BL-CORR-PROVENANCE-1 п.6).
         signals_def = [
-            (s["metric"], s["label"], s["r"], s["threshold_pct"])
+            (s["metric"], s["label"], s["threshold_pct"])
             for s in _raw_signals
         ]
         # Q-2 fix (2026-05-22, roadmap / BUG-FLOORS-ORDER): убран early
@@ -118,7 +147,7 @@ def evaluate_domain_need(domain: str) -> dict:
         pcts = db.get_metric_percentiles(baseline_days=90)
 
         fired = []
-        for metric, target_label, r_val, threshold in signals_def:
+        for metric, target_label, threshold in signals_def:
             info = pcts.get(metric)
             if info is None:
                 continue
@@ -134,64 +163,19 @@ def evaluate_domain_need(domain: str) -> dict:
                     "val":      val,
                     "mean":     mean,
                     "target":   target_label,
-                    "r":        r_val,
                     "reason":   _signal_reason(metric, val, mean, pct, domain=domain),
                 })
 
-        # Sprint 2 / Р-1 step 2 fix (F-101, 2026-05-22): абсолютные пороги
-        # больше не хардкодятся — читаются из БД (absolute_thresholds).
-        # Seed: _seed_absolute_thresholds в health_db. Источник — threshold_analysis
-        # (личные p10) или ESC/AHA (клинические). При повторе threshold_analysis
-        # обновлять через UPDATE/INSERT в absolute_thresholds, не в коде.
-        for floor in db.get_absolute_thresholds_for_person("floor"):
-            info = pcts.get(floor["metric"])
-            if info is None:
-                continue
-            val_f = info["value"]
-            # sleep_deep хранится в часах, показываем в минутах
-            display_val = val_f * 60 if floor["metric"] == "sleep_deep" else val_f
-            if val_f < floor["value"]:
-                fired.append({
-                    "metric": floor["metric"], "pct": 0, "val": val_f, "mean": info["mean"],
-                    "target": "абсолютный пол", "r": 1.0,
-                    "reason": floor["reason_template"].format(val=display_val),
-                })
-
-        for ceil in db.get_absolute_thresholds_for_person("ceiling"):
-            info = pcts.get(ceil["metric"]) or _raw_only_yesterday(ceil["metric"])
-            if info is None:
-                continue
-            val_f = info["value"]
-            if val_f > ceil["value"]:
-                fired.append({
-                    "metric": ceil["metric"], "pct": 0, "val": val_f, "mean": info["mean"],
-                    "target": "абсолютный потолок", "r": 1.0,
-                    "reason": ceil["reason_template"].format(val=val_f),
-                })
-
-        # Трендовые/оконные пороги (N дней подряд / скользящее среднее) — BL-ALERT-TREND-1.
-        # Дополняют single-day floors: конституции формулируют часть порогов как тренды
-        # (sleep_score 14-дн→онколог, sleep_deep 3-ночи, hrv/readiness 2-дня подряд).
-        _trend_medical = False
-        try:
-            import trend_alerts
-            for t in trend_alerts.evaluate_trends(domain):
-                fired.append({
-                    "metric": t["metric"], "pct": 0, "val": 0, "mean": 0,
-                    "target": f"тренд/{t['level']} ({t['window_days']}д)", "r": 1.0,
-                    "reason": t["reason"],
-                })
-                if t["level"] == "medical":
-                    _trend_medical = True
-        except Exception as _te:  # noqa: BLE001 — тренды не роняют движок
-            log.error("evaluate_domain_need(%s): trend_alerts упал: %s", domain, _te)
+        # Абсолютные полы/потолки и трендовые пороги отсюда уехали в evaluate_safety_limits
+        # (нить floors-live, 07.10): задача звала эту функцию только для доменов активных
+        # протоколов, домен пуст у всех протоколов обоих тенантов — пороги не проверялись вживую.
 
         if not fired:
             return {"needed": False, "urgency": "none", "reasons": [],
                     "protocols": [], "blocked_by": None}
 
         min_pct  = min(f["pct"] for f in fired)
-        urgency  = "required" if (_trend_medical or len(fired) >= 2 or min_pct < 10) else "recommended"
+        urgency  = "required" if (len(fired) >= 2 or min_pct < 10) else "recommended"
         reasons  = [f["reason"] for f in fired]
 
         protocols = db.get_active_protocols(domain=domain)
@@ -199,21 +183,8 @@ def evaluate_domain_need(domain: str) -> dict:
             return {"needed": False, "urgency": "none", "reasons": [],
                     "protocols": [], "blocked_by": "нет активных протоколов для домена"}
 
-        for proto in protocols:
-            for c in db.get_active_constraints(protocol_id=proto["id"]):
-                if c["action"] != "prohibit":
-                    continue
-                cond = c.get("condition") or ""
-                blocked = (
-                    ("time_of_day=evening" in cond and now_h >= 18) or
-                    ("time_of_day=morning" in cond and now_h < 10) or
-                    ("time_of_day=night"   in cond and (now_h >= 22 or now_h < 6))
-                )
-                if blocked:
-                    log.debug(f"evaluate_domain_need({domain}): заблокировано — {c['reason']}")
-                    return {"needed": False, "urgency": "none", "reasons": [],
-                            "protocols": protocols, "blocked_by": c["reason"]}
-
+        # Запрет по времени суток (patient_constraints) снят 07.10: таблица удалена 18.05,
+        # get_active_constraints отдаёт action=type, «prohibit» невозможен — проверка была мертва.
         return {"needed": True, "urgency": urgency, "reasons": reasons,
                 "protocols": protocols, "blocked_by": None}
 
@@ -228,3 +199,84 @@ def evaluate_domain_need(domain: str) -> dict:
                   domain, e, exc_info=True)
         return {"needed": False, "urgency": "none", "reasons": [],
                 "protocols": [], "blocked_by": None, "error": str(e)}
+
+
+def _pushed(rule: dict) -> bool:
+    """Доходит ли сработавший порог до человека сообщением (решение владельца 18.10, вариант «а»).
+
+    Личный порог (norm_kind='personal': свои нижние 10% или верхние 10%) срабатывает по построению
+    в каждой десятой ночи; за 30 дней до 18.10 — в 9 днях из 31. Одна такая ночь — не тревога
+    (замысел proactivity.trend_not_spike), её картину несёт утренний бриф (полосы сна и
+    восстановления). Сообщением идёт всё остальное: клинический порог (давление) и строка без
+    вида — неизвестный вид доставляется, а не глушится (fail-safe).
+    """
+    return (rule.get("norm_kind") or "unclassified") != "personal"
+
+
+def evaluate_safety_limits() -> dict:
+    """Абсолютные полы/потолки (absolute_thresholds) и трендовые пороги (trend_thresholds) —
+    без домена и протокола. Пол безопасности не зависит от того, есть ли у человека протокол:
+    задача рекомендаций зовёт это раз в прогон (нить floors-live, 07.10).
+
+    → {"fired": [{metric, reason, medical, push}], "error"?: str}. push=False — личный порог:
+    считается и пишется в лог, но сообщением не идёт (_pushed). Ошибка — громко в лог и ключом,
+    как у evaluate_domain_need: датчик видит ключ, пайплайн не падает.
+    """
+    try:
+        pcts = db.get_metric_percentiles(baseline_days=90)
+        fired = []
+        # Пороги из БД (absolute_thresholds), не из кода: seed _seed_absolute_thresholds,
+        # источник — threshold_analysis (личные p10) или клинический документ.
+        # Только свои строки: variant='' и kind='absolute'. Таблица общая — safety_net,
+        # lifestyle-агенты и цели держат там свои варианты, а кратный порог (kind='relative':
+        # «+8 к среднему за 30 дней») число абсолютным не является. Повтор 30 дней 07.10:
+        # без фильтра «ЧСС +8» срабатывала каждый день (любой пульс > 8).
+        def _own(kind_dir):
+            return [t for t in db.get_absolute_thresholds_for_person(kind_dir)
+                    if not (t.get("variant") or "") and (t.get("kind") or "absolute") == "absolute"]
+        for floor in _own("floor"):
+            info = pcts.get(floor["metric"])
+            if info is None:
+                continue
+            val_f = info["value"]
+            # sleep_deep хранится в часах, показываем в минутах
+            display_val = val_f * 60 if floor["metric"] == "sleep_deep" else val_f
+            if val_f < floor["value"]:
+                fired.append({
+                    "metric": floor["metric"], "pct": 0, "val": val_f, "mean": info["mean"],
+                    "target": "абсолютный пол", "r": 1.0,
+                    "reason": floor["reason_template"].format(val=display_val),
+                    "push": _pushed(floor),
+                })
+
+        for ceil in _own("ceiling"):
+            info = pcts.get(ceil["metric"]) or _raw_only_yesterday(ceil["metric"])
+            if info is None:
+                continue
+            val_f = info["value"]
+            if val_f > ceil["value"]:
+                fired.append({
+                    "metric": ceil["metric"], "pct": 0, "val": val_f, "mean": info["mean"],
+                    "target": "абсолютный потолок", "r": 1.0,
+                    "reason": ceil["reason_template"].format(val=val_f),
+                    "push": _pushed(ceil),
+                })
+
+        # Трендовые/оконные пороги (N дней подряд / скользящее среднее) — BL-ALERT-TREND-1:
+        # все правила тенанта (domain=None), гейт по состоянию — внутри evaluate_trends.
+        result = {"fired": fired}
+        try:
+            import trend_alerts
+            for t in trend_alerts.evaluate_trends(None):
+                fired.append({
+                    "metric": t["metric"], "pct": 0, "val": 0, "mean": 0,
+                    "target": f"тренд/{t['level']} ({t['window_days']}д)", "r": 1.0,
+                    "reason": t["reason"], "medical": t["level"] == "medical",
+                })
+        except Exception as _te:  # noqa: BLE001 — тренды не гасят полы; отказ наблюдаем ключом
+            log.error("evaluate_safety_limits: trend_alerts упал: %s", _te, exc_info=True)
+            result["error"] = f"trend_alerts: {_te}"
+        return result
+    except Exception as e:
+        log.error("evaluate_safety_limits упал в error-path: %s", e, exc_info=True)
+        return {"fired": [], "error": str(e)}

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/thread_worktree.md sha256:ee8b6cf56245 -->
+<!-- translation-of: docs/how-to/thread_worktree.md sha256:799ace14f023 -->
 **English** · [Русский](thread_worktree.md)
 
 # How to work on a thread in its own worktree
@@ -75,6 +75,11 @@ Closing now takes about six minutes: the full run is included. That is the cost
 of having exactly one run. Previously, there were as many runs as times a neighboring session moved
 `main` (measurement from one session on September 15: six runs; only the last proved the result).
 
+**`thread_finish` does not run the probes** (lesson C-78). They live outside pytest and run weekly on
+staging (`scripts/run_probes.sh`). If the change reads lab data or changes quarantine or belief state,
+run them on Studio before closing: `launchctl kickstart -k gui/$(id -u)/com.larry.health.probes` —
+and read the result. Otherwise a broken probe is seen only by the owner, a week later, as an alert.
+
 ## What to do if closing fails
 
 The script distinguishes the cases and tells you which one occurred.
@@ -112,12 +117,23 @@ during this time is rejected by pre-commit with the message `[замок зак�
 Why: on September 23, the anchor from one closing operation landed inside another's merge and became its
 merge commit (`d15f91d`). The lock check and path are in `scripts/git-hooks/finish_lock_guard.sh`.
 
+**The closing queue** (since October 7). Closings run one at a time, end to end,
+including the test run: the second waits for the first (up to 3 hours,
+`THREAD_FINISH_QUEUE_WAIT`, in seconds) and says whose thread it is waiting for.
+While someone else's closing runs, only journal files reach the main copy —
+`docs/handoff/` notes, `lessons.yaml`, `plans/*.md` plans, the read mark. A commit
+with code is refused with `[очередь закрытий]`: code goes through its own thread.
+When closing sees a journal file in a shift of `main`, it runs only that file's
+affected tests. The list of journal files lives in one place,
+`scripts/git-hooks/finish_lock_guard.sh`. Do not interrupt a closing: an interrupted
+trial merge leaves the main copy in the middle of a merge (October 7).
+
 **The main copy is in the middle of someone else's merge** (code 16). Someone manually started `git merge` in
 the main copy, bypassing the lock. The script will not commit into someone else's merge. Use
 `docs/handoff` to find out whose it is; do not finish or abort it for them.
 
-**`main` moved during the run** (code 13). A neighboring session committed code during those six
-minutes (closing handles changes limited to notes on its own, step 4). Nothing was merged. Just retry closing — the script will rebase the branch onto
+**`main` moved during the run** (code 13). A neighboring session committed code during those minutes,
+bypassing the queue (closing handles a shift by journal files on its own, step 4). Nothing was merged. Just retry closing — the script will rebase the branch onto
 the new `main` and run the suite again. There is deliberately no internal retry loop: it
 would spin precisely when the neighboring session is active.
 

@@ -189,6 +189,40 @@ def stale_verification(inv: dict, today: "datetime.date",
 _PROBE_RE = re.compile(r"plans/probe_[A-Za-z0-9_\-]+\.py")
 
 
+def carrier_lists(root=None):
+    """Что носитель проб ЗАПУСКАЕТ и что осознанно ПРОПУСКАЕТ — из исходника scripts/run_probes.sh.
+
+    Один дом разбора: сторож охвата (tests/unit/test_probe_carrier.py) и ночной датчик пересмотра
+    (integrity_tests.check_skipped_probes_reviewed) читают одно и то же — два разбора одного файла
+    разъехались бы молча. Строка пропуска: "<путь> | <пересмотр ГГГГ-ММ-ДД> | <причина>"
+    (дата — решение владельца 18.10: залежаться проба может только здесь). Строка без даты или с
+    нечитаемой датой даёт review_by=None — это находка датчика, а не падение разбора.
+    Возвращает (set запускаемых, {путь: {"review_by": date|None, "cause": str}}).
+    """
+    src = (Path(root or ROOT) / "scripts" / "run_probes.sh").read_text(encoding="utf-8")
+
+    def _array(name):
+        m = re.search(rf"^{name}=\(\n(.*?)^\)", src, re.S | re.M)
+        return m.group(1) if m else ""
+
+    run = set(_PROBE_RE.findall(_array("PROBES") + _array("LIVE_PROBES")))
+    skipped = {}
+    for line in _array("SKIPPED_PROBES").splitlines():
+        line = line.strip()
+        if not line.startswith('"') or "|" not in line:
+            continue
+        parts = [p.strip() for p in line.strip('"').split("|", 2)]
+        review = None
+        if len(parts) == 3:
+            try:
+                review = datetime.date.fromisoformat(parts[1])
+            except ValueError:
+                review = None
+        cause = parts[2] if review else " | ".join(parts[1:])
+        skipped[parts[0]] = {"review_by": review, "cause": cause}
+    return run, skipped
+
+
 def probes_of(inv: dict) -> list:
     """Пробы, названные ПОЛЕМ `probe` — явная ссылка, а не упоминание в тексте.
 

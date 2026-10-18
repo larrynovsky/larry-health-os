@@ -45,6 +45,20 @@ def _age_days(ts: str | None) -> int | None:
         return None
 
 
+def _age_label(ts: str | None) -> str:
+    """Подпись давности для карточки: «5д назад», «сегодня», «через 9д».
+
+    До 2026-10-18 шаблоны писали `{{ x | age_days }}д назад`, и запланированный
+    приём через 9 дней читался как «-9д назад» (фидбэк с GitHub). Будущее — своя форма.
+    Неразобранная дата — «дата?», а не «Noneд назад»."""
+    d = _age_days(ts)
+    if d is None:
+        return "дата?"
+    if d == 0:
+        return "сегодня"
+    return f"{d}д назад" if d > 0 else f"через {-d}д"
+
+
 def _iso_date(value):
     """First 10 chars = YYYY-MM-DD. Без многоточия (в отличие от _short(10))."""
     if not value:

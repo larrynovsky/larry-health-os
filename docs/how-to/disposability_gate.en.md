@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/disposability_gate.md sha256:0f07895387f9 -->
+<!-- translation-of: docs/how-to/disposability_gate.md sha256:4122c5a7d549 -->
 **English** · [Русский](disposability_gate.md)
 
 # How to pass the disposability gate
@@ -78,6 +78,11 @@ call `indexer._manifest`, because a package = one disposable unit.
 Size (public functions, lines) only produces a warning. It does not block the commit.
 
 ---
+
+**Probes and mutation scripts in `plans/` are modules for the gates too** (lesson C-141). A plan saying
+«no new modules» will still get its commit refused on a corpus probe or a mutation script. List them
+in the plan up front: a sidecar with `negative_control`, the invariant's link to the probe (`probe`),
+and the carrier decision — run nightly, or listed in `SKIPPED_PROBES` with a reason.
 
 ## If the module honestly is NOT disposable
 

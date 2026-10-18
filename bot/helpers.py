@@ -171,6 +171,12 @@ async def _service_trouble_background(user_msg: str, assistant_reply: str, send_
             return
 
         import notify
+        if is_owner():
+            # Владелец = оператор (решение 2026-08-02: ему сразу эскалация). Но текст оператору
+            # говорит о третьем лице — «свяжись с ним сейчас», — а в установке на одного
+            # человека этот третий и есть сам владелец (фидбэк с GitHub 2026-10-18).
+            await asyncio.to_thread(notify.notify_operator, i18n.t("support.reply.owner_alert"))
+            return
         await asyncio.to_thread(
             notify.notify_operator,
             i18n.t(

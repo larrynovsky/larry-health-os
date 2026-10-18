@@ -338,23 +338,19 @@ def test_recommendations_no_signals_no_protocols():
 
 
 def test_recommendations_floor_fired():
-    """ABSOLUTE_FLOOR triggers даже без сигналов (Q-2 BUG-FLOORS-ORDER fix)."""
-    from services.recommendations import evaluate_domain_need
+    """ABSOLUTE_FLOOR срабатывает без сигналов и без протокола (с 07.10 — evaluate_safety_limits)."""
+    from services.recommendations import evaluate_safety_limits
 
     pcts = {"hrv": {"percentile": 50, "value": 12, "mean": 25}}
     floors = [{"metric": "hrv", "value": 15, "reason_template": "HRV {val:.0f} критично"}]
-    protocols = [{"id": 1, "title": "Дыхание 4-7-8", "domain": "vagal_activation"}]
 
-    with patch("services.recommendations.db.get_domain_signals", return_value=[]), \
-         patch("services.recommendations.db.get_metric_percentiles", return_value=pcts), \
+    with patch("services.recommendations.db.get_metric_percentiles", return_value=pcts), \
          patch("services.recommendations.db.get_absolute_thresholds",
                side_effect=lambda kind: floors if kind == "floor" else []), \
-         patch("services.recommendations.db.get_active_protocols", return_value=protocols), \
-         patch("services.recommendations.db.get_active_constraints", return_value=[]):
-        result = evaluate_domain_need("vagal_activation")
+         patch("trend_alerts.evaluate_trends", return_value=[]):
+        result = evaluate_safety_limits()
 
-    assert result["needed"] is True
-    assert "критично" in result["reasons"][0]
+    assert "критично" in result["fired"][0]["reason"]
 
 
 def test_signal_reason_known_metrics():

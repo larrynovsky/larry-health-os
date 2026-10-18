@@ -206,6 +206,8 @@ def test_job_check_recommendations_outside_hours_skips():
     ctx = _make_job_context()
     fake_now = SimpleNamespace(hour=23, date=lambda: date.today())
     with patch("jobs.scheduled.get_chat_id", return_value=42), \
+         patch("jobs.scheduled.evaluate_safety_limits", return_value={"fired": []}), \
+         patch("config_db.upsert_config"), \
          patch("jobs.scheduled._dt") as dt_mock:
         dt_mock.now.return_value = fake_now
         asyncio.run(check_recommendations_scheduled(ctx))
@@ -220,6 +222,8 @@ def test_job_check_recommendations_sends_when_domain_needed():
     ctx = _make_job_context(bot_data={})
     fake_now = SimpleNamespace(hour=14, date=lambda: date(2026, 5, 23))
     with patch("jobs.scheduled.get_chat_id", return_value=42), \
+         patch("jobs.scheduled.evaluate_safety_limits", return_value={"fired": []}), \
+         patch("config_db.upsert_config"), \
          patch("jobs.scheduled._dt") as dt_mock, \
          patch("jobs.scheduled.db.get_active_protocols",
                return_value=[{"id": 1, "title": "Дыхание", "domain": "vagal_activation"}]), \
@@ -238,12 +242,15 @@ def test_job_check_recommendations_sends_when_domain_needed():
 
 def test_job_check_recommendations_respects_daily_cap():
     """check_recommendations_scheduled: если уже отправлено max — skip."""
-    from jobs.scheduled import check_recommendations_scheduled, _RECO_SENT_KEY
+    from jobs.scheduled import check_recommendations_scheduled
 
     today_str = str(date(2026, 5, 23))
-    ctx = _make_job_context(bot_data={_RECO_SENT_KEY: {f"sleep_{today_str}": 1}})
+    ctx = _make_job_context(bot_data={})
     fake_now = SimpleNamespace(hour=14, date=lambda: date(2026, 5, 23))
     with patch("jobs.scheduled.get_chat_id", return_value=42), \
+         patch("jobs.scheduled.evaluate_safety_limits", return_value={"fired": []}), \
+         patch("config_db.upsert_config"), \
+         patch("jobs.scheduled._load_sent", return_value={f"sleep_{today_str}": 1}), \
          patch("jobs.scheduled._dt") as dt_mock, \
          patch("jobs.scheduled.db.get_active_protocols",
                return_value=[{"id": 1, "title": "Сон", "domain": "sleep"}]), \

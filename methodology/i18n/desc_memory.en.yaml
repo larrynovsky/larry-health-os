@@ -430,6 +430,9 @@
 325dcaef1627:
   ru: 'morning_brief: не пересказывает слова владельца'
   en: 'morning_brief: does not retell the owner''s own words'
+32a32c576fc8:
+  ru: 'WARN: модель живой цепочки роли без замеренного поведения думания (15.10).'
+  en: 'WARN: live role chain model with no measured thinking behavior (15.10).'
 33ed1de9f9fa:
   ru: Единая сборка входа модели → (system_prompt, messages). Инспектируема через
   en: Unified model input assembly → (system_prompt, messages). Inspectable via
@@ -457,6 +460,9 @@
 361b2263a08c:
   ru: Создаёт эпизод помощи. Возвращает episode_id.
   en: Creates a help episode. Returns episode_id.
+3641c20b86e9:
+  ru: Строка канона несёт класс источника — документ, опросник, предложение или ручная
+  en: A canon row carries a source class — document, questionnaire, proposal, or manual.
 368c0ac73deb:
   ru: Возвращает последний результат для каждого теста за последние n_days дней.
   en: Returns the latest result for each test over the last n_days days.
@@ -643,6 +649,9 @@
 4c6384e9d762:
   ru: усыхание лаб-истории vs бэкап (FAIL)
   en: shrinkage of lab history vs backup (FAIL)
+4cfa276b2ff6:
+  ru: Исключённая из носителя проба с прошедшей датой пересмотра — вопрос «вернуть или убрать».
+  en: A sample excluded from the carrier with a past review date — the question of 'restore or remove'.
 4cfa612d7d11:
   ru: конвенция имён мочи (Urine_*)
   en: urine naming convention (Urine_*)
@@ -760,9 +769,6 @@
 54db7f14c8da:
   ru: конституции не полые (effect_allele заполнен до генерации)
   en: constitutions are not hollow (effect_allele populated before generation)
-5504172a4715:
-  ru: 'канон lab_results: единственный писатель (нет biochemical-json)'
-  en: 'canon lab_results: single writer (no biochemical-json)'
 555c2e83a2d8:
   ru: Сохраняет Telegram message_id уведомления для reply-to-message ввода.
   en: Saves the Telegram message_id of the notification for reply-to-message input.
@@ -844,6 +850,9 @@
 5ea116db6dc1:
   ru: Wellness-геномика (Phase G) синхронизирована с последним импортом генома.
   en: Wellness genomics (Phase G) synchronized with the latest genome import.
+5f1a77cc99a0:
+  ru: DDL защиты «строка канона несёт класс источника» — один дом текста триггеров.
+  en: DDL for the constraint «a canon row carries a source class» — single home of text triggers.
 5f2e7ea8afaa:
   ru: Смотрит ли ЭТОТ процесс в боевую БД владельца.
   en: Checks whether THIS process is looking at the owner's production DB.
@@ -1093,6 +1102,9 @@
 782d9fa4fa4f:
   ru: Сохраняет новый outcome по гипотезе (история оценок, не upsert).
   en: Saves a new outcome for a hypothesis (evaluation history, not upsert).
+78365d803e96:
+  ru: пол безопасности исполняется задачей (пульс)
+  en: Safety floor is executed by a task (pulse).
 78bd01494488:
   ru: Ошибки, ДОПИСАННЫЕ в stderr-логи джоб с прошлой проверки.
   en: Errors APPENDED to stderr logs of jobs since the last check.
@@ -1114,6 +1126,9 @@
 7b0fdabe7bb5:
   ru: Записать/заменить вердикт о норме аналита. Имя нормализуется через lab_canon
   en: Write/replace an analyte norm verdict. Name is normalized via lab_canon.
+7b185e58ef66:
+  ru: 'исключённые пробы: срок пересмотра'
+  en: 'excluded samples: review deadline'
 7b9364988ecc:
   ru: doc_reviews_db.py — доменный модуль doc_reviews. Вынесен из health_db.py (Поток C, strangler-фасад).
   en: doc_reviews_db.py — domain module doc_reviews. Extracted from health_db.py (Stream C, strangler facade).
@@ -1165,9 +1180,6 @@
 7f31c93929de:
   ru: живость reschedule брифа (местный tz)
   en: liveness of brief reschedule (local tz)
-7f5010894adc:
-  ru: Инвариант единственного писателя канона (BL-LAB-CANON-1, Primary-Based
-  en: Single-writer invariant of the canon (BL-LAB-CANON-1, Primary-Based
 7f53bd30c8c8:
   ru: пульс пересборки конституций по новым вводным
   en: pulse of constitution rebuild on new inputs
@@ -1318,6 +1330,9 @@
 90b9cd71a173:
   ru: Последний survivorship_analysis не старше 18 дней.
   en: The last survivorship_analysis is no older than 18 days.
+910687e9d94f:
+  ru: DDL «дата лечения меняется только через log_repair» — один дом текста триггеров (§20).
+  en: DDL «treatment date changes only via log_repair» — single trigger text home (§20).
 924d30534bff:
   ru: 'weekly_digest: доставлен всем тенантам (понедельник)'
   en: 'weekly_digest: delivered to all tenants (Monday)'
@@ -1393,6 +1408,9 @@
 98aa887c383f:
   ru: env-консистентность launchd-плистов (мультитенант)
   en: env consistency of launchd plists (multitenant)
+98e2196160a6:
+  ru: 'Удаляет ошибочно созданное событие целиком: строку events и её подтаблицы.'
+  en: 'Deletes an erroneously created event entirely: the events row and its sub-tables.'
 98f4969ad2d2:
   ru: Удаляет персистентную сессию (вызывается при /end или таймауте).
   en: Deletes a persistent session (called on /end or timeout).
@@ -1858,6 +1876,9 @@ c5750f870649:
 c58f59042346:
   ru: 'survivorship: PRO-балл в одной размерности'
   en: 'survivorship: PRO score in one dimension'
+c5bcf2fe7e0d:
+  ru: 'Чистое ядро: чего не хватает защите провенанса канона в одной базе.'
+  en: 'Clean core: what is missing from the canon provenance constraint in a single database.'
 c694c724fd61:
   ru: 'daily_stress: day_summary, stress_high (сек), recovery_high (сек).'
   en: 'daily_stress: day_summary, stress_high (sec), recovery_high (sec).'
@@ -2131,6 +2152,9 @@ e24b402bab2b:
 e2ac54b00493:
   ru: 'Строки, нарушающие сцепление: carrier-статус ⟹ effect_allele заполнен.'
   en: 'Rows violating linkage: carrier status ⟹ effect_allele is populated.'
+e2b6af86e89d:
+  ru: 'канон: у строки есть класс источника, защита записи жива'
+  en: 'canon: a row has a source class, the record protection is live.'
 e2e931a29369:
   ru: (ждут и не доставлены всего, id застрявших дольше двух ритмов outbox).
   en: (Total pending and undelivered count, id of items stuck longer than two outbox cycles).
@@ -2203,6 +2227,9 @@ ec3ffd82f226:
 ec5da50e4100:
   ru: 'НИТЬ-СИРОТА: ветка жива, а в реестре нитей её нет — её не видит ни одна сессия.'
   en: 'ORPHAN THREAD: branch is alive but absent from the thread registry — no session can see it.'
+eca03fc3068b:
+  ru: 'модели цепочек: думание замерено'
+  en: 'chain models: thinking measured'
 ecdebd3e8528:
   ru: 'Цепочка допущенных моделей роли: system_config.model.<role> (строка или список)'
   en: 'Chain of permitted models for the role: system_config.model.<role> (string or list).'
@@ -2251,6 +2278,9 @@ f16d0ff78019:
 f1b6c89999c6:
   ru: 'Сданные анализы коротко — по забору (draw_key: файл + дата), для медкарты.'
   en: 'Submitted tests in brief — by draw (draw_key: file + date), for the medical record.'
+f1b77dd52a99:
+  ru: Пол безопасности (абсолютные пороги + тренды) исполняется вживую у КАЖДОГО тенанта.
+  en: Safety floor (absolute thresholds + trends) is executed live for EVERY tenant.
 f28752b0ff21:
   ru: Отклоняет пропозал без изменений в problem_list.
   en: Rejects a proposal without changes to problem_list.

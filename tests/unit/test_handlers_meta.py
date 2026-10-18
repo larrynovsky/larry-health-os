@@ -43,32 +43,42 @@ def test_meta_module_exports_register():
         assert hasattr(m, fn), f"handlers.meta missing {fn}"
 
 
-def test_cmd_start_works_with_read_only_secrets(tg):
+def test_cmd_start_works_with_read_only_secrets(tg, tmp_path, monkeypatch):
     """/start ничего не пишет в каталог ключей: в Докере он смонтирован только для чтения.
 
     До 02.10 первая строка /start писала номер чата в этот каталог и роняла /start у каждой
     установки в Докере (OSError Errno 30); оба прежних теста подменяли ровно эту строку.
     Здесь не подменено ничего, что касается каталога: он реально без права записи.
+
+    Каталог — СВОЙ, а не тот, что дало окружение (§20). До 15.10 тест делал chmod настоящего
+    каталога ключей прогона: в контейнере он смонтирован `:ro`, chmod падал EROFS ещё до /start,
+    и тест краснел каждую ночь (карточка 2026-10-06); на чужой машине он менял права ключам владельца.
     """
     import os
     import stat
+    import bot.filters as bf
     from handlers.meta import cmd_start
-    from bot.filters import CHAT_ID_FILE, owner_chat_id
 
-    upd = _attach_reply(tg.make_update(text="/start", chat_id=owner_chat_id()), tg)
-    secrets = CHAT_ID_FILE.parent
+    secrets = tmp_path / "secrets"
+    secrets.mkdir()
+    chat_file = secrets / "telegram_chat_id"
+    chat_file.write_text("999999999")
+    monkeypatch.setattr(bf, "CHAT_ID_FILE", chat_file)
+    monkeypatch.setattr(bf, "_OWNER_CHAT_ID", None)
+
+    upd = _attach_reply(tg.make_update(text="/start", chat_id=bf.owner_chat_id()), tg)
     mode = stat.S_IMODE(secrets.stat().st_mode)
-    file_mode = stat.S_IMODE(CHAT_ID_FILE.stat().st_mode)
-    os.chmod(CHAT_ID_FILE, 0o400)
+    file_mode = stat.S_IMODE(chat_file.stat().st_mode)
+    os.chmod(chat_file, 0o400)
     os.chmod(secrets, 0o500)
     try:
-        assert not os.access(secrets, os.W_OK), "стенд не воспроизводит монтирование только для чтения"
+        assert not os.access(secrets, os.W_OK), "каталог не стал без записи для этого процесса (root обходит chmod)"
         with patch("handlers.meta.db.init_db", return_value=None), \
              patch("handlers.meta.db.get_patient_profile", return_value={"identity.name": "Т"}):
             asyncio.run(cmd_start(upd, _make_context()))
     finally:
         os.chmod(secrets, mode)
-        os.chmod(CHAT_ID_FILE, file_mode)
+        os.chmod(chat_file, file_mode)
 
     assert any("Привет" in m["text"] for m in tg.outgoing)
 

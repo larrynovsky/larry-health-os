@@ -2,7 +2,8 @@
 
 # Как обновлять зависимости (SEC-19, 2026-07-06)
 
-Рецепт для системного python3.11 на Studio — канонического окружения health-os.
+Рецепт для системного python3.11 на Studio (среда второго тенанта) и для образа контейнера
+(среда владельца, раздел ниже).
 Канон версий: `requirements.txt` (в git). Аудит уязвимостей: weekly
 `com.larry.health.pipaudit` → `logs/pip_audit_latest.json` → nightly
 `security_sensors` → triage → Telegram.
@@ -25,6 +26,23 @@
    — поправив дату во 2-й строке заголовка.
 5. Внепланово перегенерить аудит: `ssh <studio_ssh> "cd ~/health_scripts && /opt/homebrew/bin/python3.11 scripts/pip_audit_check.py"` — варн должен погаснуть.
 6. Commit lock (+ при advisory — строчка в SECURITY.md, если решение нетривиальное).
+
+## Образ контейнера (владелец живёт в контейнере с 30.09)
+
+Пакеты образа ставятся из того же `requirements.txt`, поэтому шаги выше обновляют и образ:
+следующий деплой соберёт его с новой версией. Отдельно от замка в образе живут **pip и
+setuptools** самого Python: их версии — `ARG PIP_VERSION` и `ARG SETUPTOOLS_VERSION` в
+`docker/Dockerfile`, по умолчанию базовый `python:3.11-slim` несёт старые.
+
+1. Проверить пакет до живой среды — в одноразовом контейнере текущего образа:
+   `ssh <studio_ssh> "DOCKER_CONTEXT=colima-health docker run --rm --entrypoint sh health-os:local -c 'pip install -q --no-deps --target /tmp/x pkg==X.Y.Z && PYTHONPATH=/tmp/x python3 -c \"import pkg\"'"`
+2. Обновить замок по шагам выше (нативная среда Studio — среда второго тенанта).
+3. pip/setuptools образа — поправить `ARG` в `docker/Dockerfile`, cooldown тот же.
+4. Собрать образ под отдельным тегом из рабочей копии, не трогая `health-os:local`:
+   `git archive $(git stash create) | ssh <studio_ssh> 'DOCKER_CONTEXT=colima-health DOCKER_BUILDKIT=0 docker build -q -f docker/Dockerfile --build-arg TARGETARCH=arm64 -t health-os:depcheck -'`
+5. Аудит внутри собранного образа: `docker run --rm --entrypoint python3 health-os:depcheck -m pip_audit`
+   — уязвимостей быть не должно (кроме тех, что в `_PIP_AUDIT_ALLOW`).
+6. Коммит; деплой соберёт рабочий образ сам. После деплоя — тот же аудит в `health-cron-1`.
 
 ## Advisory без фикса
 

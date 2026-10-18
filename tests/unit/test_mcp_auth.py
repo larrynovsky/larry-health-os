@@ -249,8 +249,11 @@ def test_http_flow_end_to_end(server):
     assert parse_qs(urlparse(loc).query)["iss"] == [BASE]                       # RFC 9207
     # Редирект на адрес возврата не должен запрещаться CSP страницы (замер 06.10: form-action 'self'
     # блокировал 302 на claude.ai, код сгорал)
-    csp = exc.value.headers["Content-Security-Policy"]
-    assert "https://claude.ai" in csp and "https://chatgpt.com" in csp
+    # Судим директиву form-action по токенам, а не подстроку всего заголовка: адрес в чужой
+    # директиве (или как часть другого адреса) редирект не разрешает (07.10, CodeQL #47/#48).
+    csp = {d.split()[0]: d.split()[1:] for d in exc.value.headers["Content-Security-Policy"].split(";")
+           if d.strip()}
+    assert {"https://claude.ai", "https://chatgpt.com"} <= set(csp["form-action"]), csp
     code = parse_qs(urlparse(loc).query)["code"][0]
     tok = json.loads(_post(url + "/token", urlencode({
         "grant_type": "authorization_code", "code": code, "code_verifier": v,

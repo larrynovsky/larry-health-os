@@ -24,8 +24,8 @@ def db(tmp_path, monkeypatch):
     with health_db.get_conn() as c:
         # старый канон: лаб (заменить), не-покрытый лаб (lost), два опросника (сохранить)
         c.executemany("INSERT INTO lab_results(date,source,test_name,value) VALUES(?,?,?,?)", [
-            ("2025-03-11", "Clinic A", "RDW", 136.0),       # покрыт новым → delete
-            ("2025-03-11", "Clinic B", "Cholesterol", 185.0),        # НЕ покрыт → lost
+            ("2025-03-11", "doc:clinic_a.pdf", "RDW", 136.0),       # покрыт новым → delete
+            ("2025-03-11", "doc:clinic_b.pdf", "Cholesterol", 185.0),        # НЕ покрыт → lost
             ("2026-01-20", "instrument:pro12", "pro12_q1", 3.0),     # preserve
             ("2021-06-14", "instrument:isi", "Hemoglobin", 13.9),    # preserve
         ])
@@ -72,7 +72,7 @@ def test_execute_preserves_same_analyte_other_date(db):
     with db.get_conn() as c:
         # тот же аналит RDW, но на ДРУГОЙ дате, не-preserved источник
         c.execute("INSERT INTO lab_results(date,source,test_name,value) VALUES(?,?,?,?)",
-                  ("2024-01-01", "Clinic A", "RDW", 12.8))
+                  ("2024-01-01", "doc:clinic_a.pdf", "RDW", 12.8))
         c.commit()
     lab_promote.plan("r1", None, execute=True)   # прогон промоутит RDW@2025 года
     with db.get_conn() as c:

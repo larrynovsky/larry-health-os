@@ -14,7 +14,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from dashboard_filters import _pretty_json, _short, _age_days, _iso_date, _eval_running
+from dashboard_filters import _pretty_json, _short, _age_days, _age_label, _iso_date, _eval_running
 
 
 ROOT = Path(__file__).resolve().parent
@@ -35,6 +35,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 templates.env.filters["pretty_json"] = _pretty_json
 templates.env.filters["short"] = _short
 templates.env.filters["age_days"] = _age_days
+templates.env.filters["age_label"] = _age_label
 templates.env.filters["iso_date"] = _iso_date
 templates.env.filters["eval_running"] = _eval_running
 

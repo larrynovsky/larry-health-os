@@ -88,6 +88,11 @@ def build_treatment_summary() -> dict:
 
     ep_by_problem = {e.get("primary_problem_id"): e for e in episodes}
 
+    # Сказанное в разговоре (добавки, лекарства без эпизода) — не этап хронологии лечения:
+    # стрелка «→» читалась бы как «потом перешёл на». Отдельной строкой через «;».
+    taking = [m for m in meds if m.get("modality") in ("supplement", "medication")]
+    meds = [m for m in meds if m not in taking]
+
     # Группировка режимов по проблеме/эпизоду, порядок — по дате начала
     groups: dict = {}
     for m in meds:
@@ -120,6 +125,17 @@ def build_treatment_summary() -> dict:
                 "start_date": m.get("start_date"),
                 "end_date": m.get("end_date"),
             })
+
+    if taking:
+        def _fmt_taking(m):
+            extra = ", ".join(x for x in (m.get("dosage"), m.get("frequency")) if x)
+            return m.get("name") + (f" ({extra})" if extra else "")
+        text_blocks.append("принимает" + ": " + "; ".join(_fmt_taking(m) for m in taking))
+        for m in taking:
+            lines.append({"episode": "принимает", "problem_id": m.get("indication_problem_id"),
+                          "regimen": m.get("name"), "modality": m.get("modality"),
+                          "intent": None, "cycles": None,
+                          "start_date": m.get("start_date"), "end_date": m.get("end_date")})
 
     chemo_total = sum(
         int(m.get("cycles_completed") or 0)

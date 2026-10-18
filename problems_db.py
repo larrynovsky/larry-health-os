@@ -37,7 +37,7 @@ def upsert_problem(problem_id: str, title: str, description: str = None,
                    status: str = 'active', priority: int = 2, domain: str = None,
                    watch_trigger: str = None, watch_deadline: str = None,
                    notes: str = None, review_date: str = None,
-                   review_in_days: int = None) -> int:
+                   review_in_days: int = None, source: str = None) -> int:
     """Создаёт или обновляет проблему в problem list.
 
     review_date: YYYY-MM-DD — абсолютная дата пересмотра.
@@ -67,10 +67,11 @@ def upsert_problem(problem_id: str, title: str, description: str = None,
                 INSERT INTO problem_list
                   (problem_id, title, description, status, priority, domain,
                    first_seen, last_updated, watch_trigger, watch_deadline,
-                   notes, review_date)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                   notes, review_date, source)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (problem_id, title, description, status, priority, domain,
-                  now, now, watch_trigger, watch_deadline, notes, review_date))
+                  now, now, watch_trigger, watch_deadline, notes, review_date,
+                  source))  # без класса источника триггер отобьёт вставку (C-173)
             return cur.lastrowid
 
 

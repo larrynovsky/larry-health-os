@@ -26,7 +26,8 @@ def fake_readers(monkeypatch):
     state["trend"] = {"points": [], "issues": ["unmapped"], "unresolved": []}
     labs = types.SimpleNamespace(get_lab_series=lambda name, n_days: state["series"],
                                  get_lab_history=lambda days: state["history"],
-                                 get_lab_trend_by_component=lambda name, n: state["trend"])
+                                 get_lab_trend_by_component=lambda name, n: state["trend"],
+                                 declared_boundary=lambda n_days, **kw: f"ГРАНИЦА ОКНА: {n_days} дн. (синтетика)")
     metrics = types.SimpleNamespace(get_day=lambda d: state["day"])
     probs = types.SimpleNamespace(get_problem_list=lambda st=None: state["problems"])
     mem = types.SimpleNamespace(get_facts=lambda mem_class=None: state["facts"])
@@ -162,3 +163,13 @@ def test_problems_default_hides_resolved_like_the_bot(fake_readers):
     assert "Наблюдение C" in mcp_tools.call("problems", {})[0]
     assert "Проблема A" in mcp_tools.call("problems", {"status": "resolved"})[0]
     assert "Наблюдение C" not in mcp_tools.call("problems", {"status": "resolved"})[0]
+
+
+def test_lab_tests_declare_their_boundary(fake_readers):
+    """Перечень аналитов несёт границу выборки (18.10): без неё «X нет в списке» читается как
+    «X не сдавался». Проба probe_context_boundary краснела на этом читателе с 12.10."""
+    fake_readers["history"] = [{"test_name": "LDL", "date": "2025-07-01"}]
+    text, err = mcp_tools.call("lab_tests", {})
+    assert not err and "ГРАНИЦА ОКНА: 7300" in text and "LDL" in text
+    # Текст границы говорит «выше показан» — значит, перечень обязан стоять до неё (18.10).
+    assert text.index('"tests"') < text.index('"boundary"'), "граница стоит перед перечнем, а говорит «выше»"

@@ -223,6 +223,21 @@ def _load_plists(directory) -> dict:
     return out
 
 
+def covered_by_template(live_only, templates_dir) -> list:
+    """Из «живых без копии» убрать те, у кого есть шаблон `<label>.plist.tmpl`.
+
+    С 29.09 службы ставятся из `templates/launchd/` (scripts/install.py), то есть шаблон и есть
+    дом плиста в репозитории; сверка только с `launchd/` объявляла «без копии» все 29 живых
+    файлов Studio (замер 15.10 вызовом датчика: шаблон у 27 из 29, двум службам хоста без
+    шаблона — colima, pilot-shadow — заведены копии; загружены из 29 восемь, остальные — плисты
+    владельца, оставленные для отката после переезда в контейнер 30.09). Граница: шаблон с
+    подстановками по ключам с живым файлом не сверяется — расхождение у таких джоб не видно.
+    """
+    from pathlib import Path as _P
+    have = {p.name[:-len(".plist.tmpl")] for p in _P(templates_dir).glob(f"{_PREFIX}*.plist.tmpl")}
+    return [label for label in live_only if label not in have]
+
+
 def repo_plist_drift(repo_dir=None) -> dict:
     """Studio-only. Сверка копий в `launchd/` с живыми `~/Library/LaunchAgents`.
     Вне Studio — пустой результат: у MacBook свой набор джоб, и сравнивать его
@@ -242,7 +257,9 @@ def repo_plist_drift(repo_dir=None) -> dict:
     if not infra_config.is_primary():
         return {"drifted": [], "live_only": [], "repo_only": []}
     repo_dir = repo_dir or (_P(__file__).parent / "launchd")
-    return compare_inventories(_load_plists(repo_dir), _load_plists(agents_dir()))
+    r = compare_inventories(_load_plists(repo_dir), _load_plists(agents_dir()))
+    r["live_only"] = covered_by_template(r["live_only"], _P(__file__).parent / "templates" / "launchd")
+    return r
 
 
 def _naive_local(ts):

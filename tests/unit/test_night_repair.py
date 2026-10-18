@@ -134,3 +134,15 @@ def test_close_receipt_names_fix_commit_not_later_head(repo, monkeypatch, tmp_pa
     _git(repo, "push", "-q", "studio", "main"); _git(repo, "fetch", "-q", "studio")
     code, text = nr.close_fix(repo, "rid")
     assert code == 0 and notes == [f"слито {fix[:7]}"], (text, notes)
+
+
+def test_split_patch_keeps_test_code_not_test_data():
+    """15.10: фикстура под tests/ — часть правки. Прогон «без правки» обязан идти БЕЗ неё,
+    иначе починка фикстуры зелёная и без правки, и оракул её отклоняет (2026-10-13-3d7cba83)."""
+    import night_repair as nr
+    patch = ("diff --git a/tests/fixtures/health_schema.sql b/tests/fixtures/health_schema.sql\n+CREATE TABLE x();\n"
+             "diff --git a/tests/unit/test_a.py b/tests/unit/test_a.py\n+def test_a(): pass\n"
+             "diff --git a/code.py b/code.py\n+y = 1\n")
+    part = nr._split_patch(patch)
+    assert "tests/unit/test_a.py" in part
+    assert "health_schema.sql" not in part and "code.py" not in part

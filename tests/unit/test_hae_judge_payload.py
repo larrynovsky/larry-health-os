@@ -66,3 +66,18 @@ def test_seed_does_not_erase_unowned_verdict(db):
     _row(db, "walking_double_support_percentage", "unowned")
     health_db._seed_hae_registry()
     assert _status("walking_double_support_percentage") == "unowned"
+
+
+def test_rmssd_is_its_own_series_and_does_not_touch_sdnn(db, tmp_path):
+    """07.10: прибор прислал heart_rate_variability_rmssd — свой ряд, hrv (SDNN) не меняется."""
+    import import_apple_health as iah
+    day = {}
+    iah.aggregate_metric_by_day("heart_rate_variability", [{"date": "2026-10-01 03:00:00 +0300", "qty": 40}], day)
+    iah.aggregate_metric_by_day("heart_rate_variability_rmssd",
+                                [{"date": "2026-10-01 03:00:00 +0300", "qty": 20},
+                                 {"date": "2026-10-01 04:00:00 +0300", "qty": 30}], day)
+    (b,) = day.values()
+    assert b["hrv"]["avg"] == 40 and b["hrv_rmssd_avg"] == 25
+    loud = hae_checker.judge_payload(_payload(tmp_path, [{"name": "heart_rate_variability_rmssd", "data": [
+        {"date": "2026-10-01 03:00:00 +0300", "qty": 20}]}]))
+    assert loud == [] and _status("heart_rate_variability_rmssd") == "handled"

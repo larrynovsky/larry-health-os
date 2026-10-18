@@ -79,3 +79,27 @@ def test_age_days_invalid_returns_none(input_val):
 def test_iso_date(input_val, expected):
     from dashboard_filters import _iso_date
     assert _iso_date(input_val) == expected
+
+
+# ── _age_label (фидбэк GitHub 2026-10-18: приём через 9 дней показывался «-9д назад») ──
+
+@pytest.mark.parametrize("ts,expected", [
+    ("2026-10-27", "через 9д"),        # будущее — не «-9д назад»
+    ("2026-10-18", "сегодня"),
+    ("2026-10-11", "7д назад"),
+    ("2026-10-19", "через 1д"),        # завтра, а не «сегодня» и не «0д»
+    (None, "дата?"),
+    ("unknown", "дата?"),              # импорт пишет effective_date='unknown'
+])
+def test_age_label_future_and_past(monkeypatch, ts, expected):
+    import dashboard_filters as df
+    monkeypatch.setattr(df, "get_now", lambda: datetime(2026, 10, 18, 13, 51))
+    assert df._age_label(ts) == expected
+
+
+def test_no_template_glues_age_days_to_nazad():
+    """Шаблон, приклеивший «д назад» к age_days, снова покажет будущее как «-9д назад»."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2] / "dashboard_templates"
+    bad = [p.name for p in root.glob("*.html") if "age_days }}д назад" in p.read_text()]
+    assert not bad, bad

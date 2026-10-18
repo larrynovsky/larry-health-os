@@ -32,7 +32,11 @@ def backup_repo(tmp_path):
 def backup_env(tmp_path):
     # На MacBook зависимости Python могут жить в user-site. Синтетический HOME
     # не должен их скрыть; пути пакетов сохраняем, конфигурация берётся из backup_repo.
+    # TZ — тот же пояс, в котором тест считает ожидаемую дату имени снимка (15.10). Без него
+    # `date` скрипта брал пояс машины, а тест — свой TZ: в контейнере (TZ=<пояс дома>, система
+    # в UTC) ночной набор в 00:09 искал crm_<сегодня>.db, а скрипт писал crm_<вчера>.db.
     return {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "HEALTH_PY": sys.executable,
+            "TZ": "UTC",
             "PYTHONPATH": os.pathsep.join(p for p in sys.path if Path(p).is_absolute())}
 
 
@@ -79,17 +83,24 @@ def test_neighbor_backup_noop_or_same_data_name_permissions_and_rotation(tmp_pat
             "crm": {"path": str(tmp_path / "crm's space"), "db": "crm.db"},
             "notes": {"path": str(tmp_path / "notes"), "db": "notes.db"},
         }}))
+    from datetime import datetime, timezone
+    before = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     r = subprocess.run(["bash", str(backup_repo / "backup_studio.sh")],
                        env=backup_env,
                        capture_output=True, text=True, timeout=60)
+    after = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     log = (tmp_path / "health" / "logs" / "backup.log").read_text()
     assert r.returncode == 0, log + r.stderr
     assert list((tmp_path / "health" / "backups").glob("health_*.db")), log
     assert old.exists() is not configured and other.exists()
     if configured:
-        today = time.strftime("%Y-%m-%d")
+        # Имя снимка несёт дату (ротация живёт на ней): crm_latest.db здесь обязан краснеть.
+        # Дата — в поясе подпроцесса (TZ=UTC); before/after закрывают переход через полночь.
         for root, prefix in ((tmp_path / "crm's space", "crm"), (tmp_path / "notes", "notes")):
-            backup = root / "backups" / f"{prefix}_{today}.db"
+            named = [root / "backups" / f"{prefix}_{d}.db" for d in {before, after}]
+            hits = [b for b in named if b.exists()]
+            assert len(hits) == 1, (named, sorted(x.name for x in (root / "backups").iterdir()), log)
+            backup = hits[0]
             assert backup.stat().st_mode & 0o777 == 0o600
             with sqlite3.connect(backup) as c:
                 assert c.execute("select x from t").fetchall() == [(7,)]

@@ -20,7 +20,7 @@
   <div class="card-head">
     <div class="card-meta">#{{ p.id }} · {{ p.source }}
       {% if p.created_at %} · <time>{{ p.created_at | short(10) }}</time>
-        <span class="age-suffix">({{ p.created_at | age_days }}д назад)</span>
+        <span class="age-suffix">({{ p.created_at | age_label }})</span>
       {% endif %}
     </div>
     <div class="card-chips"><span class="chip chip--action">ждёт решения</span>

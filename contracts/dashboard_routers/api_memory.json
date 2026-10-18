@@ -1,0 +1,33 @@
+{
+  "module": "dashboard_routers/api_memory",
+  "public": [
+    "api_memory_retire",
+    "api_memory_ban"
+  ],
+  "depends_on": [
+    {
+      "module": "memory_facts_db",
+      "uses": [
+        "retire_fact",
+        "save_fact"
+      ],
+      "why": "единственный писатель памяти: гашение записи и запись запрета",
+      "legacy": "контракта у memory_facts_db пока нет; используются только retire_fact, save_fact"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "Один домен — правка памяти владельцем с дашборда: погасить запись и добавить запрет «не предлагай мне X». Чтение страницы — views.memory; подача запрета в окна — patient_context._bans_line.",
+      "D2": "Публичны две ручки: api_memory_retire и api_memory_ban (их регистрирует router); _slug и константы — внутренние.",
+      "D3": "Только memory_facts_db.retire_fact/save_fact; своего SQL нет, чужих приватных нет.",
+      "D4": "~60 строк.",
+      "D5": "tests/integration/test_dashboard_memory.py — 5 проверок (HTTP и прямой вызов обеих ручек). Мутации 07.10, каждая красная: запрет не попадает в бриф; гашение без причины.",
+      "D6": "Общие инварианты: memory_temporal_axis (гашение не удаляет — отбор вопросов считает погашенное разобранным); dashboard.no_auth_tailnet_only_open (от чужих сайтов закрывает общий _perimeter_guard, проверено тестом на обе ручки)."
+    },
+    "rationale": "Переписывается по контракту: вход — id записи или текст запрета, выход — погашенная запись или запрет с ключом no_suggest:*, плюс строка журнала.",
+    "date": "2026-10-07",
+    "oracle": "tests/integration/test_dashboard_memory.py"
+  },
+  "rationale": "Переписывается по контракту: вход — id записи или текст запрета, выход — погашенная запись с причиной или запрет с ключом no_suggest:*."
+}

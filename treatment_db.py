@@ -60,6 +60,9 @@ def upsert_medication(
     source: str = "extractor",
     confirmation: str = "proposed",
     notes: str = None,
+    dosage: str = None,
+    frequency: str = None,
+    route: str = None,
 ) -> int | None:
     """Идемпотентный upsert режима лечения в medications.
 
@@ -84,11 +87,13 @@ def upsert_medication(
                 """INSERT INTO medications
                    (name, modality, intent, cycles_completed, cycles_planned,
                     agents, indication_problem_id, prescribing_event_id,
-                    start_date, end_date, status, source, confirmation, notes, updated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))""",
+                    start_date, end_date, status, source, confirmation, notes,
+                    dosage, frequency, route, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))""",
                 (canon, modality, intent, cycles_completed, cycles_planned,
                  agents_json, indication_problem_id, prescribing_event_id,
-                 start_date, end_date, status, source, confirmation, notes),
+                 start_date, end_date, status, source, confirmation, notes,
+                 dosage, frequency, route),
             )
             return cur.lastrowid
         # Существует. Человек-гейт: подтверждённое/ручное не трогаем extractor'ом.
@@ -101,6 +106,13 @@ def upsert_medication(
             new_cycles = max(int(cycles_completed), int(row["cycles_completed"] or 0))
         _ends = [d for d in (end_date, row["end_date"]) if d]
         new_end = max(_ends) if _ends else row["end_date"]
+        # Дата лечения меняется только с записью в журнале (триггер trg_medications_*_journal).
+        for f, new in (("start_date", start_date if start_date is not None else row["start_date"]),
+                       ("end_date", new_end)):
+            if new != row[f]:
+                _hdb.log_repair(conn, run_id=f"upsert_medication:{source}", home="sqlite:medications",
+                                entity=str(row["id"]), field=f, old_value=row[f], new_value=new,
+                                reason=f"извлечение из документа ({source})")
         conn.execute(
             """UPDATE medications SET
                  modality=COALESCE(?,modality),
@@ -114,11 +126,14 @@ def upsert_medication(
                  status=COALESCE(?,status),
                  source=?,
                  notes=COALESCE(?,notes),
+                 dosage=COALESCE(?,dosage),
+                 frequency=COALESCE(?,frequency),
+                 route=COALESCE(?,route),
                  updated_at=datetime('now')
                WHERE id=?""",
             (modality, intent, new_cycles, cycles_planned, agents_json,
              prescribing_event_id, start_date, new_end, status, source, notes,
-             row["id"]),
+             dosage, frequency, route, row["id"]),
         )
         return row["id"]
 

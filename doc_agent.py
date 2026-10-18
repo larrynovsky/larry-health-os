@@ -725,8 +725,12 @@ def translate_page(page: str, *, entry: dict | None = None, dry_run: bool = Fals
         leaked = secret_guard.find_secret_values(prompt)
         if leaked:
             print(f"🛑 SEC-21: секреты в промпте ({', '.join(leaked)}) — блок"); return False
-        resp = client.messages.create(task="doc_agent.translate_page", model=_model(), max_tokens=8000,
-                                      messages=[{"role": "user", "content": prompt}])
+        # Потоком (08.10): обычный вызов на 8000 токенов ответа идёт ~4–5 мин, и сервер
+        # рвёт соединение без ответа (RemoteProtocolError → APIConnectionError) — три
+        # большие страницы не переводились ни с одной из трёх попыток. Поток держит связь.
+        with client.messages.stream(task="doc_agent.translate_page", model=_model(), max_tokens=8000,
+                                    messages=[{"role": "user", "content": prompt}]) as _s:
+            resp = _s.get_final_message()
         en_body = llm_client.answer_text(resp).strip() + "\n"
         problems = _en_problems(entry, ru_body, en_body)
         if not problems:

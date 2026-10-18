@@ -6,6 +6,7 @@ hai_chat — chat(), run_arbiter(), CLI.
 
 import llm_client
 import base64
+import re
 import hai_core
 import logging
 from datetime import date
@@ -210,6 +211,10 @@ ARBITER_PROMPT = """
   "open_questions": [
     "вопрос который стоит отслеживать"
   ],
+  "taking": [
+    {{"name": "что принимает", "kind": "supplement|medication", "dose": "доза или пусто",
+      "frequency": "как часто и когда, или пусто", "since": "ГГГГ-ММ(-ДД) или пусто"}}
+  ],
   "assistant_recommendations": [
     {{
       "type": "supplement|protocol|behavioral",
@@ -234,13 +239,16 @@ ARBITER_PROMPT = """
     diet_preference      → ограничения/предпочтения
     exercise_frequency   → описание
     sleep_schedule       → bedtime/wake описание
-    medications          → список текущих препаратов
     melatonin_user       → "yes" / "no" / доза
   Примеры правильной классификации:
     "я не пью алкоголь"              → profile_updates: {{"alcohol_consumption": "none"}}
     "не курю никогда"                → profile_updates: {{"smoking_status": "none"}}
     "пью кофе только утром"          → profile_updates: {{"caffeine_pattern": "1 cup morning only"}}
-    "принимаю метформин 500мг"       → profile_updates: {{"medications": "metformin 500mg"}}
+- taking: ТОЛЬКО то, что пользователь САМ сказал, что принимает сейчас (лекарство или добавка).
+  Совет ассистента «попробуй X» — это assistant_recommendations, НЕ taking. Каждое вещество —
+  отдельный элемент. Лекарства и добавки в profile_updates НЕ пиши — их дом taking.
+    "принимаю метформин 500мг утром" → taking: [{{"name": "метформин", "kind": "medication",
+                                         "dose": "500 мг", "frequency": "утром", "since": ""}}]
 - observations: ТОЛЬКО наблюдаемое или сказанное пользователем, БЕЗ причинных выводов.
   Пример: "плохо спал", "сон 3.3 часа", "чувствую усталость".
   НЕ пиши "плохо спал из-за стресса" — причина это вывод, а не наблюдение, если
@@ -354,6 +362,32 @@ def _mirror_to_facts(artifacts: dict, user_message: str = "",
                       source=_provenance(_val, user_message, unverified))
 
 
+_TAKING_KINDS = ("supplement", "medication")
+_SINCE_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
+
+
+def _valid_taking(items) -> list[dict]:
+    """Ответ модели — недоверенный вход: только список словарей, kind из словаря,
+    строки с лимитом длины, дата строго ГГГГ-ММ(-ДД). Остальное отбрасывается с логом."""
+    out = []
+    if not isinstance(items, list):
+        return out
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or "").strip()[:100]
+        kind = str(it.get("kind") or "").strip().lower()
+        if not name or kind not in _TAKING_KINDS:
+            log.info(f"Арбитр: taking отброшен (имя/вид): {str(it)[:120]}")
+            continue
+        since = str(it.get("since") or "").strip()
+        out.append({"name": name, "kind": kind,
+                    "dose": str(it.get("dose") or "").strip()[:60],
+                    "frequency": str(it.get("frequency") or "").strip()[:80],
+                    "since": since if _SINCE_RE.match(since) else ""})
+    return out
+
+
 def run_arbiter(user_message: str, assistant_reply: str,
                 unverified: bool = False) -> dict:
     """
@@ -440,6 +474,24 @@ def run_arbiter(user_message: str, assistant_reply: str,
         db.save_memory("experiment_candidate", _expval, key=_name, confidence=0.7,
                        source=_provenance(_expval, user_message, unverified))
         saved.setdefault("experiment_candidates", []).append(_name[:60])
+
+    for med in _valid_taking(artifacts.get("taking")):
+        _txt = " ".join(v for v in med.values() if v)
+        # Граница доверия: в таблицу лечения — только заземлённое в словах человека и
+        # только как предложение (proposed): канон делает карточка medrev_ и «да» владельца.
+        if _provenance(_txt, user_message, unverified) != "conversation":
+            log.info(f"Арбитр: taking «{med['name']}» не заземлён в словах — пропущен")
+            continue
+        try:
+            import treatment_db as _tdb
+            _tdb.upsert_medication(
+                name=med["name"], modality=med["kind"], status="active",
+                source="conversation", confirmation="proposed",
+                dosage=med["dose"] or None, frequency=med["frequency"] or None,
+                start_date=med["since"] or None, notes="со слов в разговоре")
+            saved.setdefault("taking", []).append(med["name"])
+        except Exception as _e:
+            log.warning(f"Арбитр: taking «{med['name']}» не записан: {_e}", exc_info=True)
 
     for rec in (artifacts.get("assistant_recommendations") or []):
         name    = rec.get("name", "")

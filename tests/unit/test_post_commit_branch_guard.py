@@ -70,7 +70,7 @@ exit 0
 """
 
 
-HookRun = collections.namedtuple("HookRun", "marker stdout log cmds", defaults=("",))
+HookRun = collections.namedtuple("HookRun", "marker stdout log cmds rc", defaults=("", 0))
 
 
 def _run_hook(branch, timeout=30.0, slow=0, msg=None, push_rc=0,
@@ -127,7 +127,8 @@ def _run_hook(branch, timeout=30.0, slow=0, msg=None, push_rc=0,
         return HookRun(marker.read_text() if marker.exists() else "",
                        (res.stdout or "") + (res.stderr or ""),
                        log.read_text() if log.exists() else "",
-                       cmds.read_text() if cmds.exists() else "")
+                       cmds.read_text() if cmds.exists() else "",
+                       res.returncode)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -413,3 +414,23 @@ def test_тексты_бота_не_считаются_документами():
 def test_неизвестный_прежний_деплой_перезапускает():
     r = _run_hook("main", deployed="", changed="docs/x.md\\n")
     assert "bot.partner" in r.cmds, r.cmds
+
+
+def test_упавший_push_не_отчитывается_успехом():
+    """Код возврата хука = доехал ли код на Studio (17.10, нить deploy-rc-truth).
+
+    thread_finish.sh судит деплой по коду возврата этого хука. До правки хук
+    кончался безусловным `exit 0`, и 17.10 при Studio, недостижимой по ssh, push
+    упал дважды, а закрытие нити напечатало «закрыта и задеплоена». Судится каждая
+    ветка классификатора: и та, что тревожит владельца, и молчащая (dirty) — в
+    обеих код НЕ доехал. Позитивный контроль — успешный push даёт 0, иначе
+    тест пропустил бы хук, который отказывает всегда.
+    """
+    for name, run in (
+        ("недостижима", _run_hook("main", push_rc=1, ssh_dead=True)),
+        ("разошлась", _run_hook("main", push_rc=1)),
+        ("dirty", _run_hook("main", push_rc=1, dirty=" M health_db.py")),
+    ):
+        assert run.rc != 0, f"push упал ({name}), а хук вернул 0 — закрытие нити снова соврёт «задеплоена»"
+    ok = _run_hook("main")
+    assert ok.rc == 0, f"успешный push вернул {ok.rc}: хук отказывает всегда\n{ok.stdout[-800:]}"

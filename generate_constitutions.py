@@ -535,9 +535,48 @@ def _epistemic_version() -> str:
     from epistemic_skill.loader import load_skill
     return load_skill().version
 
+# Вводная, которую видит только один домен: её смена пересобирает только его (main, --if-changed).
+DOMAIN_ONLY_INPUTS = {"nutrition_frame": "nutrition"}
+
+
+def _frame_key(conn=None) -> dict:
+    """Рамка питания как вводная отпечатка: только решения кода (энергия, белок, коды
+    ограничений, микроэлементы), без текста причин — формулировка причины не вводная."""
+    import food_profile
+    f = food_profile.medical_frame(conn)
+    return {"energy": f["energy"], "protein": f["protein"],
+            "constraints": sorted(f["constraints"]), "micro": sorted(f["micro"])}
+
+
+def _frame_text() -> str:
+    """Рамка питания тенанта для промпта «Питания» — тот же дом, что у профиля питания и
+    MCP nutrition_frame (food_profile.medical_frame: код по курируемым правилам, не модель)."""
+    import food_profile
+    f = food_profile.medical_frame()
+    lang = i18n.DEFAULT
+    lines = [f"  энергия: {f['energy']}; белок: {f['protein']}",
+             "  коды ограничений: " + (", ".join(sorted(f["constraints"])) or "нет"),
+             "  микроэлементы в фокусе: " + (", ".join(sorted(f["micro"])) or "нет")]
+    lines += [f"  — ограничить: {x}" for x in food_profile.frame_limits(f, lang)]
+    return "\n".join(lines)
+
+
+def _frame_section(frame_txt: str) -> str:
+    if not frame_txt:
+        return ""
+    return f"""
+## Рамка питания (решение кода по курируемым правилам, не вывод модели):
+{frame_txt}
+Конституция не противоречит рамке: энергии, частоте и объёму приёмов, исключённому. Если вывод
+из генома или истории с рамкой расходится — назови расхождение, а не советуй против рамки.
+"""
+
+
 def _build_prompt(domain_key: str, snp: dict, metrics_txt: str, medical_txt: str,
-                  horizon: int = HORIZON_SEED_DAYS) -> str:
-    """Генерация конституции с нуля — только геном + longitudinal + клиническая история."""
+                  horizon: int = HORIZON_SEED_DAYS, frame_txt: str = "") -> str:
+    """Генерация конституции с нуля — геном + longitudinal + клиническая история; домену
+    «Питание» — ещё рамка питания (frame_txt): ограничения, которым текст не противоречит.
+    Прошлой версии здесь нет и быть не должно (её видит только _build_diff_prompt)."""
     cfg = DOMAINS[domain_key]
 
     def fmt_variants(variants: list, limit: int = 8) -> str:
@@ -575,7 +614,7 @@ def _build_prompt(domain_key: str, snp: dict, metrics_txt: str, medical_txt: str
 
 ## Клиническая история:
 {medical_txt if medical_txt else "  нет данных"}
-
+{_frame_section(frame_txt)}
 ## Исторический контекст (10 лет данных — longitudinal analysis):
 {metrics_txt if metrics_txt else "  нет данных"}
 
@@ -724,7 +763,8 @@ def _generate_one(domain_key: str, dry_run: bool = False) -> str:
     # опросники конституция НЕ видит — это не потеря, а правило владельца 27.09: субъективное
     # в конституцию не идёт (опросники режет labs_db.build_lab_history_context по источнику).
     horizon = horizon_days()
-    prompt  = _build_prompt(domain_key, snp, metrics, medical, horizon=horizon)
+    frame   = _frame_text() if domain_key in DOMAIN_ONLY_INPUTS.values() else ""
+    prompt  = _build_prompt(domain_key, snp, metrics, medical, horizon=horizon, frame_txt=frame)
 
     if dry_run:
         print("--- ПРОМПТ (dry-run) ---")
@@ -841,6 +881,18 @@ def _tg_notify(msg: str) -> bool:
     return True
 
 
+def _belief_links_line() -> str:
+    """Связи, принятые статистическим гейтом (вера), — единственный дом силы связи для ревью тревог."""
+    from belief_contract import read_belief
+    b = read_belief()
+    pairs = ((b.get("data") or {}).get("top_correlations") or []) if b.get("accepted") else []
+    if not pairs:
+        return i18n.t("constitutions.alert_excerpt.no_belief_links")
+    links = "; ".join(f"{c.get('a')}↔{c.get('b')} r={c.get('r'):+.2f}" for c in pairs
+                      if isinstance(c.get("r"), (int, float)))
+    return i18n.t("constitutions.alert_excerpt.belief_links", links=links)
+
+
 def _build_alert_config_excerpt() -> str:
     """Текущая alert-конфигурация (DOMAIN_SIGNALS + абсолютные пороги) из БД,
     как markdown-врезка для prompt'а ревью алертов.
@@ -850,6 +902,10 @@ def _build_alert_config_excerpt() -> str:
     всегда возвращал пусто (тихий обрыв). Пустая БД → пустая строка, без
     исключения. Ошибка чтения → диагностическая строка, не падение.
     """
+    # Сила связи у сигналов НЕ печатается (решение владельца 15.10, BL-CORR-PROVENANCE-1 п.6): r в
+    # таблице сигналов был снимком калибровки 21.04 мимо статистического гейта, и ревью цитировало
+    # его как текущий факт («r=0,2 — не пересчитывать», 07.10). У числа один дом — принятая вера:
+    # её связи идут отдельной строкой; у сигнала без связи в вере сказано, что она не проверена.
     excerpt = ""
     try:
         import health_db as _dbcfg
@@ -858,13 +914,11 @@ def _build_alert_config_excerpt() -> str:
         for _dom in _DOMAINS:
             _sigs = _dbcfg.get_domain_signals(_dom)
             if _sigs:
-                _parts = ", ".join(
-                    f"{s.get('metric')} (r={s.get('r')}, p{s.get('threshold_pct')})"
-                    for s in _sigs
-                )
+                _parts = ", ".join(f"{s.get('metric')} (p{s.get('threshold_pct')})" for s in _sigs)
                 _sig_lines.append(f"- {_dom}: {_parts}")
         if _sig_lines:
-            excerpt += "**DOMAIN_SIGNALS (из БД):**\n" + "\n".join(_sig_lines) + "\n\n"
+            excerpt += ("**DOMAIN_SIGNALS (из БД):**\n" + "\n".join(_sig_lines) + "\n"
+                        + _belief_links_line() + "\n\n")
         _floors = _dbcfg.get_absolute_thresholds()
         if _floors:
             _fl_lines = [f"- {f.get('metric')} {f.get('direction')} {f.get('value')}" for f in _floors]
@@ -1075,6 +1129,7 @@ def _current_fingerprint() -> tuple[str, dict]:
     from health_db import get_conn
     with get_conn() as conn:
         snap = inputs_snapshot(conn, read_belief())
+        snap["nutrition_frame"] = _frame_key(conn)
     return inputs_fingerprint(snap), snap
 
 
@@ -1131,10 +1186,20 @@ def main():
             print(f"конституции: новых вводных нет (отпечаток {fp}) — пересборка не нужна")
             _mark_checked()
             return
-        print(f"конституции: сменились вводные — {', '.join(changed_inputs((old or {}).get('snap'), snap))}")
-        args.domain = "all"
+        moved = changed_inputs((old or {}).get('snap'), snap)
+        print(f"конституции: сменились вводные — {', '.join(moved)}")
+        only = {DOMAIN_ONLY_INPUTS[k] for k in moved if k in DOMAIN_ONLY_INPUTS}
+        if old and only and all(k in DOMAIN_ONLY_INPUTS for k in moved):
+            args.domain = "only:" + ",".join(sorted(only))   # сменилась вводная одного домена
+        else:
+            args.domain = "all"
 
-    targets = list(DOMAINS.keys()) if args.domain == "all" else [args.domain]
+    if args.domain == "all":
+        targets = list(DOMAINS.keys())
+    elif args.domain.startswith("only:"):
+        targets = args.domain[len("only:"):].split(",")
+    else:
+        targets = [args.domain]
 
     # Синхронизируем event-based поля patient_profile перед генерацией
     if not args.dry_run:
@@ -1166,7 +1231,9 @@ def main():
     # Отпечаток пишется только после ПОЛНОЙ пересборки (все домены прошли цикл без исключения;
     # законный пропуск домена без генома — не сбой). Один домен или сбой API — отпечаток старый,
     # триггер сработает снова, а не сочтёт вводные учтёнными.
-    if not args.dry_run and args.domain == "all":
+    # Пересборка доменов своей вводной (only:) тоже учитывает вводные целиком: остальные
+    # домены эту вводную не читают.
+    if not args.dry_run and (args.domain == "all" or args.domain.startswith("only:")):
         _store_fingerprint(fp, snap)
         _mark_checked()
 

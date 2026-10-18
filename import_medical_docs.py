@@ -69,6 +69,9 @@ def run():
     with db.get_conn() as conn:
         for row in LAB_DATA:
             date, source, test_name, value, unit, ref_low, ref_high, status, notes = row
+            # Сид без документа — помеченное наследство (C-173, решение владельца 07.10).
+            source = source if str(source).startswith(("doc:", "instrument:", "manual:")) \
+                else f"manual:legacy:{source}"
             # Проверяем дубликат
             exists = conn.execute(
                 "SELECT 1 FROM lab_results WHERE date=? AND test_name=? AND source=?",
@@ -106,6 +109,7 @@ def run():
             title=p["title"],
             status=p["status"],
             notes=p["notes"],
+            source="manual:seed_medical_docs",
         )
         inserted_probs += 1
         log.info(f"  Добавлено [{slug}]: {p['title'][:60]}")

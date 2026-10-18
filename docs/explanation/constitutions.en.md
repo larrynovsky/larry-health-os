@@ -1,58 +1,59 @@
-<!-- translation-of: docs/explanation/constitutions.md sha256:98c4aa1f72e2 -->
+<!-- translation-of: docs/explanation/constitutions.md sha256:ae044fcb771f -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](constitutions.md)
 
-# Constitutions: operating rules for your specific body
+# Constitutions: operating rules for your specific organism
 
 ## What changed
 
-- **The "one year or longer" horizon: wording revised.** The claim for the `horizon_year_or_longer` limit has been rewritten. The direction of the change is not machine-determinable — only the fact of the rewording is recorded, not a strengthening or weakening of the guarantee.
+- **The "Nutrition" constitution sees the nutrition frame (07.10).** The frame is a code decision based on curated rules: energy, protein, restriction codes such as "caution with dumping" and "no lactose". Previously the model wrote about food without seeing the frame, and could recommend a meal schedule that the frame excludes. Now the frame sits in the prompt as a constraint the text does not contradict. This is a request to the model, not a guard: code does not yet catch contradictions with the frame. (Paragraph corrected by hand: on regeneration the model called the change "a wording clarification".)
 
-- **The self-description-from-chat limit has been reclassified.** Previously this was called a loss (boundary BL-CONST-SELF-1): the constitution cannot see subjective self-description from conversation. It is now an explicit rule (from 27.09.2026): subjective content is kept out of the constitution by decision, not by a technical limit. The "loss" framing has been removed.
+- **The nutrition frame is a new trigger for reconstruction.** If the frame changes, only "Nutrition" is reconstructed; if something shared changes, all five are reconstructed, as before.
 
-- **The former self-description boundary has been removed — but what is proven has become narrower.** The old boundary concerned a classification limitation: `temporal_class` labels (`standing/durable`) alone do not guarantee separation of stable facts from other content. That boundary has been removed — but precisely because the question is closed by a rule, not because the tagging has become more reliable. The amount of proven content has not grown; what changed is the basis for the justification.
-
-**Updated:** 2026-09-27
+**Updated:** 2026-10-07
 
 
 ## Why it exists
 
-Your personal norms are statistics: an average over you, a corridor you yourself deviate from. They say clearly *what* is happening, but say nothing about *why* it works that way for you specifically.
+Numbers can describe you, but not explain you. When the system knows your resting heart rate today is 58, that is a fact. But it does not know why yours responds the way it does, and what that means for you personally — not for an average person with similar readings.
 
-Constitutions exist to fill that gap. Not "step count norm is such-and-such," but a narrative explanation: here is your upper load threshold without a recovery phase — and here is why it is exactly that, because the genome says one thing and several years of your own history confirm it in another way. This is not a diagnosis and not a protocol. It is a description of the mechanism — your specific one.
+Constitutions exist to fill that gap. Not a reference document, not a textbook norm — but a narrative explanation of how you are structured in each domain: sleep, nutrition, stress, nervous system, movement. What is specifically true of you, and why specifically of you.
 
-Five domains: sleep, nutrition, stress, nervous system, movement. One document per domain.
+This is an attempt to move from "what was measured" to "how it is structured".
 
-## What it does, in plain terms
+## What it does, in plain language
 
-A powerful language model receives three sources simultaneously: your genome data, your long-term correlations and clinical periods — and writes a narrative. Not a table, not a list of recommendations — a text that explains you to yourself.
+For each domain, a powerful language model reads three sources simultaneously: genomic data (SNPs for that domain), your long-term correlations, and your clinical history. From these it produces not a table of metrics but a coherent text — an explanation of how you are structured in that specific domain.
 
-**What counts as long-term.** A constitution describes structure, not state. Only things whose significant consequence holds for at least one year are included. What is measured is the duration of the consequence, not the duration of the event itself: a surgery lasted a day, but its trace may live for years — and then it is included. Last year's trip or a current protocol are not; their home is the monthly report.
+One detail about time matters: a constitution is about structure, not about current state. It includes only things whose consequences have persisted for at least one year. What is measured is not how long an event lasted, but how long its trace continues. A surgery is one day, but its trace in the organism lasts years; that is a constitution. Last autumn's trip, the current protocol, recent lab results — those are not its concern. They live in the monthly report.
 
-**Two safeguards against fabrication.** The system does not allow itself to speak confidently where data is absent.
+Two hard safeguards are built into the generation logic itself.
 
-- No genomic data for a domain — the constitution for that domain is simply not created. An empty genome does not produce confident text.
-- No long-term history — the model generates based on the genome only, but with an explicit note: there are no confirmed trends here, do not invent them.
+First: if there is no genomic data for a domain, no constitution is created for that domain at all. An empty genome does not produce confident text. The system simply returns nothing — and that is an honest answer.
 
-**When it is rebuilt.** Every Sunday the system checks whether anything has changed in the source data — genome, clinical history, lab series, phases. If nothing is new — no rebuild occurs, only the fact that the check took place is recorded. If the inputs are the same, the text stays the same: a constitution is not updated "just because a week has passed."
+Second: if there is no long-term observation history, a text may still be created, but with an explicit flag. That flag prohibits the model from inventing trends from data that does not exist. The same discipline as in the morning report: if you do not know, do not pretend that you do.
 
-**The database is the source of truth.** Files in folders and in iCloud are mirrors. The real constitution lives in the database table; everything else is derived from it.
+A constitution is not reconstructed on a schedule for the sake of a schedule, but only when new inputs have appeared: the genome changed, a new clinical period was added, a new laboratory series long enough has accumulated, or the nutrition frame was updated. Drifting averages or a single new test result are not a reason. Every Sunday morning the system checks: has anything substantial changed? No — it writes only a "checked" timestamp and exits. Yes — it reconstructs all five; with one exception: if only the nutrition frame changed, only "Nutrition" is reconstructed — the other domains do not read it.
 
 ## What is honest to say about its limits
 
-It is important not to gloss over this.
+It is important to speak plainly here, because two substantial questions are still open, and one check holds but not everywhere.
 
-**The narrative is not verified by outcome — and this is an open question.** A constitution is an interpretation by a capable model, written with discipline against fabricated trends. But it has not been verified by what subsequently happened to you. By design it feeds personal alert thresholds — meaning decisions depend on it. How reliable this chain of "narrative → threshold" actually is has not yet been confirmed. This is not fine print — this is honest incompleteness.
+**The "narrative → threshold" link is not confirmed by outcome.**
+A constitution is a powerful model's interpretation, written with discipline against invented trends. But it is not validated by a real outcome. By design it feeds personal alert thresholds — meaning the system plans to rely on it when making decisions. How reliable that chain is in practice is not yet known. This is not a technical disclaimer in fine print — it is an open question that remains open.
 
-**The rebuild-on-trigger logic is also an open question.** The decision to "rebuild only when inputs change" has been made and implemented; the system tracks a fingerprint of the input data and checks it every week. But the logic itself — what exactly counts as a "new input" sufficient to trigger a rebuild — is still being refined. Drift in averages and a new one-off test result have been explicitly excluded from inputs since September 2026: they do not trigger a rebuild. The boundary between "this is new" and "this is not new" is a live decision, not one that is closed.
+**The "reconstruct only on new inputs" logic is adopted as a decision, but not closed as an implementation.**
+The fingerprint architecture for inputs is described: what counts as new, what does not, how it is stored, when which domain is reconstructed. But this is a decision from September 2026, and it has not yet gone through long practical testing. The schedule works, the negative control executes — and yet that is not the same as "works reliably under all conditions".
 
-**The horizon holds, but has not been verified everywhere.** The promise "only data at or beyond the horizon goes into the prompt" is fulfilled — this is an invariant that holds. But it has blind spots, and they need to be named directly, not in a footnote.
+**The output oracle: the promise holds, but not everywhere.**
+After a constitution is created, the system checks the text for "freshness" — to see whether anything too transient has leaked through. This promise is fulfilled, and tests have confirmed it. But the check has blind spots: it will not catch a date without a year ("in September" — which one?), does not always recognise relative time expressed in unusual phrasing ("since the end of summer", "recently"), and may misread a number in dd.mm format as a date. The promise holds — but "holds" and "verified everywhere" are different claims.
 
-The system looks at the model's output and searches for signs that it slipped into a short period anyway: specific dates, relative phrases like "recently" or "over the last few days." But it looks at form — and that has limits. A month without a year ("in September"), a vague "since late summer," a date of the form day.month without a year — all of these are either outside the check's field of view or may produce a false alarm. This is not a catastrophe, but it is a real limit, not fine print.
+**One rule that is not a limit but a deliberate choice.**
+A constitution does not see your self-descriptions from chat — "I always feel alert in the morning", "stress gives me poor sleep". This is not a technical constraint but an owner decision: subjective input does not go into a constitution.
 
-Separately: the constitution cannot see subjective self-description from chat. This is not a loss and not a technical limit — it is a deliberate decision: subjective content does not go into the constitution. The sources are the genome, measured history, and clinical data.
+## Where this sits in the system
 
-## Where this lives in the system
+Generation is performed by `generate_constitutions.py`. It receives the inputs for each domain, runs the powerful model, checks the output for freshness, and writes the result to the database table — `constitutions_db`. Everything you see in markdown files and in iCloud is a derived copy; the source of truth is always the database.
 
-The generation logic lives in `generate_constitutions.py`. The intent and domain boundaries are described in `subsystem_intent.yaml`. Completed constitutions are stored in the `constitutions_db` table — that is their sole authoritative source; files in `constitutions/` and in iCloud are synchronised from it as mirrors.
+The intent and rules of the subsystem are described in `subsystem_intent.yaml`. The invariants also live there — the verifiable promises discussed above — along with notes on their status: what holds, what is open, what is not verified everywhere.

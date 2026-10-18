@@ -345,8 +345,15 @@ def run(max_per_run=DEFAULT_MAX_PER_RUN, dry_run=False):
                           "reason": "dedup or generation failed"})
         else:
             counts[action] = counts.get(action, 0) + 1
+            # Сводка уезжает в отчёт, который читают человек и датчик
+            # check_reco_repeats_fresh_lab; совет сдать обязан назвать дату последней
+            # сдачи — тем же домом, что задача в tasks_db.save_task (13.10).
+            import gp_context as _gc
+            summary = decision.get("summary")
+            if isinstance(summary, str):
+                summary = _gc.annotate_lab_recency(summary)
             audit.append({"finding_type": f.get("type"), "action": action,
-                          "result_id": result_id, "summary": decision.get("summary")})
+                          "result_id": result_id, "summary": summary})
     if not dry_run:
         try:
             db.save_agent_report(

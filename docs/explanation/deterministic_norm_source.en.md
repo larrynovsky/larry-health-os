@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/deterministic_norm_source.md sha256:8195ea3358f3 -->
+<!-- translation-of: docs/explanation/deterministic_norm_source.md sha256:2d0c57b92fbb -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](deterministic_norm_source.md)
@@ -7,47 +7,59 @@
 
 ## What Changed
 
-- **The claim about unconditional checking (`fires_regardless_of_signals`) has been clarified.** The wording has been revised; what exactly changed in substance was not machine-determinable. The direction of the edit has not been established.
+- **The claim about threshold storage has been clarified.** The claim about where and how clinical thresholds (`safety_net_thresholds_in_db`) are stored has been corrected; the previous wording is acknowledged as inaccurate. The direction of the change could not be determined automatically — it is described neutrally.
 
-**Updated:** 2026-09-26
+- **The claim about check permanence has been clarified.** The claim that absolute thresholds are checked on every run regardless of signals (`fires_regardless_of_signals`) has been corrected; the previous wording is acknowledged as inaccurate. The direction of the change could not be determined automatically — it is described neutrally.
+
+**Updated:** 2026-10-18
 
 
 ## Why It Exists
 
-When the system looks at your lab results or blood pressure readings and decides whether to raise an alert, somewhere in that decision there has to be a line: "here is the boundary beyond which something is alarming." That line has to come from somewhere.
+Imagine you have several smoke detectors at home, and each one decides for itself at what temperature to call a fire a fire. One triggers at fifty degrees, another at seventy, and a third just guesses "from context." That is not safety — that is the illusion of safety.
 
-The problem is that "somewhere" is a dangerous word in medicine. If the boundary lives directly in the code, scattered across different places, it is easy for them to fall out of sync: fixed in one place, forgotten in another. If the boundary is computed each time by a smart model, the model can be wrong — and more importantly, it will never be possible to say precisely where a particular number came from. A fluent, confident, and incorrect boundary is more dangerous than no boundary at all: it does not look like an error.
+The same danger arises in a medical system when an "alert threshold" for a blood marker or blood pressure is scattered across code in dozens of places, or — worse — is computed on the fly by a smart model. A model can be convincing and still be wrong. Values scattered across many places diverge from one another without anyone noticing.
 
-The deterministic norm layer exists precisely to settle this question once and for all: clinical norms are taken from one place, and only from that place. Not from the model's reasoning. Not from numbers hardcoded into an algorithm. From a single table.
+The deterministic norm layer exists precisely to prevent this. It is not a stand-in for the smart AI layer, nor a competitor to it. It is the load-bearing wall beneath it — dumb, predictable, and fundamentally impossible to argue out of its position. No matter how eloquently a model reasons about your specific case, it does not assign and does not change the alert threshold.
 
-It is not a stand-in for the smart layer, and not a competitor to it. It is the load-bearing wall beneath it — the part of the structure that cannot be demolished no matter how persuasive the arguments from above may sound.
+---
 
 ## What It Does, in Plain Terms
 
-When the system needs to check whether a metric has crossed an alarming boundary, it goes to fetch that boundary from one place — the `absolute_thresholds` table. It does not matter which path led to the check: a morning report, a trend signal, a lifestyle agent, or the emergency fuse. All of them read from the same source.
+**One table — one source of truth.**
+All clinical thresholds — "above this is dangerous," "below this is dangerous" — live in one table. Not in code, not in the model's internals, but in one place that can be opened, inspected, and updated. Every part of the system that checks your readings — smart agents, the safety net, the morning report — reads thresholds from there and only from there.
 
-What happens if the needed threshold is not in the table? The system does not substitute a guess. It fails loudly — specifically so that someone notices. Because a quietly wrong number will look like the truth, while a loud failure says plainly: "something is broken here, go fix it."
+Some thresholds came from clinical documents; one threshold is personal, set by the owner. The source of each is recorded honestly.
 
-There is also a fallback for the case where the table is entirely unavailable — for example, the database is not responding. In that case the system uses a cached snapshot of the same data. But even then — not silently: a loud signal is raised indicating that the system is operating from the cache rather than the live source. The cache is not a normal state; it is an alarm.
+**No silent guess — a loud failure.**
+If a needed threshold is not in the table, the system does not substitute "something reasonable" and does not stay silent. It fails loudly — specifically so that someone notices and fixes it. The reasoning behind this is simple: a confidently wrong threshold is more dangerous than an absence. An absence is a signal that says "go and figure this out." A silent guess is a false sense that everything is under control.
 
-One type of threshold deserves special mention — not absolute, but relative: "how many times above the reference range for this lab." Such a threshold exists on its own, but to apply it one must know what the reference range of the specific laboratory on your report form is. If that reference is unknown, the system neither guesses nor stays silent: it emits a separate loud signal for that specific metric. The threshold exists, but there is simply nothing to measure it against — that must be said out loud, not swept under the rug.
+A related but distinct case: sometimes a threshold for a metric exists, but a reference point from your lab report is needed for comparison — and that reference point is absent. This is not the same as a missing threshold: the threshold exists, there is simply nothing to judge against yet. Here too the system does not guess — it says so out loud, as a separate signal.
 
-The absolute check — a floor and ceiling for each metric — fires unconditionally. Even if no other alerts are active at that moment, the fuse still looks at the absolute boundaries. It cannot be accidentally "skipped" because of a quiet day.
+**The safety net checks everything — not only when asked.**
+Absolute limits for metrics are checked regularly, on a schedule, regardless of whether any treatment protocol is currently active. If a check has not run for a long time, the system notices this and raises an alert on that fact alone.
 
-Where do the boundaries in the table come from? From clinical documents — not from the model's memory, not from someone's paraphrased recollections. One of the earlier sets of literals turned out to be exactly that, a recollection from memory — and was removed, replaced with snapshots of real sources. This too is part of the principle: not "seems right," but "taken from here."
+There is also a fallback mechanism for cases where the primary table is unavailable — for example, if the database is not responding. The fallback is a snapshot of the same clinical documents that formed the basis for the table. If the system switches to the fallback, it announces this loudly rather than pretending everything is fine. The fallback and the primary table must match — this is verified separately.
+
+**Alert delivery is your choice.**
+When the system finds a clinical threshold violation, it records it. Whether a message is sent to you depends on your configuration. If sending is turned off, the system still names the event out loud — it does not suppress it. "Already alerted today" is remembered in the database, not in memory: if the bot restarts, the same alert does not arrive twice. A personal threshold — for example, "one bad night" — does not generate an alert message; its picture is carried by the morning report.
+
+---
 
 ## What to Honestly Say About Its limits
 
-All the stated invariants of this layer are currently met. But "currently met" and "verified under all conditions" are different claims, and conflating them is not acceptable.
+All claimed invariants of this layer hold. But "holds" and "verified under any conditions" are different statements, and it is important not to conflate them here.
 
-There is one known boundary that is important to understand. The value this path uses for comparison with a threshold is taken from the same calculation that computes percentiles, and that calculation skips any metric that has fewer than 14 days of data within the last 90. For a rare metric that lives as a column in a daily table, the threshold here therefore stays silent: it will not produce an error, but it will not check either. This was the case with blood pressure — a measurement on 2026-09-26 showed that the ceiling of 140 would not have fired regardless of the data. This is a limit, not a design intent; it is named here so that it is not mistaken for a guarantee. (This paragraph was corrected by hand: the model, when regenerating, called it "intentional behavior.")
+**History and column-level metrics.** Trend thresholds operate on metrics that have accumulated sufficient observation history. If there is too little data — the threshold stays silent. Some metrics, due to the way they are stored, do not enter this check layer at all — they are judged by other parts of the system.
 
-For metrics of a different type — for example, peak daily blood pressure values — the approach is different: they are read directly from yesterday's data and do not depend on accumulated history. The check there operates without this condition.
+**The connection between layers.** The safety net is a load-bearing wall, but not the only safeguard. Some metrics reach evaluation only through smart agents or the morning report. This is not a gap in the architecture but a deliberate separation of responsibilities — however, it is important to understand: "the deterministic layer checked it" does not mean "everything that could possibly be checked has been checked."
 
-In other words: the layer is honest about what it does not know, and loud about what is going wrong. But it is not omniscient, and for some metrics its coverage depends on how much data has already been collected.
+**The fallback is not a permanent support.** The threshold backup exists for emergency situations, not for normal operation. Switching to it is accompanied by a loud signal precisely because this is an abnormal situation that requires attention.
+
+**Consistency of the table with reality** is a separate responsibility. The layer guarantees that all parts of the system look at the same place. It does not guarantee that the contents of that place are current for your specific clinical situation. That remains a human responsibility.
+
+---
 
 ## Where This Lives in the System
 
-The rules and thresholds are stored in `rules_db.py` — that is where the `absolute_thresholds` table lives, the table from which all paths draw clinical boundaries. The intent of the subsystem — why it is designed this way rather than another — is described in `subsystem_intent.yaml`: it records that the deterministic layer is the load-bearing structure beneath everything else and cannot be overridden by a model's decision.
-
-These two files are the entry point if you need to understand or verify where a particular threshold comes from.
+The safety net logic lives in `rules_db.py` — it implements reading the threshold table, loud failure when values are absent, and fallback switching with an alert. The intent and boundaries of the subsystem are described in `subsystem_intent.yaml` — this is a document about *why* things are arranged this way, not *how* to run it. If something in the safety net's behavior seems unexpected, `subsystem_intent.yaml` is the first place to look: it records the intentions that the code is meant to embody.

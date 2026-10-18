@@ -104,6 +104,83 @@ def save_event(
     return evt_id
 
 
+# Кто может ССЫЛАТЬСЯ на событие из чужой таблицы. Такое событие delete_event не трогает:
+# удалить его = молча оборвать ссылку у лекарства, анализа или правила мониторинга.
+_DEPENDENTS = (
+    ("лекарства",            "SELECT COUNT(*) FROM medications WHERE prescribing_event_id=?", None),
+    ("анализы",              "SELECT COUNT(*) FROM lab_results WHERE event_id=?", None),
+    ("назначенные события",  "SELECT COUNT(*) FROM diagnostic_events "
+                             "WHERE ordering_event_id=? AND event_id<>?", "twice"),
+    ("правила мониторинга",  "SELECT COUNT(*) FROM lab_monitoring_schedule WHERE source=?", "encounter"),
+)
+
+
+def _event_dependents(conn, event_id: int) -> dict:
+    """{что: сколько} — внешние ссылки на событие. Пусто = событие можно удалить целиком."""
+    import sqlite3
+    out = {}
+    for label, sql, shape in _DEPENDENTS:
+        args = ((event_id, event_id) if shape == "twice"
+                else (f"encounter:{event_id}",) if shape == "encounter" else (event_id,))
+        try:
+            n = conn.execute(sql, args).fetchone()[0]
+        except sqlite3.OperationalError as e:
+            if "no such" not in str(e):
+                raise
+            continue  # silent-ok: нет таблицы/колонки — ссылаться нечему
+        if n:
+            out[label] = n
+    return out
+
+
+def delete_event(event_id: int, reason: str, recorded_by: str = "dashboard") -> dict:
+    """Удаляет ошибочно созданное событие целиком: строку events и её подтаблицы.
+
+    Зачем (2026-10-18, фидбэк с GitHub): создать событие в медкарте было можно, убрать —
+    нельзя; неверный приём оставался в медкарте и в контексте моделей навсегда.
+
+    Почему удаление, а не status='entered-in-error': ни один читатель events (контекст GP,
+    консилиум, экстракторы, медкарта) статус не фильтрует, и «мягко удалённый» приём
+    продолжал бы ехать в промпт. Старая строка не теряется — она в data_repair_log.
+
+    Fail-closed: на событие ссылаются лекарства/анализы/правила → ValueError с перечнем,
+    ничего не удалено. Нет события → LookupError.
+    """
+    with _hdb.get_conn() as conn:
+        row = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+        if row is None:
+            raise LookupError(f"события #{event_id} нет")
+        deps = _event_dependents(conn, event_id)
+        if deps:
+            raise ValueError("на событие ссылаются: " +
+                             ", ".join(f"{k} — {v}" for k, v in deps.items()))
+        old = dict(row)
+        # В журнал — и подтаблицы: у приёма смысл (причина, заключение) живёт в encounters.
+        snapshot = {"event": old}
+        for sub in ("encounters", "diagnostic_events"):
+            r = conn.execute(f"SELECT * FROM {sub} WHERE event_id=?", (event_id,)).fetchone()
+            if r is not None:
+                snapshot[sub] = dict(r)
+        conn.execute("BEGIN")
+        try:
+            _hdb.log_repair(conn, run_id=f"delete_event:{recorded_by}", home="sqlite:events",
+                            entity=str(event_id), field="row",
+                            old_value=json.dumps(snapshot, ensure_ascii=False), new_value=None,
+                            reason=reason or "удалено пользователем как ошибочное")
+            for sql in ("DELETE FROM encounters WHERE event_id=?",
+                        "DELETE FROM diagnostic_events WHERE event_id=?",
+                        "DELETE FROM event_problem_links WHERE event_id=?",
+                        "DELETE FROM event_relationships WHERE parent_event_id=? OR child_event_id=?",
+                        "DELETE FROM events WHERE id=?"):
+                conn.execute(sql, (event_id,) * sql.count("?"))
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    log.info(f"delete_event #{event_id} ({old.get('event_type')} {old.get('effective_date')}): {reason}")
+    return old
+
+
 def get_events(
     n: int = 20,
     event_type: str = None,

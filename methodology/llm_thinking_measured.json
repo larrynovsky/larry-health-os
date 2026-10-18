@@ -40,6 +40,14 @@
    "latency_sec": 1.44,
    "sec_per_token": 0.00726,
    "slack_sec": 6.2
+  },
+  "claude-haiku-5-5": {
+   "date": "2026-10-15",
+   "calls": 8,
+   "reserve_tokens": 708,
+   "latency_sec": 1.8,
+   "sec_per_token": 0.00454,
+   "slack_sec": 2.6
   }
  }
 }

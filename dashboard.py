@@ -146,6 +146,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 from dashboard_routers.api_profile        import router as _api_profile_router
 from dashboard_routers.api_status_actions import router as _api_status_actions_router
 from dashboard_routers.api_tasks          import router as _api_tasks_router
+from dashboard_routers.api_memory         import router as _api_memory_router
 from dashboard_routers.api_events         import router as _api_events_router
 from dashboard_routers.api_lab_review      import router as _api_lab_review_router
 from dashboard_routers.api_hae_ingest      import router as _api_hae_ingest_router
@@ -155,6 +156,7 @@ from dashboard_routers.views              import router as _views_router
 app.include_router(_api_profile_router)
 app.include_router(_api_status_actions_router)
 app.include_router(_api_tasks_router)
+app.include_router(_api_memory_router)
 app.include_router(_api_events_router)
 app.include_router(_api_lab_review_router)
 app.include_router(_api_hae_ingest_router)

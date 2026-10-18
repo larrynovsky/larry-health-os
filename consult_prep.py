@@ -139,6 +139,7 @@ def _build_medications_block(*, errors: list | None = None) -> str:
                 SELECT name, dosage, frequency, route, notes
                 FROM medications
                 WHERE status = 'active'
+                  AND COALESCE(confirmation, 'proposed') IN ('confirmed', 'manual')
                 ORDER BY name
             """).fetchall()
         if not rows:

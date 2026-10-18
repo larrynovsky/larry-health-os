@@ -22,7 +22,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "logs" / "pip_audit_latest.json"
-PY = "/opt/homebrew/bin/python3.11"  # launchd PATH пуст — полный путь
+# Аудируем окружение того интерпретатора, которым запущен джоб: его выбирает плист
+# ({{PYTHON}} из scripts/install.py — на Маке homebrew-путь, в контейнере python3).
+# Жёсткий homebrew-путь в контейнере не существует — аудит падал FileNotFoundError.
+PY = sys.executable
 
 
 def main() -> int:

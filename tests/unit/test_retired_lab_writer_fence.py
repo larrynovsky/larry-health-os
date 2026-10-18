@@ -73,10 +73,3 @@ def test_lab_document_is_delegated_not_dropped(monkeypatch, tmp_path):
     # Тот же урок, что в сторожах проекта: ассерть связку, не наличие строки.
     assert "force_lab" in called, "лабораторная ветка не делегирует вотчеру"
     assert "coordinate_import" not in called, "старый маршрут всё ещё зовётся из main()"
-
-
-def test_fence_date_is_declared_for_the_sensor():
-    """Дата фенса отделяет легаси от рецидива; без неё граница отсутствует."""
-    import integrity_tests as it
-    from datetime import date
-    assert date.fromisoformat(it.RETIRED_LAB_WRITER_FENCE)

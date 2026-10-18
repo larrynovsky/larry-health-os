@@ -1,67 +1,69 @@
-<!-- translation-of: docs/explanation/device_metrics_owner.md sha256:84744de32a41 -->
+<!-- translation-of: docs/explanation/device_metrics_owner.md sha256:4b5978d52870 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](device_metrics_owner.md)
 
-# Every instrument metric has an owner: explanation
+# Every device metric has an owner: how the system notices what isn't visible
 
 ## What changed
 
-- **The proof boundary for `bp_second_source` has been clarified.** Confirmation by live import is recorded more precisely: on 05.10 three readings (dates are in the closed part of the borrow-botkin thread) passed into the production database and matched "Health" (Withings source); the 21:10 run received 1 reading, a live token was created at 21:10:00, the error log is empty, and there are no `import_withings` records in `faults.jsonl`. The criterion was approved by the owner on 05.10 at 16:55. This is "proven within the stated limits" — no broader.
+- **`bp_day_owner_withings`: status changed from `open` to `holds`.** The invariant that when Withings is connected it becomes the sole owner of daily blood pressure is now considered satisfied — not open.
 
-- **The old boundary wording has been removed as the narrower formulation.** The previous text listed specific reading dates in the open — the dates have now been moved to the closed part and the wording has been generalised. The substantive content of the confirmation has not changed; the removal means that the boundaries of what is proven are now described differently, not that the proof has become stronger or weaker.
+- **The boundary of what is proven for `bp_day_owner_withings` is fixed.** Confirmation was received on 07.10 in read-only mode (Studio container): three days from the previous confirmation hold measurement averages and `bp_source=withings`; after deploy, 7 Health files arrived (the last one on 07.10 at 08:42) — the days were not rewritten; an independent recalculation of averages by local day produced 0 days of discrepancy and 0 values without measurements; the nightly integrity artifact of 07.10 did not contain `check_bp_day_is_withings` among failures or warnings; `import_withings` runs at 09:10 and 21:10 — error log is empty. This is "holds within the stated limits", not "verified under all possible conditions".
 
-- **The direction of the claim change for `bp_second_source` is not machine-determined.** Read as a neutral clarification of wording: what exactly became more precise is within the proven limits stated above; the conclusion "became more reliable" or "weakened" does not follow from the anchor.
+- **Confirmation run date: 2026-10-07.** Silence in this field would mean "not confirmed" — the date is now recorded.
 
-**Updated:** 2026-10-06
+**Updated:** 2026-10-07
 
 
 ## Why it exists
 
-The instrument sends dozens of different readings at once. Most of them reach somewhere, turn into numbers in a table, appear in the summary — and it seems like everything is working. But "seems" is the key word here.
+The device sends dozens of readings at once. If any one of them is lost along the way — the bot does not know. Digests go out, notifications work, one number just quietly disappeared. That is exactly why "everything is working" does not mean "everything arrived".
 
-A failure in this part of the system looks not like an error, but like silence. The bot responds. The summary arrives. It's just that there are no steps for three days in it, or blood pressure is calculated incorrectly, or one metric quietly disappeared after an update — and nobody noticed. Precisely because everything looks alive on the surface.
+Loss can look different ways. The device sends a field under one name, and the parser expects another — and stays silent. Or the data ingestion path changed, while an old watchdog sensor keeps staring into the void and raises no alarm. From the outside, "no data" is indistinguishable from "data exists but did not arrive".
 
-The "every metric has an owner" subsystem exists so that such silence becomes a scream. Its purpose is to prevent data loss from passing itself off as normal.
+This subsystem exists for one purpose: to make such a loss visible.
 
-## What it does, in plain words
+## What it does, in plain terms
 
-When the instrument sends the next data packet, the system does not simply sort numbers into their places. It asks a question about every metric: *what happened to it?*
+When data arrives, a dedicated judge examines each metric and delivers one of four verdicts.
 
-There can be several answers. The metric reached storage — good, it has an owner. The metric has a pre-recorded note saying "we don't take this, because…" — also fine, the decision was deliberate. The metric was parsed but did not reach storage — that is an alert. The metric is completely unrecognised — also an alert.
+**Handled** — the metric reached storage. This is confirmed not by a mark in the registry, but by the real behaviour of the parser: the data completed the full path.
 
-An important point: the words "covered by such-and-such column" are not enough. The system checks that on days when this metric arrived, the column was actually non-empty. If the column is empty — the metric is lost, regardless of how it is labelled in the registry.
+**Tracked** — the metric is intentionally not collected, and this is recorded as an explicit decision with an explanation. If the decision states "not collected because it is covered by another column" — it is verified that on days when the metric did arrive that column was indeed non-empty. A bare label of "covered" without data confirmation does not count.
 
-The question "has the monitoring system itself gone blind?" is protected separately. If the registry has not seen new data for a long time — not because the instrument was silent, but because the ingestion path became stale — that is also a scream, separate from all others.
+**Unowned** — the metric was parsed but is stored nowhere. This is the loss that needs to be noticed.
 
-There is one more subtle point about empty columns. If some family member's metric is not filled in, it may mean "no device present," or it may mean loss. The system distinguishes between these two cases: "no device present" is accepted only when the source of that metric has not appeared even once across the full depth of the raw archive. That is why the archive is compressed but not deleted — it is needed for this check.
+**New** — the metric is entirely unknown to the system.
 
-For blood pressure, a separate, independent path is set up: data arrives directly from the Withings cloud, bypassing the main channel. This was done after it became clear that some readings were not reaching the system through the normal channel, and once a reading that the person had already deleted in the app ended up in the daily average. This path works as a cloud mirror — a reading deleted in the app is removed here too; an empty response when history is non-empty is treated as a failure, not as "no readings."
+The judge itself is watched separately. If the registry has not seen incoming data for a long time — either the ingestion path is stale or something has broken silently. Such blindness of the judge also becomes a loud alarm, not silence.
 
-## What is honest to say about its limits
+One more rule concerns empty columns. If a column is empty — that can mean "no device present". But only in one case: when the entire raw data archive contains not a single file from that source. If the source has arrived before and the column is empty — that is a loss. That is exactly why the archive is compressed but not deleted: without it, the two cases cannot be told apart.
 
-It is important to separate two things here: what holds and what is not yet complete.
+Blood pressure is a special case. It has two independent paths. The first is through the device and the standard parser. The second is directly from the Withings cloud: each measurement with time of day and pulse. When Withings is connected, it becomes the sole owner of daily blood pressure in the final digest. The daily value is the average of all measurements over the local day, and the peak value used for alert assessment is the maximum among them. The Health path in this case does not write to those columns; instead it stores its data as a separate witness. If a measurement is deleted in the Withings app — on the next sync it disappears from the database as well. An empty response from Withings when history is non-empty is not interpreted as "no measurements" — it is treated as a failure, and data is not erased.
 
-**What holds, but has not been verified everywhere.**
+The nightly sensor checks all of this not on the event of data arrival, but against the state of the registry. This matters: the sensor does not wait for a new file to notice a problem — it looks at what is already there and compares it with what should be there.
 
-The independent blood pressure path via Withings works and is confirmed by live import into the production database. But this confirmation has specific boundaries, and stating them in fine print would be dishonest:
+## What to honestly say about its limits
 
-- Withings is polled twice a day. If a person deletes a reading in the app, the database will learn about it only at the next poll — not instantly.
-- The mirror logic, by which a reading deleted in the app is also removed from the database, was added recently. Such a deletion has not gone through in a real situation yet — it has been verified in tests, but not in reality.
-- If a particular user does not have Withings connected, this path simply stays silent — as a device that is absent would.
+All described invariants hold at the time of writing. But "holds" and "verified under all possible conditions" are different claims.
 
-**What is not yet complete.**
+**The second path for blood pressure (Withings)** is confirmed by a live import into the production database: several measurements matched Health data, the token worked, the error log was empty. But there are limits that are important to name directly.
 
-The rule about exactly who writes the daily blood pressure into the final table is formulated and the decision has been made, but the invariant is not yet closed — it is marked as open. The meaning of the rule is as follows: for those with Withings connected, the daily blood pressure should be calculated as the average of all readings for the day in local time, and the day's peak as the maximum of readings; only the Withings import should write this, while data from "Health" is stored separately as a witness but does not go into the final columns. From the first day Withings is connected it becomes the sole owner of the day; days before that moment remain with "Health." The nightly checker must recalculate averages itself and raise alerts about discrepancies.
+Withings is polled twice a day. If a measurement was deleted in the app, that deletion will not reach the database until the next poll — not instantly.
 
-This rule is formulated precisely, but has not yet been fully implemented. Treating it as working right now is incorrect.
+Deletion mirroring — that is, removing from the database measurements that no longer exist in Withings — was added after the first import was confirmed. Not a single deletion has gone through this path in production yet.
 
-Additional limits worth knowing:
+If a given user does not have Withings connected — this path simply stays silent for them, as if the device does not exist. Blood pressure in that case is still written by Health.
 
-- The day is counted by the timezone of the system installation, not by the location of the reading. During travel, a night-time reading may fall into the adjacent day.
-- For a partner without Withings, blood pressure is still written by "Health." Readings deleted on the device are not visible there.
-- "Health" blood pressure data is stored as a witness but is not adjudicated by anyone: the system deliberately does not compare it with Withings, because deleting a reading on the device is a normal human action, and such a comparison would raise an alert on every deletion.
+**The sole owner of daily blood pressure** has been verified across several days since connection: averages hold, no foreign value has leaked through, the nightly sensor found no discrepancies. But here too there are real limits.
 
-## Where this is in the system
+The day is calculated according to the timezone of the system installation, not the location of the person. If a measurement is taken at night while travelling, it may fall into the neighbouring day.
 
-The main logic is concentrated in `hae_checker.py` — that is where the judge lives that delivers a verdict on every incoming metric, and the nightly sensor that checks the state of the registry independently of incoming events. The intentions and rules of the subsystem are described in `subsystem_intent.yaml` — this is not code, but recorded decisions: what we take, what we do not take and why, and what promises the system undertakes to keep.
+For a partner without Withings, blood pressure is still calculated differently, and measurements deleted on the device are not visible there — this is not a bug, but a different arrangement for different situations, though it is important to be aware of.
+
+Health data for blood pressure sits as a separate witness and is not automatically cross-checked against Withings by anything. This is intentional: deleting a measurement on the device is a normal human action, and automatic cross-checking would raise an alarm on every such deletion.
+
+## Where this lives in the system
+
+The judge's logic lives in **hae_checker.py** — there are the verdicts for each metric, data-coverage verification, registry-blindness control, and tests for distinguishing loss from silence. The intentions of the subsystem — why it exists and what exactly counts as a loss — are described in **subsystem_intent.yaml**.

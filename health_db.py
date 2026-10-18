@@ -2048,9 +2048,15 @@ def _scrub_leaky_seed_reasons():
             ('readiness',  i18n.t('health_db.reason.readiness_low', "ru")),
             ('sleep_deep', i18n.t('health_db.reason.deep_sleep_low', "ru")),
         ):
+            # Матч по идентичности ряда, не по source (18.10): после персонализации source =
+            # 'p10_personal', и прежний матч молча промахивался — тот же провал, что ниже у
+            # trend_thresholds. До 18.10 в тексте личного пола жили старое число порога и ярлык
+            # прошлой калибровки, расходясь с текущим значением.
             conn.execute(
                 "UPDATE absolute_thresholds SET reason_template=? "
-                "WHERE source='threshold_analysis_2026-04-21' AND direction='floor' AND metric=?",
+                "WHERE direction='floor' AND metric=? AND kind='absolute' "
+                "AND COALESCE(variant,'')='' AND COALESCE(band_label,'')='' "
+                "AND source IN ('threshold_analysis_2026-04-21', 'p10_personal')",
                 (reason, metric))
         # trend_thresholds: текст из единого дома _TREND_REASONS по идентичности правила (не по
         # source — после персонализации source другой, и прежний матч молча промахивался).
@@ -2495,6 +2501,8 @@ def init_db():
     _migrate_lab_domain_verdicts()      # 2026-08-01 работа B: «класс → дом», оракул человек, не литерал в коде
     _migrate_analyte_norm_verdicts()    # 2026-09-03: «нормы нет / отложено до даты» — дом вердикта о норме аналита
     _refresh_lab_refs()                 # norm-from-documents 2026-09-02: референсы = мода бланков, не литерал (после миграций lab_results)
+    _migrate_canon_provenance()         # 2026-10-07 C-173: класс источника у строки канона, триггеры на записи
+    _migrate_treatment_date_journal()   # 2026-10-07: дата лечения меняется только с записью в журнале
     _migrate_ecg_readings()      # 2026-07-06: ЭКГ Apple Watch через HAE (вердикт+метаданные)
     _migrate_body_composition()  # 2026-07-12 Фаза 2: состав тела Fitdays (жир/мышцы/вода/висц/кость/протеин/BMR)
     _migrate_context_cards()     # 2026-07-13: анти-повтор брифа — event-log карточек контекста + recurrence FSM
@@ -2551,6 +2559,127 @@ def _migrate_problem_proposals():
             "CREATE INDEX IF NOT EXISTS idx_proposals_status "
             "ON problem_list_proposals(status)"
         )
+
+
+# Провенанс строки канона (C-173, 07.10). Две разовые пачки сессии записали канон мимо путей,
+# оставляющих источник: дубли медкарты с ярлыками не из документов и строки анализов с неверным
+# значением — и ни один датчик их не видел. Класс источника — префикс: документ, опросник или
+# ручная правка с причиной. Строки, записанные до 07.10 без класса, помечены «manual:legacy:<было>»
+# (решение владельца 07.10: «просто пометить»). Один дом: и миграция, и датчик, и тест читают отсюда.
+CANON_SOURCE_CLASSES = {
+    "lab_results": ("doc:", "instrument:", "manual:"),
+    "problem_list": ("proposal:", "doc:", "manual:"),
+}
+
+
+def canon_provenance_ddl() -> list[str]:
+    """DDL защиты «строка канона несёт класс источника» — один дом текста триггеров.
+
+    Защита на записи, а не только ночной датчик: ручная вставка без класса отбивается в момент
+    записи. Публичная — её текст читают и датчик (имена триггеров), и тест (§20)."""
+    out = []
+    for table, classes in CANON_SOURCE_CLASSES.items():
+        cond = " OR ".join(f"NEW.source GLOB '{c}*'" for c in classes)
+        for verb in ("INSERT", "UPDATE OF source"):
+            name = f"trg_{table}_source_class_{'ins' if verb == 'INSERT' else 'upd'}"
+            out.append(f"""
+        CREATE TRIGGER IF NOT EXISTS {name}
+        BEFORE {verb} ON {table}
+        FOR EACH ROW
+        WHEN NEW.source IS NULL OR NOT ({cond})
+        BEGIN
+            SELECT RAISE(ABORT,
+                '{table}.source must start with one of {"|".join(classes)} (canon provenance, C-173)');
+        END
+        """)
+    return out
+
+
+def canon_provenance_trigger_names() -> list[str]:
+    import re as _re
+    return [_re.search(r"TRIGGER IF NOT EXISTS (\w+)", d).group(1) for d in canon_provenance_ddl()]
+
+
+def _migrate_canon_provenance():
+    """Колонка источника у медкарты, пометка наследства, триггеры. Идемпотентна; обе базы."""
+    with get_conn() as conn:
+        have = {r[1] for r in conn.execute("PRAGMA table_info(problem_list)")}
+        if have and "source" not in have:
+            conn.execute("ALTER TABLE problem_list ADD COLUMN source TEXT")
+        for table, classes in CANON_SOURCE_CLASSES.items():
+            if not {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+                continue
+            ok = " OR ".join(f"source GLOB '{c}*'" for c in classes)
+            legacy = ("'manual:legacy:' || COALESCE(source, '')" if table == "lab_results"
+                      else "'manual:legacy:' || COALESCE(substr(created_at, 1, 10), '')")
+            conn.execute(f"UPDATE {table} SET source = {legacy} "
+                         f"WHERE source IS NULL OR NOT ({ok})")
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        for ddl in canon_provenance_ddl():
+            if any(f" ON {t}\n" in ddl for t in tables):   # таблицу канона заводят лениво
+                conn.execute(ddl)
+
+
+# Дата лечения меняется только с записью в журнале (07.10, нить treatment-date-journal). 30.08 дату
+# курса в periods поменяли прямой правкой: журнала нет, а source остался «canonical_2026_04_21» —
+# строка соврала о происхождении, и защита класса источника (выше) этого бы не увидела: менялась дата,
+# не источник. Поэтому стережётся само поле: UPDATE даты пропускается, только если в data_repair_log
+# ПОСЛЕДНЯЯ запись этой строки и поля несёт ЭТО значение: вперёд — неоткаченная с new_value, откат —
+# откаченная с old_value (revert_repairs помечает до правки и идёт от новых к старым). Только последняя:
+# замер 07.10 на живой базе — по любой записи из прошлого прошёл тихий возврат ошибочной даты.
+# Граница названа: доказательность причины («слово владельца» без ссылки) механизм не проверяет.
+TREATMENT_DATE_FIELDS = {"periods": ("start_date", "end_date"),
+                         "medications": ("start_date", "end_date")}
+NON_MEDICAL_PERIOD_TYPES = ("travel", "vacation", "experiment", "stress")
+
+
+def treatment_date_journal_ddl() -> list[str]:
+    """DDL «дата лечения меняется только через log_repair» — один дом текста триггеров (§20)."""
+    out = []
+    for table, fields in TREATMENT_DATE_FIELDS.items():
+        scope = ("" if table != "periods" else
+                 " AND NEW.type NOT IN (%s)" % ",".join(f"'{t}'" for t in NON_MEDICAL_PERIOD_TYPES))
+        for f in fields:
+            key = (f"home = 'sqlite:{table}' AND entity = CAST(NEW.id AS TEXT) AND field = '{f}'")
+            q = f"json_quote(NEW.{f})"
+            # Вперёд: последняя запись поля не откачена и несёт new_value. Откат: самая ранняя из
+            # хвоста откаченных записей (после последней неоткаченной) несёт old_value — туда и
+            # ведёт отмена, шаг за шагом от новых к старым.
+            out.append(f"""
+        CREATE TRIGGER IF NOT EXISTS trg_{table}_{f}_journal
+        BEFORE UPDATE OF {f} ON {table}
+        FOR EACH ROW
+        WHEN NEW.{f} IS NOT OLD.{f}{scope}
+         AND NOT EXISTS (
+            SELECT 1 FROM data_repair_log
+            WHERE id = (SELECT MAX(id) FROM data_repair_log WHERE {key})
+              AND reverted_at IS NULL AND new_value = {q})
+         AND NOT EXISTS (
+            SELECT 1 FROM data_repair_log
+            WHERE id = (SELECT MIN(id) FROM data_repair_log WHERE {key}
+                        AND id > COALESCE((SELECT MAX(id) FROM data_repair_log
+                                           WHERE {key} AND reverted_at IS NULL), 0))
+              AND old_value = {q})
+        BEGIN
+            SELECT RAISE(ABORT,
+                '{table}.{f}: treatment date changes only with a data_repair_log entry (log_repair)');
+        END
+        """)
+    return out
+
+
+def _migrate_treatment_date_journal():
+    """Триггеры журнала дат лечения. Идемпотентна; таблицы могут появиться позже — ставим что есть."""
+    with get_conn() as conn:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "data_repair_log" not in tables:
+            return
+        for ddl in treatment_date_journal_ddl():
+            if any(f" ON {t}\n" in ddl for t in tables):
+                import re as _re
+                name = _re.search(r"TRIGGER IF NOT EXISTS (\w+)", ddl).group(1)
+                conn.execute(f"DROP TRIGGER IF EXISTS {name}")   # текст триггера мог смениться
+                conn.execute(ddl)
 
 
 def question_answer_gate_ddl() -> list[str]:
@@ -2810,6 +2939,7 @@ def _ensure_lab_table():
         CREATE INDEX IF NOT EXISTS idx_lab_name ON lab_results(test_name);
         CREATE INDEX IF NOT EXISTS idx_lab_date_name ON lab_results(date, test_name);
         """)
+    _migrate_canon_provenance()   # таблица только что могла появиться — защита записи с ней (C-173)
 
 
 def import_biochemical_json(filepath: str) -> int:
@@ -2960,8 +3090,9 @@ def log_repair(conn, *, run_id, home, entity, field, old_value, new_value, reaso
 # Ремонт фактов о лечении 04.10.2026 (нить treatment-homes) — канон владельца, §13: откат обязан
 # быть исполнимым, а не заявленным.
 # memory и tasks — с 05.10.2026 (нить test-thread-leak): ремонт следов потока теста в живой базе.
+# periods — с 07.10.2026 (нить supplements-home): главный дом дат лечения чинится тем же журналом.
 _ROW_REPAIR_HOMES = {"medications": "id", "patient_profile": "key", "problem_list": "problem_id",
-                     "memory": "id", "tasks": "id"}
+                     "memory": "id", "tasks": "id", "periods": "id"}
 
 
 def revert_repairs(run_id: str) -> int:
@@ -2980,7 +3111,7 @@ def revert_repairs(run_id: str) -> int:
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, home, entity, field, old_value FROM data_repair_log "
-            "WHERE run_id=? AND reverted_at IS NULL ORDER BY id", (run_id,)
+            "WHERE run_id=? AND reverted_at IS NULL ORDER BY id DESC", (run_id,)   # отмена — от новых к старым
         ).fetchall()
         unknown = {r[1] for r in rows} - set(_KNOWN_HOMES)
         if unknown:
@@ -2999,6 +3130,12 @@ def revert_repairs(run_id: str) -> int:
 
         for rid, home, entity, field, old_json in rows:
             old = json.loads(old_json)
+            # Пометка ДО правки: триггер журнала дат лечения пропускает возврат к old_value только
+            # по свежей пометке отката, иначе любое прежнее значение из журнала открывало бы тихий
+            # возврат ошибки (замер 07.10 на живой базе). Отказ ниже откатит и пометку — транзакция одна.
+            conn.execute(
+                "UPDATE data_repair_log SET reverted_at = datetime('now') WHERE id = ?", (rid,)
+            )
             if home == "sqlite:daily_metrics":
                 conn.execute(
                     f"UPDATE daily_metrics SET {field} = ? WHERE date = ?", (old, entity)
@@ -3024,9 +3161,6 @@ def revert_repairs(run_id: str) -> int:
                 doc = json.loads(path.read_text())
                 doc.setdefault("sleep", {})[field] = old
                 path.write_text(json.dumps(doc, ensure_ascii=False, indent=2))
-            conn.execute(
-                "UPDATE data_repair_log SET reverted_at = datetime('now') WHERE id = ?", (rid,)
-            )
             done += 1
     return done
 
@@ -4229,6 +4363,7 @@ _HAE_SEED: list[tuple[str, str, str]] = [
     ("heart_rate",                      "handled", "ЧСС из iPhone"),
     ("resting_heart_rate",              "handled", "ЧСС покоя"),
     ("heart_rate_variability",          "handled", "HRV из iPhone"),
+    ("heart_rate_variability_rmssd",    "handled", "HRV RMSSD: separate raw series hrv_rmssd_avg, never mixed with SDNN (2026-10-07)"),
     ("blood_oxygen_saturation",         "handled", "SpO2"),
     ("step_count",                      "handled", "шаги"),
     ("walking_running_distance",        "handled", "дистанция"),
@@ -4540,7 +4675,7 @@ from assessments_db import (  # noqa: E402
 
 # ── Поток C (2026-06-27): домен events → events_db.py ──
 from events_db import (  # noqa: E402
-    save_event, get_events, get_context_events, save_context_event,
+    save_event, get_events, get_context_events, save_context_event, delete_event,
 )
 
 

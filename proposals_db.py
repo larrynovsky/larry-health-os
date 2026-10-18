@@ -272,15 +272,16 @@ def apply_proposal(proposal_id: int) -> int:
                         INSERT INTO problem_list
                         (problem_id, title, description, status, priority,
                          domain, first_seen, last_updated, watch_trigger,
-                         watch_deadline, notes, review_date, plain_summary)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                         watch_deadline, notes, review_date, plain_summary, source)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """, (
                         _src.get("problem_id"), _src.get("title"),
                         _src.get("description"), _src.get("status", "active_monitoring"),
                         _src.get("priority", 3), _src.get("domain", "other"),
                         now, now,
                         _src.get("watch_trigger"), _src.get("watch_deadline"),
-                        _src.get("reason", ""), _rd, _src.get("plain_summary") or plains.get(i)
+                        _src.get("reason", ""), _rd, _src.get("plain_summary") or plains.get(i),
+                        f"proposal:{proposal_id}",
                     ))
                     applied += 1
 

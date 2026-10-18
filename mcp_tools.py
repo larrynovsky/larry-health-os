@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+from _time_inject import get_today
 import json
 import re
 
@@ -101,7 +102,7 @@ def _days(args: dict, default: int) -> int:
 
 
 def _envelope(source: str, body) -> str:
-    today = _dt.date.today().isoformat()
+    today = get_today().isoformat()
     head = f"Источник: Health OS — {source}. Выдано {today}."
     return head + "\n" + (body if isinstance(body, str) else json.dumps(body, ensure_ascii=False, default=str))
 
@@ -120,7 +121,14 @@ def _tool_lab_tests(args: dict) -> str:
         a = agg.setdefault(r["test_name"], {"test_name": r["test_name"], "last_date": r["date"], "results": 0})
         a["results"] += 1
         a["last_date"] = max(a["last_date"], r["date"])
-    return _envelope("лабораторные результаты (канон)", sorted(agg.values(), key=lambda a: a["test_name"]))
+    # Граница выборки — в самом ответе (18.10, проба probe_context_boundary покраснела 12.10): список
+    # аналитов без неё читается помощником как полный, и «X в списке нет» становится «X не сдавался»,
+    # хотя изнутри ответа выход за окно и отсутствие измерения неразличимы. Текст границы — общий
+    # дом labs_db.declared_boundary; он же говорит, когда окно покрывает весь канон.
+    # Порядок полей (18.10): сначала перечень, потом граница — текст границы говорит «выше показан…».
+    return _envelope("лабораторные результаты (канон)",
+                     {"tests": sorted(agg.values(), key=lambda a: a["test_name"]),
+                      "boundary": labs_db.declared_boundary(MAX_DAYS)})
 
 
 def _tool_lab_results(args: dict) -> str:
@@ -128,7 +136,7 @@ def _tool_lab_results(args: dict) -> str:
     if not isinstance(name, str) or not name.strip() or len(name) > 100:
         raise BadArgs("test_name — непустая строка до 100 символов")
     name, days = name.strip(), _days(args, 1825)
-    cutoff = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    cutoff = (get_today() - _dt.timedelta(days=days)).isoformat()
     import labs_db
     # Основной путь — по ВЕЩЕСТВУ через отображение LOINC (решение владельца 06.10): разные
     # лаборатории пишут один анализ по-разному («LDL calculated» и «ЛПНП»), и ряд по одному

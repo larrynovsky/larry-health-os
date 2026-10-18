@@ -15,6 +15,13 @@ import intent_registry as ir
 
 pytestmark = pytest.mark.unit
 
+# Настоящий `git merge` во временном репозитории. В контейнере владельца git нет по замыслу образа
+# (решение владельца 05.10, тот же пропуск в test_night_repair): там эти тесты судить нечем, их судит
+# полный прогон при слиянии нити. Замер 15.10: три теста файла красные в ночном наборе контейнера
+# с 08.10 — FileNotFoundError 'git'. Пропуск только по отсутствию git.
+if __import__("shutil").which("git") is None:
+    pytest.skip("git нет в этой среде: слияние нитей судится на MacBook/Studio", allow_module_level=True)
+
 
 def _reg(status, by=None):
     inv = {"id": "i1", "status": status}

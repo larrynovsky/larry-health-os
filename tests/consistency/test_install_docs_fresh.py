@@ -61,7 +61,13 @@ def _sandbox(tmp_path, monkeypatch, replies):
     monkeypatch.setattr(secret_guard, "find_secret_values", lambda prompt: [])
     create = Mock(side_effect=[SimpleNamespace(content=[SimpleNamespace(text=r)], stop_reason="end_turn")
                                for r in replies])
-    monkeypatch.setattr(llm_client, "guarded_client", lambda: SimpleNamespace(messages=SimpleNamespace(create=create)))
+    # Перевод идёт потоком (08.10): поток отдаёт ответ того же create, счёт вызовов общий.
+    def stream(**kw):
+        import contextlib
+        msg = create(**kw)
+        return contextlib.nullcontext(SimpleNamespace(get_final_message=lambda: msg))
+    monkeypatch.setattr(llm_client, "guarded_client",
+                        lambda: SimpleNamespace(messages=SimpleNamespace(create=create, stream=stream)))
     path = tmp_path / install.INSTALL_DOC_PAGES[0]
     path.parent.mkdir(parents=True)
     return da, path, create

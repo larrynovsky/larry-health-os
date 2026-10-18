@@ -27,7 +27,7 @@
       <div class="card-meta">{{ p.problem_id or p.id }}
         {% if p.domain %} · {{ p.domain }}{% endif %}
         {% if p.first_seen %} · с <time>{{ p.first_seen | short(10) }}</time>
-          <span class="age-suffix">({{ p.first_seen | age_days }}д назад)</span>
+          <span class="age-suffix">({{ p.first_seen | age_label }})</span>
         {% endif %}
       </div>
       <div class="card-chips">

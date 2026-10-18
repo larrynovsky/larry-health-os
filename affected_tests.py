@@ -33,7 +33,12 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 TESTS = ROOT / "tests"
 SELECTION_CAP = 40
-_TRANSLATION_TEST = "tests/consistency/test_doc_translations.py"          # выше потолка выбор бессмысленен — честнее сказать «гони всё»
+_TRANSLATION_TEST = "tests/consistency/test_doc_translations.py"
+# Ядро выше потолка (07.10, урок C-174): широкая правка раньше не гоняла НИЧЕГО — и нить
+# canon-provenance узнала о двух красных сторожах согласованности (новый датчик без пометки
+# вреда и негативного контроля) только в конце 13-минутного прогона закрытия. Сторожи
+# tests/consistency судят форму и реестры, бегут секундами (замер: 7 файлов, 13 с на MacBook).
+CORE_PREFIX = "tests/consistency/"          # выше потолка выбор бессмысленен — честнее сказать «гони всё»
 
 
 def _module_imports(path: Path) -> set[str]:
@@ -100,6 +105,11 @@ def select(changed: list[str]) -> tuple[list[str], str | None]:
     return hits, None
 
 
+def _core_of(hits: list[str]) -> list[str]:
+    """Сторожи согласованности из выбора: их гоняем и тогда, когда выбор шире потолка."""
+    return [h for h in hits if h.startswith(CORE_PREFIX)]
+
+
 def _staged() -> list[str]:
     """Изменённые файлы берутся из ИНДЕКСА, а не из рабочего дерева (§15):
     судится то, что реально уйдёт в коммит, поэтому частичный стейдж не обманет."""
@@ -114,8 +124,14 @@ def main() -> int:
         return 0
     hits, refusal = select(changed)
     if refusal:
-        print(f"affected_tests: {refusal}")
-        return 0
+        core = _core_of(hits)
+        if not core:
+            print(f"affected_tests: {refusal}")
+            return 0
+        # Выбор не сужает — но ядро гоняем: stdout — список к прогону, stderr — почему не всё.
+        print(f"affected_tests: {refusal}; гоню только сторожей согласованности ({len(core)})",
+              file=sys.stderr)
+        hits = core
     for h in hits:
         print(h)
     return 0

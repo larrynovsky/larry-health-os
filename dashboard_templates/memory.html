@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Память — Health OS{% endblock %}
+{% set page_name = "память" %}
+
+{% macro record(f) %}
+  <li id="mem-{{ f.id }}" class="mem-item">
+    {% if f.show_key %}<span class="mem-key">{{ f.key | replace("_", " ") }}:</span> {% endif %}{{ f.value | short(300) }}
+    <div class="card-meta">{{ f.origin_label }}{% if f.day %} · {{ f.day }}{% endif %}
+      <button class="action-pill action-pill--ghost" hx-post="/api/memory/{{ f.id }}/retire"
+              hx-confirm="Убрать эту запись из памяти?" hx-target="closest li" hx-swap="delete">убрать</button>
+    </div>
+  </li>
+{% endmacro %}
+
+{% block header %}
+<div class="shell-title-block">
+  <h1>Память</h1>
+  <p class="shell-subtitle">{{ total }} действующих записей. Это видят бот, утренний бриф, Claude и ChatGPT.
+    «Убрать» гасит запись, но не удаляет её.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+{% for cls, title, items, old in sections %}
+  {% if cls == "preference" %}
+  <article class="card card--action" id="mem-bans">
+    <div class="card-head"><div class="card-meta">{{ title }} · {{ items | length }}</div></div>
+    <form hx-post="/api/memory/ban" hx-target="#ban-list" hx-swap="beforeend"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      <input name="text" maxlength="200" required class="kv-edit-input"
+             placeholder="например: не предлагай мне бег">
+      <button class="action-pill action-pill--active">добавить запрет</button>
+    </form>
+    <ul id="ban-list">
+      {% for f in items %}
+      <li id="mem-{{ f.id }}">{{ f.value }}
+        <button class="action-pill action-pill--ghost" hx-post="/api/memory/{{ f.id }}/retire"
+                hx-confirm="Убрать запрет?" hx-target="closest li" hx-swap="delete">убрать</button></li>
+      {% endfor %}
+    </ul>
+  </article>
+  {% else %}
+  <details class="card" id="mem-{{ cls }}" {% if cls == "fact" %}open{% endif %}>
+    <summary class="card-meta">{{ title }} · {{ items | length + old | length }}{% if old %} (свежих за {{ fresh_days }} дней: {{ items | length }}){% endif %}</summary>
+    {% if not items and not old %}<p class="hint">Пусто.</p>{% endif %}
+    <ul>{% for f in items %}{{ record(f) }}{% endfor %}</ul>
+    {% if old %}
+    <details>
+      <summary class="card-meta">старше {{ fresh_days }} дней · {{ old | length }}</summary>
+      <ul>{% for f in old %}{{ record(f) }}{% endfor %}</ul>
+    </details>
+    {% endif %}
+  </details>
+  {% endif %}
+{% endfor %}
+{% endblock %}

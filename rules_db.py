@@ -21,7 +21,7 @@ def get_absolute_thresholds(direction: str | None = None) -> list[dict]:
         if direction:
             rows = conn.execute(
                 """SELECT metric, direction, value, reason_template, source, source_date,
-                          kind, baseline, band_label, variant
+                          kind, baseline, band_label, variant, norm_kind
                    FROM absolute_thresholds WHERE active=1 AND direction=?
                    ORDER BY metric""",
                 (direction,),
@@ -29,7 +29,7 @@ def get_absolute_thresholds(direction: str | None = None) -> list[dict]:
         else:
             rows = conn.execute(
                 """SELECT metric, direction, value, reason_template, source, source_date,
-                          kind, baseline, band_label, variant
+                          kind, baseline, band_label, variant, norm_kind
                    FROM absolute_thresholds WHERE active=1
                    ORDER BY direction, metric"""
             ).fetchall()

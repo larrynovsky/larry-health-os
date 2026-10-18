@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:50a673488cdd -->
+<!-- translation-of: docs/how-to/README.md sha256:c952363f434f -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -50,6 +50,7 @@ A terminal on the machine where the system is installed is required. Use the rul
   [with an OpenAI, Gemini or DeepSeek key](llm_provider.md)
 - [Connect Google Calendar](connect_google_calendar.md)
 - [Connect Health OS to Claude and ChatGPT](connect_cloud_assistants.md)
+- [Correct memory and add a ban](edit_memory.md)
 - [Connect a Withings blood-pressure monitor](connect_withings.md) — section "Docker image install"
 - The bot replied “I couldn't answer: something failed inside the system…” with a code: [find the cause by the code](bot_fault.md)
 

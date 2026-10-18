@@ -341,6 +341,7 @@
     "config_db",
     "correlation_gate",
     "doc_translation",
+    "food_profile",
     "hai_core",
     "health_db",
     "i18n",
@@ -488,7 +489,8 @@
     "hai_reports",
     "health_db",
     "llm_client",
-    "memory_facts_db"
+    "memory_facts_db",
+    "treatment_db"
   ],
   "hai_context": [
     "_fmt_helpers",
@@ -720,6 +722,7 @@
     "google_calendar_fetcher",
     "gp_context",
     "hae_checker",
+    "hai_core",
     "health_db",
     "heldout_readiness",
     "i18n",
@@ -731,6 +734,7 @@
     "lab_oracles",
     "lab_promote",
     "labs_db",
+    "llm_client",
     "log_rotate",
     "loinc_match",
     "memory_facts_db",
@@ -944,6 +948,7 @@
     "signal_family"
   ],
   "mcp_tools": [
+    "_time_inject",
     "food_profile",
     "generated_food_rules",
     "labs_db",
@@ -1267,6 +1272,7 @@
   "survivorship_curator": [
     "_time_inject",
     "cbcr_hypothesis",
+    "gp_context",
     "hai_core",
     "hai_hypotheses",
     "health_db",

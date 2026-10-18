@@ -21,24 +21,24 @@ pytestmark = pytest.mark.e2e_mock
 # 2 preserved (два instrument:*). Промоут покроет ТОЛЬКО RDW@2021-05-20.
 _CANON_SEED = [
     # (date, source, test_name, value)
-    ("2021-05-20", "Clinic Hospital", "RDW", 142.0),        # покрыт новым → replace
-    ("2021-05-20", "Clinic Hospital", "Hemoglobin", 13.1),  # НЕ покрыт → survive (lost)
-    ("2021-05-20", "Clinic Hospital", "Glucose", 95.0),     # покрыт новым → replace
-    ("2024-01-01", "HealthFund", "RDW", 13.0),                 # др. дата → survive
-    ("2024-01-01", "HealthFund", "Creatinine", 0.9),           # survive
-    ("2023-05-05", "Clinic", "Cholesterol", 170.0),         # survive
-    ("2023-05-05", "Clinic", "LDL", 100.0),                 # survive
-    ("2023-05-05", "Clinic", "HDL", 55.0),                  # survive
-    ("2022-11-11", "Synevo", "TSH", 2.1),                   # survive
-    ("2022-11-11", "Synevo", "T4", 1.2),                    # survive
-    ("2022-11-11", "Synevo", "Ferritin", 80.0),             # survive
-    ("2021-07-07", "HealthFund", "CEA", 1.3),                  # survive
-    ("2021-07-07", "HealthFund", "CA19-9", 4.7),               # survive
-    ("2020-03-03", "Clinic", "ALT", 25.0),                  # survive
-    ("2020-03-03", "Clinic", "AST", 22.0),                  # survive
-    ("2019-09-09", "Clinic", "Albumin", 4.5),               # survive
-    ("2019-09-09", "Clinic", "Bilirubin", 0.8),             # survive
-    ("2018-01-01", "HealthFund", "WBC", 6.2),                  # survive
+    ("2021-05-20", "doc:Clinic Hospital", "RDW", 142.0),        # покрыт новым → replace
+    ("2021-05-20", "doc:Clinic Hospital", "Hemoglobin", 13.1),  # НЕ покрыт → survive (lost)
+    ("2021-05-20", "doc:Clinic Hospital", "Glucose", 95.0),     # покрыт новым → replace
+    ("2024-01-01", "doc:HealthFund", "RDW", 13.0),                 # др. дата → survive
+    ("2024-01-01", "doc:HealthFund", "Creatinine", 0.9),           # survive
+    ("2023-05-05", "doc:Clinic", "Cholesterol", 170.0),         # survive
+    ("2023-05-05", "doc:Clinic", "LDL", 100.0),                 # survive
+    ("2023-05-05", "doc:Clinic", "HDL", 55.0),                  # survive
+    ("2022-11-11", "doc:Synevo", "TSH", 2.1),                   # survive
+    ("2022-11-11", "doc:Synevo", "T4", 1.2),                    # survive
+    ("2022-11-11", "doc:Synevo", "Ferritin", 80.0),             # survive
+    ("2021-07-07", "doc:HealthFund", "CEA", 1.3),                  # survive
+    ("2021-07-07", "doc:HealthFund", "CA19-9", 4.7),               # survive
+    ("2020-03-03", "doc:Clinic", "ALT", 25.0),                  # survive
+    ("2020-03-03", "doc:Clinic", "AST", 22.0),                  # survive
+    ("2019-09-09", "doc:Clinic", "Albumin", 4.5),               # survive
+    ("2019-09-09", "doc:Clinic", "Bilirubin", 0.8),             # survive
+    ("2018-01-01", "doc:HealthFund", "WBC", 6.2),                  # survive
     ("2021-02-10", "instrument:pro12", "pro12_q1", 3.0),      # preserved
     ("2020-08-12", "instrument:isi", "B12", 400.0),           # preserved
 ]

@@ -88,10 +88,14 @@ def import_from_pending(pending_path: str) -> int:
     data = _json.loads(Path(pending_path).read_text(encoding="utf-8"))
     date_str = data.get("date", "unknown")
     # Source = имя PDF (напр. "10000000002.PDF"), не имя pending-хеш-файла
-    source = Path(data.get("source_file", pending_path)).name
+    # Источник — с классом «doc:» (C-173): строка канона без класса отбивается триггером.
+    # Повторный импорт того же файла снимает и строки прежних форм (голое имя до 07.10).
+    _name = Path(data.get("source_file", pending_path)).name
+    source = f"doc:{_name}"
     count = 0
     with _hdb.get_conn() as conn:
-        conn.execute("DELETE FROM lab_results WHERE source=?", (source,))
+        conn.execute("DELETE FROM lab_results WHERE source IN (?, ?, ?)",
+                     (source, _name, f"manual:legacy:{_name}"))
         for t in data.get("tests", []):
             val = t.get("value")
             if val is None:

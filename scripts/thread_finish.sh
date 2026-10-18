@@ -162,6 +162,40 @@ fi
 # выходят и не мешают; ребёнок, который переживёт скрипт, унёс бы замок с собой
 # навсегда. Поэтому деплою дескриптор закрывается явно (`9>&-`).
 LOCK_FILE="$("$MAIN_TREE/scripts/git-hooks/finish_lock_guard.sh" --path 2>/dev/null)"
+QUEUE_FILE="$("$MAIN_TREE/scripts/git-hooks/finish_lock_guard.sh" --queue-path 2>/dev/null)"
+JOURNAL_RE="$("$MAIN_TREE/scripts/git-hooks/finish_lock_guard.sh" --journal-regex 2>/dev/null)"
+# ОЧЕРЕДЬ (07.10, нить finish-queue): дескриптор 8, держится всё закрытие — от ребейза
+# до деплоя, включая прогон. Второе закрытие ждёт здесь (до 3 ч), а не горит кодом 13
+# на сдвиге main соседом. Снимается ядром при смерти процесса, как и замок.
+_queue_take() {
+    [[ -n "$QUEUE_FILE" && -n "$JOURNAL_RE" ]] || { echo "thread_finish.sh: очередь/журнальный список не получены (finish_lock_guard.sh)" >&2; exit 15; }
+    exec 8>>"$QUEUE_FILE" || { echo "thread_finish.sh: не открыть $QUEUE_FILE" >&2; exit 15; }
+    if ! "$_PY" -c '
+import fcntl, sys, time
+end, said = time.time() + float(sys.argv[1]), False
+while True:
+    try:
+        fcntl.flock(8, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        sys.exit(0)
+    except BlockingIOError:
+        if time.time() > end:
+            sys.exit(1)
+        if not said:
+            try:
+                who = open(sys.argv[2] + ".holder").read().strip()
+            except OSError:
+                who = "?"
+            print(f"⏳ очередь закрытий: жду, пока закроется {who}", file=sys.stderr)
+            said = True
+        time.sleep(1)
+' "${THREAD_FINISH_QUEUE_WAIT:-10800}" "$QUEUE_FILE"; then
+        echo "⛔ очередь закрытий не дошла за ${THREAD_FINISH_QUEUE_WAIT:-10800} с — закрытие перед тобой висит." >&2
+        echo "   Ничего не тронуто. Посмотри, чья нить держит: $QUEUE_FILE.holder" >&2
+        exit 15
+    fi
+    printf '%s %s\n' "$SLUG" "$(date '+%F %T')" > "$QUEUE_FILE.holder"
+    export THREAD_FINISH_HOLDS_QUEUE=1
+}
 _lock_take() {
     [[ -n "$LOCK_FILE" ]] || { echo "thread_finish.sh: путь замка не получен (finish_lock_guard.sh)" >&2; exit 15; }
     exec 9>>"$LOCK_FILE" || { echo "thread_finish.sh: не открыть $LOCK_FILE" >&2; exit 15; }
@@ -192,6 +226,7 @@ _lock_drop() { exec 9>&-; unset THREAD_FINISH_HOLDS_LOCK; }
 # не видит того, кто начал слияние руками мимо thread_finish.
 _foreign_merge() { git -C "$MAIN_TREE" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; }
 
+_queue_take
 _lock_take
 # Судим ТОЛЬКО отслеживаемые файлы (--untracked-files=no, правка 13.09).
 # Untracked исключены не из мягкости, а потому что слияние их НЕ ТРОГАЕТ: файл,
@@ -390,11 +425,13 @@ while [[ "$MAIN_AFTER" != "$MAIN_BEFORE" ]]; do
     # core.quotePath=false: иначе git берёт кириллический путь в кавычки с \\ooo, и он
     # перестаёт начинаться с docs/handoff/ — поймано оракулом при первом прогоне.
     DRIFT_FILES="$(git -C "$MAIN_TREE" -c core.quotePath=false diff --name-only "$MAIN_BEFORE" "$MAIN_AFTER")"
-    NOT_NOTES="$(printf '%s\n' "$DRIFT_FILES" | grep -v '^docs/handoff/' | grep -v '^$' || true)"
+    # Журнальные файлы (записки, уроки, планы .md, отметка прочтения) — дрейф, который
+    # закрытие переживает своими затронутыми тестами; список — в finish_lock_guard.sh.
+    NOT_NOTES="$(printf '%s\n' "$DRIFT_FILES" | grep -Ev "$JOURNAL_RE" | grep -v '^$' || true)"
     if [[ -n "$NOT_NOTES" || $DRIFT_ROUNDS -ge 3 || -z "$_PY" ]]; then
         echo "" >&2
         echo "⛔ main сдвинулся, пока шёл прогон: $MAIN_BEFORE → $MAIN_AFTER" >&2
-        [[ -n "$NOT_NOTES" ]] && echo "   Сдвиг не только записками: $(printf '%s' "$NOT_NOTES" | head -3 | tr '\n' ' ')" >&2
+        [[ -n "$NOT_NOTES" ]] && echo "   Сдвиг не только журнальными файлами: $(printf '%s' "$NOT_NOTES" | head -3 | tr '\n' ' ')" >&2
         ((DRIFT_ROUNDS >= 3)) && echo "   Три круга дрейфа записками подряд — сосед активен, закрою позже." >&2
         echo "   Прогон судил дерево на СТАРОМ основании; сливать его — зелёный не" >&2
         echo "   на той версии (§12). Ничего не слито и не задеплоено." >&2
@@ -402,7 +439,7 @@ while [[ "$MAIN_AFTER" != "$MAIN_BEFORE" ]]; do
         exit 13
     fi
     DRIFT_ROUNDS=$((DRIFT_ROUNDS + 1))
-    echo "▶ main сдвинулся только записками ($(printf '%s\n' "$DRIFT_FILES" | grep -c .) файл.) — ребейз и затронутые тесты, без второго полного прогона"
+    echo "▶ main сдвинулся только журнальными файлами ($(printf '%s\n' "$DRIFT_FILES" | grep -c .) файл.) — ребейз и затронутые тесты, без второго полного прогона"
     if ! git -C "$TREE" rebase main >/dev/null 2>&1; then
         git -C "$TREE" rebase --abort 2>/dev/null
         echo "⛔ ребейз на сдвинутый записками main не прошёл — повтори закрытие." >&2
@@ -534,7 +571,7 @@ fi
 
 echo "▶ деплой (при слиянии git не зовёт post-commit — зовём сами)"
 # `9>&-`: деплой рестартит службы — ни один его потомок не должен унести замок.
-if ! "$MAIN_TREE/scripts/git-hooks/post-commit-macbook" 9>&-; then
+if ! "$MAIN_TREE/scripts/git-hooks/post-commit-macbook" 9>&- 8>&-; then
     echo "⚠️  деплой вернул ошибку — дерево нити НЕ убираю, работа на месте" >&2
     exit 7
 fi
@@ -543,7 +580,7 @@ fi
 # задеплоенного main — решение владельца 29.09 (нить arch-en-gen). Отказ закрытия не валит: код
 # и лог — logs/arch_regen.log, а ночной датчик check_arch_map_fresh видит устаревший штамп.
 echo "▶ пересобираю карту проекта"
-if ! bash "$MAIN_TREE/scripts/arch_regen.sh" "$MAIN_TREE" "$SLUG" 9>&-; then
+if ! bash "$MAIN_TREE/scripts/arch_regen.sh" "$MAIN_TREE" "$SLUG" 9>&- 8>&-; then
     echo "⚠️  карта проекта не пересобрана — logs/arch_regen.log; датчик карты это увидит" >&2
 fi
 

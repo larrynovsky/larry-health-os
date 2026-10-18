@@ -47,6 +47,7 @@
   [с ключом OpenAI, Gemini или DeepSeek](llm_provider.md)
 - [Подключить Google Calendar](connect_google_calendar.md)
 - [Подключить Health OS к Claude и ChatGPT](connect_cloud_assistants.md)
+- [Поправить память и добавить запрет](edit_memory.md)
 - [Подключить тонометр Withings](connect_withings.md) — раздел «Установка из образа Докера»
 - Бот ответил «Не получилось ответить: сбой внутри системы…» с кодом: [найти причину по коду](bot_fault.md)
 

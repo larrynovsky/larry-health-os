@@ -170,6 +170,55 @@ def tasks(request: Request):
     })
 
 
+# Порядок разделов страницы «Память»: запреты сверху — их владелец правит чаще всего.
+_MEMORY_SECTIONS = ("preference", "fact", "state", "question", "recommendation", "experiment")
+# Состояния и вопросы — сиюминутное: на странице по умолчанию только свежее, старое — под катом
+# (07.10: 340 состояний одним списком владелец назвал мусором).
+_MEMORY_FOLD_OLD = ("state", "question")
+_MEMORY_FRESH_DAYS = 30
+# Источник записи — словами владельца, а не кодом базы (07.10).
+_MEMORY_ORIGINS = ("conversation", "arbiter_unverified", "task", "backfill", "device_gps",
+                   "consolidation", "owner_dashboard")
+
+
+def _memory_origin_label(source: str, lang) -> str:
+    kind = source.split(":", 1)[0]
+    return i18n.t(f"dashboard.memory.origin.{kind}", lang) if kind in _MEMORY_ORIGINS else source
+
+
+def _human_day(iso) -> str:
+    s = str(iso or "")[:10]
+    return f"{s[8:10]}.{s[5:7]}.{s[0:4]}" if len(s) == 10 else s
+
+
+@router.get("/memory", response_class=HTMLResponse)
+def memory(request: Request):
+    """Память о владельце — та же, что видят бот, бриф, Claude и ChatGPT (07.10).
+    Читает через memory_facts_db.get_facts: читатель памяти один, своего SQL здесь нет."""
+    import memory_facts_db as mf
+    rows = mf.get_facts()
+    lang = i18n.lang_of()
+    from datetime import date as _d, timedelta as _td
+    fresh_from = str(_d.today() - _td(days=_MEMORY_FRESH_DAYS))
+    for r in rows:
+        r["origin_label"] = _memory_origin_label(r.get("source") or "", lang)
+        r["show_key"] = bool(r.get("key")) and not str(r["key"]).startswith(("question:", "no_suggest:"))
+        r["day"] = _human_day(r.get("valid_from"))
+    sections = []
+    for cls in _MEMORY_SECTIONS:
+        items = [r for r in rows if r.get("mem_class") == cls]
+        if cls in _MEMORY_FOLD_OLD:
+            fresh = [r for r in items if (r.get("valid_from") or "") >= fresh_from]
+            old = [r for r in items if (r.get("valid_from") or "") < fresh_from]
+        else:
+            fresh, old = items, []
+        sections.append((cls, i18n.t(f"dashboard.memory.section.{cls}", lang), fresh, old))
+    return templates.TemplateResponse(request, "memory.html", {
+        "request": request, "sections": sections, "total": len(rows),
+        "fresh_days": _MEMORY_FRESH_DAYS,
+    })
+
+
 @router.get("/problems", response_class=HTMLResponse)
 def problems(request: Request):
     rows = _q("""

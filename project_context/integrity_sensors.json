@@ -63,7 +63,6 @@
     "check_lab_no_billing_rows",
     "check_lab_ref_scale",
     "check_lab_review_queue_movement",
-    "check_lab_single_writer",
     "check_lab_unit_present",
     "check_labs_freshness_per_tenant",
     "check_launchd_inventory",
@@ -798,6 +797,100 @@
           "verdict": "ПОКРАСНЕЛ"
         }
       ]
+    },
+    "check_canon_provenance": {
+      "harness": "plans/mutate_canon_provenance_2026-10-07.sh",
+      "ran_at": "2026-10-07",
+      "mutations": [
+        {
+          "tag": "no-triggers",
+          "statement": "миграция не ставит триггеры — строка без класса проходит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "proposal-no-source",
+          "statement": "одобренное предложение не пишет свой номер",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sensor-count-blind",
+          "statement": "сторож не считает строки без класса",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "sensor-trigger-blind",
+          "statement": "сторож не видит снятый триггер",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_safety_limits_executed": {
+      "harness": "plans/mutate_safety_limits_2026-10-07.sh",
+      "ran_at": "2026-10-07",
+      "mutations": [
+        {
+          "tag": "pulse-not-beaten",
+          "statement": "задача не отмечает пульс — исполненный пол неотличим от мёртвого",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "threshold-void",
+          "statement": "порог молчания обессмыслен — датчик не называет тенанта, у которого пол молчит",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "limits-not-called",
+          "statement": "задача не зовёт пол — пик давления выше потолка не доходит до человека",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_chain_models_thinking_known": {
+      "harness": "plans/mutate_chain_thinking_sensor_2026-10-15.sh",
+      "ran_at": "2026-10-15",
+      "mutations": [
+        {
+          "tag": "profile-blind",
+          "statement": "модель без профиля думания считается замеренной",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "reserve-blind",
+          "statement": "у думающей модели запас не проверяется",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "silent",
+          "statement": "находка считается, но не доставляется (warn снят)",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_skipped_probes_reviewed": {
+      "harness": "plans/mutate_skipped_probes_sensor_2026-10-18.sh",
+      "ran_at": "2026-10-18",
+      "mutations": [
+        {
+          "tag": "late-blind",
+          "statement": "прошедшая дата пересмотра не считается просрочкой",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "off-by-one",
+          "statement": "срок истекает уже в день пересмотра",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "silent",
+          "statement": "просрочка считается, но не доставляется (warn снят)",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "date-not-read",
+          "statement": "разбор носителя не читает дату — у всех пропусков нет будильника",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
     }
   },
   "_harm": "Кого задевает поломка, которую ловит датчик (нить repair-order, решение владельца 02.10): person — человек получает неверное или не получает нужное (совет, отчёт, бриф, ответ бота); data — портятся или устаревают данные, на которых всё строится; system — только внутренняя кухня (гейты, документы, журналы, тесты). Читатель — night_repair.pick_cards: первое место ночи самой вредной карточке, второе — старейшей. Новый датчик приходит с пометкой: tests/consistency/test_sensor_harm_declared.py краснеет на датчике без неё. Разметка 02.10 — суждение по имени и метке датчика; спорные отнесены к system и перечислены в записке нити.",
@@ -806,6 +899,7 @@
       "check_absence_surface_guarded",
       "check_brief_does_not_retell_owner",
       "check_canon_normal_flag_matches_reference",
+      "check_chain_models_thinking_known",
       "check_correlations_grounded",
       "check_cross_tenant_contamination",
       "check_daemons_alive",
@@ -831,6 +925,7 @@
       "check_report_content",
       "check_reschedule_liveness",
       "check_review_dates",
+      "check_safety_limits_executed",
       "check_safety_net_can_judge",
       "check_schedule_vs_guideline",
       "check_stale_visual_cases",
@@ -851,6 +946,7 @@
       "check_calendar_freshness",
       "check_canon_naming_debt",
       "check_canon_one_date_per_analyte_in_doc",
+      "check_canon_provenance",
       "check_canon_rows_have_a_result",
       "check_carrier_status_allele_coupling",
       "check_censored_values_coherent",
@@ -886,7 +982,6 @@
       "check_lab_no_billing_rows",
       "check_lab_ref_scale",
       "check_lab_review_queue_movement",
-      "check_lab_single_writer",
       "check_lab_unit_present",
       "check_labs_freshness_per_tenant",
       "check_literature_freshness",
@@ -992,7 +1087,8 @@
       "check_ungrounded_corr_ratchet",
       "check_validation_gate_methodology_present",
       "check_watchdog_liveness",
-      "check_machine_judge_alive"
+      "check_machine_judge_alive",
+      "check_skipped_probes_reviewed"
     ]
   }
 }

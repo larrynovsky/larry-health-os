@@ -316,6 +316,11 @@ SECRET_SCOPE: dict[str, str] = {
     "oura_client_id": "tenant",        # installation supplies its own Oura app
     "oura_client_secret": "tenant",
     "google_calendar_token.json": "tenant",
+    # 12.10: Withings (нить withings-bp) — как Oura: своё приложение и свой вход у установки.
+    # Файлы легли на Studio 06.10, реестр отстал — датчик «реестр против каталогов» доложил
+    "withings_client_id": "tenant",
+    "withings_client_secret": "tenant",
+    "withings_oauth.json": "tenant",
     # клиент ПРИЛОЖЕНИЯ, не пациента: client_id один на оба каталога (замер 02.09,
     # проект <gcp-project-id>). Тенантское — token.json и account: КТО вошёл
     "google_calendar_client.json": "owner",

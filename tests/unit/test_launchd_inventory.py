@@ -89,3 +89,31 @@ def test_off_studio_is_silent(monkeypatch):
     import socket
     monkeypatch.setattr(socket, "gethostname", lambda: "MacBook-Pro.local")
     assert pl.repo_plist_drift() == {"drifted": [], "live_only": [], "repo_only": []}
+
+
+def test_template_counts_as_repo_copy(tmp_path):
+    """15.10: с 29.09 службы ставятся из templates/launchd/*.plist.tmpl — шаблон и есть дом
+    плиста в репозитории. Сверка только с launchd/ объявляла «без копии» все 29 живых файлов
+    Studio, хотя шаблон был у каждого. Живой без шаблона и без копии — по-прежнему находка."""
+    (tmp_path / "com.larry.health.bot.plist.tmpl").write_text("<plist/>")
+    (tmp_path / "com.larry.health.bot.partner.plist").write_text("не шаблон")  # не считается
+    live_only = ["com.larry.health.bot", "com.larry.health.bot.partner", "com.larry.health.new"]
+    assert pl.covered_by_template(live_only, tmp_path) == \
+        ["com.larry.health.bot.partner", "com.larry.health.new"]
+
+
+def test_repo_plist_drift_applies_template_coverage(monkeypatch, tmp_path):
+    """Покрытие шаблоном применено в настоящем входе датчика, а не только в помощнике:
+    без вызова covered_by_template в repo_plist_drift этот тест краснеет."""
+    live = tmp_path / "agents"
+    live.mkdir()
+    import plistlib
+    for label in ("com.larry.health.bot", "com.larry.health.zzz-untemplated"):
+        (live / f"{label}.plist").write_bytes(plistlib.dumps({"Label": label}))
+    monkeypatch.setattr(pl, "in_container", lambda: False)
+    monkeypatch.setattr(pl.infra_config, "is_primary", lambda *a, **k: True)
+    monkeypatch.setattr(pl, "agents_dir", lambda: live)
+    empty_repo = tmp_path / "repo_launchd"
+    empty_repo.mkdir()
+    r = pl.repo_plist_drift(empty_repo)
+    assert r["live_only"] == ["com.larry.health.zzz-untemplated"], r

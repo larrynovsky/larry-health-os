@@ -269,6 +269,12 @@ Radicale in the container (phone Reminders after the 30.09 move) is a tailnet-on
 
 ---
 
+### SEC-54: Withings secrets were missing from the SECRET_SCOPE registry (06.10–15.10)
+
+Three files (`withings_client_id`, `withings_client_secret`, `withings_oauth.json`) were placed on Studio on 06.10 but not declared in `secrets_paths.SECRET_SCOPE`. The "registry vs directories" sensor reported the mismatch every night. Fix: entries added with scope `tenant` (as for Oura); the reader in `withings_api._client()` now uses literal paths (an f-string hid the names from `check_contracts`); a unit test runs the real sensor on synthetic tmp directories (live secrets are not read, §19–20).
+
+---
+
 ## WHAT IS ALREADY GOOD ✅ (current state)
 
 - `anthropic_key`, `oura_token`, `telegram_token` — permissions 600, owner only.

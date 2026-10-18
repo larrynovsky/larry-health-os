@@ -1,266 +1,301 @@
-<!-- translation-of: docs/explanation/test_architecture.md sha256:59afb8d2b269 -->
+<!-- translation-of: docs/explanation/test_architecture.md sha256:74d56b625bf4 -->
+<!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
+
 **English** · [Русский](test_architecture.md)
 
-# Test architecture
+# Test Architecture
 
 > **Document type:** Explanation (Diataxis) — explains **why** the test
-> system is built this way. For **what exists**, see `TEST_ARCHITECTURE.md`,
-> `USE_CASES.md`, `uc_index.yaml`. For **how to do it**, see
+> system is designed the way it is. For **what exists** — see `TEST_ARCHITECTURE.md`,
+> `USE_CASES.md`, `uc_index.yaml`. For **how to do things** — see
 > `docs/how-to/run_tests.md`, `add_new_uc.md`, `handle_test_failure.md`.
 
 ---
 
-## Idea
+## The Idea
 
-Health OS makes medical claims. Tests must catch **regressions in
-the correctness of those claims**, not just “the code does not crash.” This changes everything
-relative to a standard pytest framework.
+Health OS makes medical claims. Tests must catch **regressions in the
+correctness of those claims**, not just "the code doesn't crash". This changes
+everything relative to a standard pytest scaffold.
 
-## Three key principles
+## Three Core Principles
 
 ### 1. Spec-by-example: `USE_CASES.md` is the single source of truth
 
-The UC catalog describes **desired behavior**, not current behavior. A test against
-an `intended` UC is an `expected_gap`, not a “broken test.” A test against
-an `implemented` UC is a regression signal.
+The UC catalogue describes **desired behaviour**, not current behaviour. A test
+against an `intended` UC is an `expected_gap`, not a "broken test". A test
+against an `implemented` UC is a regression signal.
 
 The `status` × `confirmation` lifecycle distinguishes:
 
 | status | confirmation | a failing test means |
 |---|---|---|
 | `implemented` | `confirmed` | REGRESSION → CRITICAL → TG alert + Reminder |
-| `partial` (gap portion) | `confirmed` | expected_gap → INFO |
-| `intended` | `confirmed` | expected_gap → INFO (code has not yet caught up with intent) |
-| any | `proposed`/`rejected` | the test should not exist (UC-J-02) |
+| `partial` (gap part) | `confirmed` | expected_gap → INFO |
+| `intended` | `confirmed` | expected_gap → INFO (code hasn't caught up to the intention yet) |
+| any | `proposed`/`rejected` | the test must not exist (UC-J-02) |
 
-Without `confirmation = confirmed`, `generate_test.py` refuses to generate
-a skeleton — this is disciplined development.
+Without `confirmation = confirmed`, `generate_test.py` refuses to generate a
+skeleton — this is disciplined development.
 
-### 2. The automation boundary: B+E+C+D, plus H for quality
+### 2. Automation boundary: B+E+C+D, plus H for quality
 
-Not all medical quality can be automated. A four-level strategy:
+Not all medical quality can be automated. A 4-level strategy:
 
-- **B (negative invariants)** — what the system must NOT do. The main
-  medical invariant: “if NULL, make no claim.”
-- **E (cross-check against deterministic truth)** — numbers in the text = numbers
-  in the database (not invented).
-- **C (snapshot)** — for critical JSON structures. **Rejected** for LLM output
-  as an illusion of protection (does not distinguish “code regression” from “LLM instability”).
-- **D (LLM judge)** — a separate Claude Haiku with explicit questions. Not a source
-  of truth. Never the sole oracle for P0.
+- **B (negative invariants)** — what the system must NOT do. The primary
+  invariant for medicine: "if NULL — do not assert".
+- **E (cross-check against deterministic truth)** — numbers in text = numbers
+  in the DB (not invented).
+- **C (snapshot)** — for critical JSON structures. Rejected for LLM output
+  as an illusion of protection (cannot distinguish "regression in code" vs
+  "LLM instability").
+- **D (LLM-judge)** — a separate Claude Haiku with explicit questions. Not a
+  source of truth. Never the sole oracle for P0.
 
-For qualitative claims (UC-I-08 oncology context, UC-I-09 genome as a framework,
-UC-H-03 Round B deliberation), use `H` (Human charter): a risk-oriented
-review path. This is markdown in `tests/charters/`, not code. `assert "хороший
-врач"` does not exist.
+For qualitative claims (UC-I-08 oncology context, UC-I-09 genome-as-frame,
+UC-H-03 Round B deliberation) — `H` (Human charter): a risk-oriented review
+route. This is not code but markdown in `tests/charters/`. `assert "good
+doctor"` does not exist.
 
-### 3. Health OS's distributed properties require a separate test layer
+### 3. Distributed properties of Health OS require a dedicated test layer
 
-The standard test pyramid ignores the fact that the project has:
+The standard test pyramid ignores what the project actually has:
 
-- **Conit + staleness deviation** (TC §1) — data older than 26 hours/30 days
-  must trigger an alert. Testing this requires **time substitution**, otherwise
-  it cannot be implemented. `_time_inject.py` solves this centrally.
-- **Tentative writes** — `pending_labs/` is a separately observable object
-  BEFORE approval. Test the tentative → committed transition.
+- **Conit + staleness deviation** (TC §1) — data older than 26h/30 days
+  must trigger an alert. Tests for this require **time substitution**,
+  otherwise they are unimplementable. `_time_inject.py` solves this
+  centrally.
+- **Tentative write** — `pending_labs/` is a separate observable object
+  BEFORE approval. Tests cover the tentative → committed transition.
 - **Single-primary** — writes to `health.db` only from Studio. The guard in
-  `health_db.get_conn()` returns a read-only connection outside Studio.
-- **Read-your-writes** — evening check-in → GP sees it in the morning.
+  `health_db.get_conn()` returns a read-only connection on non-Studio.
+- **Read-your-writes** — check-in in the evening → GP sees it in the morning.
 - **Causal consistency** — Council Round B depends on Round A.
-- **Eventual consistency** — Tasks ↔ Reminders sync window of 3 hours.
+- **Eventual consistency** — Tasks ↔ Reminders sync window 3h.
 
-These have a separate layer, `tests/consistency/` (neither unit nor integration —
-specifically about distributed properties).
-
----
-
-## The seven-layer pyramid
-
-```
-                    Charter (H)            5 pcs  ← markdown, not code
-                  Snapshot (C)            ~1 pc   ← minimal
-              LLM-judge (D)               2 pcs   ← skipped without an API key
-          Consistency-specific           21 pcs   ← RYW/tentative/staleness/...
-        E2E_mock                          5 pcs
-      Integration                        14 tests
-    Unit                                 ~110 tests  ← foundation
-```
-
-Layers 1–4 run on every commit through `pytest -m "not slow"`.
-Layer 5 (consistency) is also fast and belongs in the main suite.
-Layer 6 (LLM judge) runs only nightly and requires the Anthropic API.
-Layer 7 (charter) is not code; it follows a calendar.
+There is a dedicated layer `tests/consistency/` for these (not unit, not
+integration — specifically about distributed properties).
 
 ---
 
-## Architectural decisions that needed justification
+## The 7-Layer Pyramid
 
-### Why `_time_inject.py` instead of a `clock` parameter in every function
+```
+                    Charter (H)            5 шт   ← markdown, не код
+                  Snapshot (C)            ~1 шт   ← минимально
+              LLM-judge (D)               2 шт    ← skipped без API ключа
+          Consistency-specific           21 шт    ← RYW/tentative/staleness/...
+        E2E_mock                          5 шт
+      Integration                        14 шт
+    Unit                                 ~110 шт  ← основа
+```
 
-The initial plan was “an optional `clock` parameter in important functions.”
-An audit found that 40+ files use `date.today()` /
-`datetime.now()`. A parameter in every function adds a lot of ceremony to agent code,
-and it is easy to forget to pass it in one place.
+Layers 1–4 run on every commit via `pytest -m "not slow"`.
+Layer 5 (consistency) is also fast and is included in the main suite.
+Layer 6 (LLM-judge) — nightly only, requires the Anthropic API.
+Layer 7 (charter) — not code, runs on a calendar schedule.
 
-`_time_inject.get_now()` / `get_today()` provide global substitution through
-`set_test_clock()`. The test changes `_TEST_CLOCK`; production sees real time.
-Tests reset it automatically through an autouse fixture in `conftest.py`.
+---
 
-CLI blocks `if __name__ == "__main__":` are deliberately untouched — the test calls
-the function directly with fixed dates, bypassing the CLI.
+## Architectural Decisions That Required Justification
 
-### Why snapshots were rejected for LLM output
+### Why `_time_inject.py` rather than a `clock` parameter in every function
 
-A snapshot catches divergence from a reference. But for an LLM, divergence can come
-from (a) code regression, (b) model instability, or (c) normal
-generation variability. A snapshot cannot distinguish them.
+The original plan was "an optional `clock` parameter in important functions".
+After an audit it turned out that 40+ files use `date.today()` /
+`datetime.now()`. Adding a parameter to each one means a lot of ceremony in
+agent code and it is easy to forget to pass it in one place.
 
-Replacement for UC-A-01 (`lab_extractor`): self-consistency — two runs on
-the same PDF; key fields `{name, value, unit, flagged}` must match
-bit for bit. Divergence = extractor instability (actionable: the prompt needs
-refactoring or temperature=0). This avoids hand-to-hand combat with
+`_time_inject.get_now()` / `get_today()` — global substitution via
+`set_test_clock()`. A test changes `_TEST_CLOCK`; production sees real time.
+In tests, automatic reset is done via an autouse fixture in `conftest.py`.
+
+CLI blocks `if __name__ == "__main__":` are intentionally left untouched —
+the test calls the function directly with fixed dates, bypassing the CLI.
+
+### Why snapshot for LLM output was rejected
+
+A snapshot catches divergence from a reference. But for an LLM, divergence can
+come from: (a) a code regression, (b) model instability, (c) normal generation
+variability. A snapshot cannot distinguish between these.
+
+The replacement for UC-A-01 (`lab_extractor`): self-consistency — a double
+run on the same PDF, and the key fields `{name, value, unit, flagged}` must
+match bit-for-bit. A mismatch = extractor instability (actionable: prompt
+refactoring or temperature=0 is needed). This is not hand-to-hand combat with
 references on every change.
 
-### Why test_failure_handler does not repair code itself (Repair narrowed; see amendment below)
+### Why test_failure_handler does not fix code itself (Repair is narrowed — see the amendment below)
 
-Fully automatic Claude patching of production code in a medical system means
-a risk of silently weakened assertions. In agent mode, Claude sometimes “fixes”
-a test by weakening the check rather than fixing the logic. The cost of a silent
-regression in the correctness of medical conclusions exceeds any time savings.
+Fully automatic Claude patching of production code in a medical system =
+risk of silent weakening of asserts. Claude in agent mode will sometimes
+"fix" a test by weakening the check instead of fixing the logic. The cost of
+a silent regression in the correctness of medical conclusions outweighs any
+time saving.
 
 The accepted model: **diagnose, don't repair**.
 - Level A — deterministic retries based on log patterns.
-- Level B — Haiku writes a diagnosis in markdown; a person reads it in the morning.
-- A Reminder for 10:00 with a prompt ready to copy and paste — your idea, and it proved
-  sound. In the morning: open Reminder → copy → Claude helps investigate.
+- Level B — Haiku writes a diagnosis to markdown; a human reads it in the
+  morning.
+- A Reminder at 10:00 with a ready-to-paste prompt — your idea, it turned out
+  to be sound. In the morning: open the Reminder → copy → Claude helps work
+  it out.
 
-**Owner's amendment on 2026-08-03 (thread night-cycle): the prohibition was NARROWED, not removed.**
-Automatic application of a fix for a red result is allowed only when all three conditions hold:
-(1) the action is reversible (`git revert`, not deleting rows or migrating data);
-(2) the patch passed an independent reviewer agent (§17 — a prompt aimed at refutation,
-without the author's explanations); (3) there is a DOWNSTREAM oracle that turns red — nightly
-integrity catches a failure CAUSED BY the fix and parks it again. Everything else remains
-“diagnose, don't repair.” The normative text and the cost knowingly accepted by the owner
-(a window of up to a day between application and nightly detection) are in the rule set, `CLAUDE.md §13`;
-this is a pointer so the page is not read as a current blanket prohibition.
-The mechanism (`fix_applier`) has not been built: until it is, the amendment is declarative.
+**Owner amendment 2026-08-03 (night-cycle thread): the ban is NARROWED, not lifted.**
+Auto-applying a red fix is permitted when all three conditions hold simultaneously:
+(1) the action is reversible (`git revert`, not deleting lines and not a data
+migration); (2) the patch has passed an independent reviewer agent (§17 — a
+refutation prompt, without the author's explanations); (3) there is a
+DOWNSTREAM oracle that turns red — the nightly integrity check catches a
+breakage CAUSED BY the fix and parks it back. Everything else remains
+"diagnose, don't repair". The normative text and the cost accepted by the owner
+with full awareness (a window of up to one day between application and nightly
+detection) are in the compendium, `CLAUDE.md §13`; this is a pointer so that
+the page is not read as a currently operative blanket ban.
+The carrier mechanism (`fix_applier`) is not built: until it is, the amendment
+is declarative.
 
-### Why severity depends on UC status, not test type
+### Why severity is based on UC status, not test type
 
-“Test failed → CRITICAL” creates noise. 70% of tests could target
-`intended` UCs, making every nightly run CRITICAL.
+The approach "test failed → CRITICAL" creates noise. 70% of tests may be
+against `intended` UCs, and every nightly run will be CRITICAL.
 
-“Test failed → CRITICAL depends on UC status” separates regressions from
-expected_gap. If UC-A-01 has status=`partial` (automatic Council startup
-is deferred to the backlog), a test of that part of the pipeline is an `expected_gap`, not noise.
+The approach "test failed → CRITICAL depends on UC status" separates
+regressions from expected gaps. If UC-A-01 has status=`partial` (Council
+auto-launch deferred to backlog), a test for that part of the pipeline is an
+`expected_gap`, not noise.
 
-### Why UC-J-02 prohibits generating a test for an unconfirmed UC
+### Why UC-J-02 forbids generating a test for an unconfirmed UC
 
-Without this process, an agent could write a test for its own interpretation of a UC
-instead of clarifying with the user exactly what is being tested.
-`confirmation = confirmed` is an explicit gate: “yes, this is the behavior
-we are testing.”
+Without this process, an agent could write a test against its own
+interpretation of a UC instead of clarifying with the user exactly what is
+being tested. `confirmation = confirmed` is an explicit gate: "yes, this is
+the behaviour we are testing".
 
-### Why `sys.modules.pop`/reload of shared modules is prohibited in tests (2026-06-22)
+### Why `sys.modules.pop`/reload of shared modules in tests is forbidden (2026-06-22)
 
-Dozens of modules import `health_db` (`treatment_*`, `survivorship`, etc.).
-If a fixture does `sys.modules.pop("health_db")` + reimport, it creates a NEW
-module object. Modules that imported the old one keep v1, while the fixture/test uses
-v2 → **split-brain between two health_db objects**: writes go to one database, reads to another.
-The symptom is deceptive — the test passes alone and fails only in the full run
-(`pytest tests/`), in UNRELATED files, and depends on collection order.
-This is how the whole `tests/` silently stayed red (22 failed) while subsuites were green.
+`health_db` is imported by dozens of modules (`treatment_*`, `survivorship`,
+etc.). If a fixture does `sys.modules.pop("health_db")` + reimport, a NEW
+module object is created. Modules that had already imported the old one hold
+v1, while the fixture/test works with v2 → **split-brain between two
+health_db instances**: writes go to one DB, reads come from another.
+The symptom is insidious — the test passes in isolation but fails only in a
+full run (`pytest tests/`), and specifically in UNRELATED files, depending on
+collection order. This is how the entire `tests/` suite was silently red
+(22 failed) while individual sub-suites were green.
 
 Rules:
-- substitute the database through `monkeypatch.setattr(health_db, "DB_PATH", tmp)` (the same
-  object, automatic restore), as in `tests/fixtures/db.py`. No pop+reimport.
-- if pop is unavoidable (testing an import-time guard), save the ORIGINAL object and
-  restore that exact object in `finally`, not a fresh import. `importlib.reload(x)` is gentler —
-  it re-executes in place, preserving identity.
-- diagnose order-dependent failures by bisection (suspected file BEFORE
-  the victim), not by the intuition that “the modules are unrelated.”
+- DB substitution — via `monkeypatch.setattr(health_db, "DB_PATH", tmp)` (the
+  same object, auto-restore), as in `tests/fixtures/db.py`. Not pop+reimport.
+- If pop is unavoidable (test of an import-time guard): save the ORIGINAL
+  object and restore exactly that in `finally`, not a fresh import.
+  `importlib.reload(x)` is gentler — re-executes in place, identity is
+  preserved.
+- Diagnosing order-dependent failures — by bisection (suspected file BEFORE
+  the victim), not by the intuition "these modules are unrelated".
 
 ⚠️ `run_checks.sh` (post-commit) runs smoke_tests + integrity_tests, NOT pytest —
-this class of bugs is caught only by a manual/CI full `pytest tests/` run.
+this class of bugs is only caught by a manual/CI full `pytest tests/`.
 
-In a medical system, the cost of “a test written for the wrong behavior” is that a regression
-is not caught → bad conclusions reach the user.
+In a medical system, the cost of "wrote a test against the wrong behaviour" =
+a regression is not caught → bad conclusions reach the user.
 
 ---
 
 ### Why a test waits for its threads before fixture teardown (2026-10-05)
 
-A test's database substitution (`monkeypatch`, a temporary `DB_PATH`) lives exactly until fixture
-teardown. A thread started by the test does not know that: if it outlives the test, its late write
-follows the path that has already been restored. At night that path is the owner's live database.
+The DB substitution in a test (`monkeypatch`, temporary `DB_PATH`) lives exactly
+until fixture teardown. A thread launched by the test does not know about this:
+if it runs longer than the test, its late write goes to the path that has
+already been restored. At night, that path is the owner's live database.
 
-That is what happened from 30.08 to 04.10. The background-consilium test waited for the consilium
-to be *called*, not for the thread to finish. The thread wrote the verdict into the live database —
-into the `memory` row with the same number as the hypothesis in the test database (the number is
-shared by all categories) — and created tasks for the owner from the `test` field. The test was green.
-The `query_only` guard (thread treatment-homes) stopped the writes, but even then the nightly log held
-a single warning line that nobody read.
+That is exactly what happened from 30.08 to 04.10. The background council test
+waited for the council to be *invoked*, not for the thread to finish. The thread
+wrote its verdict to the live database — into the `memory` row with the same
+number as the hypothesis in the test database (the number is shared across all
+categories) — and created tasks for the owner via the `test` field. The test was
+green. Writing was stopped by the `query_only` guard (the treatment-homes thread),
+but even then one warning line remained in the nightly log that nobody read.
 
-What is in place now (tests/conftest.py, block `thread_guard`; pytest.ini):
-- a call-phase hook waits for threads born in the test — in the call phase, i.e. BEFORE fixture
-  teardown; a fixture cannot do this: its teardown would run after the substitution is undone;
-- a thread that did not finish — the test is red with the thread's name;
-- an exception in a thread is an error, not a warning (`filterwarnings`);
-- boundary: the idle AnyIO pool worker (dashboard TestClient) is excluded by name — the response has
-  already been returned by then; stand measurement: 69 dashboard tests were red only because of it;
-- the hypothesis resolver writes only to rows with `category='hypothesis'`.
+What is now in place (`tests/conftest.py`, `thread_guard` block; `pytest.ini`):
+- a call-phase hook waits for threads spawned by the test — in the call phase,
+  i.e. BEFORE fixture teardown; a fixture cannot do this: its teardown would run
+  after the substitution had been rolled back;
+- threads that did not finish in time — the test is red with the thread's name;
+- an exception in a thread — an error, not a warning (`filterwarnings`);
+- boundary: an idle AnyIO worker pool worker (TestClient panel) is excluded by
+  name — the response has already been delivered by that point; bench
+  measurement: 69 panel tests were red only because of it;
+- the hypothesis solver writes only to rows with `category='hypothesis'`.
 
-**The nightly suite stays on the live environment (2026-10-06, owner's decision).** A run on a
-database copy was measured: a copy in another directory breaks ~60 tests that check the data
-directory against installed services, and causes a cascade of fixture errors. So the night runs
-under the guards above, not on a copy. The AnyIO pool worker is excluded from the thread guard by
-class and idleness (the `idle_workers` queue), not by name: a busy worker is waited for like any thread.
+**The nightly suite continues to run against the live environment (06.10.2026,
+owner decision).** Running against a DB copy was measured: a copy in a different
+directory breaks ~60 tests that compare the data directory against installed
+services, producing a cascade of fixture errors. Therefore the nightly run
+operates under the guards above, not against a copy.
+The AnyIO worker pool worker is excluded from the thread guard by class and idle
+state (`idle_workers` queue), not by name: a busy worker is waited for like any
+other thread.
 
-The nightly chronicle (`run_checks.sh`) names ERROR (fixture or teardown failure) as well as FAILED:
-otherwise a red guard in a fixture would pass as "the set did not change".
+The nightly chronicle (`run_checks.sh`) names both ERROR (fixture or teardown
+failure) and FAILED: a red guard in a fixture would otherwise pass unnoticed as
+"suite unchanged".
 
-## Contract tests for public APIs (pattern validated 2026-05-10)
+## Contract Tests for Public APIs (pattern, validated 2026-05-10)
 
-A pattern that proved valuable after the 2026-05-10 regression:
+A pattern that proved valuable after the regression of 2026-05-10:
 
-**Idea**. If a public function in `health_db.py` (or another core module) has required parameters, it has **N callers** in the code. When its signature changes, a caller may retain an outdated call. If the caller runs infrequently (once a day at 03:00), the bug will not appear immediately. If the crash is silenced by `try/except` (as in `morning_test_summary.save_to_db`), it may stay silent for weeks.
+**Idea**. If a public function in `health_db.py` (or another core module) has
+required parameters, it has **N callers** in the codebase. When a signature
+changes, one of those callers may remain with a stale call. If the caller runs
+infrequently (once a day at 03:00) — the bug may not surface immediately. If the
+crash is silenced by `try/except` (as was the case in
+`morning_test_summary.save_to_db`) — it can stay silent for weeks.
 
 **Test pattern** (see `tests/unit/test_save_agent_report_contract.py`):
 
-1. An AST parser scans all `*.py` in the project.
-2. Finds calls to `<func_name>(...)` (by name or through `db.<func_name>`).
-3. For each call, collects `args` (positional) + `keywords` (kwargs).
-4. Compares them with `inspect.signature(func)` for required parameters.
-5. Fails with `файл:строка` and a list of missing args.
+1. An AST parser scans all `*.py` files in the project.
+2. It finds calls to `<func_name>(...)` (by name or via `db.<func_name>`).
+3. For each call: collects `args` (positional) + `keywords` (kwargs).
+4. Compares against `inspect.signature(func)` for required parameters.
+5. Fails with `file:line` and a list of missing args.
 
 **When to apply**:
 
 - Public APIs with `≥2` callers in the project.
-- The signature contains required parameters (without defaults).
-- Callers run infrequently or through `try/except`.
+- Signatures that contain required parameters (no default).
+- Callers that run infrequently or through `try/except`.
 
-**Value**: the check takes ~100 ms and catches a class-wide regression in one day rather than after a week of investigation. After the 2026-05-10 episode (reset --hard reverted morning_test_summary to a 7-argument signature; the contract test caught it on the very first night), the pattern is validated in practice.
+**Value**: the check takes ~100ms, catches a class-wide regression in one day
+rather than after a week of investigation. After the 2026-05-10 episode (reset
+--hard rolled `morning_test_summary` back to a 7-arg signature; the contract
+test caught it on the very first night) this pattern is validated in practice.
 
-**Expansion**: after `save_agent_report`, cover the other public functions in `health_db.py` with required args. This is a W3-DOC extension, not a one-off task.
+**Expansion**: after `save_agent_report`, the other public functions in
+`health_db.py` with required args should be covered. This is a W3-DOC
+expansion, not a one-off task.
 
 **Limits**:
 
-- Does not catch **semantic** regressions (the caller passed the right number of args but in the wrong order) — that is the job of `inspect.signature` + named-only args in code.
-- Does not catch regressions **through indirect calls** (`getattr(db, name)(...)` where `name` is determined at runtime). This class is rare in the project.
+- Does not catch **semantic** regressions (a caller passed the right number of
+  args but in the wrong order) — that is the job of `inspect.signature` +
+  named-only args in the code.
+- Does not catch regressions **via indirect calls** (`getattr(db, name)(...)`
+  where `name` is determined at runtime). This class is rare in the project.
 
 ---
 
-## Related documents
+## Related Documents
 
 | Type | Document |
 |---|---|
-| Reference | `USE_CASES.md` (catalog + rules) |
+| Reference | `USE_CASES.md` (catalogue + rules) |
 | Reference | `uc_index.yaml` (machine-readable index) |
-| Reference | `external_dependencies.yaml` (upstream artifacts) |
+| Reference | `external_dependencies.yaml` (upstream artefacts) |
 | Reference | `TEST_ARCHITECTURE.md` (layer and fixture details) |
 | Reference | `TESTING_CONTRACTS.md` (conit thresholds) |
 | How-to | `docs/how-to/run_tests.md` |
 | How-to | `docs/how-to/add_new_uc.md` |
 | How-to | `docs/how-to/handle_test_failure.md` |
 | Reference | `tests/README.md` (quick start) |
-| Reference | `tests/charters/*.md` (risk paths) |
+| Reference | `tests/charters/*.md` (risk routes) |

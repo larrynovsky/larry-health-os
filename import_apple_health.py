@@ -159,6 +159,16 @@ def aggregate_metric_by_day(metric_name, entries, daily):
                     "unit": "ms",
                 }
 
+        elif metric_name == "heart_rate_variability_rmssd":
+            # RMSSD — другая мера вариабельности, чем heart_rate_variability (SDNN у Apple): иной
+            # масштаб, смешение испортило бы ряд hrv и пороги над ним. Отдельный ключ, только raw
+            # (решение владельца 07.10: «брать»).
+            qty = entry.get("qty")
+            if qty is not None:
+                s = bucket.setdefault("_rmssd_samples", [])
+                s.append(qty)
+                bucket["hrv_rmssd_avg"] = round(sum(s) / len(s), 2)
+
         elif metric_name == "blood_oxygen_saturation":
             qty = entry.get("qty")
             if qty is not None:
@@ -371,7 +381,7 @@ def process_hae_json(filepath):
         "hrv_samples", "spo2_samples", "resp_rate_samples",
         "bp_sys_samples", "bp_dia_samples", "_bp_seen",
         "_walking_speed_samples", "_step_length_samples",
-        "_asymmetry_samples", "_met_samples", "_double_support_samples",
+        "_asymmetry_samples", "_met_samples", "_double_support_samples", "_rmssd_samples",
     ] + [f"_{k}_{t}" for k in _FITNESS_DAILY_MEAN.values() for t in ("seen", "samples")] \
       + [f"_{k}_t" for k in _BODYCOMP_MORNING.values()]
     for ds, bucket in daily.items():

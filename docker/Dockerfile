@@ -43,6 +43,15 @@ RUN set -eu; \
     echo "$sha  /usr/local/bin/supercronic" | sha256sum -c -; \
     chmod +x /usr/local/bin/supercronic
 
+# pip и setuptools самого образа (18.10): базовый python:3.11.15-slim несёт pip 24.0 и setuptools 79.0.1,
+# pip-audit внутри контейнера насчитал 15 записей (PYSEC-2026-1795/1796/2875/2876/196/3721 — pip,
+# PYSEC-2026-3447 — setuptools). Обе уязвимости срабатывают при установке и сборке пакетов, не в работе
+# служб, но образ ставит пакеты при каждой сборке. Версии закреплены (§9): «последняя» дала бы другой
+# образ через месяц. Обновлять — docs/how-to/dependency_updates.md, раздел про образ.
+ARG PIP_VERSION=26.2.1
+ARG SETUPTOOLS_VERSION=83.0.0
+RUN pip install --no-cache-dir --timeout 120 --retries 10 "pip==${PIP_VERSION}" "setuptools==${SETUPTOOLS_VERSION}"
+
 COPY --from=wheels /wheels /wheels
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --no-index -f /wheels -r /tmp/requirements.txt \
@@ -56,7 +65,9 @@ WORKDIR /app
 COPY --chown=health:health . /app
 # WORKDIR создаёт /app от root: без передачи владения рендер расписания при старте падал
 # на build/ (поймано первым живым прогоном образа 29.09 — планировщик не стартовал бы).
-RUN mkdir -p /app/build /app/logs && chown health:health /app /app/build /app/logs
+# outputs/ — родитель тома дайджеста (override владельца): без него Docker создаёт его от root, и
+# прогон 11.10 упал PermissionError (замер 15.10) (tests/unit/test_docker_mount_parents_owned.py).
+RUN mkdir -p /app/build /app/logs /app/outputs && chown health:health /app /app/build /app/logs /app/outputs
 USER health
 # Шаблоны установки (private/infra.yaml, базовая методология) — при сборке, с основной машиной
 # health-os (hostname из compose). Каталоги данных и секретов здесь — временные: настоящие

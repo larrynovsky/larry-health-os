@@ -34,6 +34,10 @@ def _run(monkeypatch, owner_tz, tenant_tz):
     monkeypatch.setenv("HEALTH_TZ", tenant_tz)
     monkeypatch.setattr(sched, "get_chat_id", lambda: 555)
     monkeypatch.setattr(sched.db, "get_active_protocols", lambda: asked.append(1) or [])
+    # пол безопасности (floors-live) — свой тест; здесь только окно, без записи пульса
+    monkeypatch.setattr(sched, "evaluate_safety_limits", lambda: {"fired": []})
+    import config_db
+    monkeypatch.setattr(config_db, "upsert_config", lambda *a, **k: None)
     ctx = SimpleNamespace(bot=SimpleNamespace(), bot_data={})
     asyncio.run(sched.check_recommendations_scheduled(ctx))
     return bool(asked)

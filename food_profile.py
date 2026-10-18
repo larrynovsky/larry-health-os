@@ -259,22 +259,7 @@ def build_food_profile(conn=None, month: int = 1, profile: dict | None = None, *
                 desc += i18n.t('food.micro.resection_suffix', lang)
             micro.append((m, desc))
 
-    # Ограничить (детерминированно из constraints + energy)
-    limit: list[str] = []
-    c = frame["constraints"]
-    if "lactose_free" in c:
-        limit.append(i18n.t('food.limit.lactose', lang))
-    if "sat_fat_limit" in c:
-        limit.append(i18n.t('food.limit.saturated_fat', lang))
-    if "low_GI" in c:
-        limit.append(i18n.t('food.limit.sugar', lang))
-    if "purine_limit" in c:
-        limit.append(i18n.t('food.limit.purines', lang))
-    if "dumping_aware" in c:
-        limit.append(i18n.t('food.limit.dumping', lang))
-    if frame["energy"] in ("gain", "maintain"):
-        limit.append(i18n.t('food.limit.volume', lang))
-    limit.append(i18n.t('food.limit.alcohol', lang))
+    limit = frame_limits(frame, lang)
 
     # Пол безопасности (нить data-in-code-9, инкремент 1): независимый гвардиан на рамку.
     # НЕ фатально — детерминированный выход и так проходит; лог, если пол пробит. Станет
@@ -301,6 +286,27 @@ def build_food_profile(conn=None, month: int = 1, profile: dict | None = None, *
     return {"frame": frame, "month": month, "language": lang,
             "categories": {k: v for k, v in cats.items() if v},
             "micro": micro, "limit": limit, "from_repertoire": from_rep}
+
+
+def frame_limits(frame: dict, lang: str) -> list[str]:
+    """«Ограничить» на языке человека — детерминированно из constraints + energy рамки.
+    Читатели: профиль питания (выше) и промпт конституции «Питание» (generate_constitutions)."""
+    limit: list[str] = []
+    c = frame["constraints"]
+    if "lactose_free" in c:
+        limit.append(i18n.t('food.limit.lactose', lang))
+    if "sat_fat_limit" in c:
+        limit.append(i18n.t('food.limit.saturated_fat', lang))
+    if "low_GI" in c:
+        limit.append(i18n.t('food.limit.sugar', lang))
+    if "purine_limit" in c:
+        limit.append(i18n.t('food.limit.purines', lang))
+    if "dumping_aware" in c:
+        limit.append(i18n.t('food.limit.dumping', lang))
+    if frame["energy"] in ("gain", "maintain"):
+        limit.append(i18n.t('food.limit.volume', lang))
+    limit.append(i18n.t('food.limit.alcohol', lang))
+    return limit
 
 
 _ENERGY_LABEL_KEYS = {

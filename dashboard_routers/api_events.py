@@ -2,8 +2,9 @@
 
 Sprint 5 finish (2026-05-22): извлечено из dashboard.py.
 
-2 endpoints:
+3 endpoints:
   POST /api/events/new — создаёт events + encounters/diagnostic_events
+  POST /api/events/{id}/delete — удаляет ошибочное событие (events_db.delete_event)
   GET  /api/ping       — HTMX smoke
 """
 from __future__ import annotations
@@ -84,6 +85,24 @@ def api_event_new(
     r = _Resp(status_code=204)
     r.headers["HX-Redirect"] = "/medical-record"
     return r
+
+
+@router.post("/events/{event_id}/delete", response_class=HTMLResponse)
+def api_event_delete(event_id: int):
+    """Удалить ошибочно созданное событие (фидбэк с GitHub 2026-10-18: создать было можно,
+    убрать — нет). Успех → пустой ответ, карточка исчезает (hx-swap=outerHTML).
+    Отказ (на событие ссылаются лекарства/анализы) → текст причины под карточкой,
+    а не молчаливый 4xx, который htmx не показал бы."""
+    import events_db
+    try:
+        events_db.delete_event(event_id, reason=i18n.t("dashboard.medical_record.delete_reason"))
+    except (LookupError, ValueError) as exc:
+        why = i18n.t("dashboard.medical_record.delete_refused", why=str(exc))
+        r = HTMLResponse(f'<p class="hint" style="color:var(--color-warning)">{_html.escape(why)}</p>')
+        r.headers["HX-Retarget"] = f"#evmsg-{event_id}"
+        r.headers["HX-Reswap"] = "innerHTML"
+        return r
+    return HTMLResponse("")
 
 
 @router.get("/ping", response_class=HTMLResponse)

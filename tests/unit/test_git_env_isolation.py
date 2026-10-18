@@ -97,6 +97,9 @@ def _run_probe(stand_in: Path, report: Path, *, noconftest: bool) -> dict:
     env["GIT_INDEX_FILE"] = str(stand_in / ".git" / "index")
     env["GIT_WORK_TREE"] = str(stand_in)
     env["GIT_PREFIX"] = ""
+    # Так git зовёт хуки при `git merge` (18.10): без этой строки утечка жила только внутри
+    # merge-коммита, и обычный прогон её не видел.
+    env["GIT_REFLOG_ACTION"] = "merge"
     env["PROBE_REPORT_PATH"] = str(report)
 
     cmd = [sys.executable, "-m", "pytest", "-c", str(REPO_ROOT / "pytest.ini"),

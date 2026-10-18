@@ -30,6 +30,9 @@
       Протоколы
       {% if counts %}<span class="sidebar-count sidebar-count--active">{{ counts.protocols_active }}</span>{% endif %}
     </a>
+    <a class="sidebar-item {% if path.startswith('/memory') %}sidebar-item--active{% endif %}" href="/memory">
+      Память
+    </a>
     <a class="sidebar-item {% if path.startswith('/tasks') %}sidebar-item--active{% endif %}" href="/tasks">
       Задачи
       {% if counts %}<span class="sidebar-count">{{ counts.tasks_open }}</span>{% endif %}

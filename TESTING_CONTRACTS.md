@@ -114,7 +114,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 
 <!-- BEGIN AUTOGEN: integrity-sensors (gen_testing_contracts.py) -->
 
-### Реестр датчиков целостности (186 шт., генерируется)
+### Реестр датчиков целостности (189 шт., генерируется)
 
 > Источник: `integrity_tests.py`. Таблица построена из AST — не редактировать руками, менять код. launchd 07:50 → triage 08:00.
 
@@ -142,7 +142,6 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | ответы пациента доезжают до GP-контекста | `check_question_answers_reach_doctor` | Квитанция в точке потребления: свежий ответ ВИДЕН в собранном GP-контексте. |
 | проблемы под наблюдением доезжают до недельного разбора | `check_watched_problems_reach_review` | Каждая проблема со статусом наблюдения видна в контексте недельного разбора GP. |
 | build_context(yesterday) содержит данные | `check_build_context` | — |
-| канон lab_results: единственный писатель (нет biochemical-json) | `check_lab_single_writer` | Инвариант единственного писателя канона (BL-LAB-CANON-1, Primary-Based |
 | PGS reference-БД на месте и населена | `check_pgs_reference` | Reference-БД полигенных весов (pgs_catalog+pgs_weights) вынесена из канона |
 | свежесть genome_update_agent | `check_genome_update` | genome_update_agent не старше GENOME_UPDATE_ALERT_DAYS. |
 | liveness демонов (KeepAlive) | `check_daemons_alive` | KeepAlive-демоны должны иметь живой PID. Закрывает класс «сервис тихо умер» |
@@ -206,6 +205,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | канон lab_results: один аналит в документе — одна дата | `check_canon_one_date_per_analyte_in_doc` | Внутри ОДНОГО документа один аналит в одном материале не может иметь две даты. |
 | канон lab_results: у нового значения есть единица | `check_lab_unit_present` | Число без шкалы непригодно для клинического вывода — а канон его принимает. |
 | канон lab_results: референс в той же шкале, что значение | `check_lab_ref_scale` | Референс обязан быть в той же шкале, что значение. |
+| канон: у строки есть класс источника, защита записи жива | `check_canon_provenance` | Строка канона несёт класс источника — документ, опросник, предложение или ручная |
 | staging: материал пробы и его ступень не разошлись | `check_staging_specimen_provenance` | Материал БЕЗ своей ступени неотличим от назначенного — а именно эта |
 | значение и оператор сравнения не разошлись | `check_censored_values_coherent` | Оператор сравнения и число живут ТОЛЬКО вместе. |
 | specialized_lab_results: целостность (panel_type + значение) | `check_specialized_lab_health` | specialized_lab_results (BL-LAB-CANON-2): целостность спец-панелей. Каждая |
@@ -262,6 +262,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | survivorship: open hypotheses ageing | `check_open_hypotheses_ageing` | Гипотезы со status='open' старше 60 дней без перехода в testing. |
 | hypothesis: оценка консилиумом | `check_unresolved_evaluations` | HV-6: гипотезы в testing, лабные данные есть, outcome отсутствует > 7 дней. |
 | recommendation engine здоров | `check_recommendation_engine_health` | evaluate_domain_need не должен молча падать в error-path. |
+| пол безопасности исполняется задачей (пульс) | `check_safety_limits_executed` | Пол безопасности (абсолютные пороги + тренды) исполняется вживую у КАЖДОГО тенанта. |
 | survivorship: constitution conflicts unresolved | `check_constitution_conflicts_unresolved` | memory(category='constitution_conflict') со status='open' старше 45 дней. |
 | фармакогеномика синхронизирована с геномом (WFR) | `check_pharmaco_genome_sync` | Фармакогеномика синхронизирована с последним импортом генома. |
 | черты генома синхронизированы с геномом (WFR, Phase F) | `check_traits_genome_sync` | Детерминированные черты (Phase F) синхронизированы с последним импортом генома. |
@@ -276,6 +277,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | LLM-тракты без secret_guard не множатся (§19) | `check_llm_tracts_guarded` | Число LLM-трактов БЕЗ secret_guard не растёт (§19, решение владельца 2026-08-03). |
 | Конструкторы Anthropic мимо llm_client не множатся | `check_llm_direct_constructors` | Клиент Anthropic конструируется ТОЛЬКО в llm_client — там гард секретов стоит по конструкции. |
 | Блокировки LLM-гарда видны в отчёте | `check_llm_guard_blocks_reported` | Блокировки гарда не молчат: счётчик за сутки виден человеку. |
+| модели цепочек: думание замерено | `check_chain_models_thinking_known` | WARN: модель живой цепочки роли без замеренного поведения думания (15.10). |
 | Корреляции в отчётах обоснованы (UC-B-09) | `check_correlations_grounded` | UC-B-09: каждое `r=0.X` в свежих отчётах агентов подтверждено ПРИНЯТОЙ верой. |
 | UC-B-09: ратчет журнала необоснованных корреляций | `check_ungrounded_corr_ratchet` | ЧИТАТЕЛЬ журнала — читает СОДЕРЖИМОЕ, а не длину. |
 | UC-B-09: производители корреляций объявлены | `check_correlation_producers_declared` | WARN: КТО в периметре считает корреляцию — объявлен либо находка. |
@@ -299,6 +301,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | patient_profile: не отстаёт от живых источников | `check_profile_reconciler_fresh` | WARN: patient_profile разошёлся с живым источником — reconciler отстал или мёртв. |
 | контракт единого времени (_time_inject) | `check_time_contract` | Контракт единого времени: прод-код читает часы через _time_inject. |
 | носитель проб жив и зелен (§14) | `check_probe_liveness` | §14 для НОСИТЕЛЯ ПРОБ: у датчика, на котором стоят обещания реестра, обязан быть пульс. |
+| исключённые пробы: срок пересмотра | `check_skipped_probes_reviewed` | Исключённая из носителя проба с прошедшей датой пересмотра — вопрос «вернуть или убрать». |
 | набор тестов гонялся недавно (§14 для носителя доказательств) | `check_suite_freshness` | §14 для САМОГО НАГРУЖЕННОГО датчика проекта — набора тестов. |
 | ночной прогон тестов состоялся (§14) | `check_nightly_suite_liveness` | §14 для НОЧНОЙ задачи тестов (`com.larry.health.test-suite`, 00:00). |
 | ночной цикл жив (§14) | `check_night_cycle_liveness` | §14 для движка ночного цикла: тихо умерший движок = падения ночью никто не |
@@ -307,7 +310,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | у каждого класса лаб-строк есть вердикт о доме | `check_lab_class_verdicts_complete` | Каждый класс, который РЕАЛЬНО есть в данных, имеет вердикт человека. |
 | проверки машины Studio дошли (машинный судья) | `check_machine_judge_alive` | Проверки машины Studio дошли до владельца: квитанция машинного прогона свежа, его находки — |
 
-### Пороги-константы (41 шт., генерируется)
+### Пороги-константы (42 шт., генерируется)
 
 | Константа | Значение | Пояснение |
 |---|---|---|
@@ -330,7 +333,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | `_ABSENCE_SURFACE_BASELINE` | 0 | замер 14.09: открытых трактов не осталось |
 | `NAMING_DEBT_RATCHET` | 0 | — |
 | `_PARTNER_TENANTS_AT_DECISION` | 1 | — |
-| `_LAUNCHD_UNCOVERED_BASELINE` | 23 | — |
+| `_LAUNCHD_UNCOVERED_BASELINE` | 0 | — |
 | `MACBOOK_SNAPSHOT_STALE_D` | 3 | снимок раз в 3ч; трое суток тишины уже не «ноут поспал» |
 | `THREAD_COPY_GRACE_H` | 6 | два периода снимка (backup-wip каждые 3ч), решение владельца 16.09 |
 | `THREAD_ORPHAN_GRACE_H` | 48 | решение владельца 22.09: свежую нить не шуметь двое суток |
@@ -351,6 +354,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | `_CORR_WINDOW_DAYS` | 30 | — |
 | `_RETELL_WINDOW_DAYS` | 3 | окно реплик владельца назад от даты брифа |
 | `_RETELL_THETA_SEED` | 0.15 | доля слов первого предложения, пришедших из его реплики |
+| `_RETELL_MIN_SHARED` | 2 | — |
 | `SUITE_STALE_DAYS` | 10 | у носителя проб недельный ритм и порог 10; свой ритм не заводим |
 
 <!-- END AUTOGEN: integrity-sensors -->

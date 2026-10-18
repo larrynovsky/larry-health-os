@@ -35,27 +35,10 @@ PROBE = "plans/probe_labs_scope_enforced_2026-07-28.py"
 
 
 def _carrier_lists():
-    """Что носитель ЗАПУСКАЕТ и что осознанно ПРОПУСКАЕТ — из его исходника.
-
-    Один дом разбора на все проверки охвата: три теста, читающие один и тот же файл
-    тремя регулярками, разъехались бы между собой — и это была бы ровно та болезнь,
-    против которой они написаны.
-    """
-    src = (ROOT / "scripts" / "run_probes.sh").read_text(encoding="utf-8")
-
-    def _array(name):
-        m = re.search(rf"^{name}=\(\n(.*?)^\)", src, re.S | re.M)
-        return m.group(1) if m else ""
-
-    run = set(re.findall(r"plans/probe_[\w\-.]+\.py",
-                         _array("PROBES") + _array("LIVE_PROBES")))
-    skipped = {}
-    for line in _array("SKIPPED_PROBES").splitlines():
-        if "|" not in line:
-            continue
-        path, _, cause = line.strip().strip('"').partition("|")
-        skipped[path.strip()] = cause
-    return run, skipped
+    """Что носитель ЗАПУСКАЕТ и что осознанно ПРОПУСКАЕТ — разбор живёт в intent_registry.carrier_lists
+    (18.10: его же читает ночной датчик пересмотра; второй разбор здесь разъехался бы с ним)."""
+    run, skipped = ir.carrier_lists(ROOT)
+    return run, {p: v["cause"] for p, v in skipped.items()}
 
 
 def _inv(status="holds", probe=PROBE):
@@ -523,3 +506,29 @@ def test_успешная_запись_вердиктов_не_объявляе�
         assert "упала" not in r.stdout and "ДОШЛИ" in r.stdout, r.stdout
     else:
         assert "упала" in r.stdout and r.returncode == 2, (r.returncode, r.stdout)
+
+
+def test_every_skip_carries_a_review_date():
+    """Пропуск без даты пересмотра — залежавшаяся проба без будильника (решение владельца 18.10).
+
+    Калибраторы порога силы связи стояли в пропуске с причиной «сломан self-test» с 14.08, а путь
+    их обещания к holds («починить, вернуть в носитель») никто не шёл два месяца: причина была,
+    срока не было. Дата — данные, по ним ночной датчик спрашивает «вернуть или убрать»."""
+    _, skipped = ir.carrier_lists(ROOT)
+    assert skipped, "список пропусков пуст — тест судит пустое множество"
+    undated = [p for p, v in skipped.items() if v["review_by"] is None]
+    assert not undated, f"пропуски без читаемой даты пересмотра (ГГГГ-ММ-ДД вторым полем): {undated}"
+
+
+def test_carrier_lists_reads_old_and_new_format(tmp_path):
+    """Разбор не падает на строке старого вида — отдаёт review_by=None (это находка датчика)."""
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "run_probes.sh").write_text(
+        'PROBES=(\n  "plans/probe_a_2026-01-01.py --x"\n)\nLIVE_PROBES=(\n)\nSKIPPED_PROBES=(\n'
+        '  "plans/probe_b_2026-01-01.py | 2027-01-16 | причина с | чертой"\n'
+        '  "plans/probe_c_2026-01-01.py | старая причина без даты"\n)\n', encoding="utf-8")
+    run, skipped = ir.carrier_lists(tmp_path)
+    assert run == {"plans/probe_a_2026-01-01.py"}
+    assert str(skipped["plans/probe_b_2026-01-01.py"]["review_by"]) == "2027-01-16"
+    assert skipped["plans/probe_b_2026-01-01.py"]["cause"] == "причина с | чертой"
+    assert skipped["plans/probe_c_2026-01-01.py"] == {"review_by": None, "cause": "старая причина без даты"}

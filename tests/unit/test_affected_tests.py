@@ -93,3 +93,21 @@ def test_doc_without_pair_does_not_pull_form_check(tmp_path, monkeypatch):
     hits, _ = at.select(["solo.md"])
     assert at._TRANSLATION_TEST not in hits
 
+
+
+def test_wide_edit_still_runs_consistency_core():
+    """Широкая правка не сужает выбор, но сторожи согласованности гоняются всё равно (C-174).
+
+    07.10 правка integrity_tests.py выбрала 111 тестов — выше потолка, и pre-commit не гонял
+    НИЧЕГО. Два красных сторожа нового датчика (пометка вреда, негативный контроль) нашлись
+    только в конце полного прогона закрытия. Исполняется сам скрипт, как его зовёт хук:
+    stdout — список к прогону, stderr — причина, почему не всё."""
+    import subprocess
+    root = Path(__file__).resolve().parents[2]
+    r = subprocess.run([sys.executable, str(root / "affected_tests.py"), "integrity_tests.py"],
+                       cwd=root, capture_output=True, text=True, timeout=60)
+    run = r.stdout.split()
+    assert "tests/consistency/test_sensor_harm_declared.py" in run
+    assert "tests/consistency/test_sensor_negative_control.py" in run
+    assert all(t.startswith(at.CORE_PREFIX) for t in run), "выше потолка — только ядро"
+    assert "полный набор" in r.stderr and "affected_tests:" in r.stderr

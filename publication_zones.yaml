@@ -122,6 +122,8 @@ private:
     why: "тест оснастки plans/mutation_stand.py"
   - glob: "tests/unit/test_premechanism_retire_selection.py"
     why: "тест оснастки plans/ — импортирует plans/"
+  - glob: "tests/unit/test_probe_arbiter_taking.py"
+    why: "тест оснастки plans/ — импортирует plans/"
   - glob: "tests/unit/test_probe_quarantine_exit_helpers.py"
     why: "тест пробы plans/probe_quarantine_exit_2026-07-29.py"
   - glob: "tests/unit/test_ungrounded_corr_journal.py"

@@ -58,7 +58,6 @@ MIN_OPEN_TASKS            = 0    # 0 = только проверяем что т
 LAB_REMINDER_DAYS         = 180  # 6 мес — напоминание пересдать анализы
 LAB_ALERT_DAYS            = 270  # 9 мес — тревога: агент работает по stale labs
 PROMOTION_BACKLOG_DAYS    = 7    # staging: строка «к авто-промоуту» ждёт > N дней = затор
-RETIRED_LAB_WRITER_FENCE  = "2026-07-29"  # дата фенса coordinate_import→lab_results (F-01)
 UNIT_REQUIRED_FENCE       = "2026-07-30"  # с этой даты строка канона обязана нести единицу (loinc-name-home, шаг A)
 GENOME_UPDATE_ALERT_DAYS  = 30   # genome_update_agent не запускался > N дней
 HYPOTHESIS_MAX_AGE_DAYS   = 14   # гипотеза без эксперимента/лога > N дней
@@ -1225,59 +1224,10 @@ def check_lab_canon_health():
 # check("канон lab_results: нет невозможных значений и конфликтов") ПЕРЕНЕСЁН в блок.
 
 
-def check_lab_single_writer():
-    """Инвариант единственного писателя канона (BL-LAB-CANON-1, Primary-Based
-    Protocol). lab_results пишет только vision-пайплайн (source=doc:/имя PDF).
-    Строки от ЗАГЛУШЁННОГО biochemical-JSON writer (source *_chemistry.json) =
-    нарушение: рецидив старого пути ИЛИ устаревшая копия после отката из бэкапа.
-    Красный до реконсиляции Ш3; после — ловит любой новый прорыв фенса."""
-    import collections
-    with db.get_conn() as conn:
-        rows = conn.execute(  # %chemistry%.json ловит и дубли _2/_594.json
-            "SELECT source FROM lab_results "
-            "WHERE source LIKE '%chemistry%.json' AND source NOT LIKE 'instrument:%'"
-        ).fetchall()
-    if rows:
-        by = collections.Counter(r["source"] for r in rows)
-        warn(f"канон lab_results: {len(rows)} строк от заглушённого biochemical-writer "
-             f"(нарушение single-writer, source *_chemistry.json)",
-             "; ".join(f"{s}×{n}" for s, n in by.most_common(6)))
-
-    # Второй ретайрнутый писатель (фенс 2026-07-29): coordinate_import →
-    # _write_known_to_db писал в канон НАПРЯМУЮ, минуя staging и ревью (F-01).
-    # Его строки узнаются по source БЕЗ известного префикса: единственный живой
-    # писатель ставит `doc:`, приборы — `instrument:`, ручной ввод — `manual:`.
-    # Смотрим только на строки моложе фенса: более ранние относятся к легаси.
-    # Граница отделяет рецидив от истории без ратчета по размеру коллекции.
-    with db.get_conn() as conn:
-        # Неспособность проверить — не пропуск. Нет колонки времени → датчик рецидива
-        # СЛЕПОЙ, и молчание тут неотличимо от «всё чисто»; говорим об этом громко.
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(lab_results)")}
-        if "created_at" not in cols:
-            warn("датчик рецидива ретайрнутого писателя СЛЕП: в lab_results нет "
-                 "created_at — отличить легаси от нового прорыва нечем")
-            return len(rows)
-        revived = conn.execute(
-            "SELECT source, COUNT(*) n FROM lab_results "
-            "WHERE created_at > ? AND source IS NOT NULL "
-            "AND source NOT LIKE 'doc:%' AND source NOT LIKE 'instrument:%' "
-            "AND source NOT LIKE 'manual:%' "
-            # Строки biochemical-писателя тоже без префикса, но за них отвечает
-            # запрос выше. Без этого исключения один и тот же прорыв считался бы
-            # дважды — поймано существующим тестом фенса, не мной.
-            "AND source NOT LIKE '%chemistry%.json' "
-            "GROUP BY source ORDER BY n DESC",
-            (RETIRED_LAB_WRITER_FENCE,)
-        ).fetchall()
-    if revived:
-        total = sum(r["n"] for r in revived)
-        warn(f"канон lab_results: {total} строк от РЕТАЙРНУТОГО писателя после фенса "
-             f"{RETIRED_LAB_WRITER_FENCE} — старый путь воскрес, staging обойдён",
-             "; ".join(f"{r['source']}×{r['n']}" for r in revived[:6]))
-    return len(rows) + sum(r["n"] for r in revived)
-
-
-check("канон lab_results: единственный писатель (нет biochemical-json)", check_lab_single_writer)
+# check_lab_single_writer удалён 07.10 (нить canon-tails): его поглотил check_canon_provenance.
+# Строку без класса источника (и *_chemistry.json старого писателя, и голое имя бланка от
+# ретайрнутого coordinate_import) отбивает триггер на записи; откат из бэкапа без триггеров
+# краснит check_canon_provenance. Фенс самих писателей — tests/integration/test_lab_single_writer_fence.py.
 
 
 def promotion_backlog(canon_rows, staging_rows, today_):
@@ -1663,6 +1613,51 @@ def check_lab_ref_scale():
         "значение и референс в РАЗНЫХ шкалах — нормальный анализ читается как "
         "патология: " + "; ".join(offenders))
     return out or None
+
+
+def canon_provenance_offenders(conn) -> list[str]:
+    """Чистое ядро: чего не хватает защите провенанса канона в одной базе.
+
+    Два вопроса: стоят ли триггеры (живость защиты — §14: снятый триггер не краснеет
+    сам) и есть ли строки без класса источника (защиту обошли до её появления или мимо).
+    Пустой список — защита на месте и обходов нет."""
+    have = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    out = [f"нет триггера {n}" for n in db.canon_provenance_trigger_names()
+           if n not in have and any(n.startswith(f"trg_{t}_source") for t in tables)]
+    # Дата лечения — только с записью в журнале (07.10, нить treatment-date-journal).
+    if "data_repair_log" in tables:
+        out += [f"нет триггера trg_{t}_{f}_journal"
+                for t, fields in db.TREATMENT_DATE_FIELDS.items() if t in tables
+                for f in fields if f"trg_{t}_{f}_journal" not in have]
+    for table, classes in db.CANON_SOURCE_CLASSES.items():
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if not cols:
+            continue
+        if "source" not in cols:
+            out.append(f"{table}: колонки source нет (миграция не прошла)")
+            continue
+        ok = " OR ".join(f"source GLOB '{c}*'" for c in classes)
+        n = conn.execute(f"SELECT COUNT(*) FROM {table} "
+                         f"WHERE source IS NULL OR NOT ({ok})").fetchone()[0]
+        if n:
+            out.append(f"{table}: {n} строк без класса источника")
+    return out
+
+
+def check_canon_provenance():
+    """Строка канона несёт класс источника — документ, опросник, предложение или ручная
+    правка с причиной (C-173, 07.10). Две разовые пачки сессии записали канон без следа:
+    дубли медкарты с ярлыками не из документов и строки анализов с неверным значением.
+    Запись без класса отбивают триггеры; этот датчик стережёт, что триггеры живы и что
+    обходов нет. Оба тенанта; соседу — только счётчики, без значений."""
+    bad = []
+    for _tag, _conn, _cur in _iter_tenant_ro():   # C-19
+        found = canon_provenance_offenders(_conn)
+        if found:
+            bad.append(f"[{_tag}] " + "; ".join(found))
+    assert not bad, "провенанс канона: " + " | ".join(bad)
+    return len(bad)
 
 
 # ── «Пусто по правде» — явное объявление, а не молчание (2026-08-09) ─────────
@@ -2720,7 +2715,11 @@ check("env-консистентность launchd-плистов (мультит
 # копии 24. Ратчет только ВНИЗ: число снижается вместе с заведением копий, само вверх
 # не ходит. Иначе «покрытие улучшается» тем, что джобу удалили.
 # 28.09: копии двух партнёрских плистов крана литературы заведены вместе с кранами → 25 − 2 = 23.
-_LAUNCHD_UNCOVERED_BASELINE = 23
+# 15.10 (ночной ремонт 2026-10-09-5b90e92e): шаблон templates/launchd/<label>.plist.tmpl — тоже
+# копия (дом установки с 29.09). Замер на Studio после деплоя fd9f22e: из 29 шаблон у 27; у colima и
+# pilot-shadow (службы хоста без шаблона) заведены копии в launchd/ → 0. (Сообщение fd9f22e ошибочно
+# говорило «у всех 29» — замер был по списку шаблонов глазами, не вызовом датчика.)
+_LAUNCHD_UNCOVERED_BASELINE = 0
 
 
 def check_launchd_inventory():
@@ -2749,9 +2748,13 @@ def check_launchd_inventory():
              f"но не оставляй врать")
     n = len(inv["live_only"])
     if n > _LAUNCHD_UNCOVERED_BASELINE:
+        # Ратчет помнит ЧИСЛО, не имена: какие из них новые, датчик не знает. До 09.10 здесь
+        # стояло «новая: » + три последних по алфавиту — карточка 04.10 назвала новыми
+        # wellally-check/withings-import/healthbot.morningwake (хвост сортировки). Весь список.
         warn(f"launchd: джоб без копии в репозитории стало больше ({n} > "
              f"{_LAUNCHD_UNCOVERED_BASELINE})",
-             "новая: " + ", ".join(inv["live_only"][-3:]))
+             f"все {n} (какие из них новые, датчик не помнит — сверь с placement.yaml и "
+             f"историей templates/launchd/): " + ", ".join(inv["live_only"]))
     if inv["repo_only"]:
         warn("launchd: копия есть, живой джобы нет",
              ", ".join(inv["repo_only"]) + " — надгробие или незагруженная джоба")
@@ -5104,6 +5107,7 @@ check("канон lab_results: один аналит в документе — �
 check("канон lab_results: у нового значения есть единица", check_lab_unit_present)  # регистрация здесь: forward-def _iter_tenant_ro
 check("канон lab_results: референс в той же шкале, что значение", check_lab_ref_scale,
       critical=True)  # шкала разошлась → «норма/не норма» в брифе перевёрнута молча
+check("канон: у строки есть класс источника, защита записи жива", check_canon_provenance)  # C-173; forward-def _iter_tenant_ro
 check("staging: материал пробы и его ступень не разошлись", check_staging_specimen_provenance)  # там же и по той же причине
 check("значение и оператор сравнения не разошлись", check_censored_values_coherent,
       critical=True)  # «<0,01» прочитанное как 0,01 — цифра в брифе неверна по знаку
@@ -7254,6 +7258,10 @@ def check_recommendation_engine_health():
             continue
         if res.get("error"):
             broken.append((d, res["error"]))
+    from services.recommendations import evaluate_safety_limits
+    _lim = evaluate_safety_limits()
+    if _lim.get("error"):
+        broken.append(("пол безопасности", _lim["error"]))
     if broken:
         details = "; ".join(f"{d}: {msg}" for d, msg in broken[:5])
         warn(
@@ -7264,6 +7272,37 @@ def check_recommendation_engine_health():
 
 
 check("recommendation engine здоров", check_recommendation_engine_health)
+
+
+def check_safety_limits_executed():
+    """Пол безопасности (абсолютные пороги + тренды) исполняется вживую у КАЖДОГО тенанта.
+    Нить floors-live 07.10: пороги жили внутри evaluate_domain_need, а задача звала её только для
+    доменов протоколов — домен пуст у всех, и пол не проверялся ни разу; все датчики были зелёные,
+    потому что звали функцию сами. Здесь — вопрос получателя: исполнила ли ЗАДАЧА пол недавно.
+    Пульс пишет check_recommendations_scheduled только у исправного прогона; допустимое молчание
+    выводится из расписания задачи (services.recommendations.limits_max_silence_s)."""
+    from datetime import timezone as _tz
+    import config_db
+    from services import recommendations as _reco
+    from _time_inject import get_now
+    now = get_now(_tz.utc)
+    quiet, muted = [], []
+    for tag, rc, _cur in _iter_tenant_ro():
+        if not config_db.get_config(_reco.LIMITS_SEND_KEY, 0, conn=rc):
+            muted.append(tag)
+        if _reco.limits_stale(rc, now):
+            s = _reco.limits_silence_s(rc, now)
+            quiet.append(f"{tag}: " + ("ни разу или не читается" if s is None else f"{s / 3600:.0f} ч"))
+    if muted:
+        warn("пол безопасности считается, но человеку не доставляется",
+             ", ".join(muted) + f" — нет {_reco.LIMITS_SEND_KEY}=1 в system_config (включение — решение владельца)")
+    assert not quiet, ("пол безопасности не исполняется задачей рекомендаций: " + "; ".join(quiet)
+                       + f" (допустимо {_reco.limits_max_silence_s() / 3600:.0f} ч)"
+                       + " — пульс recommendations.limits_checked_at; лог бота: evaluate_safety_limits")
+    return {"quiet": quiet, "muted": muted}
+
+
+check("пол безопасности исполняется задачей (пульс)", check_safety_limits_executed)
 
 
 def check_constitution_conflicts_unresolved():
@@ -7892,6 +7931,41 @@ def check_llm_guard_blocks_reported():
 check("Блокировки LLM-гарда видны в отчёте", check_llm_guard_blocks_reported)
 
 
+def check_chain_models_thinking_known():
+    """WARN: модель живой цепочки роли без замеренного поведения думания (15.10).
+
+    Класс реализовался: 13.10 claude-haiku-4-5 исчезла из списка доступных, цепочки haiku и
+    haiku_pinned штатно стали [claude-haiku-5-5] — а записи этой модели в профилях думания
+    (methodology/llm_providers.json) не было. Модель думает по умолчанию, и задачи режима
+    «чтение» с малым лимитом остались без ответа: генератор простых описаний проблем — двое суток
+    stop=max_tokens, блоки=['thinking']. Ни один датчик этого не видел: падение вызова не было
+    ошибкой, ответ просто был пуст. Профиль снимается пробой (какой параметр выключает думание),
+    запас — замером (llm_admission --record-thinking); оба — до того, как модель работает."""
+    import hai_core
+    import llm_client
+    if llm_client.provider() != "anthropic":
+        return {"skipped": "провайдер не anthropic — профили думания заведены только для него"}
+    roles: dict = {}
+    for role in sorted(hai_core.MODEL_DEFAULTS):
+        for m in hai_core.model_chain(role):
+            roles.setdefault(m, []).append(role)
+    gaps = []
+    for m, rs in sorted(roles.items()):
+        prof = llm_client.thinking_profile(m)
+        if not prof:
+            gaps.append(f"{m} ({', '.join(rs)}) — нет профиля думания")
+        elif prof.get("think") and llm_client.reasoning_reserve(m) <= 0:
+            gaps.append(f"{m} ({', '.join(rs)}) — думать умеет, запас не замерен")
+    if gaps:
+        warn("модель цепочки с незамеренным думанием",
+             "; ".join(gaps[:6]) + " — задачи «чтение» на ней могут голодать, "
+             "«суждение» — идти без думания")
+    return {"gaps": len(gaps)}
+
+
+check("модели цепочек: думание замерено", check_chain_models_thinking_known)
+
+
 _CORR_RE = __import__("re").compile(r"\br\s*=\s*([+-]?0[.,]\d+)")
 _CORR_WINDOW_DAYS = 30
 
@@ -7929,6 +8003,10 @@ def collect_ungrounded(window_days=None):
                 # находки, и причина её была бы невидима.
                 warn("В принятой вере запись без разбираемого r",
                      f"{c!r:.120} — не попадёт в множество подтверждённых")
+    # Вход самого агента (15.10): до решения владельца по BL-CORR-PROVENANCE-1 п.6 ревью тревог получало
+    # в промпт r таблицы сигналов (снимок калибровки мимо гейта) и цитировало его — две ложные карточки
+    # 07.10. Теперь выдержка (_build_alert_config_excerpt) несёт силу связи только из принятой веры,
+    # то есть из этого же множества `known`; отдельного источника провенанса больше нет.
     sql = ("SELECT agent_type, date, COALESCE(findings,'') || COALESCE(raw_output,'') "
            "FROM agent_reports")
     args = ()
@@ -9108,6 +9186,10 @@ check("morning_brief: gate liveness", check_morning_brief_gate_liveness)
 # сравнение двух результатов одного преобразования не обходит его ошибки (§17).
 _RETELL_WINDOW_DAYS = 3     # окно реплик владельца назад от даты брифа
 _RETELL_THETA_SEED = 0.15   # доля слов первого предложения, пришедших из его реплики
+# Одно общее слово — не пересказ, а совпадение: на коротком предложении (6 слов) оно одно
+# даёт 0.17 ≥ 0.15. Ложное срабатывание 2026-10-10 («Ночь на субботу не посчиталась…»).
+# Структурный минимум, как guard «≥5 слов» ниже; инциденты 02–04.08 несут по 3 общих слова.
+_RETELL_MIN_SHARED = 2
 
 
 def _retell_tokens(text: str) -> set:
@@ -9120,12 +9202,14 @@ def retell_score(first_sentence: str, owner_messages: list) -> float:
 
     Containment, а не Jaccard: реплика бывает длинной, предложение коротким, и симметричная
     мера тонула бы в длине реплики. 0.0, если считать не по чему (нет реплик ≥5 слов или
-    само предложение короче 5 слов) — молчание, а не ложная тревога."""
+    само предложение короче 5 слов) — молчание, а не ложная тревога. Реплика, с которой
+    общих слов меньше _RETELL_MIN_SHARED, не засчитывается: одно слово — совпадение."""
     st = _retell_tokens(first_sentence)
     said = [t for t in (_retell_tokens(m) for m in (owner_messages or [])) if len(t) >= 5]
     if len(st) < 5 or not said:
         return 0.0
-    return max(len(st & tt) / len(st) for tt in said)
+    return max((len(st & tt) / len(st) for tt in said
+                if len(st & tt) >= _RETELL_MIN_SHARED), default=0.0)
 
 
 def check_brief_does_not_retell_owner():
@@ -9367,6 +9451,38 @@ def check_probe_liveness():
 
 
 check("носитель проб жив и зелен (§14)", check_probe_liveness)
+
+
+def check_skipped_probes_reviewed():
+    """Исключённая из носителя проба с прошедшей датой пересмотра — вопрос «вернуть или убрать».
+
+    Решение владельца 18.10 (вариант Б′): пропуск в SKIPPED_PROBES законен, но залежаться проба
+    может только там. Калибраторы порога силы связи стояли в пропуске «self-test красный» с 14.08,
+    а путь их обещания к holds (починить, вернуть в носитель, переподтвердить) два месяца никто не
+    шёл — причина была, срока не было, и §15 три недели звонил про «повтор причины» вместо этого.
+    Дата живёт данными во втором поле строки, разбор — intent_registry.carrier_lists. Строка без
+    читаемой даты — тоже находка: будильника у неё нет. Живые пробы носителя здесь не судятся —
+    их пульс стережёт check_probe_liveness, второй судья того же факта был бы лишним сигналом.
+    """
+    import intent_registry as _ir
+    _, skipped = _ir.carrier_lists()
+    late, undated = [], []
+    for path, v in sorted(skipped.items()):
+        if v["review_by"] is None:
+            undated.append(path)
+        elif v["review_by"] < today:
+            late.append(f"{path} (пересмотр {v['review_by']}): {v['cause'][:160]}")
+    if late:
+        warn("исключённая проба: срок пересмотра прошёл",
+             "вернуть в запуск, продлить с новой причиной или убрать — scripts/run_probes.sh "
+             "SKIPPED_PROBES:\n  " + "\n  ".join(late))
+    if undated:
+        warn("исключённая проба без даты пересмотра",
+             "вторым полем строки SKIPPED_PROBES нужна дата ГГГГ-ММ-ДД: " + ", ".join(undated))
+    return {"skipped": len(skipped), "late": len(late), "undated": len(undated)}
+
+
+check("исключённые пробы: срок пересмотра", check_skipped_probes_reviewed)
 
 
 SUITE_MARKER_PATH = Path.home() / "health_scripts" / "logs" / "suite_last_run.json"

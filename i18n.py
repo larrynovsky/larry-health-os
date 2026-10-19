@@ -16,6 +16,7 @@ pромпты моделей (исключение — model.answer_language: я
 from __future__ import annotations
 
 import logging
+from collections import deque
 from functools import lru_cache
 from pathlib import Path
 
@@ -57,7 +58,24 @@ def t(key: str, lang: str | None = None, **kw) -> str:
             raise KeyError(f"i18n: ключа {key!r} нет ни в {lang}, ни в {DEFAULT}")
         if lang != DEFAULT:
             log.warning("i18n: нет перевода %s для %s — показан русский текст", key, lang)
-    return text.format(**kw) if kw else text
+    text = text.format(**kw) if kw else text
+    _RECENT.append((key, text))
+    return text
+
+
+# Последние выданные тексты процесса — сырьё «следа экрана» (screen_trace). Только в памяти:
+# какие из них реально ушли человеку, решает слой отправки, сверяя с отправленным текстом.
+_RECENT: deque = deque(maxlen=300)
+_MIN_MATCH = 12   # короче — подписи кнопок вроде «Да»: совпали бы с чем угодно
+
+
+def keys_in(sent: str) -> list[str]:
+    """Ключи строк, чей текст целиком вошёл в отправленное сообщение; свежие первыми, без повторов."""
+    out: list[str] = []
+    for key, text in reversed(_RECENT):
+        if len(text) >= _MIN_MATCH and text in sent and key not in out:
+            out.append(key)
+    return out
 
 
 def pick(value, lang: str | None = None) -> str:

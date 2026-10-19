@@ -28,6 +28,17 @@ def test_group_threads_by_handoff_marker_and_path():
     assert len(g["norm-from-documents"]) == 2
 
 
+
+def test_handoff_subject_with_word_nit_names_the_thread_not_the_word():
+    """Ночь 17.10 (карточка 20bfeb78): «docs(handoff): нить nutrition-homes — …» относился к нити
+    «нить», и thread_last_activity не знал nutrition-homes — нить-сирота не доходила до владельца
+    вопросом «добить или закрыть». Мутант прежнего выражения краснеет здесь."""
+    c = C("e", "2026-10-07", "docs(handoff): нить nutrition-homes — конституции", "",
+          ["docs/handoff/INDEX.md"])
+    assert wd._thread_name(c) == "nutrition-homes"
+    assert wd._thread_name(C("f", "2026-09-01", "docs(handoff): norm-from-documents — снимок", "", [])) \
+        == "norm-from-documents"
+
 def test_major_threads_is_code_not_model():
     threads = {"big": _cs(6), "mid": _cs(3), "small": _cs(2), "прочее": _cs(40)}
     assert wd._major_threads(threads) == ["big", "mid"]          # «прочее» и <3 — доделки

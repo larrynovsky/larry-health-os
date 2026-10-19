@@ -48,6 +48,17 @@ def _breached(values: list[float], n: int, direction: str, value: float,
     return (m > value, m)
 
 
+def pushed(t: dict) -> bool:
+    """Идёт ли сработавшее оконное правило сообщением (решение владельца 19.10).
+
+    Серия подряд (consecutive) — «дёрнуть»: несколько плохих ночей подряд, замысел
+    proactivity.trend_not_spike. Среднее за окно (avg) — картина, а не событие: порог личный
+    (p10 скользящих средних), окно две недели, за утро не изменится — его несёт утренний бриф
+    (brief_pipeline, провайдер trend). Один предикат на оба потребителя: бот и бриф.
+    """
+    return t.get("mode") != "avg"
+
+
 def evaluate_trends(domain: str | None = None, conn=None) -> list[dict]:
     """Активные trend_thresholds для домена (t.domain пустой = не привязан).
 
@@ -81,7 +92,7 @@ def evaluate_trends(domain: str | None = None, conn=None) -> list[dict]:
             if hit:
                 out.append({
                     "metric": t["metric"], "level": t["level"],
-                    "window_days": t["window_days"], "mode": t["mode"],
+                    "window_days": t["window_days"], "mode": t["mode"], "val": computed,
                     "reason": t["reason_template"].format(
                         val=computed, n=t["window_days"], thr=t["value"]),
                 })

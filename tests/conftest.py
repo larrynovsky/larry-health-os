@@ -289,6 +289,25 @@ def fault_journal(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def screen_trace_file(tmp_path_factory, monkeypatch):
+    """«След экрана» теста не попадает в рабочие logs/ (нить bug-report). Каталог вне tmp_path:
+    тесты, считающие файлы в tmp_path, его не видят (тот же урок, что у журнала сбоев)."""
+    path = tmp_path_factory.mktemp("trace") / "screen_trace.jsonl"
+    monkeypatch.setenv("HEALTH_SCREEN_TRACE", str(path))
+    return path
+
+
+@pytest.fixture(autouse=True)
+def _no_real_bug_receiver(monkeypatch, tmp_path_factory):
+    """Тест не шлёт отчёт о сбое в настоящий приёмник разработчика (урок C-122): адрес по
+    умолчанию — закрытый порт localhost; тест с приёмником поднимает свой и подменяет адрес."""
+    import bug_outbox
+    monkeypatch.setattr(bug_outbox, "RECEIVER", "http://127.0.0.1:9/report")
+    # и не читает настоящие отчёты: в контейнере cron владельца BUG_INBOX_DB указывает на них
+    monkeypatch.setenv("BUG_INBOX_DB", str(tmp_path_factory.mktemp("inbox") / "reports.db"))
+
+
+@pytest.fixture(autouse=True)
 def owner_weekly_journal(tmp_path, monkeypatch):
     """Понедельничный журнал и квитанция теста никогда не попадают в рабочие logs/."""
     path = tmp_path / "owner_weekly.jsonl"

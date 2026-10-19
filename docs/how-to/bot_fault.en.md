@@ -1,55 +1,63 @@
-<!-- translation-of: docs/how-to/bot_fault.md sha256:d9925b15cb7e -->
+<!-- translation-of: docs/how-to/bot_fault.md sha256:efd96a701090 -->
 **English** · [Русский](bot_fault.md)
 
-# The bot replied “I couldn't answer: something failed inside the system…” with a code
+# Something went wrong — how to tell the developer
 
 > **Genre (Diátaxis): how-to.** For someone who installed the system themselves with the
-> [installation tutorial](../tutorials/first_install.md) ([English](../tutorials/first_install.en.md)) and got this message from the bot.
+> [installation tutorial](../tutorials/first_install.md) ([English](../tutorials/first_install.en.md)):
+> the bot replied “I couldn't answer: something failed inside the system…” with a code, the morning
+> report didn't arrive, or a button did nothing.
 
-The bot answers this way when a command or button failed and your installation has no other
-repairer: you installed it, so you repair it. The bot keeps working meanwhile, there is no rush. The
-code in the message has six characters, for example `a1b2c3`. It leads to the fault record on your machine.
+The bot keeps working meanwhile, there is no rush.
 
-## 1. Find the fault record
+## 1. Send the bot /bug
 
-From the installation directory (`~/health-docker` in the tutorial), put in your code:
+The bot asks what happened — pick the closest button: “A report didn't arrive”, “The bot didn't
+respond to a button or command”, “A lab result wasn't recognised” or “Something else”. Then it shows
+exactly what will go to the developer and asks “Send it?”.
+
+Only this goes: the version and system, the button you picked, the type and place of this week's
+faults (for example `KeyError in labs_db.py`), what is connected (yes/no) and the names of the bot's
+latest messages — without their text. Never sent: message texts, your data and lab results, keys.
+Full list — [what goes into the report](../reference/bug_report_fields.md).
+
+“Delivered, number R-…” means the developer has the report. “I can't reach the developer right now” —
+the report is saved and the bot will send it itself. “Sending reports isn't set up in this build” —
+you built the image yourself instead of downloading a release; see step 3.
+
+## 2. If the bot doesn't answer at all
+
+From the installation directory (`~/health-docker` in the tutorial):
 
 ```bash
 cd ~/health-docker
-docker compose exec -T cron sh -c 'grep a1b2c3 /app/logs/faults.jsonl'
+docker compose run --rm cron python3 -m bug_outbox
 ```
 
-The answer is one line: when (`ts`), where (`where`) and what happened (`text`). Empty means the
-code is mistyped or the journal was already trimmed (it keeps the last two thousand records).
+The command shows the same report and asks whether to send it.
 
-Details with the traceback are in the bot log, close in time:
+## 3. A GitHub issue instead of the bot
+
+If you have a GitHub account and want to discuss the fault in the open, print the same report and
+paste it into a [new issue](https://github.com/larrynovsky/larry-health-os/issues/new):
 
 ```bash
-docker compose exec -T cron sh -c 'tail -n 60 /app/logs/bot_err.log'
+docker compose run --rm cron python3 -m bug_outbox --print
 ```
 
-## 2. Try the common causes
+Don't paste lines from the `faults.jsonl` and `bot_err.log` journals into the issue: error text can
+contain what you wrote to the bot or a lab value. The report from the command above contains neither.
 
-| In the record | What it is | What to do |
+## Common causes you can fix yourself
+
+| The bot or the report says | What it is | What to do |
 |---|---|---|
-| `Read-only file system` … `.health_secrets` | this bot version writes to the keys directory, which is read-only | update to the latest release — the “How to update” section of the tutorial |
-| `authentication_error`, `credit balance` | the Anthropic key is wrong or the account has no balance | tutorial step 4: check the key and the balance, then `docker compose restart bot` |
-| `InvalidToken` | wrong Telegram token | tutorial step 6 |
-
-## 3. Still broken — open an issue
-
-Open an issue on [GitHub](https://github.com/larrynovsky/larry-health-os/issues/new) and attach:
-
-- the fault code and its line from `faults.jsonl`;
-- the version: output of `grep 'image:' ~/health-docker/compose.yaml | sort -u`;
-- 20–60 lines of `bot_err.log` around the time of the fault.
-
-Look the text over before sending: it must not contain keys or tokens. The fault journal holds no
-medical data by design, but a traceback may contain the text of your message to the bot — you can
-erase it.
+| `authentication_error`, `credit balance` among the faults | the model provider key is wrong or the account has no balance | tutorial step 4: check the key and the balance, then `docker compose restart bot` |
+| the bot is silent, the journal has `InvalidToken` | wrong Telegram token | tutorial step 6 |
+| `Read-only file system` | an old bot version | update — the “How to update” section of the tutorial |
 
 ## Why the bot doesn't put details into the chat
 
-Error text can contain internal addresses and pieces of keys, and Telegram messages often get
-forwarded and attached to issues. So only the code goes to the chat, and the details stay on your
-machine.
+Error text can contain internal addresses, pieces of keys and your data, and Telegram messages often
+get forwarded. So only a short code goes to the chat, and the developer gets a report assembled from
+fields that cannot hold anything personal.

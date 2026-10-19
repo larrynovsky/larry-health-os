@@ -1,0 +1,32 @@
+{
+  "module": "screen_trace",
+  "public": ["note", "recent"],
+  "depends_on": [
+    {
+      "module": "i18n",
+      "uses": ["keys_in"],
+      "why": "i18n помнит последние выданные строки процесса; след сверяет с ними отправленный текст",
+      "legacy": "i18n — легаси вне периметра §15, контракта нет; поведение keys_in стережётся tests/unit/test_screen_trace.py (мутация S2)"
+    },
+    {
+      "module": "secrets_paths",
+      "uses": ["secrets_dir"],
+      "why": "метка тенанта строки следа — тот же каталог ключей, что у журнала сбоев",
+      "legacy": "secrets_paths — легаси вне периметра §15, контракта нет"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — что из шаблонов интерфейса реально ушло человеку. Не отправляет, не собирает отчёт (bug_report), не читает данные человека.",
+      "D2": "два входа: note(sent_text) — зовут носители отправки (bot/main._TracedRequest, notify._telegram); recent() — читает сборщик отчёта.",
+      "D3": "stdlib + i18n.keys_in + secrets_paths.secrets_dir.",
+      "D4": "~90 строк, половина — докстринг с границей (какие отправки в след не попадают).",
+      "D5": "tests/unit/test_screen_trace.py (5) + tests/unit/test_first_contact.py::test_walk_leaves_a_screen_trace_for_every_message (весь путь знакомства через настоящие обработчики, подделан только Telegram; замер 19.10: 18 отправок, 18 строк, 17 по шаблону). ИСПОЛНЕННЫЕ негативные контроли 2026-10-19, /tmp/mutate_screen_trace.sh: S1 обёртка бота не отмечает — 3 failed; S2 сверка ничего не узнаёт — 2 failed; S3 след пишет текст сообщения — 1 failed; S4 чужой тенант не отфильтрован — 1 failed. После восстановления 6 passed.",
+      "D6": "инвариант с bug_report: строка следа — «ЧЧ:ММ ключ», ключ из [a-z0-9_.] (шаблон _TRACE сборщика); текст сообщения в след не пишется никогда (S3)."
+    },
+    "rationale": "Переписывается по контракту и тестам. Решение «отметка на отправке, а не в i18n.t» и граница (6 прямых отправителей мимо бота и notify) названы в докстринге.",
+    "date": "2026-10-19",
+    "oracle": "tests/unit/test_screen_trace.py, tests/unit/test_first_contact.py; в образе — scripts/first_contact_smoke.py печатает замер и краснеет на пропуске отправки."
+  }
+}

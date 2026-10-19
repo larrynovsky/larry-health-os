@@ -191,23 +191,57 @@
   }
  },
  "anthropic": {
-  "opus": {
-   "claude-opus-5": {
+  "haiku": {
+   "claude-haiku-4-5-20251001": {
+    "passed": false,
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
+   },
+   "claude-haiku-5-5": {
     "passed": true,
-    "date": "2026-10-02",
-    "corpus": "2026-10-02.3"
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
+   }
+  },
+  "haiku_pinned": {
+   "claude-haiku-4-5-20251001": {
+    "passed": false,
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
+   },
+   "claude-haiku-5-5": {
+    "passed": true,
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
+   }
+  },
+  "opus": {
+   "claude-opus-4-7": {
+    "passed": true,
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
+   },
+   "claude-opus-5": {
+    "passed": false,
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
    },
    "claude-opus-5-5": {
     "passed": false,
-    "date": "2026-10-02",
-    "corpus": "2026-10-02.3"
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
    }
   },
   "sonnet": {
+   "claude-sonnet-4-6": {
+    "passed": false,
+    "date": "2026-10-05",
+    "corpus": "2026-10-05.1"
+   },
    "claude-sonnet-5-5": {
-    "passed": true,
-    "date": "2026-10-02",
-    "corpus": "2026-10-02.3"
+    "passed": false,
+    "date": "2026-10-13",
+    "corpus": "2026-10-05.1"
    }
   }
  },

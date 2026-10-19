@@ -159,3 +159,36 @@ def test_непрочитанный_ящик_это_сбой_а_не_пусто�
     sync.run.side_effect = None
     sync.run.return_value = subprocess.CompletedProcess([], 0, stdout="", stderr="")
     assert sync.module.get_completed_task_ids() == [] and faults == []    # честно пусто — тишина
+
+
+@pytest.mark.parametrize("sync", ["health_partner"], indirect=True)
+def test_таймаут_назван_в_сбое_а_не_отрезан_срезом(sync, monkeypatch):
+    """Карточка 2026-10-18: str(TimeoutExpired) начинается с текста скрипта (~500 симв.),
+    срез [:300] в журнале сбоев отрезал «timed out» — причина сбоя не доезжала до триажа."""
+    faults = []
+    monkeypatch.setitem(sys.modules, "notify",
+                        SimpleNamespace(fault=lambda tech, person_key="x": faults.append(tech)))
+
+    def run(args, **kwargs):
+        raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 30))   # настоящий cmd со скриптом
+    sync.run.side_effect = run
+    assert sync.module.get_completed_task_ids() == []
+    assert len(faults) == 1
+    assert "таймаут osascript 30s" in faults[0] and "Health (partner)" in faults[0]
+    assert "tell application" not in faults[0]
+
+
+@pytest.mark.parametrize("sync", ["health_partner"], indirect=True)
+def test_ошибка_внутри_applescript_это_сбой_а_не_пустой_ящик(sync, monkeypatch):
+    """Ревью карточки 2026-10-18: try без on error в AppleScript глушил «списка нет» —
+    выход пустой, «выполненных нет», ни строки сбоя. Теперь ошибка приходит меткой."""
+    faults = []
+    monkeypatch.setitem(sys.modules, "notify",
+                        SimpleNamespace(fault=lambda tech, person_key="x": faults.append(tech)))
+    sync.run.side_effect = None
+    sync.run.return_value = subprocess.CompletedProcess(
+        [], 0, stdout=sync.module._ERR + "-1728: Can’t get list \"Health (partner)\".", stderr="")
+    assert sync.module.get_completed_task_ids() == []
+    assert len(faults) == 1 and "-1728" in faults[0] and "Health (partner)" in faults[0]
+    script = sync.run.call_args[0][0][2]
+    assert "on error" in script and sync.module._ERR in script     # метку ставит сам скрипт

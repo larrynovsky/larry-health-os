@@ -60,6 +60,9 @@ def _unread(why: str) -> list[int]:
     return []
 
 
+_ERR = "§ERROR§"  # метка ошибки, которую AppleScript отдаёт вместо тишины
+
+
 def get_completed_task_ids() -> list[int]:
     """
     Читает выполненные напоминания из списка текущего тенанта через AppleScript.
@@ -84,6 +87,8 @@ tell application "Reminders"
                 set output to output & b & "\\n---\\n"
             end if
         end repeat
+    on error errMsg number errNum
+        return "{_ERR}" & errNum & ": " & errMsg
     end try
     return output
 end tell'''
@@ -97,11 +102,19 @@ end tell'''
             return _unread(f"AppleScript: {result.stderr.strip()}")
 
         raw = result.stdout
+        if raw.startswith(_ERR):
+            # Без этой ветки ошибка внутри AppleScript (списка нет, переименован) давала пустой
+            # вывод — «выполненных нет», то есть тишину вместо сбоя (ревью ночной карточки 18.10).
+            return _unread(f"AppleScript: список {reminders_list_name()!r}: {raw[len(_ERR):].strip()}")
         ids = [int(m) for m in re.findall(r'\[task_id:(\d+)\]', raw)]
         return list(set(ids))  # дедупликация
 
+    except subprocess.TimeoutExpired as e:
+        # str(e) начинается с текста скрипта (~500 симв.), и срез [:300] в _unread отрезал
+        # ровно причину — «timed out» (ночная карточка 2026-10-18). Причину — вперёд.
+        return _unread(f"AppleScript: таймаут osascript {e.timeout}s, список {reminders_list_name()!r}")
     except Exception as e:
-        return _unread(f"AppleScript: {e}")
+        return _unread(f"AppleScript: {type(e).__name__}: {e}")
 
 
 def sync_completed_reminders():

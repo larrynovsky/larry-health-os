@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:c952363f434f -->
+<!-- translation-of: docs/how-to/README.md sha256:6a76fafbf951 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -52,7 +52,7 @@ A terminal on the machine where the system is installed is required. Use the rul
 - [Connect Health OS to Claude and ChatGPT](connect_cloud_assistants.md)
 - [Correct memory and add a ban](edit_memory.md)
 - [Connect a Withings blood-pressure monitor](connect_withings.md) — section "Docker image install"
-- The bot replied “I couldn't answer: something failed inside the system…” with a code: [find the cause by the code](bot_fault.md)
+- Something went wrong (a fault with a code, a report did not arrive, the bot is silent): [report it to the developer](bot_fault.md)
 
 The other maintenance guides are still written for the author's original installation and do not
 work in an image-based install — they are in section 3.

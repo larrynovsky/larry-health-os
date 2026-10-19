@@ -38,7 +38,7 @@ def _load(file, names, **env):
 
 # fault и то, на чём он стоит (нить first-contact, 02.10: выбор текста по живости ремонта).
 _FAULT_NAMES = {"fault", "_faults_journal", "repairer_alive", "REPAIR_SEEN", "REPAIR_FRESH_S",
-                "_night_cycle_covered", "honest_key", "NIGHT_CYCLE_RECEIPT"}
+                "_night_cycle_covered", "honest_key", "NIGHT_CYCLE_RECEIPT", "_exc_shape"}
 
 
 def _notify(operator):

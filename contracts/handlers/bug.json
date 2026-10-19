@@ -1,0 +1,24 @@
+{
+  "module": "handlers/bug",
+  "public": ["cmd_bug", "act_category", "act_send", "act_cancel", "register"],
+  "depends_on": [
+    {"module": "bug_report", "uses": ["CATEGORIES", "collect"], "why": "форма отчёта"},
+    {"module": "bug_outbox", "uses": ["next_report_id", "send"], "why": "доставка"},
+    {"module": "bot/actions", "uses": ["action", "button", "keyboard", "clear_markup"], "why": "кнопки вместо команд (решение владельца 28.09)"},
+    {"module": "i18n", "uses": ["t"], "why": "тексты человеку", "legacy": "i18n — легаси вне периметра §15, контракта нет"}
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — РАЗГОВОР /bug: категория, предпросмотр, отправка, ответ человеку.",
+      "D2": "команда, три кнопки и register — как у соседних handlers/*.",
+      "D3": "bug_report, bug_outbox, bot/actions, i18n.",
+      "D4": "~75 строк.",
+      "D5": "tests/unit/test_bug_channel.py::test_bot_says_delivered_only_with_number — настоящий приёмник на localhost; без квитанции бот говорит «отправлю сам», а не «доставлено». Мутация C3 (/tmp/mutate_bug_channel.sh, 2026-10-19) — 3 failed.",
+      "D6": "слово «доставлено» — только с номером от приёмника (общий инвариант с bug_outbox)."
+    },
+    "rationale": "Переписывается по контракту и тестам.",
+    "date": "2026-10-19",
+    "oracle": "tests/unit/test_bug_channel.py"
+  }
+}

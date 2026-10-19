@@ -504,7 +504,13 @@ HOST_LOGS = "/app/host_logs"   # журналы хоста в контейнер
 DIGEST_DIR = "/app/outputs/weekly_digest"   # = weekly_digest.OUT_DIR в образе (ROOT=/app)
 
 
-def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp_base: "str | None" = None) -> dict[str, str]:
+REPORTS_NODE = "health-reports"          # узел приёмника отчётов о сбоях (нить bug-report)
+REPORTS_TS_VOLUME = "health_reports-ts"   # вход узла в tailnet
+REPORTS_VOLUME = "health_reports-data"    # сами отчёты — отдельно от любых данных владельца
+
+
+def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp_base: "str | None" = None,
+                          reports_base: bool = False) -> dict[str, str]:
     """Настройки контейнера ВЛАДЕЛЬЦА на Studio (волна Б, этап 11): compose.override.yaml и infra.yaml
     контейнера. Не для посторонних — у них слоя владельца нет. Что и почему (замеры этапа 9):
     - имя машины = primary_host установки (решение владельца «Имя Studio»): иначе запись запрещена;
@@ -586,10 +592,39 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp
             "TCP": {"443": {"HTTPS": True}},
             "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/": {"Proxy": "http://mcp:8765"}}}},
             "AllowFunnel": {"${TS_CERT_DOMAIN}:443": True}}, indent=2)
+    if reports_base:
+        # Приёмник отчётов о сбоях от чужих установок (нить bug-report, решения владельца 19.10:
+        # отдельный узел tailnet, хранение 90 дней). Вход анонимный — поэтому у приёмника НЕТ ни
+        # одного тома с данными, ключами или кодом хоста и нет .env: взлом открывает только отчёты.
+        # Узел — тот же класс, что MCP (tag:mcp: снаружи Funnel, внутри tailnet не видит ничего).
+        img = base["cron"]["image"]
+        services["bug-inbox"] = {
+            "image": img, "restart": "unless-stopped",
+            "environment": {"BUG_INBOX_DB": "/app/reports/reports.db", "BUG_INBOX_PORT": "8766"},
+            "command": ["python3", "/app/bug_inbox.py"],
+            "volumes": [f"{REPORTS_VOLUME}:/app/reports"]}
+        services["reports-funnel"] = {
+            "image": f"tailscale/tailscale:{TAILSCALE_IMAGE_TAG}", "hostname": REPORTS_NODE,
+            "restart": "unless-stopped",
+            "environment": {"TS_STATE_DIR": "/var/lib/tailscale", "TS_USERSPACE": "true",
+                            "TS_HOSTNAME": REPORTS_NODE, "TS_AUTH_ONCE": "true",
+                            "TS_SERVE_CONFIG": "/config/serve.json", "TS_EXTRA_ARGS": "--advertise-tags=tag:mcp"},
+            "volumes": [f"{REPORTS_TS_VOLUME}:/var/lib/tailscale",
+                        f"{repo}/build/docker/reports_serve.json:/config/serve.json:ro"],
+            "depends_on": ["bug-inbox"]}
+        # ночной разбор читает отчёты — только чтение
+        services["cron"]["volumes"].append(f"{REPORTS_VOLUME}:/app/reports:ro")
+        services["cron"]["environment"]["BUG_INBOX_DB"] = "/app/reports/reports.db"
+        extra["reports_serve.json"] = json.dumps({
+            "TCP": {"443": {"HTTPS": True}},
+            "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/report": {"Proxy": "http://bug-inbox:8766/report"}}}},
+            "AllowFunnel": {"${TS_CERT_DOMAIN}:443": True}}, indent=2)
     head = "# сгенерировано scripts/install.py --owner-override (этап 11 волны Б) — руками не править\n"
     doc = {"services": services}
     if mcp_base:
         doc["volumes"] = {MCP_TS_VOLUME: {"external": True}}   # создаётся один раз при входе узла
+    if reports_base:
+        doc.setdefault("volumes", {}).update({REPORTS_TS_VOLUME: {"external": True}, REPORTS_VOLUME: {}})
     return {"compose.override.yaml": head + yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
             "infra.yaml": head + yaml.safe_dump({"primary_host": primary_host}), **extra}
 
@@ -707,10 +742,13 @@ def main(argv: list[str] | None = None) -> int:
         tn = str(getattr(infra_config, "_D", {}).get("tailnet_hostname", ""))
         mcp_base = (f"https://health-mcp.{tn.split('.', 1)[1]}"
                     if (Path.home() / ".health_mcp").is_dir() and "." in tn else None)
-        out = render_owner_override(str(Path.home()), ROOT, infra_config.PRIMARY_HOST, a.tz, mcp_base)
+        # Приёмник отчётов о сбоях — только если владелец его завёл: каталог ~/.health_reports.
+        reports = (Path.home() / ".health_reports").is_dir()
+        out = render_owner_override(str(Path.home()), ROOT, infra_config.PRIMARY_HOST, a.tz, mcp_base, reports)
         (dest / "compose.override.yaml").write_text(out["compose.override.yaml"], encoding="utf-8")
-        if "mcp_serve.json" in out:
-            (dest / "mcp_serve.json").write_text(out["mcp_serve.json"], encoding="utf-8")
+        for name in ("mcp_serve.json", "reports_serve.json"):
+            if name in out:
+                (dest / name).write_text(out[name], encoding="utf-8")
         (dest / "host" / "infra.yaml").write_text(out["infra.yaml"], encoding="utf-8")
         print(f"override владельца: {dest / 'compose.override.yaml'} (имя машины {infra_config.PRIMARY_HOST})")
         return 0

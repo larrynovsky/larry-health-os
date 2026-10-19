@@ -148,6 +148,7 @@ PROVIDER_CATEGORY = {
     "drift": "pulse",
     "sleep_agent": "pulse",
     "recovery": "pulse",   # композит восстановления: дедуп со drift/sleep через общий pulse-слот
+    "trend": "trend",      # среднее за окно ниже личного порога (19.10): свой слот — в pulse его вытесняет любой дрейф
     "genome": "context",
     "env": "environment",
     "calendar": "plan",
@@ -160,7 +161,10 @@ PROVIDER_CATEGORY = {
 # и почти всегда проигрывали. Теперь: activity (тропа+море) и food — отдельные каналы,
 # не давят и не давятся безопасностью/планами. UV/жара/пыль остаются в environment.
 SLOT_BUDGET = {"pulse": 1, "lever": 1, "context": 1, "environment": 1, "plan": 1,
-               "question": 1, "activity": 2, "food": 1}
+               "question": 1, "activity": 2, "food": 1,
+               # Оконное среднее (19.10): единственный путь правила к человеку — бриф; в общем
+               # pulse-слоте его вытеснял дрейф с severity 0.9 (замер 19.10: active_kcal, стресс).
+               "trend": 1}
 
 
 # 'resolved' осмыслен у измерительного канала: показатель может вернуться к норме.
@@ -168,7 +172,7 @@ SLOT_BUDGET = {"pulse": 1, "lever": 1, "context": 1, "environment": 1, "plan": 1
 # улучшения здоровья. Разбиение категорий полное и под тестом
 # test_category_partition_is_total: новая категория без явного отнесения роняет тест.
 _SUGGESTION_CATEGORIES = frozenset({"food", "activity", "plan"})
-_MEASUREMENT_CATEGORIES = frozenset({"safety", "pulse", "context", "environment", "lever"})
+_MEASUREMENT_CATEGORIES = frozenset({"safety", "pulse", "context", "environment", "lever", "trend"})
 
 
 def _category(provider: str, semantic_key: str) -> str:

@@ -208,6 +208,15 @@ def main() -> int:
     db.init_db()
     problems, sent = asyncio.run(walk(owner_chat_id()))
     print(f"бот отправил сообщений: {len(sent)}")
+    # «След экрана» (нить bug-report): каждая отправка бота отмечена, и видно, сколько из них
+    # узнаны по шаблону. Замер, а не порог: доля шаблонных печатается, краснеет только пропуск.
+    import screen_trace
+    texts = [m for m in sent if m["method"].lower() == "sendmessage"]
+    trace = screen_trace.recent(limit=1000)
+    keyed = [t for t in trace if not t.endswith(" " + screen_trace.FREE)]
+    print(f"след экрана: строк {len(trace)}, по шаблону {len(keyed)}, отправок текстом {len(texts)}")
+    if len(trace) < len(texts):
+        problems.append(f"след экрана пропустил отправки: {len(trace)} строк на {len(texts)} сообщений")
     if problems:
         print("⛔ первый контакт не пройден:")
         for p in problems:

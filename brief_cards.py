@@ -267,6 +267,22 @@ def from_sleep_deep(deep_today_min: int, band: dict, genome_mods=None) -> Card:
                 allowed_claims=allowed, genome_terms=terms)
 
 
+def from_trend(t: dict) -> Card:
+    """trend_alerts.evaluate_trends()[i], не идущее сообщением (trend_alerts.pushed) → Card.
+    Решение владельца 19.10: двухнедельное среднее ниже личного порога — картина для брифа, не
+    отдельное сообщение. Ключ = trend:<metric>:<окно>d:<режим>; FSM брифа даёт ему кулдаун,
+    как хронической находке, — строка не повторяется каждое утро, пока среднее стоит низко.
+    Утверждение — готовый текст правила (i18n, число из самого порога)."""
+    metric = str(t.get("metric", "?")).lower()
+    claim = str(t.get("reason") or "")
+    val = t.get("val")
+    return Card(provider="trend",
+                semantic_key=f"trend:{metric}:{t.get('window_days')}d:{t.get('mode')}",
+                lane="routine", severity=0.6,
+                last_value=(f"{val:.1f}" if isinstance(val, (int, float)) else None),
+                evidence_summary=claim, allowed_claims=[claim])
+
+
 def from_recovery(composite: float, band: dict) -> "Card | None":
     """Индекс восстановления ниже ЛИЧНОЙ trailing-полосы композита → карточка.
     Гейт по личной полосе (band извне, brief_gate.band_position), а не по абсолюту:

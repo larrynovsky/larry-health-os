@@ -64,7 +64,9 @@ def test_routes_transient_devfix_owner(env):
                  # сводке ЕСТЬ и при пустом входе: нули отличают «производитель отработал
                  # вхолостую» от «его не позвали».
                  "stalled_seen": 0, "stalled_new": 0, "stalled_mailed": None, "stalled_retired": 0,
-                 "red_parked": 0, "red_retired": 0}
+                 "red_parked": 0, "red_retired": 0,
+                 # пятый — отчёты /bug (нить bug-report); приёмника в тесте нет — нули
+                 "bug_reports": 0, "bug_report_cards": 0}
     kinds = {g["id"]: g["kind"] for g in pd.list_open()}
     assert "dev_fix" in kinds.values() and "owner_decision" in kinds.values()
     assert len(kinds) == 2, "транзиент не паркуется"

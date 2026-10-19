@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/llm_providers.md sha256:1755241a0be2 -->
+<!-- translation-of: docs/reference/llm_providers.md sha256:d74fc32a7c25 -->
 **English** · [Русский](llm_providers.md)
 
 <!-- generated: python3 llm_admission.py --reference; не править руками / do not edit -->
@@ -14,12 +14,18 @@ A role is the system's internal name for a task (opus, sonnet, haiku, haiku_pinn
 | Role | What it does | Model | Admitted | Date | Why |
 |---|---|---|---|---|---|
 | sonnet | lab photos (pass 2), chat | `claude-sonnet-4-6` | default | — | — |
-| sonnet | lab photos (pass 2), chat | `claude-sonnet-5-5` | fallback: yes | 2026-10-02 | — |
+| sonnet | lab photos (pass 2), chat | `claude-sonnet-4-6` | fallback: no | 2026-10-05 | — |
+| sonnet | lab photos (pass 2), chat | `claude-sonnet-5-5` | fallback: no | 2026-10-13 | — |
 | haiku | check-in, short answers | `claude-haiku-4-5` | default | — | — |
+| haiku | check-in, short answers | `claude-haiku-4-5-20251001` | fallback: no | 2026-10-13 | — |
+| haiku | check-in, short answers | `claude-haiku-5-5` | fallback: yes | 2026-10-13 | — |
 | haiku_pinned | treatment and labs from text | `claude-haiku-4-5-20251001` | default | — | — |
+| haiku_pinned | treatment and labs from text | `claude-haiku-4-5-20251001` | fallback: no | 2026-10-13 | — |
+| haiku_pinned | treatment and labs from text | `claude-haiku-5-5` | fallback: yes | 2026-10-13 | — |
 | opus | lab photos (pass 1), consilium | `claude-opus-4-7` | default | — | — |
-| opus | lab photos (pass 1), consilium | `claude-opus-5` | fallback: yes | 2026-10-02 | — |
-| opus | lab photos (pass 1), consilium | `claude-opus-5-5` | fallback: no | 2026-10-02 | — |
+| opus | lab photos (pass 1), consilium | `claude-opus-4-7` | fallback: yes | 2026-10-13 | — |
+| opus | lab photos (pass 1), consilium | `claude-opus-5` | fallback: no | 2026-10-13 | — |
+| opus | lab photos (pass 1), consilium | `claude-opus-5-5` | fallback: no | 2026-10-13 | — |
 
 ## openai
 

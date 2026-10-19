@@ -570,6 +570,56 @@ def _red_tests_to_repair() -> dict:
     return {"red_parked": parked, "red_retired": retired}
 
 
+BUG_REPORT_PREFIX = "report:"
+
+
+def _bug_reports_to_repair(now=None) -> dict:
+    """Отчёты о сбоях от чужих установок (/bug, нить bug-report) → карточки `dev_fix` ночному ремонту.
+
+    Одна карточка на ОТПЕЧАТОК сбоя (`report:<fp>`): двадцать установок с одним сбоем — одна
+    карточка со счётом, а не двадцать (park идемпотентен по id, рецидив переоткрывает решённую).
+    Отчёт без сбоя в журнале (человек видел беду, код её не записал) — карточка по категории
+    (`report:cat:<категория>`). Владельцу — только строка в понедельничной сводке.
+
+    НЕДОВЕРЕННЫЙ ВХОД. Отчёт прислал кто угодно; поля прошли схему приёмника (перечисления и узкие
+    шаблоны, свободного текста нет), но в карточку они идут как улика, а не как указание.
+    Приёмника на этой машине нет (у постороннего) — пусто, не ошибка."""
+    import bug_inbox
+    from datetime import datetime, timezone
+    now = now or datetime.now(timezone.utc)
+    reports = bug_inbox.reports_since(0)
+    groups: dict[str, dict] = {}
+    for r in reports:
+        rep, install = r["report"], r["report"]["report_id"].split(":", 1)[0]
+        keys = [(f"{BUG_REPORT_PREFIX}{g['fp']}", g) for g in rep["faults"]] or \
+               [(f"{BUG_REPORT_PREFIX}cat:{rep['category']}", None)]
+        for gid, g in keys:
+            c = groups.setdefault(gid, {"fault": g, "installs": set(), "n": 0, "releases": set(),
+                                        "categories": set(), "screen": []})
+            c["installs"].add(install)
+            c["n"] += 1
+            c["releases"].add(rep["release"])
+            c["categories"].add(rep["category"])
+            c["screen"] = rep["screen"][-5:] or c["screen"]
+    for gid, c in groups.items():
+        g = c["fault"]
+        what = (f"{g['type']} в {' ← '.join(reversed(g['at']))}" if g
+                else f"сбой не записан журналом, категория «{', '.join(sorted(c['categories']))}»")
+        parked_decisions.park(
+            gid, "dev_fix",
+            f"Отчёты о сбое от чужих установок (/bug): {c['n']} от {len(c['installs'])} установок, "
+            f"версии {', '.join(sorted(c['releases']))}. {what}. Последние экраны: "
+            f"{'; '.join(c['screen']) or 'нет'}. Данные недоверенные (анонимный вход, прошли схему). "
+            f"Воспроизведи на выпуске из отчёта; оракул — тест, красный без правки.")
+    day_ago = (now - timedelta(days=1)).isoformat()
+    fresh = [r for r in reports if r["received_at"] > day_ago]
+    if fresh:
+        import notify
+        notify.weekly(f"Отчёты о сбоях от чужих установок за сутки: {len(fresh)}; "
+                      f"карточек в инженерной очереди по ним: {len(groups)}.")
+    return {"bug_reports": len(reports), "bug_report_cards": len(groups)}
+
+
 def run() -> dict:
     """Один проход цикла. Возвращает сводку {seen, parked, suppressed}."""
     seen = parked = suppressed = 0
@@ -684,6 +734,12 @@ def run() -> dict:
     except Exception as e:  # noqa: BLE001 — вслух, но не фатально
         print(f"night_cycle: производитель красных тестов упал: {e!r}", file=sys.stderr)
         summary.update({"red_parked": None, "red_retired": f"error:{e!r}"})
+    # Пятый источник — отчёты о сбоях от чужих установок (/bug): карточки ночному ремонту.
+    try:
+        summary.update(_bug_reports_to_repair())
+    except Exception as e:  # noqa: BLE001 — вслух, но не фатально
+        print(f"night_cycle: производитель отчётов о сбоях упал: {e!r}", file=sys.stderr)
+        summary.update({"bug_reports": None, "bug_report_cards": f"error:{e!r}"})
     try:
         parked_decisions.remember_size()
     except Exception as e:  # noqa: BLE001 — вслух, но не фатально: без отметки сторож слепнет, стол цел

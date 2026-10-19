@@ -334,6 +334,9 @@
 27ac011eb055:
   ru: PRAGMA integrity_check per-tenant — B-tree corruption и out-of-order rowids.
   en: PRAGMA integrity_check per-tenant — B-tree corruption and out-of-order rowids.
+27b81b076615:
+  ru: Очередь отчётов /bug разбирается (нить bug-report, 19.10).
+  en: The /bug report queue is being processed (bug-report thread, 19.10).
 27e92e4724cb:
   ru: 'Проверяет активные эксперименты: если сегодня = start_date + check_day[N],'
   en: 'Checks active experiments: if today = start_date + check_day[N],'
@@ -865,6 +868,9 @@
 5fc1258bcc95:
   ru: 'Пульс пересборки конституций по новым вводным (решение владельца 2026-09-25: «дальше'
   en: 'Pulse of constitution rebuild on new inputs (owner decision 2026-09-25: «further'
+608e61324c27:
+  ru: Очередь отчётов о сбоях разбирается
+  en: The failure report queue is being processed.
 6097dfb6c242:
   ru: Фармакогеномика синхронизирована с последним импортом генома.
   en: Pharmacogenomics is synchronized with the last genome import.

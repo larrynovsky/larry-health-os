@@ -87,11 +87,25 @@
     "health_db",
     "location_signal",
     "safety_net",
-    "trails"
+    "trails",
+    "trend_alerts"
   ],
   "brief_state": [
     "brief_gate",
     "config_db"
+  ],
+  "bug_inbox": [
+    "bug_report"
+  ],
+  "bug_outbox": [
+    "bug_report",
+    "health_db"
+  ],
+  "bug_report": [
+    "health_db",
+    "notify",
+    "screen_trace",
+    "secrets_paths"
   ],
   "calendar_client": [
     "_time_inject",
@@ -705,6 +719,7 @@
     "assessment_importer",
     "assessment_scheduler",
     "belief_contract",
+    "bug_outbox",
     "cbcr_lookup",
     "clinical_kb",
     "config_db",
@@ -1035,6 +1050,7 @@
     "_fmt_helpers",
     "_time_inject",
     "agent_reports_db",
+    "bug_inbox",
     "finding_identity",
     "i18n",
     "morning_test_summary",
@@ -1067,6 +1083,7 @@
     "owner_nag",
     "plist_env_liveness",
     "release_notice",
+    "screen_trace",
     "secrets_paths"
   ],
   "oura_freshness_check": [
@@ -1238,6 +1255,10 @@
     "norm_documents",
     "notify",
     "rules_db"
+  ],
+  "screen_trace": [
+    "i18n",
+    "secrets_paths"
   ],
   "seasonal_produce": [
     "region_pack"

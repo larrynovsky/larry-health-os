@@ -1,0 +1,32 @@
+{
+  "module": "bug_inbox",
+  "public": [
+    "accept",
+    "reports_since",
+    "main"
+  ],
+  "depends_on": [
+    {
+      "module": "bug_report",
+      "uses": [
+        "schema_problems",
+        "MAX_BYTES"
+      ],
+      "why": "один дом схемы на обе стороны: приёмник не пересказывает схему, а импортирует её"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — ПРИЁМ анонимных отчётов: суд над телом, лимиты, повтор, хранение 90 дней, выдача на разбор. Не разбирает и не отвечает людям.",
+      "D2": "три входа: accept(raw) — вся логика без HTTP; reports_since(after_id) — чтение для ночного разбора (только чтение); main — HTTP-обёртка. _Handler, _db, _path приватны.",
+      "D3": "stdlib (http.server, sqlite3) + схема bug_report. Ничего из медицинской части — контейнер приёмника без томов данных.",
+      "D4": "~150 строк.",
+      "D5": "tests/unit/test_bug_channel.py (настоящий HTTP) + tests/unit/test_docker_render.py::test_override_приёмник_отчётов_без_данных_и_только_post_report. ИСПОЛНЕННЫЕ негативные контроли 2026-10-19, /tmp/mutate_bug_channel.sh: C1 лимит не проверяется; C2 повтор заводит новый отчёт; C4 у приёмника том данных; C5 старые не удаляются; C6 Funnel на весь приёмник. Итоги: C1 — 1 failed; C2 — 1 failed; C4 — 1 failed; C5 — 1 failed; C6 — 1 failed; после восстановления 10 passed.",
+      "D6": "общий с bug_outbox — протокол ответов; с ночным разбором — тела в базе уже прошли схему, но остаются недоверенными (разбор без инструментов)."
+    },
+    "rationale": "Переписывается по контракту и тестам. Почему лимит и повтор в базе, а не в памяти — WSTG-BUSL-05 (перезапуск не снимает лимит). Почему без томов — взлом открывает только отчёты.",
+    "date": "2026-10-19",
+    "oracle": "tests/unit/test_bug_channel.py, tests/unit/test_docker_render.py"
+  }
+}

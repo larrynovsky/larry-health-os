@@ -3638,9 +3638,11 @@ lessons:
   cause: 'ssh к стенду идёт без keepalive и без общего таймаута — разрыв канала не превращается в отказ, а превращается в вечное ожидание'
   address: {kind: runtime, ref: scripts/test_on_studio.sh}
   subject: [test_stand, shell_scripts]
-  outcome: {kind: check, text: 'кандидат: ServerAliveInterval/ServerAliveCountMax у ssh стенда + отказ с кодом при обрыве; негативный контроль — убить ssh посреди прогона, закрытие обязано выйти ненулевым за минуты'}
-  status: observation
-  evidence: ['docs/handoff/uc-b09-own-input/2026-10-18-c43f4eb.md']
+  outcome: {kind: check, text: 'ssh/rsync/scp стенда идут с ServerAliveInterval=15/CountMax=4; rc=255 называется «связь потеряна, это не красные тесты». tests/unit/test_stand_ssh_keepalive.py; plans/mutate_stand_keepalive_2026-10-18.sh — 3 мутации красные. Замер на Studio: без опций клиент жив на 206 с, с опциями вышел на 74 с, rc=255'}
+  status: adopted
+  adopted_on: '2026-10-18'
+  change: scripts/test_on_studio.sh
+  evidence: ['docs/handoff/uc-b09-own-input/2026-10-18-c43f4eb.md', 'git:82b6607', 'git:4a911bc']
   owner: владелец
 - id: C-179
   date: '2026-10-18'
@@ -3663,4 +3665,26 @@ lessons:
   status: observation
   evidence:
   - git:ea3aa8b
+  owner: владелец
+- id: C-180
+  date: '2026-10-19'
+  thread: limits-push
+  modules:
+  - jobs/scheduled.py
+  - services/recommendations.py
+  event: 'Тревога пола приходила владельцу одним и тем же текстом по нескольку раз за день: отметка «уже отправлено сегодня» жила в памяти бота, а деплой пересоздаёт контейнер бота на каждом коммите в main, и джоб проверки стартует через 300 с после запуска. 6 из 6 повторов совпали по времени с деплоями.'
+  cost: шесть одинаковых тревог владельцу за день; канал тревог стал шумом, который хочется выключить
+  cause: 'жизнь процесса бота молча сжалась до интервала между коммитами (деплой на каждый коммит), а состояние доставки было рассчитано на долгоживущий процесс; в разделе среды нигде не сказано, сколько живёт память бота'
+  address:
+    kind: registry_rule
+    ref: CLAUDE.md §C
+  subject:
+  - state_lifetime
+  - message_delivery
+  outcome:
+    kind: rule
+    text: 'состояние доставки владельцу («уже отправлено») хранится в базе (system_config), не в памяти процесса; память контейнера считается живущей до следующего коммита в main'
+  status: observation
+  evidence:
+  - git:bd22253
   owner: владелец

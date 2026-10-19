@@ -61,7 +61,7 @@ PROMPT_WINDOW_DAYS = 730
 
 
 def canon_window_note(n_days: int, exclude_pro: bool = True, shown_tests: list = None,
-                      named_below: bool = False) -> str:
+                      named_below: bool = False, analyte_names: list = None) -> str:
     """Объявление границы окна лаб-блока: что показано и что лежит ЗА границей.
 
     `shown_tests` — список имён, если блок фильтрует аналиты не только окном
@@ -86,8 +86,15 @@ def canon_window_note(n_days: int, exclude_pro: bool = True, shown_tests: list =
     четырёх читателей (`gp_context`, `patient_context`, `wellally_consult`,
     `hai_context`) блок зовёт один, и остальным текст менять нельзя — для них
     безоговорочная формулировка верна.
+
+    `analyte_names` — ответ про ОДИН анализ (его написания), а не список аналитов: тогда
+    граница считается по этим именам, а не по всему канону. Без этого режима пустой ответ
+    про один анализ получал фразу «выше показан ВЕСЬ канон … значит не сдавался» — про
+    канон в целом верную, про этот анализ ложную (ревью ночной карточки 2026-10-18).
     """
     _hdb._ensure_lab_table()
+    if analyte_names is not None:
+        return _analyte_window_note(n_days, list(analyte_names), exclude_pro)
     # n_days=None — у блока НЕТ окна, он отбирает только именами (21.09: так устроен
     # build_lab_history_context — min_points и «только числовые»). Граница тогда одна,
     # и объявляется она той же функцией: второй дом текста разъехался бы с первым.
@@ -152,6 +159,37 @@ def canon_window_note(n_days: int, exclude_pro: bool = True, shown_tests: list =
             f"аналита в блоке НЕ значит «не сдавался», «ни разу» или «отсутствует "
             f"полностью» — оно значит «нет данных за {n_days} дн.», и писать надо именно "
             f"так. Утверждать отсутствие анализа по отсутствию строки нельзя.{list_note}")
+
+
+def _analyte_window_note(n_days: int, names: list, exclude_pro: bool) -> str:
+    """Граница ответа про один анализ: сколько его числовых строк в окне и есть ли старше.
+    Предикат строк — тот же, что у get_lab_series (число, дата, без опросников)."""
+    who = ", ".join(f"«{n}»" for n in names[:5]) + (f" и ещё {len(names) - 5}" if len(names) > 5 else "")
+    if not names:
+        return ("ГРАНИЦА ОТВЕТА: название анализа не опознано — отсутствие строк НЕ значит "
+                "«не сдавался». Утверждать отсутствие анализа нельзя; точные имена — lab_tests.")
+    cutoff = str(get_today() - timedelta(days=n_days))
+    pro_filter = " AND (source IS NULL OR source NOT LIKE 'instrument:%')" if exclude_pro else ""
+    marks = ",".join("?" * len(names))
+    with _hdb.get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(date >= ?), 0), COALESCE(SUM(date < ?), 0), "
+            "MAX(CASE WHEN date < ? THEN date END) FROM lab_results "
+            f"WHERE test_name IN ({marks}) AND value IS NOT NULL AND date IS NOT NULL{pro_filter}",
+            (cutoff, cutoff, cutoff, *names)).fetchone()
+    inside, older, older_last = int(row[0]), int(row[1]), row[2]
+    if not inside and not older:
+        return (f"ГРАНИЦА ОТВЕТА: числовых строк под названием {who} в базе нет ни за какой "
+                f"срок. Это НЕ значит «не сдавался»: анализ мог быть записан под другим "
+                f"названием или текстом без числа (точные имена — lab_tests). Утверждать "
+                f"отсутствие анализа нельзя.")
+    if older:
+        return (f"ГРАНИЦА ОКНА: по {who} за последние {n_days} дн. числовых строк {inside}; "
+                f"ещё {older} строк СТАРШЕ границы (последняя — {older_last}). Отсутствие строк "
+                f"за окно НЕ значит «не сдавался» — пиши «нет данных за {n_days} дн.».")
+    return (f"ГРАНИЦА ОКНА: по {who} строк старше {n_days} дн. нет — показана вся числовая "
+            f"история под этим названием ({inside} строк). Тот же анализ под другим названием "
+            f"или без числа сюда не попадает.")
 
 
 def declared_boundary(n_days, unjudged: bool = False, **kw) -> str:

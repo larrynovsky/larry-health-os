@@ -48,7 +48,10 @@ _VISIBLE_HINTS_DEFAULT = ("jobs/scheduled", "gp_agent", "gp_context", "brief_", 
                  "monthly_consilium", "hai_chat", "notify", "trend_alerts", "consult")
 
 _THREAD_RE = [
-    re.compile(r"docs\(handoff\):\s*([\w\-]+)"),
+    # Слово «нить» перед именем — не имя: «docs(handoff): нить nutrition-homes — …» до 18.10
+    # относилось к нити «нить» (22 коммита за 4 месяца), и датчик «нить стоит» не видел
+    # такие нити вовсе (ночная карточка 2026-10-17-20bfeb78). Имя нити — латиница.
+    re.compile(r"docs\(handoff\):\s*(?:нить\s+)?([a-z][\w\-]*)"),
     re.compile(r"plan\(([\w\-]+)\)"),
     re.compile(r"\[нить\s+([\w\-]+)\]"),
     re.compile(r"\bнить\s+([a-z][\w\-]{3,})"),      # только латинские имена нитей

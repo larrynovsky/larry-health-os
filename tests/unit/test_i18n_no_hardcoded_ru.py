@@ -1063,8 +1063,13 @@ def test_k1_dictionary_contract():
     # Deliberate K1 snapshot: whitespace, punctuation and numeric formats are part of the contract.
     # Одна сознательная правка после переноса (29.09): symptom_intake.hypothesis.observation —
     # «см. кейс» ловил сторож внутренней лексики test_i18n::test_person_copy_has_no_internal_vocabulary.
+    # Вторая сознательная правка (19.10, нить trend-to-brief): sleep_score_average и
+    # sleep_score_consecutive — «Оценка сна» вместо сырого ключа, числа среднего с десятой
+    # («69 ниже 69» из округления); текст среднего теперь идёт в утренний бриф. Третья (19.10, trend-brief-slot):
+    # среднее и порог с сотой — 69.07 против 69.14 давало «69.1 ниже 69.1»; число порога в тексте
+    # остаётся (test_trend_reason_threshold: текст несёт порог самого правила).
     snapshot = json.dumps(staged["ru"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    assert hashlib.sha256(snapshot.encode()).hexdigest() == "e7cb25f355b640263cdd100a0a327b0d1066695a5ae4733a95fc1c1cbc848555"
+    assert hashlib.sha256(snapshot.encode()).hexdigest() == "f04a5bd58403aa3b065c996c0afa342bd1904eec67969d1d55227e1eed95de04"
     for key, ru in staged["ru"].items():
         en = staged["en"][key]
         ru_fields = sorted((f, s, c) for _, f, s, c in string.Formatter().parse(ru) if f is not None)
@@ -1363,6 +1368,11 @@ ALLOWED_RU.update({
         "f'Заполнен опросник {source_id}'": 'OUTSIDE_K6: stored task completion text, not in PERSON inventory; may reach task history.',
     },
     'labs_db.py': {
+        "f' и ещё {len(names) - 5}'": 'MODEL: _analyte_window_note — граница ответа MCP про один анализ для модели-читателя (canon_window_note analyte_names); outside PERSON inventory.',
+        "'ГРАНИЦА ОТВЕТА: название анализа не опознано — отсутствие строк НЕ значит «не сдавался». Утверждать отсутствие анализа нельзя; точные имена — lab_tests.'": 'MODEL: _analyte_window_note — граница ответа MCP про один анализ для модели-читателя (canon_window_note analyte_names); outside PERSON inventory.',
+        "f'ГРАНИЦА ОТВЕТА: числовых строк под названием {who} в базе нет ни за какой срок. Это НЕ значит «не сдавался»: анализ мог быть записан под другим названием или текстом без числа (точные имена — lab_tests). Утверждать отсутствие анализа нельзя.'": 'MODEL: _analyte_window_note — граница ответа MCP про один анализ для модели-читателя (canon_window_note analyte_names); outside PERSON inventory.',
+        "f'ГРАНИЦА ОКНА: по {who} за последние {n_days} дн. числовых строк {inside}; ещё {older} строк СТАРШЕ границы (последняя — {older_last}). Отсутствие строк за окно НЕ значит «не сдавался» — пиши «нет данных за {n_days} дн.».'": 'MODEL: _analyte_window_note — граница ответа MCP про один анализ для модели-читателя (canon_window_note analyte_names); outside PERSON inventory.',
+        "f'ГРАНИЦА ОКНА: по {who} строк старше {n_days} дн. нет — показана вся числовая история под этим названием ({inside} строк). Тот же анализ под другим названием или без числа сюда не попадает.'": 'MODEL: _analyte_window_note — граница ответа MCP про один анализ для модели-читателя (canon_window_note analyte_names); outside PERSON inventory.',
         "'отрицательно'": 'MODEL/SHARED: qualitative-result vocabulary or required-test metadata; outside the one PERSON source-label occurrence.',
         "'не обнаружено'": 'MODEL/SHARED: qualitative-result vocabulary or required-test metadata; outside the one PERSON source-label occurrence.',
         "'положительно'": 'MODEL/SHARED: qualitative-result vocabulary or required-test metadata; outside the one PERSON source-label occurrence.',

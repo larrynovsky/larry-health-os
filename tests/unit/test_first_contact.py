@@ -37,6 +37,21 @@ def test_walk_passes_start_and_whole_onboarding(base):
     assert len(sent) >= 14, "знакомство — 14 вопросов, бот обязан был их задать"
 
 
+def test_walk_leaves_a_screen_trace_for_every_message(base, screen_trace_file):
+    """Нить bug-report: каждая отправка бота отмечена в следе экрана (замер 1а плана)."""
+    from scripts.first_contact_smoke import walk
+    from bot.filters import owner_chat_id
+    import screen_trace
+
+    _, sent = asyncio.run(walk(owner_chat_id()))
+    lines = [json.loads(x) for x in screen_trace_file.read_text(encoding="utf-8").splitlines()]
+    msgs = [m for m in sent if m["method"] in ("sendMessage", "editMessageText")]
+    keyed = [x for x in lines if x["keys"] != [screen_trace.FREE]]
+    print(f"ЗАМЕР след экрана: отправок {len(msgs)}, строк {len(lines)}, по шаблону {len(keyed)}")
+    assert len(lines) == len(msgs)
+    assert keyed, "ни одно сообщение знакомства не узнано по шаблону — сверка сломана"
+
+
 def test_walk_is_red_when_start_breaks(base, monkeypatch):
     """Негативный контроль смоука: /start падает — смоук обязан это сказать, а не позеленеть."""
     import handlers.meta as meta

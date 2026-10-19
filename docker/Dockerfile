@@ -67,7 +67,9 @@ COPY --chown=health:health . /app
 # на build/ (поймано первым живым прогоном образа 29.09 — планировщик не стартовал бы).
 # outputs/ — родитель тома дайджеста (override владельца): без него Docker создаёт его от root, и
 # прогон 11.10 упал PermissionError (замер 15.10) (tests/unit/test_docker_mount_parents_owned.py).
-RUN mkdir -p /app/build /app/logs /app/outputs && chown health:health /app /app/build /app/logs /app/outputs
+# reports/ — том приёмника отчётов о сбоях (нить bug-report): именованный том наследует владельца
+# каталога образа; без каталога он был бы от root, и приёмник от health не смог бы писать.
+RUN mkdir -p /app/build /app/logs /app/outputs /app/reports && chown health:health /app /app/build /app/logs /app/outputs /app/reports
 USER health
 # Шаблоны установки (private/infra.yaml, базовая методология) — при сборке, с основной машиной
 # health-os (hostname из compose). Каталоги данных и секретов здесь — временные: настоящие
@@ -79,7 +81,10 @@ RUN HEALTH_PRIMARY_HOST=health-os python3 scripts/install.py --apply --non-inter
 # release_notice решает, есть ли с чем сравнивать новую версию на GitHub. Стоит последним
 # слоем: смена номера не пересобирает зависимости.
 ARG HEALTH_RELEASE=""
+# Адрес приёмника отчётов о сбоях (/bug, нить bug-report) — из переменной репозитория при выпуске.
+ARG HEALTH_BUG_RECEIVER=""
 ENV HOME=/home/health \
+    HEALTH_BUG_RECEIVER=${HEALTH_BUG_RECEIVER} \
     HEALTH_RUNTIME=container \
     PYTHONUNBUFFERED=1 \
     HEALTH_RELEASE=${HEALTH_RELEASE}

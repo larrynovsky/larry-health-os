@@ -334,3 +334,28 @@ def test_override_mcp_только_по_выбору_и_наружу_тольк�
     (site, cfg), = serve["Web"].items()
     assert cfg == {"Handlers": {"/": {"Proxy": "http://mcp:8765"}}}
     assert serve["AllowFunnel"] == {site: True}
+
+
+def test_override_приёмник_отчётов_без_данных_и_только_post_report(tmp_path):
+    """Приёмник отчётов о сбоях (нить bug-report, 19.10): только по выбору владельца; у приёмника
+    нет ни одного тома, кроме своих отчётов, нет .env и портов хоста; наружу узел отдаёт только
+    /report; ночной разбор видит отчёты только на чтение. Мутация «том данных у приёмника» или
+    «Funnel на весь приёмник» краснеет здесь."""
+    import json as _json
+    import yaml
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    off = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin")
+    assert "bug-inbox" not in yaml.safe_load(off["compose.override.yaml"])["services"]
+    out = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin", None, True)
+    doc = yaml.safe_load(out["compose.override.yaml"])
+    svc = doc["services"]
+    assert svc["bug-inbox"]["volumes"] == [f"{install.REPORTS_VOLUME}:/app/reports"]
+    assert "env_file" not in svc["bug-inbox"] and "ports" not in svc["bug-inbox"]
+    assert "ports" not in svc["reports-funnel"]
+    assert svc["reports-funnel"]["environment"]["TS_HOSTNAME"] == install.REPORTS_NODE
+    assert f"{install.REPORTS_VOLUME}:/app/reports:ro" in svc["cron"]["volumes"]
+    serve = _json.loads(out["reports_serve.json"])
+    handlers = next(iter(serve["Web"].values()))["Handlers"]
+    assert handlers == {"/report": {"Proxy": "http://bug-inbox:8766/report"}}
+    assert doc["volumes"][install.REPORTS_TS_VOLUME] == {"external": True}

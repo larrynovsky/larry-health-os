@@ -51,9 +51,13 @@ def _telegram(msg: str, secrets=None, reply_markup=None) -> bool:
         import json
         receipt = json.loads(r.stdout) if r.returncode == 0 else {}
         result = receipt.get("result") if isinstance(receipt, dict) else None
-        return (receipt.get("ok") is True and isinstance(result, dict)
-                and isinstance(result.get("message_id"), int)
-                and not isinstance(result["message_id"], bool) and result["message_id"] > 0)
+        ok = (receipt.get("ok") is True and isinstance(result, dict)
+              and isinstance(result.get("message_id"), int)
+              and not isinstance(result["message_id"], bool) and result["message_id"] > 0)
+        if ok:
+            import screen_trace       # «след экрана» для отчёта о сбое: ушло — отмечаем
+            screen_trace.note(msg)
+        return ok
     except Exception:  # silent-ok: любой сбой = Telegram недоступен → fallback решит notify()
         return False
 
@@ -188,6 +192,11 @@ def _faults_journal() -> Path:
                 Path(__file__).resolve().parent / "logs" / "faults.jsonl")
 
 
+def faults_journal() -> Path:
+    """Путь журнала сбоев для читателей вне notify (отчёт о сбое, bug_report.collect)."""
+    return _faults_journal()
+
+
 def repairer_alive() -> bool:
     """Есть ли у ЭТОЙ установки тот, кто чинит сбои: свежая отметка ночного ремонта.
 
@@ -239,7 +248,29 @@ def honest_key(person_key: str) -> str:
     return person_key if repairer_alive() else alt
 
 
-def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -> "str | None":
+def _exc_shape(exc: "BaseException | None") -> dict:
+    """Форма исключения без его ТЕКСТА: тип и кадры «файл:функция» внутри кода установки.
+
+    Текст исключения не берётся никогда: у KeyError это сам ключ (например, название
+    анализа), у ошибки базы — значения строки. Кадры вне каталога кода (библиотеки, пути
+    с именем пользователя) отбрасываются. Это вход отчёта о сбое (bug_report), и
+    безопасность отчёта держится здесь, в точке рождения записи, а не в вычистке потом."""
+    if exc is None:
+        return {}
+    import traceback
+    root = Path(__file__).resolve().parent
+    frames = []
+    for fr in traceback.extract_tb(exc.__traceback__):
+        try:
+            rel = Path(fr.filename).resolve().relative_to(root)
+        except ValueError:
+            continue
+        frames.append(f"{rel.as_posix()}:{fr.name}")
+    return {"exc_type": type(exc).__name__, "frames": frames[-6:]}
+
+
+def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
+          exc: "BaseException | None" = None, **kw) -> "str | None":
     """Технический сбой — в журнал, человеку — одна человеческая строка.
 
     Решение владельца 28.09 (холодное чтение сообщений): «Error code: 529», «проверь
@@ -271,7 +302,8 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", **kw) -
         if len(parts) > 1 and ("/" in where or where.endswith((".py", ".sh"))):
             where += ":" + parts[1]
         record = {"ts": ts, "code": code,
-                  "tenant": Path(secrets_dir()).name, "where": where, "text": tech[:500]}
+                  "tenant": Path(secrets_dir()).name, "where": where, "text": tech[:500],
+                  **_exc_shape(exc)}
         path = _faults_journal()
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a+", encoding="utf-8") as journal:

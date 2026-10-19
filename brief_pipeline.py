@@ -147,6 +147,17 @@ def assemble_cards(target: date, hypotheses_n: int = 5) -> list:
         log.warning("assemble_cards recovery провайдер упал: %r", e)
         _record_provider_failure("recovery", e)
 
+    # Оконные правила, которые сообщением не идут (среднее за окно, решение владельца 19.10):
+    # их единственный путь к человеку — бриф. Предикат общий с ботом (trend_alerts.pushed).
+    try:
+        import trend_alerts as _ta
+        for t in _ta.evaluate_trends(None):
+            if not _ta.pushed(t):
+                cards.append(bc.from_trend(t))
+    except Exception as e:
+        log.warning("assemble_cards trend провайдер упал: %r", e)
+        _record_provider_failure("trend", e)
+
     # Среда (Open-Meteo/aqicn) — жара/UV/пыль/воздух
     try:
         import env_context as _ec

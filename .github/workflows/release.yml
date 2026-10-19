@@ -54,7 +54,9 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           push: true
           provenance: false
-          build-args: HEALTH_RELEASE=${{ github.ref_name }}
+          build-args: |
+            HEALTH_RELEASE=${{ github.ref_name }}
+            HEALTH_BUG_RECEIVER=${{ vars.BUG_RECEIVER }}
           tags: ${{ env.IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}
 
   manifest:

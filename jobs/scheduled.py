@@ -1501,6 +1501,14 @@ def register(app):
         name="deliver_unsent_assessment_tasks",
     )
 
+    # Очередь отчётов о сбоях (/bug, нить bug-report): не было связи — повтор раз в час.
+    app.job_queue.run_repeating(
+        drain_bug_reports_job,
+        interval=3600,
+        first=300,
+        name="drain_bug_reports",
+    )
+
     # Outbox предложений делает доставку независимой от ручной /report.
     import proposals_db as _pdb
     app.job_queue.run_repeating(
@@ -1660,6 +1668,16 @@ async def deliver_unsent_outcomes(app) -> None:
 async def deliver_unsent_outcomes_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Job-обёртка: тот же outbox, что и post_init, по расписанию."""
     await deliver_unsent_outcomes(context.application)
+
+
+async def drain_bug_reports_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Повтор очереди /bug. Отказ доставки за трое суток — одна строка человеку (он нажимал
+    «Отправить» и получил «отправлю сам» — молча потерять отчёт значило бы соврать)."""
+    import bug_outbox
+    res = await asyncio.to_thread(bug_outbox.drain)
+    chat_id = get_chat_id()
+    if res["gave_up"] and chat_id:
+        await context.bot.send_message(chat_id=chat_id, text=i18n.t("bug.reply.gave_up"))
 
 
 # ── Outbox задач-опросников ──────────────────────────────────────────────────

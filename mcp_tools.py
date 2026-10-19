@@ -111,11 +111,26 @@ def _none(what: str) -> str:
     return f"нет данных: {what}. Не достраивай значения — скажи, что в Health OS этого нет."
 
 
+def _with_note(text: str, note: str) -> str:
+    return text + ("\n" + note if note else "")
+
+
+def _lab_none(what: str, note: str) -> str:
+    # Не _none: его «скажи, что в Health OS этого нет» про анализ за окном или под другим
+    # названием было бы ложью. Граница — labs_db.declared_boundary, позвана в инструменте:
+    # проба границы контекста судит прямой вызов в функции-читателе.
+    return _with_note(f"нет данных: {what}. Не достраивай значения и не утверждай, что анализ "
+                      f"не сдавался.", note)
+
+
 def _tool_lab_tests(args: dict) -> str:
     import labs_db
     rows = labs_db.get_lab_history(days=MAX_DAYS)
+    note = labs_db.declared_boundary(MAX_DAYS)
     if not rows:
-        return _none(f"анализов за {MAX_DAYS} дней нет")
+        # Пустое объявление — канон пуст целиком: тогда «в Health OS этого нет» правда.
+        return _lab_none(f"анализов за {MAX_DAYS} дней нет", note) if note else \
+            _none(f"анализов за {MAX_DAYS} дней нет")
     agg: dict = {}
     for r in rows:
         a = agg.setdefault(r["test_name"], {"test_name": r["test_name"], "last_date": r["date"], "results": 0})
@@ -128,7 +143,7 @@ def _tool_lab_tests(args: dict) -> str:
     # Порядок полей (18.10): сначала перечень, потом граница — текст границы говорит «выше показан…».
     return _envelope("лабораторные результаты (канон)",
                      {"tests": sorted(agg.values(), key=lambda a: a["test_name"]),
-                      "boundary": labs_db.declared_boundary(MAX_DAYS)})
+                      "boundary": note})
 
 
 def _tool_lab_results(args: dict) -> str:
@@ -148,8 +163,10 @@ def _tool_lab_results(args: dict) -> str:
         tr, why_not = None, "справочник веществ недоступен"
     if tr is not None and tr.get("points"):
         pts = [p for p in tr["points"] if p["date"] >= cutoff]
+        note = labs_db.declared_boundary(
+            days, analyte_names=sorted({p["test_name"] for p in tr["points"]}))
         if not pts:
-            return _none(f"по веществу «{name}» за {days} дней результатов нет")
+            return _lab_none(f"по веществу «{name}» за {days} дней результатов нет", note)
         out = {"by": "вещество (LOINC): разные написания и шкалы сведены",
                "names_merged": sorted({p["test_name"] for p in pts}),
                "points": [{"date": p["date"], "value": p["value"], "unit": p["unit"],
@@ -160,7 +177,9 @@ def _tool_lab_results(args: dict) -> str:
         if unres:
             out["not_merged"] = [{"date": u["date"], "value": u["value"], "unit": u["unit"],
                                   "why": u["reason"]} for u in unres]
-        return _envelope(f"анализ «{name}», дата — дата забора", out)
+        if len(tr["points"]) >= MAX_POINTS:
+            out["truncated"] = f"показаны не больше {MAX_POINTS} последних точек ряда"
+        return _with_note(_envelope(f"анализ «{name}», дата — дата забора", out), note)
     if tr is not None and why_not is None:
         why_not = {"unmapped": "для этого названия сведения веществ ещё нет",
                    "ambiguous": "название соответствует нескольким веществам",
@@ -168,14 +187,16 @@ def _tool_lab_results(args: dict) -> str:
             (tr.get("issues") or ["unmapped"])[0], "сведение веществ не построено")
     # Запасной путь — по точному названию, с пометкой: помощник должен знать, что ряд может быть неполным.
     rows = [r for r in labs_db.get_lab_series(name, n_days=days)]
+    note = labs_db.declared_boundary(days, analyte_names=[name])
     if not rows:
-        return _none(f"по анализу «{name}» за {days} дней результатов нет (точные имена — lab_tests)")
+        return _lab_none(f"по анализу «{name}» за {days} дней результатов нет (точные имена — lab_tests)",
+                         note)
     # Путь бланка (source) не отдаём: в нём бывает имя человека и номер документа.
     out = {"by": f"точное название, БЕЗ сведения веществ ({why_not}): ряд может быть неполным — "
                  "тот же анализ под другим названием сюда не попал",
            "points": [{"date": r["date"], "value": r["value"], "unit": r.get("unit"),
                        "ref_low": r.get("ref_low"), "ref_high": r.get("ref_high")} for r in rows]}
-    return _envelope(f"анализ «{name}», дата — дата забора", out)
+    return _with_note(_envelope(f"анализ «{name}», дата — дата забора", out), note)
 
 
 def _tool_day_metrics(args: dict) -> str:

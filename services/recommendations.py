@@ -272,6 +272,7 @@ def evaluate_safety_limits() -> dict:
                     "metric": t["metric"], "pct": 0, "val": 0, "mean": 0,
                     "target": f"тренд/{t['level']} ({t['window_days']}д)", "r": 1.0,
                     "reason": t["reason"], "medical": t["level"] == "medical",
+                    "push": trend_alerts.pushed(t),
                 })
         except Exception as _te:  # noqa: BLE001 — тренды не гасят полы; отказ наблюдаем ключом
             log.error("evaluate_safety_limits: trend_alerts упал: %s", _te, exc_info=True)

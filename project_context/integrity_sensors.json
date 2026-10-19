@@ -891,6 +891,17 @@
           "verdict": "ПОКРАСНЕЛ"
         }
       ]
+    },
+    "check_bug_outbox_drains": {
+      "harness": "plans/mutate_bug_report_2026-10-19.sh",
+      "ran_at": "2026-10-19",
+      "mutations": [
+        {
+          "tag": "stuck-always-zero",
+          "statement": "вход датчика (bug_outbox.stuck) перестаёт видеть очередь, пережившую повторщика",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
     }
   },
   "_harm": "Кого задевает поломка, которую ловит датчик (нить repair-order, решение владельца 02.10): person — человек получает неверное или не получает нужное (совет, отчёт, бриф, ответ бота); data — портятся или устаревают данные, на которых всё строится; system — только внутренняя кухня (гейты, документы, журналы, тесты). Читатель — night_repair.pick_cards: первое место ночи самой вредной карточке, второе — старейшей. Новый датчик приходит с пометкой: tests/consistency/test_sensor_harm_declared.py краснеет на датчике без неё. Разметка 02.10 — суждение по имени и метке датчика; спорные отнесены к system и перечислены в записке нити.",
@@ -898,6 +909,7 @@
     "person": [
       "check_absence_surface_guarded",
       "check_brief_does_not_retell_owner",
+      "check_bug_outbox_drains",
       "check_canon_normal_flag_matches_reference",
       "check_chain_models_thinking_known",
       "check_correlations_grounded",

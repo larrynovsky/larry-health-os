@@ -1,8 +1,8 @@
 # requirements.txt — канон (до 01.10 назывался requirements.lock; Dependabot читает только *.txt) окружения health-os (системный python3.11, Studio)
-# Сгенерировано: 2026-10-18 (multidict 6.7.1 → 6.9.1: PYSEC-2026-4244, утечка памяти в операциях items-view; установлено на Studio, pip check чист; прежде 2026-10-02: +openai 3.19.2, google-genai 2.25.0 с зависимостями, google-auth 2.58.0, h3 4.5.0 и flatbuffers 25.12.19 (зависимости timezonefinder, стояли на Studio, в замке не было) — нить llm-provider, карантин ≥3 дней; прежде 2026-10-01: urllib3 2.8.0 + oauthlib 4.0.0 — Dependabot #1–#5; прежде 2026-07-17: +pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
+# Сгенерировано: 2026-10-20 (aiohttp 3.14.3 → 3.14.4: GHSA-5wr8-gcqf-gqf3 и GHSA-2g87-pp6c-29x5, Dependabot #7–#8; выпуск 3.14.4 от 05.10 — карантин пройден; установлено на Studio, pip check чист; в образе импорт проверен; прежде 2026-10-18: multidict 6.7.1 → 6.9.1: PYSEC-2026-4244, утечка памяти в операциях items-view; установлено на Studio, pip check чист; прежде 2026-10-02: +openai 3.19.2, google-genai 2.25.0 с зависимостями, google-auth 2.58.0, h3 4.5.0 и flatbuffers 25.12.19 (зависимости timezonefinder, стояли на Studio, в замке не было) — нить llm-provider, карантин ≥3 дней; прежде 2026-10-01: urllib3 2.8.0 + oauthlib 4.0.0 — Dependabot #1–#5; прежде 2026-07-17: +pytest-timeout 2.4.0: маркер timeout в test_literature_pipeline_e2e ожил; база — SEC-19 2026-07-06) | Python 3.11.15
 # Обновление ТОЛЬКО через docs/how-to/dependency_updates.md (cooldown, по одному пакету)
 aiohappyeyeballs==2.6.1
-aiohttp==3.14.3
+aiohttp==3.14.4
 aiosignal==1.4.0
 annotated-doc==0.0.4
 annotated-types==0.7.0

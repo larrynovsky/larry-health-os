@@ -10,7 +10,7 @@ from __future__ import annotations
 import i18n
 
 
-def parks_due(weeks_since_freeze, q_lag_passed, floor_weeks, frozen_at=None, *, lang="ru"):
+def parks_due(weeks_since_freeze, q_lag_passed, floor_weeks, frozen_at=None, *, judged=None, lang="ru"):
     """Какие решения поднять владельцу СЕЙЧАС. Возврат [(gate_id, summary)], пустой — нечего.
 
     Два независимых спусковых оживления нити:
@@ -27,13 +27,20 @@ def parks_due(weeks_since_freeze, q_lag_passed, floor_weeks, frozen_at=None, *, 
     НЕ несёт: промоут в генеративный слой — standing-политика владельца, не свойство окна;
     перезвонить про решённую политику после пере-freeze = нытьё, а не гаситель.
 
+    judged — итоги confirm ЭТОЙ установки ({"passed": n, "failed": n} из gate.heldout при
+    status=judged). Без итогов (a) не звонит: календарь от общего frozen_at один на все
+    установки, и посторонний получал карточку «система нашла связи» на второй день, хотя
+    проверять было нечего (отчёт друга 20.10). Звонок — только когда есть что прочесть.
+
     Чистая функция: тот же вход — тот же выход, без побочных эффектов. Оракул — __main__ ниже."""
     gates = []
+    passed = int((judged or {}).get("passed") or 0)
+    failed = int((judged or {}).get("failed") or 0)
     if (weeks_since_freeze is not None and floor_weeks is not None
-            and weeks_since_freeze >= floor_weeks):
+            and weeks_since_freeze >= floor_weeks and passed + failed > 0):
         gates.append((
             "vg:heldout_ready" + (f":{frozen_at}" if frozen_at else ""),
-            i18n.t("owner.card.heldout", lang=lang)))
+            i18n.t("owner.card.heldout", lang=lang, passed=passed, failed=failed)))
     if q_lag_passed and q_lag_passed > 0:
         gates.append((
             "vg:signal_generative_promotion",
@@ -43,15 +50,17 @@ def parks_due(weeks_since_freeze, q_lag_passed, floor_weeks, frozen_at=None, *, 
 
 if __name__ == "__main__":
     # Оракул: каждая ветка гасителя краснеет при поломке порога/условия.
+    J = {"passed": 2, "failed": 0}
+    assert parks_due(8, 0, 6) == [], "дозрело по календарю, но проверять нечего — не звоним"
     assert parks_due(5, 0, 6) == [], "рано и лагов нет — ничего не поднимаем"
-    assert [g for g, _ in parks_due(6, 0, 6)] == ["vg:heldout_ready"], "дозрело ровно на пол"
-    assert [g for g, _ in parks_due(8, 0, 6)] == ["vg:heldout_ready"], "с запасом"
+    assert [g for g, _ in parks_due(6, 0, 6, judged=J)] == ["vg:heldout_ready"], "дозрело ровно на пол"
+    assert [g for g, _ in parks_due(8, 0, 6, judged=J)] == ["vg:heldout_ready"], "с запасом"
     assert [g for g, _ in parks_due(3, 2, 6)] == ["vg:signal_generative_promotion"], "лаг-выживший рано"
-    assert [g for g, _ in parks_due(6, 1, 6)] == [
+    assert [g for g, _ in parks_due(6, 1, 6, judged=J)] == [
         "vg:heldout_ready", "vg:signal_generative_promotion"], "оба спусковых разом"
     assert parks_due(None, None, 6) == [], "нет данных → нечего судить (fail-open)"
-    assert [g for g, _ in parks_due(6, 0, 6, frozen_at="2026-07-12")] == [
+    assert [g for g, _ in parks_due(6, 0, 6, frozen_at="2026-07-12", judged=J)] == [
         "vg:heldout_ready:2026-07-12"], "ключ heldout обязан нести freeze"
-    assert (parks_due(6, 1, 6, frozen_at="2026-07-12")[1][0]
+    assert (parks_due(6, 1, 6, frozen_at="2026-07-12", judged=J)[1][0]
             == "vg:signal_generative_promotion"), "ключ §6.1 freeze НЕ несёт (standing-политика)"
     print("heldout_readiness selftest ok")

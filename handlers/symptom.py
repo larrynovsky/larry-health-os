@@ -151,8 +151,7 @@ async def on_photo_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = await _photo_bytes(update, context)
     except Exception as e:
         log.error(f"symptom photo download: {e}")
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/symptom.py:on_photo_entry: {type(e).__name__}: {e}", person_key="photos.error.download_failed"))
+        await update.message.reply_text(await notify.afault(f"handlers/symptom.py:on_photo_entry: {type(e).__name__}: {e}", person_key="photos.error.download_failed"))
         return ConversationHandler.END
 
     import os
@@ -196,8 +195,7 @@ async def on_photo_during_elicit(update: Update, context: ContextTypes.DEFAULT_T
         return ELICIT
     except Exception as e:
         log.error(f"elicit photo download: {e}")
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/symptom.py:on_photo_during_elicit: {type(e).__name__}: {e}", person_key="photos.error.download_failed"))
+        await update.message.reply_text(await notify.afault(f"handlers/symptom.py:on_photo_during_elicit: {type(e).__name__}: {e}", person_key="photos.error.download_failed"))
         return ELICIT
     try:
         visual_db.add_visual_photo(state["case_id"], stored["path"], stored["sha256"],
@@ -288,8 +286,7 @@ async def _handle_action(update, context, state, action):
             await update.message.reply_text(verdict[:3900])
         return ConversationHandler.END
     # error
-    await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/symptom.py:_handle_action: analysis failed case_id={state.get('case_id')}", person_key="symptoms.error.analysis_failed"))
+    await update.message.reply_text(await notify.afault(f"handlers/symptom.py:_handle_action: analysis failed case_id={state.get('case_id')}", person_key="symptoms.error.analysis_failed"))
     return ELICIT
 
 
@@ -331,8 +328,7 @@ async def _handle_followup_photo(update: Update, context: ContextTypes.DEFAULT_T
         return ConversationHandler.END
     except Exception as e:
         log.error(f"followup photo download: {e}")
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/symptom.py:_handle_followup_photo: {type(e).__name__}: {e}", person_key="photos.error.download_failed"))
+        await update.message.reply_text(await notify.afault(f"handlers/symptom.py:_handle_followup_photo: {type(e).__name__}: {e}", person_key="photos.error.download_failed"))
         return ConversationHandler.END
 
     cid = case["id"]

@@ -346,7 +346,10 @@ def test_override_приёмник_отчётов_без_данных_и_тол�
     repo = tmp_path / "repo"
     repo.mkdir()
     off = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin")
-    assert "bug-inbox" not in yaml.safe_load(off["compose.override.yaml"])["services"]
+    off_svc = yaml.safe_load(off["compose.override.yaml"])["services"]
+    assert "bug-inbox" not in off_svc
+    # без приёмника /bug владельца честно говорит «не настроено», а не шлёт в пустоту
+    assert all("HEALTH_BUG_RECEIVER" not in (s.get("environment") or {}) for s in off_svc.values())
     out = install.render_owner_override("/Users/o", repo, "h", "Europe/Berlin", None, True)
     doc = yaml.safe_load(out["compose.override.yaml"])
     svc = doc["services"]
@@ -358,4 +361,8 @@ def test_override_приёмник_отчётов_без_данных_и_тол�
     serve = _json.loads(out["reports_serve.json"])
     handlers = next(iter(serve["Web"].values()))["Handlers"]
     assert handlers == {"/report": {"Proxy": "http://bug-inbox:8766/report"}}
+    # /bug владельца (решение 19.10) — в тот же приёмник изнутри сети compose: бот отправляет,
+    # cron повторяет очередь; адрес — тот же, куда смотрит Funnel
+    for name in ("bot", "cron"):
+        assert svc[name]["environment"]["HEALTH_BUG_RECEIVER"] == handlers["/report"]["Proxy"]
     assert doc["volumes"][install.REPORTS_TS_VOLUME] == {"external": True}

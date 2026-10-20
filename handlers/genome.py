@@ -86,8 +86,7 @@ async def cmd_genome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             variants = db.get_significant_variants(limit=20)
             if not variants:
-                await send_md(update.message.reply_text, text=await asyncio.to_thread(
-                notify.fault, f"handlers/genome.py:cmd_genome: no significant variants; check genome intake/pipeline", person_key="genome.reply.empty"))
+                await send_md(update.message.reply_text, text=await notify.afault(f"handlers/genome.py:cmd_genome: no significant variants; check genome intake/pipeline", person_key="genome.reply.empty"))
                 return
 
             shown = variants[:15]
@@ -99,8 +98,7 @@ async def cmd_genome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 actions.button(i18n.t("actions.genome.question"), "gq", "")]))
         except Exception as e:
             log.error(f"cmd_genome (summary) error: {e}", exc_info=True)
-            await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/genome.py:cmd_genome: {type(e).__name__}: {e}"))
+            await update.message.reply_text(await notify.afault(f"handlers/genome.py:cmd_genome: {type(e).__name__}: {e}"))
         return
 
     await _answer_genome(update.message, question)
@@ -114,8 +112,7 @@ async def _answer_genome(message, question):
         await send_md(message.reply_text, text=i18n.t("genome.reply.answer", answer=answer))
     except Exception as e:
         log.error(f"cmd_genome error: {e}", exc_info=True)
-        await message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/genome.py:cmd_genome: {type(e).__name__}: {e}"))
+        await message.reply_text(await notify.afault(f"handlers/genome.py:cmd_genome: {type(e).__name__}: {e}"))
 
 
 @actions.action("gq")
@@ -151,8 +148,7 @@ async def cmd_genome_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ))
     except Exception as e:
         log.error(f"cmd_genome_update error: {e}", exc_info=True)
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/genome.py:cmd_genome_update: {type(e).__name__}: {e}"))
+        await update.message.reply_text(await notify.afault(f"handlers/genome.py:cmd_genome_update: {type(e).__name__}: {e}"))
 
 
 def register(app, owner_filter):

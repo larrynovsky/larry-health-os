@@ -198,8 +198,7 @@ def _never_located() -> bool:
 async def _alert_tz_fallback(context: ContextTypes.DEFAULT_TYPE):
     """Громкий сенсор: свежий GPS-tz не получен, держим last-good (не молча-UTC)."""
     tzn = (context.job.data or {}).get("tz", "?")
-    await asyncio.to_thread(notify.fault,
-        f"scheduled._alert_tz_fallback: GPS timezone unavailable, using last-good {tzn}; check timezonefinder and GPS",
+    await notify.afault(f"scheduled._alert_tz_fallback: GPS timezone unavailable, using last-good {tzn}; check timezonefinder and GPS",
         person_key=None)
 
 
@@ -387,8 +386,7 @@ async def send_morning_report(context: ContextTypes.DEFAULT_TYPE):
         # _build_clinical_history) → Markdown-парс валит отправку и даже это
         # сообщение об ошибке тоже может не дойти.
         await send_long(context.bot, chat_id,
-                        await asyncio.to_thread(notify.fault,
-                            f"scheduled.send_morning_report: {type(e).__name__}: {e}",
+                        await notify.afault(f"scheduled.send_morning_report: {type(e).__name__}: {e}",
                             person_key="jobs.morning.failed"),
                         parse_mode=None)
         return
@@ -537,8 +535,7 @@ async def send_weekly_report(context: ContextTypes.DEFAULT_TYPE):
         header = i18n.t("jobs.weekly.heading") + report
     except Exception as e:
         log.error(f"Ошибка GP weekly report: {e}")
-        header = await asyncio.to_thread(notify.fault,
-            f"scheduled.send_weekly_report: {type(e).__name__}: {e}", person_key="jobs.weekly.failed")
+        header = await notify.afault(f"scheduled.send_weekly_report: {type(e).__name__}: {e}", person_key="jobs.weekly.failed")
     await send_long(context.bot, chat_id, header)
     # Извлекаем задачи из scheduled отчёта
     if report:
@@ -605,8 +602,7 @@ async def send_monthly_check(context: ContextTypes.DEFAULT_TYPE):
         header = i18n.t("jobs.monthly.heading") + report
     except Exception as e:
         log.error(f"Ошибка GP monthly report: {e}")
-        header = await asyncio.to_thread(notify.fault,
-            f"scheduled.send_monthly_report: {type(e).__name__}: {e}", person_key="jobs.monthly.failed")
+        header = await notify.afault(f"scheduled.send_monthly_report: {type(e).__name__}: {e}", person_key="jobs.monthly.failed")
     await send_long(context.bot, chat_id, header)
 
 
@@ -775,11 +771,9 @@ async def _send_doc_review_message(bot, review: dict) -> None:
         # отдало бы партнёру ЧУЖОЙ документ — ровно класс бага 2026-07-01 (секреты
         # владельца в процессе тенанта). Пока корень не тенант-осознан, вложение только
         # у владельца; текстовая карточка тенанту приходит как раньше.
-        await asyncio.to_thread(notify.fault,
-            f"scheduled.doc_review: attachment owner-only review_id={rid}", person_key=None)
+        await notify.afault(f"scheduled.doc_review: attachment owner-only review_id={rid}", person_key=None)
     elif path is None:
-        await asyncio.to_thread(notify.fault,
-            f"scheduled.doc_review: file missing review_id={rid}", person_key=None)
+        await notify.afault(f"scheduled.doc_review: file missing review_id={rid}", person_key=None)
     else:
         size_mb = path.stat().st_size / 1048576
         if size_mb > _DOC_ATTACH_MAX_MB:
@@ -791,8 +785,7 @@ async def _send_doc_review_message(bot, review: dict) -> None:
             except TelegramError as e:
                 # Алерт важнее вложения: файл не ушёл — карточка уходит всё равно.
                 log.warning("doc_review id=%s: send_document отклонён (%s) → шлём текстом", rid, e)
-                await asyncio.to_thread(notify.fault,
-                    f"scheduled.doc_review: attachment rejected review_id={rid}: {type(e).__name__}: {e}", person_key=None)
+                await notify.afault(f"scheduled.doc_review: attachment rejected review_id={rid}: {type(e).__name__}: {e}", person_key=None)
 
     await send_md(bot.send_message, chat_id=owner_chat_id(), text=text, reply_markup=keyboard)
 
@@ -933,15 +926,13 @@ async def send_genome_update_monthly(context: ContextTypes.DEFAULT_TYPE):
                     _regen.returncode,
                     _regen.stderr[:500],
                 )
-                await asyncio.to_thread(notify.fault,
-                    f"scheduled.send_genome_update_monthly: generate_constitutions failed code={_regen.returncode}",
+                await notify.afault(f"scheduled.send_genome_update_monthly: generate_constitutions failed code={_regen.returncode}",
                     person_key=None)
             else:
                 log.info("send_genome_update_monthly: конституции успешно перегенерированы")
         except Exception as e:
             log.error("send_genome_update_monthly: regen failed: %s", e, exc_info=True)  # silent-ok: regen failure не роняет job
-            await asyncio.to_thread(notify.fault,
-                f"scheduled.send_genome_update_monthly: regeneration: {type(e).__name__}: {e}", person_key=None)
+            await notify.afault(f"scheduled.send_genome_update_monthly: regeneration: {type(e).__name__}: {e}", person_key=None)
     else:
         log.info(f"send_genome_update_monthly: изменений {changed}, значимых 0 — уведомление не нужно")
 
@@ -1032,8 +1023,7 @@ async def check_prs_updates_monthly(context: ContextTypes.DEFAULT_TYPE):
         phase_h = await asyncio.to_thread(_run_phase_h)
     except Exception as e:
         log.error(f"check_prs_updates_monthly: Phase H failed: {e}", exc_info=True)
-        await asyncio.to_thread(notify.fault,
-            f"scheduled.check_prs_updates_monthly: Phase H: {type(e).__name__}: {e}", person_key=None)
+        await notify.afault(f"scheduled.check_prs_updates_monthly: Phase H: {type(e).__name__}: {e}", person_key=None)
         return
 
     if not phase_h:
@@ -1084,8 +1074,7 @@ async def discover_pgs_monthly(context: ContextTypes.DEFAULT_TYPE):
         result = await asyncio.to_thread(pgsd.discover_and_import_new_scores)
     except Exception as exc:
         log.error("discover_pgs_monthly: failed: %s", exc, exc_info=True)
-        await asyncio.to_thread(notify.fault,
-            f"scheduled.discover_pgs_monthly: {type(exc).__name__}: {exc}", person_key=None)
+        await notify.afault(f"scheduled.discover_pgs_monthly: {type(exc).__name__}: {exc}", person_key=None)
         return
 
     imported        = result.get("imported",       [])
@@ -1094,12 +1083,10 @@ async def discover_pgs_monthly(context: ContextTypes.DEFAULT_TYPE):
 
     # Snapshot failure — всегда алерт, независимо от импортов
     if snapshot_error:
-        await asyncio.to_thread(notify.fault,
-            f"scheduled.discover_pgs_monthly: pre-op snapshot failed: {snapshot_error}", person_key=None)
+        await notify.afault(f"scheduled.discover_pgs_monthly: pre-op snapshot failed: {snapshot_error}", person_key=None)
         log.error("discover_pgs_monthly: snapshot failed: %s", snapshot_error)
     if errors:
-        await asyncio.to_thread(notify.fault,
-            f"scheduled.discover_pgs_monthly: import errors={len(errors)}", person_key=None)
+        await notify.afault(f"scheduled.discover_pgs_monthly: import errors={len(errors)}", person_key=None)
 
     if not imported:
         log.info(
@@ -1656,8 +1643,7 @@ async def deliver_unsent_outcomes(app) -> None:
                            evaluated_at=evaluated_at, coord_text=coord_text),
                 )
             else:
-                await asyncio.to_thread(notify.fault,
-                    f"scheduled.deliver_unsent_outcomes: report unavailable memory_id={memory_id} outcome_id={outcome_id}",
+                await notify.afault(f"scheduled.deliver_unsent_outcomes: report unavailable memory_id={memory_id} outcome_id={outcome_id}",
                     person_key=None)
             db.mark_hypothesis_outcome_sent(memory_id, outcome_id)
             log.info(f"deliver_unsent_outcomes: #{memory_id} (outcome {outcome_id}) доставлено")
@@ -1973,6 +1959,5 @@ async def check_hypothesis_evaluations(context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=chat_id, text=resolution["message"])
         except Exception as e:
             log.error(f"check_hypothesis_evaluations #{memory_id}: {e}", exc_info=True)
-            await asyncio.to_thread(notify.fault,
-                f"scheduled.check_hypothesis_evaluations memory_id={memory_id}: {type(e).__name__}: {e}",
+            await notify.afault(f"scheduled.check_hypothesis_evaluations memory_id={memory_id}: {type(e).__name__}: {e}",
                 person_key=None)

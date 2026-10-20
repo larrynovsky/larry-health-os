@@ -486,7 +486,7 @@ ALLOWED_RU.update({
         "'ЛАБОРАТОРНЫЕ ДАННЫЕ (последние доступные, до 2 лет):'": 'MODEL: GP context/prompt; not the appended person-facing correction (_build_gp_context)',
         "'❌ просрочен'": 'MODEL: GP context/prompt; not the appended person-facing correction (_check_lab_freshness)',
         "'Все ключевые данные актуальны.'": 'MODEL: GP context/prompt; not the appended person-facing correction (_check_lab_freshness)',
-        "'ИСТОРИЯ БОЛЕЗНИ: данных пока нет (новый профиль).'": 'MODEL: GP context/prompt; not the appended person-facing correction (_build_clinical_history)',
+        "'ИСТОРИЯ БОЛЕЗНИ: не заполнена — периодов болезней и лечения в базе нет.'": 'MODEL: GP context/prompt; not the appended person-facing correction (_build_clinical_history)',
         "'_build_clinical_history: periods пустая или нет валидных записей — migrate на Studio не запускалась.'": 'MODEL: GP context/prompt; not the appended person-facing correction (_build_clinical_history)',
         "'н.в.'": 'MODEL: GP context/prompt; not the appended person-facing correction (_build_clinical_history)',
         "f'\\n\\nАКТИВНЫЕ ПРОБЛЕМЫ:\\n{pl}'": 'MODEL: GP context/prompt; not the appended person-facing correction (_build_clinical_history)',
@@ -1065,11 +1065,12 @@ def test_k1_dictionary_contract():
     # «см. кейс» ловил сторож внутренней лексики test_i18n::test_person_copy_has_no_internal_vocabulary.
     # Вторая сознательная правка (19.10, нить trend-to-brief): sleep_score_average и
     # sleep_score_consecutive — «Оценка сна» вместо сырого ключа, числа среднего с десятой
-    # («69 ниже 69» из округления); текст среднего теперь идёт в утренний бриф. Третья (19.10, trend-brief-slot):
-    # среднее и порог с сотой — 69.07 против 69.14 давало «69.1 ниже 69.1»; число порога в тексте
+    # («N ниже N» из округления); текст среднего теперь идёт в утренний бриф. Третья (19.10, trend-brief-slot):
+    # среднее и порог с сотой не спасли (округлённые до сотой — снова одно число): текст
+    # больше не утверждает видимую разницу — «при границе … у нижнего края или ниже»; число порога в тексте
     # остаётся (test_trend_reason_threshold: текст несёт порог самого правила).
     snapshot = json.dumps(staged["ru"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    assert hashlib.sha256(snapshot.encode()).hexdigest() == "f04a5bd58403aa3b065c996c0afa342bd1904eec67969d1d55227e1eed95de04"
+    assert hashlib.sha256(snapshot.encode()).hexdigest() == "052ac70cfd48c5c958df7f260afabb02675f4963f4a7429fa67583a2a85deb11"
     for key, ru in staged["ru"].items():
         en = staged["en"][key]
         ru_fields = sorted((f, s, c) for _, f, s, c in string.Formatter().parse(ru) if f is not None)

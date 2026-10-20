@@ -44,7 +44,13 @@ def note(sent_text: str) -> None:
     """Отправка состоялась — записать, какие шаблоны в ней были. Не бросает."""
     try:
         import i18n
-        keys = i18n.keys_in(sent_text) or [FREE]
+        found = i18n.keys_in(sent_text)
+        # Разговор самой команды /bug — не то, что человек видел ДО неё: в след не пишется
+        # (живой отчёт R-1 19.10 — две строки следа из двух, и обе bug.*).
+        keys = [k for k in found if not k.startswith("bug.")]
+        if found and not keys:
+            return
+        keys = keys or [FREE]
         rec = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                "tenant": _tenant(), "keys": keys[:5]}
         path = _path()

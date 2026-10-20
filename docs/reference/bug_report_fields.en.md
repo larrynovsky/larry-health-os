@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/bug_report_fields.md sha256:fd77602de49f -->
+<!-- translation-of: docs/reference/bug_report_fields.md sha256:ed7e72516737 -->
 **English** · [Русский](bug_report_fields.md)
 
 # What goes into a fault report
@@ -18,8 +18,8 @@ report is not scrubbed — it is assembled from these fields only.
 | `platform` | system and architecture | `linux/aarch64` |
 | `category` | the button the person picked | `report_missing` |
 | `connected` | whether connected (yes/no); key values are never read | `{"oura": true, ...}` |
-| `faults` | journal faults for 7 days: type, code location “file:function”, count, fingerprint | `KeyError`, `labs_db.py:build_lab_history_context`, 3, `7f3a1c` |
-| `screen` | template names of the bot's latest messages and their time, no text | `07:30 jobs.brief.header` |
+| `faults` | journal faults for 7 days: type, code location “file:function”, count, fingerprint. A fault without an exception has type `none` and the location of the function that recorded it | `KeyError`, `labs_db.py:build_lab_history_context`, 3, `7f3a1c` |
+| `screen` | template names of the bot's latest messages and their time, no text; the `/bug` command's own messages are not included | `07:30 jobs.brief.header` |
 
 `category` values: `report_missing`, `button_silent`, `lab_not_read`, `other`.
 

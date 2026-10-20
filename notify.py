@@ -248,29 +248,65 @@ def honest_key(person_key: str) -> str:
     return person_key if repairer_alive() else alt
 
 
-def _exc_shape(exc: "BaseException | None") -> dict:
+def _code_rel(filename: str) -> "str | None":
+    """Путь файла относительно кода установки, если файл ВНУТРИ кода; иначе None.
+    «<string>» (python -c) резолвится в каталог процесса — поэтому требуется настоящий файл."""
+    root = Path(__file__).resolve().parent
+    p = Path(filename).resolve()
+    try:
+        return p.relative_to(root).as_posix() if p.is_file() else None
+    except ValueError:
+        return None
+
+
+def _caller_place(frame) -> "str | None":
+    """«файл:функция» первого кадра над notify, если он в коде установки; иначе None."""
+    me = Path(__file__).resolve()
+    f = frame
+    while f is not None and Path(f.f_code.co_filename).resolve() == me:
+        f = f.f_back
+    place = _code_rel(f.f_code.co_filename) if f is not None else None
+    return f"{place}:{f.f_code.co_name}" if place else None
+
+
+def _exc_shape(exc: "BaseException | None", place: "str | None" = None) -> dict:
     """Форма исключения без его ТЕКСТА: тип и кадры «файл:функция» внутри кода установки.
 
     Текст исключения не берётся никогда: у KeyError это сам ключ (например, название
     анализа), у ошибки базы — значения строки. Кадры вне каталога кода (библиотеки, пути
     с именем пользователя) отбрасываются. Это вход отчёта о сбое (bug_report), и
-    безопасность отчёта держится здесь, в точке рождения записи, а не в вычистке потом."""
+    безопасность отчёта держится здесь, в точке рождения записи, а не в вычистке потом.
+
+    Сбой без исключения (вердикт, состояние) несёт одно место — того, кто позвал fault:
+    первый кадр над notify (или `place`, взятый заранее — так делает afault, см. там).
+    Без него все такие сбои модуля сливались в один отпечаток («none в llm_admission»,
+    живой отчёт R-1 19.10). Кадр вне кода (python -c из оболочки, библиотека) — места нет,
+    отчёт возьмёт `where`."""
     if exc is None:
-        return {}
+        place = place or _caller_place(sys._getframe(1))
+        return {"frames": [place]} if place else {}
     import traceback
-    root = Path(__file__).resolve().parent
-    frames = []
-    for fr in traceback.extract_tb(exc.__traceback__):
-        try:
-            rel = Path(fr.filename).resolve().relative_to(root)
-        except ValueError:
-            continue
-        frames.append(f"{rel.as_posix()}:{fr.name}")
+    frames = [f"{r}:{fr.name}" for fr in traceback.extract_tb(exc.__traceback__)
+              if (r := _code_rel(fr.filename))]
     return {"exc_type": type(exc).__name__, "frames": frames[-6:]}
 
 
+async def afault(tech: str, person_key: "str | None" = "common.error.our_side", *,
+                 exc: "BaseException | None" = None, **kw) -> "str | None":
+    """fault из асинхронного кода (бот, задачи по расписанию) — вместо to_thread(fault, …).
+
+    Запись журнала блокирующая, поэтому едет в рабочий поток. Но обрабатываемое исключение
+    видно только в потоке, где оно поймано, а стек рабочего потока — код asyncio, не наш:
+    через to_thread(fault) сбой терял и тип, и место (замер 20.10: sys.exc_info() в рабочем
+    потоке — None; 42 места бота и расписания). Здесь оба берутся ДО передачи в поток."""
+    import asyncio
+    exc = exc if exc is not None else sys.exc_info()[1]
+    place = None if exc is not None else _caller_place(sys._getframe(1))
+    return await asyncio.to_thread(fault, tech, person_key, exc=exc, _place=place, **kw)
+
+
 def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
-          exc: "BaseException | None" = None, **kw) -> "str | None":
+          exc: "BaseException | None" = None, _place: "str | None" = None, **kw) -> "str | None":
     """Технический сбой — в журнал, человеку — одна человеческая строка.
 
     Решение владельца 28.09 (холодное чтение сообщений): «Error code: 529», «проверь
@@ -295,6 +331,9 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
     from _time_inject import get_now
 
     ts = get_now().astimezone().isoformat()
+    # Вызов из обработчика исключения: форма того исключения, что сейчас обрабатывается, —
+    # из 53 мест вызова 18 стоят в except и exc= не передаёт ни одно (замер 19.10).
+    exc = exc if exc is not None else sys.exc_info()[1]
     code = hashlib.sha256(f"{ts}\n{tech}".encode()).hexdigest()[:6]   # код, не защита; sha1 CodeQL отбивает (#42)
     try:
         parts = tech.split(":", 2)
@@ -303,7 +342,7 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
             where += ":" + parts[1]
         record = {"ts": ts, "code": code,
                   "tenant": Path(secrets_dir()).name, "where": where, "text": tech[:500],
-                  **_exc_shape(exc)}
+                  **_exc_shape(exc, _place)}
         path = _faults_journal()
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a+", encoding="utf-8") as journal:

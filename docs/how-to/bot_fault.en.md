@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/bot_fault.md sha256:efd96a701090 -->
+<!-- translation-of: docs/how-to/bot_fault.md sha256:5ece2131e44c -->
 **English** · [Русский](bot_fault.md)
 
 # Something went wrong — how to tell the developer
@@ -47,6 +47,11 @@ docker compose run --rm cron python3 -m bug_outbox --print
 
 Don't paste lines from the `faults.jsonl` and `bot_err.log` journals into the issue: error text can
 contain what you wrote to the bot or a lab value. The report from the command above contains neither.
+
+If you have your own AI assistant with access to the installation (for example, Claude), ask it to
+trace the fault in the code and write the issue: what you did, what you saw, where the cause is in the
+code. Such an issue helps more than the short report. Read it yourself before posting and remove your
+data, lab values and journal lines — a GitHub issue is visible to everyone.
 
 ## Common causes you can fix yourself
 

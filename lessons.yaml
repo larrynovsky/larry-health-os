@@ -1395,7 +1395,7 @@ lessons:
   outcome:
     kind: rule
     text: путь для замера — вызовом функции потребителя (lab_intake_watcher._incoming)
-  status: adopted
+  status: failed
   adopted_on: '2026-10-18'
   change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — 1.6 замер: то, что видит потребитель, — через функцию самого потребителя; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence:
@@ -2465,7 +2465,7 @@ lessons:
   address: {kind: ritual, ref: letitbe}
   subject: [hypothesis_before_fact, measurement_path]
   outcome: {kind: rule, text: 'план, по числам которого владелец выбирает вариант, до выдачи перепроверяет независимый агент без контекста — повторяет замеры на машине своими командами; расхождения правятся до вопроса владельцу'}
-  status: adopted
+  status: failed
   adopted_on: '2026-10-18'
   change: 'ritual:letitbe, редакция 2026-10-15 (skills-mirror 1c93cdb) — «Открытые вопросы»: числа, по которым владелец выбирает вариант, до вопроса перемеряет независимый агент на целевой машине; ставка группы hypothesis_before_fact проверяется 2026-11-15; установлено 2026-10-18, установленная копия = skills-mirror по md5 (7 из 7 файлов); повтор 63ddc03, откатанного merge-коммитом ea3aa8b (C-179)'
   evidence: ['plans/PLAN_docker_install_2026-09-29.md']
@@ -3687,4 +3687,45 @@ lessons:
   status: observation
   evidence:
   - git:bd22253
+  owner: владелец
+- id: C-181
+  date: '2026-10-19'
+  thread: bug-report
+  modules:
+  - notify.py
+  - bug_report.py
+  event: 'Канал /bug спроектирован и покрыт тестами на форме сбоя (тип исключения + место «файл:функция»), но первый живой отчёт владельца пришёл почти пустым: 18 из 18 сбоев недели — тип none и одно слово модуля. Форму писал только обработчик ошибок бота (exc=err); остальные 53 места вызова notify.fault её не передавали, а тесты вызывали fault с exc= сами — проверяли путь, по которому живые сбои не ходили. Выпуск v0.2.3 с тонкими отчётами успел уйти в публичный репозиторий.'
+  cost: один публичный выпуск (v0.2.3) с отчётами, по которым ночной ремонт не находит причину; вторая нить (bug-report-depth) и второй выпуск до приёмки другом
+  cause: 'в плане нити утверждение «отчёт несёт тип и место сбоя» стояло без замера живой популяции журнала: вход отчёта был тестом, написанным исполнителем (fault с exc=), а не распределением реальных записей faults.jsonl; шаг 1.6 ритуала (замер/гипотеза) требует источник по пути, но не называет «вход, который пишет сам тест» как подмену источника'
+  address:
+    kind: ritual
+    ref: letitbe
+  subject:
+  - measurement_path
+  - writers_readers
+  outcome:
+    kind: check
+    text: 'tests/unit/test_bug_report.py::test_fault_inside_except_carries_the_exception_without_exc_arg и ::test_fault_without_exception_names_its_caller_not_notify — fault зовётся так, как зовут 53 живых места (без exc=); мутации M5/M6 красные (plans/mutate_bug_report_depth_2026-10-19.sh). Правка ритуала (п. 1.6: «вход, написанный тестом, — не замер популяции») — у владельца ритуала'
+  status: observation
+  evidence:
+  - git:440fef3
+  owner: владелец
+- id: C-182
+  date: '2026-10-19'
+  thread: bug-report
+  event: 'Новый узел tailnet health-reports не входил в сеть: контейнер tailscale (containerboot) обрывает `tailscale up` через 60 с (context deadline exceeded), перезапускается и выдаёт НОВУЮ ссылку входа; владелец получал ссылку, которая умирала до того, как он её открывал. Вошёл только через разовый контейнер на том же томе с `tailscale up --timeout=900s`.'
+  cost: три ссылки входа впустую, около часа ожидания владельцем; тот же капкан ждёт любой новый узел и перевход health-mcp
+  cause: 'инструкция входа узла (docs/how-to/connect_cloud_assistants.md: «возьми ссылку из журнала контейнера») опирается на поведение containerboot по умолчанию, у которого срок входа 60 с, а не на процедуру с явным сроком'
+  address:
+    kind: methodology_page
+    ref: docs/how-to/connect_cloud_assistants.md
+  subject:
+  - vendor_data
+  - probes
+  outcome:
+    kind: rule
+    text: 'вход нового узла — разовым контейнером на томе состояния узла с `tailscale up --timeout=900s` (штатный контейнер на это время остановлен), затем штатный контейнер; рецепт записан в docs/handoff/bug-report/2026-10-19-440fef3.md §3, в how-to ещё не перенесён'
+  status: observation
+  evidence:
+  - docs/handoff/bug-report/2026-10-19-440fef3.md
   owner: владелец

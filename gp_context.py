@@ -536,7 +536,6 @@ def annotate_lab_recency(text: str) -> str:
 
 
 def _build_clinical_history() -> str:
-    # RuntimeError если periods пустая — не генерировать отчёт молча
     import health_db as db
     # PERIODS-SEMANTICS (2026-06-19, D++ hybrid): мигрировано на helper.
     # historical_periods(exclude_types=['travel','baseline']) возвращает всю
@@ -544,18 +543,16 @@ def _build_clinical_history() -> str:
     # soft-deleted записи (#9, #17) исключены.
     periods = db.historical_periods(exclude_types=['travel', 'baseline'])
     if not periods:
-        # Для установки, требующей начальной истории, пустая periods означает
-        # незавершённую инициализацию → рейз. Отдельный новый профиль может законно
-        # не иметь истории: в этом случае показываем пустую секцию,
-        # сохраняя возможность сформировать остальной отчёт.
-        import os as _os
-        dd = _os.environ.get("HEALTH_DATA_DIR", "")
-        if dd and _os.path.basename(dd.rstrip("/")) != "health":
-            return "ИСТОРИЯ БОЛЕЗНИ: данных пока нет (новый профиль)."
-        raise RuntimeError(
-            "_build_clinical_history: periods пустая или нет валидных записей — "
-            "migrate на Studio не запускалась."
-        )
+        # Решение владельца 20.10 (вариант 3а): пустая история болезни НЕ роняет отчёт —
+        # ни у кого. Раньше падение оставляли «основному профилю» по имени папки данных
+        # (== health), и любая Docker-установка (/home/health/health) попадала туда же:
+        # у постороннего отчёт не собирался ни разу, а добавить период ему было нечем
+        # (отчёт друга 20.10). Пустота видна дважды: строкой в контексте отчёта и сбоем в
+        # журнале — его прочтёт ночная проверка, если пустота окажется поломкой, а не новизной.
+        import notify
+        notify.fault("gp_context._build_clinical_history: periods empty — clinical history "
+                     "not filled in, report built without it", person_key=None)
+        return "ИСТОРИЯ БОЛЕЗНИ: не заполнена — периодов болезней и лечения в базе нет."
     with db.get_conn() as conn:
         problems = conn.execute(
             "SELECT title, status FROM problem_list"

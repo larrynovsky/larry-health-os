@@ -100,8 +100,7 @@ async def _complete_task(message, context, task_id, resolved_text=None):
                                      resolved_text, "telegram_done")
         await message.reply_text(
             i18n.t("tasks.reply.answer_recorded", task_id=task_id)
-            if ok else await asyncio.to_thread(
-            notify.fault, f"handlers/tasks.py:record_answer failed task_id={task_id}", person_key="tasks.error.answer_not_saved")
+            if ok else await notify.afault(f"handlers/tasks.py:record_answer failed task_id={task_id}", person_key="tasks.error.answer_not_saved")
         )
         return   # вопрос закрыт ответом (record_answer) — второй раз не закрываем
         return
@@ -202,8 +201,7 @@ async def cmd_visit(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_long(bot, update.effective_chat.id, report)
     except Exception as e:
         log.error(f"cmd_visit: {e}", exc_info=True)
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/tasks.py:cmd_visit: {type(e).__name__}: {e}"))
+        await update.message.reply_text(await notify.afault(f"handlers/tasks.py:cmd_visit: {type(e).__name__}: {e}"))
 
 
 def register(app, owner_filter):

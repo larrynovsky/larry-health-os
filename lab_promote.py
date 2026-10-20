@@ -571,22 +571,28 @@ def plan(run_id: str, reject_file: str | None, execute: bool):
     # документа (первый бланк новой лаборатории законно приносит десятки имён), и
     # выдумывать его наперёд значило бы получить либо шум, либо ложный комфорт.
     # Предмет здесь — ВИДИМОСТЬ притока перед разрушающей записью, а не запрет.
-    old_keys = {(r["date"], lab_canon.normalize(r["test_name"]), r["specimen"])
-                for r in old_rows}
-    old_names = {lab_canon.normalize(r["test_name"]) for r in old_rows}
+    # Ключ покрытия старой строки — ДВА написания: нормализованное И записанное. Новая
+    # не-кровь несёт имя как есть (canonical_name, без normalize — см. выше), и старая
+    # строка того же файла лежит под ним же; сравнение только по normalize считало её
+    # «непокрытой», оставляло, и вставка падала на idx_lab_uniq (отчёт друга 20.10:
+    # «Индекс HOMA-IR», материал other, повторное «Добавить в базу» откатывалось целиком).
+    def _cover_keys(r):
+        return {(r["date"], lab_canon.normalize(r["test_name"]), r["specimen"]),
+                (r["date"], r["test_name"], r["specimen"])}
+    old_keys = set().union(*map(_cover_keys, old_rows))
+    old_names = {n for r in old_rows for n in (lab_canon.normalize(r["test_name"]), r["test_name"])}
     arrived = sorted(new_keys - old_keys)
     fresh_names = sorted({n for _d, n, _s in arrived if n not in old_names})
 
     lost = []
     lost_ids = set()
     for r in to_delete:
-        on = lab_canon.normalize(r["test_name"])
         # ЗАЩИТА ОТ ПОТЕРИ: сохраняем старое (date, аналит), которого нет в новом
         # прогоне. Условие `on not in new_names` УБРАНО (2026-07-01): оно стирало
         # историю аналита по ДРУГИМ датам, если прогон содержал его хоть на одной
         # дате → инкрементный промоут одного бланка выкашивал весь лонгитюд. Теперь
         # промоут заменяет ТОЛЬКО покрытые (date, аналит), остальные даты живут.
-        if (r["date"], on, r["specimen"]) not in new_keys:
+        if not (_cover_keys(r) & new_keys):
             lost.append((r["date"], r["test_name"], r["value"], r["source"]))
             lost_ids.add(r["id"])
 

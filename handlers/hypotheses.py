@@ -115,8 +115,7 @@ async def _confirm_hypothesis(message, hyp_id):
                                  reply_markup=protocol_keyboard([{"id": protocol_id}]))
     except Exception as e:
         log.error(f"generate_protocol: {e}", exc_info=True)
-        await message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/hypotheses.py:cmd_confirm id={hyp_id}: {type(e).__name__}: {e}", person_key="protocols.error.plan_failed"))
+        await message.reply_text(await notify.afault(f"handlers/hypotheses.py:cmd_confirm id={hyp_id}: {type(e).__name__}: {e}", person_key="protocols.error.plan_failed"))
 
 
 async def cmd_hreject(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -212,8 +211,7 @@ async def _hypothesis_query(message, hyp_id):
         await send_long(bot, message.chat_id, report)
     except Exception as e:
         log.error(f"cmd_hyp: {e}", exc_info=True)
-        await message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/hypotheses.py:cmd_hyp id={hyp_id}: {type(e).__name__}: {e}"))
+        await message.reply_text(await notify.afault(f"handlers/hypotheses.py:cmd_hyp id={hyp_id}: {type(e).__name__}: {e}"))
 
 
 
@@ -325,10 +323,8 @@ async def _evaluate_hypothesis(message, hyp_id):
             missing = False
             log.warning("hypothesis lookup failed: %s", lookup_error)
         text = (i18n.t("hypotheses.error.not_found", hypothesis_id=hyp_id) if missing else
-                await asyncio.to_thread(notify.fault,
-                    f"handlers/hypotheses.py:cmd_eval_hypothesis id={hyp_id}: {type(e).__name__}: {e}"))
+                await notify.afault(f"handlers/hypotheses.py:cmd_eval_hypothesis id={hyp_id}: {type(e).__name__}: {e}"))
         await message.reply_text(text)
     except Exception as e:
         log.error(f"cmd_eval_hypothesis #{hyp_id}: {e}", exc_info=True)
-        await message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/hypotheses.py:cmd_eval_hypothesis id={hyp_id}: {type(e).__name__}: {e}"))
+        await message.reply_text(await notify.afault(f"handlers/hypotheses.py:cmd_eval_hypothesis id={hyp_id}: {type(e).__name__}: {e}"))

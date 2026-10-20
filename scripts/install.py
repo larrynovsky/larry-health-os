@@ -507,6 +507,7 @@ DIGEST_DIR = "/app/outputs/weekly_digest"   # = weekly_digest.OUT_DIR в обр�
 REPORTS_NODE = "health-reports"          # узел приёмника отчётов о сбоях (нить bug-report)
 REPORTS_TS_VOLUME = "health_reports-ts"   # вход узла в tailnet
 REPORTS_VOLUME = "health_reports-data"    # сами отчёты — отдельно от любых данных владельца
+INBOX_URL = "http://bug-inbox:8766/report"  # приёмник изнутри сети compose (Funnel проксирует сюда же)
 
 
 def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp_base: "str | None" = None,
@@ -615,9 +616,14 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp
         # ночной разбор читает отчёты — только чтение
         services["cron"]["volumes"].append(f"{REPORTS_VOLUME}:/app/reports:ro")
         services["cron"]["environment"]["BUG_INBOX_DB"] = "/app/reports/reports.db"
+        # /bug владельца — в свой же приёмник по сети compose, а не через Funnel (решение владельца
+        # 19.10: проверить цепочку на своём боте). Сборка владельца не из выпуска, адрес в образе
+        # пуст; публичный адрес в дереве держать нельзя (перепись личного), внутренний — можно.
+        for name in ("bot", "cron"):
+            services[name].setdefault("environment", {})["HEALTH_BUG_RECEIVER"] = INBOX_URL
         extra["reports_serve.json"] = json.dumps({
             "TCP": {"443": {"HTTPS": True}},
-            "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/report": {"Proxy": "http://bug-inbox:8766/report"}}}},
+            "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/report": {"Proxy": INBOX_URL}}}},
             "AllowFunnel": {"${TS_CERT_DOMAIN}:443": True}}, indent=2)
     head = "# сгенерировано scripts/install.py --owner-override (этап 11 волны Б) — руками не править\n"
     doc = {"services": services}

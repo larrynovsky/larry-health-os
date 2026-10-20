@@ -38,11 +38,12 @@ def _load(file, names, **env):
 
 # fault и то, на чём он стоит (нить first-contact, 02.10: выбор текста по живости ремонта).
 _FAULT_NAMES = {"fault", "_faults_journal", "repairer_alive", "REPAIR_SEEN", "REPAIR_FRESH_S",
-                "_night_cycle_covered", "honest_key", "NIGHT_CYCLE_RECEIPT", "_exc_shape"}
+                "_night_cycle_covered", "honest_key", "NIGHT_CYCLE_RECEIPT", "_exc_shape",
+                "_caller_place", "_code_rel", "afault"}
 
 
 def _notify(operator):
-    return _load("notify.py", _FAULT_NAMES, Path=Path, os=os, __file__=str(ROOT / "notify.py"),
+    return _load("notify.py", _FAULT_NAMES, Path=Path, os=os, sys=sys, __file__=str(ROOT / "notify.py"),
                  secrets_dir=lambda: Path("invented-tenant"), notify_operator=operator)
 
 
@@ -74,7 +75,10 @@ class FaultRoutingTests(unittest.TestCase):
             self.assertEqual(person, i18n.t("common.error.our_side", "ru"))
             self.assertNotIn("FAKE_529", person)
             record = self.records()[-1]
-            self.assertEqual(set(record), {"ts", "code", "tenant", "where", "text"})
+            self.assertEqual(set(record), {"ts", "code", "tenant", "where", "text", "frames"})
+            # сбой без исключения несёт место позвавшего (нить bug-report-depth, 19.10)
+            self.assertEqual(record["frames"],
+                             ["tests/unit/test_fault_journal.py:test_fault_appends_one_record_and_preserves_person_return"])
             self.assertRegex(record["code"], r"^[0-9a-f]{6}$")   # код сбоя для человека (first-contact)
             self.assertEqual(record["where"], where)
             self.assertEqual(record["text"], tech[:500])
@@ -86,7 +90,7 @@ class FaultRoutingTests(unittest.TestCase):
 
     def test_default_journal_path_is_relative_to_repo(self):
         root = self.journal.parent
-        notify = _load("notify.py", _FAULT_NAMES, Path=Path, os=os,
+        notify = _load("notify.py", _FAULT_NAMES, Path=Path, os=os, sys=sys,
                        __file__=str(root / "notify.py"), secrets_dir=lambda: Path("invented-tenant"))
         with patch.dict(os.environ):
             os.environ.pop("HEALTH_FAULTS_JOURNAL", None)

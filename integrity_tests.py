@@ -8383,9 +8383,13 @@ def check_heldout_ready():
     _b = belief_contract.read_belief()
     _fam = ((((_b.get("data") or {}).get("gate") or {}).get("mc_gap") or {}).get("families") or {})
     q_lag_passed = int((_fam.get("q_lag") or {}).get("passed") or 0)
+    # Итоги confirm ЭТОЙ установки: без них карточка held-out не звонит (отчёт друга 20.10).
+    _ho = (((_b.get("data") or {}).get("gate") or {}).get("heldout") or {})
+    judged = (_ho.get("counts") or {}) if _ho.get("status") == "judged" else None
     parked = []
     for gate_id, summary in heldout_readiness.parks_due(
-            weeks, q_lag_passed, _sf.HELDOUT_FLOOR_WEEKS, frozen_at=str(fz), lang=i18n.lang_of()):
+            weeks, q_lag_passed, _sf.HELDOUT_FLOOR_WEEKS, frozen_at=str(fz), judged=judged,
+            lang=i18n.lang_of()):
         rec = parked_decisions.get(gate_id)
         if rec is not None and rec.get("status") == "resolved":
             continue   # владелец уже решил — не переоткрывать (park() рецидивит resolved)

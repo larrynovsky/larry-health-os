@@ -129,8 +129,7 @@ async def cmd_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ck.checkin_state.start(question)
         await update.message.reply_text(question + i18n.t("checkin.help.stop"), reply_markup=checkin_keyboard())
     except Exception as e:
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/meta.py:cmd_checkin: {type(e).__name__}: {e}"))
+        await update.message.reply_text(await notify.afault(f"handlers/meta.py:cmd_checkin: {type(e).__name__}: {e}"))
 
 
 def checkin_keyboard():
@@ -310,8 +309,7 @@ async def cmd_map(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await send_md(update.message.reply_text, text=i18n.t(
                 "labs.reply.alias_added", raw_name=raw_name, canonical=canonical))
         else:
-            await asyncio.to_thread(
-                notify.fault, "handlers/meta.py:cmd_map: pending review and lab format not found", person_key=None)
+            await notify.afault("handlers/meta.py:cmd_map: pending review and lab format not found", person_key=None)
 
 
 def register(app, owner_filter):

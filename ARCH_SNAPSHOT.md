@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.425 | **Дата:** 2026-10-19
+**Версия:** 15.429 | **Дата:** 2026-10-20
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -344,7 +344,7 @@ checkins_fts       -- виртуальная FTS5 таблица для полн
 <!-- GEN:MODULE_REGISTRY:START -->
 
 ## МОДУЛЬНЫЙ РЕЕСТР
-<!-- Авто-генерировано gen_blueprint.py 2026-10-19 -->
+<!-- Авто-генерировано gen_blueprint.py 2026-10-20 -->
 
 ### СЛОЙ ДАННЫХ
 ```
@@ -1167,10 +1167,10 @@ monthly_consilium            → _time_inject, cbcr_hypothesis, consilium_roster
 lab_intake_watcher           → _time_inject, daemon_liveness, doc_triage, genome_intake, hai_core, health_db, i18n, import_all, import_medical_events, infra_config, lab_backfill, lab_recognizer, link_fetch, llm_client, notify, plist_env_liveness, secrets_paths
 task_agent                   → _fmt_helpers, _time_inject, config_db, hai_core, health_db, i18n, lab_canon, labs_db, llm_client, location_signal, memory_facts_db, notify, reminders_backend, reminders_sync, secrets_paths
 generate_constitutions       → _time_inject, belief_contract, config_db, correlation_gate, doc_translation, food_profile, hai_core, health_db, i18n, infra_config, labs_db, llm_client, profile_reconciler, secrets_paths
+gp_context                   → _fmt_helpers, _time_inject, belief_contract, clinical_kb, correlation_gate, ecg_db, genome_context, health_db, i18n, lab_canon, labs_db, lifestyle_agents, notify, patient_context
 assessment_dialog            → _fmt_helpers, _time_inject, assessment_importer, assessment_scheduler, config_db, genome_intake, health_db, i18n, notify, problems_db, profile_db, secrets_paths, treatment_db
 brief_pipeline               → _time_inject, brief_cards, brief_gate, calendar_client, env_context, food_profile, genome_context, health_ai, health_db, location_signal, safety_net, trails, trend_alerts
 consult_prep                 → _time_inject, config_db, genome_context, hai_core, hai_hypotheses, health_db, i18n, infra_config, labs_db, llm_client, notify, patient_context, treatment_summary
-gp_context                   → _fmt_helpers, _time_inject, belief_contract, clinical_kb, correlation_gate, ecg_db, genome_context, health_db, i18n, lab_canon, labs_db, lifestyle_agents, patient_context
 night_cycle                  → _fmt_helpers, _time_inject, agent_reports_db, bug_inbox, finding_identity, i18n, morning_test_summary, night_investigator, notify, owner_gate, owner_nag, parked_decisions, weekly_digest
 getting_started              → _time_inject, brief_gate, food_quarterly, generate_constitutions, google_calendar_fetcher, health_db, i18n, labs_db, metrics_db, release_notice, secrets_paths, signal_family
 longitudinal_analysis        → _time_inject, belief_contract, correlation_gate, git_facts, health_db, i18n, lab_canon, metrics_db, notify, quarantine_db, secrets_paths, signal_family
@@ -1626,6 +1626,7 @@ XFAIL — известные баги, документированы как `pa
 ## ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ
 
 <!-- GEN:ARCH_LOG:START -->
+- `2026-10-20` — `gp_context` + зависимость: notify
 - `2026-10-19` — новый модуль `bug_inbox` (зависит от: bug_report); новый модуль `bug_outbox` (зависит от: bug_report, health_db); новый модуль `bug_report` (зависит от: health_db, notify, screen_trace, secrets_paths); `integrity_tests` + зависимость: bug_outbox (+3 изменений)
 - `2026-10-19` — `brief_pipeline` + зависимость: trend_alerts
 - `2026-10-15` — `mcp_tools` + зависимость: _time_inject

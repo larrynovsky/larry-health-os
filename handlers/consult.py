@@ -81,8 +81,7 @@ async def _start_consult(message, context, user_message):
         return CONSULTING
     except Exception as e:
         log.error(f"cmd_consult ОШИБКА: {type(e).__name__}: {e}\n{_tb.format_exc()}")
-        await message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/consult.py:cmd_consult: {type(e).__name__}: {e}"))
+        await message.reply_text(await notify.afault(f"handlers/consult.py:cmd_consult: {type(e).__name__}: {e}"))
         return ConversationHandler.END
 
 
@@ -129,8 +128,7 @@ async def cmd_consult_continue(update: Update, context: ContextTypes.DEFAULT_TYP
         return CONSULTING
     except Exception as e:
         log.error(f"cmd_consult_continue ОШИБКА: {type(e).__name__}: {e}\n{_tb.format_exc()}")
-        await update.message.reply_text(await asyncio.to_thread(
-                notify.fault, f"handlers/consult.py:cmd_consult_continue: {type(e).__name__}: {e}"))
+        await update.message.reply_text(await notify.afault(f"handlers/consult.py:cmd_consult_continue: {type(e).__name__}: {e}"))
         return CONSULTING
 
 

@@ -66,3 +66,12 @@ def test_trace_never_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("HEALTH_SCREEN_TRACE", str(tmp_path / "файл" / "trace.jsonl"))
     screen_trace.note("любой текст")                   # не бросает
     assert screen_trace.recent() == []
+
+
+def test_bug_conversation_itself_is_not_traced(screen_trace_file):
+    """Живой R-1 19.10: обе строки следа — сообщения самой /bug. След — о том, что было ДО неё."""
+    _send(i18n.t("bug.ask.category"))
+    assert not screen_trace_file.exists() or screen_trace_file.read_text() == ""
+    _send(i18n.t("onboarding.reply.stopped") + "\n\n" + i18n.t("bug.preview.none"))
+    rec = json.loads(screen_trace_file.read_text(encoding="utf-8").splitlines()[-1])
+    assert rec["keys"] == ["onboarding.reply.stopped"]

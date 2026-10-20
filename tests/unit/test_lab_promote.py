@@ -263,3 +263,33 @@ def test_newest_run_promotes_normally(db):
         ])
         c.commit()
     lab_promote.plan("fresh", None, execute=False)     # не должно бросить
+
+
+def test_повторное_добавление_не_крови_с_именем_вне_нормы(db):
+    """Отчёт друга 20.10 (значения выдуманы): строка не-крови (материал other) несёт имя
+    модели как есть — «Индекс HOMA-IR», а normalize сводит его к HOMA_IR. Старый ключ
+    покрытия считался по normalize, новый — по имени как есть: старая строка того же файла
+    оставалась «непокрытой», вставка падала на idx_lab_uniq, и всё добавление откатывалось."""
+    import lab_canon
+    import lab_promote
+    assert lab_canon.normalize("Индекс HOMA-IR") != "Индекс HOMA-IR"   # посылка теста
+    row = ("2025-03-11", "other", "Индекс HOMA-IR", "Индекс HOMA-IR", 3.2, "agree", "auto")
+    with db.get_conn() as c:
+        c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                  ("r1", "v", "lab_a.pdf", *row))
+        c.commit()
+    lab_promote.plan("r1", None, execute=True)
+    with db.get_conn() as c:
+        c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                  ("r2", "v", "lab_a.pdf", *row))
+        for name, val in (("RDW", 13.6), ("Glucose", 94.0)):
+            c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                      ("r2", "v", "lab_a.pdf", "2025-03-11", "cbc", name, name, val, "agree", "auto"))
+        c.commit()
+    r = lab_promote.plan("r2", None, execute=False)
+    assert "Индекс HOMA-IR" not in r["fresh_names"], r       # не «новое имя» и не «старое непокрытое»
+    assert r["lost"] == 1, r                                  # только Cholesterol фикстуры
+    lab_promote.plan("r2", None, execute=True)               # раньше: IntegrityError idx_lab_uniq
+    with db.get_conn() as c:
+        n = c.execute("SELECT COUNT(*) FROM lab_results WHERE test_name='Индекс HOMA-IR'").fetchone()[0]
+    assert n == 1

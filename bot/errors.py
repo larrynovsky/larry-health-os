@@ -41,8 +41,7 @@ async def _tell_person(update, err) -> None:
     person_key = ("person.llm.role_not_admitted" if isinstance(err, hai_core.ModelNotAdmitted)
                   else "common.error.our_side")
     try:
-        text = await asyncio.to_thread(
-            notify.fault, f"необработанная ошибка бота: {type(err).__name__}: {err}",
+        text = await notify.afault(f"необработанная ошибка бота: {type(err).__name__}: {err}",
             person_key=person_key, exc=err)
         await update.get_bot().send_message(chat_id=chat.id, text=text)
     except Exception as e:  # silent-ok: сообщить о сбое не удалось — лог уже есть выше

@@ -57,8 +57,11 @@ cd "$SCRIPT_DIR"
 
 # ── Утилиты ───────────────────────────────────────────────────────────────────
 
+# Место сбоя — «run_checks.<шаг>» (первое слово сообщения), а не голое «run_checks» (20.10,
+# карточка report:0caa7b): python -c не даёт кадра, и без шага pytest, integrity и arch_guard
+# сливались в отчёте /bug в один отпечаток «none в run_checks» — что сломано, не видно.
 record_fault() {
-    "$PY" -c 'import notify, sys; notify.fault("run_checks: " + sys.argv[1], person_key=None)' "$1"
+    "$PY" -c 'import notify, re, sys; m = sys.argv[1]; step = re.sub(r"[^a-z0-9_]", "_", m.split()[0].lower()); notify.fault(f"run_checks.{step}: {m}", person_key=None)' "$1"
 }
 
 # --- pytest_diff begin ---
@@ -175,7 +178,7 @@ if [[ "$SCHEDULED" == "true" ]]; then
         fi
         echo "$(date '+%Y-%m-%d %H:%M:%S') [scheduled $TAG] ${SUMMARY:-0 FAIL}" >> "$LOG"
         if [[ -n "$SUMMARY" ]]; then
-            "$PY" -c 'import notify; notify.fault("run_checks: tenant integrity failed; see tenant artifact", person_key=None)' || true
+            "$PY" -c 'import notify; notify.fault("run_checks.tenant_integrity: tenant integrity failed; see tenant artifact", person_key=None)' || true
         fi
         $PY oura_freshness_check.py --notify >> "$LOG" 2>&1 || true
         $PY model_health_check.py --daily --notify >> "$LOG" 2>&1 || true

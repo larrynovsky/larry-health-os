@@ -3864,6 +3864,17 @@ def _migrate_patient_profile_and_config():
         # который стоял в lab_promote; сид его переносит, а не переоценивает.
         # Зеркало в коде — lab_promote._SPREAD_FALLBACK, держится равным
         # coherence-тестом (резерв, а не альтернативная норма).
+        # Дата рождения установки (нить triage-cost-leak, 23.10.2026). Единственное, что
+        # отличает «отчётов ещё не было» у установки трёх дней от пропажи отчёта у
+        # установки трёх месяцев, — её возраст; возраст ДАННЫХ им быть не может: владелец
+        # и любой тенант с импортом истории Apple Health носят строки 2015 года с первого
+        # дня. OR IGNORE: пишется ровно один раз, при первом init_db на пустой базе; у
+        # старых установок появится при первом запуске после обновления — безвредно,
+        # грейс действует только когда отчётов нет вовсе. Читатель —
+        # integrity_tests.check_gp_reports.
+        conn.execute(
+            """INSERT OR IGNORE INTO system_config (key, value_text, category, source)
+               VALUES ('install.first_run', date('now'), 'install', 'code_seed')""")
         conn.execute(
             """INSERT OR IGNORE INTO system_config (key, value_num, category, source)
                VALUES ('lab.conflict_spread', 0.01, 'lab', 'code_seed')""")

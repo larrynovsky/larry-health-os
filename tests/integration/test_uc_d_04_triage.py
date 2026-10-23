@@ -104,14 +104,25 @@ def test_fail_does_not_trigger_autofix(triage_env):
 # ── E (cross-check): автофиксы ──────────────────────────────────────────────
 
 
-def test_warn_gp_report_triggers_popen(triage_env):
-    """WARN «GP-отчёт отсутствует» → Popen(gp_agent.py weekly)."""
+def test_gp_report_absent_launches_nothing(triage_env):
+    """FAIL «GP-отчёт отсутствует» → НИ Popen, НИ fault (контракт 23.10.2026).
+
+    До этого триаж спавнил `gp_agent.py weekly`, чей дефолт — полный консилиум на
+    Opus. У свежей установки датчик красный по построению до первого воскресенья,
+    и консилиум шёл каждое утро (отчёт с GitHub, v0.2.4: ~$17 за неделю, лимит API,
+    бот встал). Провал читает ночной цикл из integrity_latest.json; второй журнал
+    сбоев был бы дублём (решение владельца 28.09). Мутация «вернуть Popen» красная.
+    """
     _write_integrity(triage_env, failures=[
         ["GP-отчёт отсутствует или короткий", "0 chars"]
     ])
-    triage_env["ta"].run_triage(send_user_questions=False)
-    assert any("gp_agent" in " ".join(c) for c in triage_env["popen"]), \
-        f"gp_agent.py weekly не запущен. Popen calls: {triage_env['popen']}"
+    res = triage_env["ta"].run_triage(send_user_questions=False)
+    assert triage_env["popen"] == [], \
+        f"GP-провал запустил процесс: {triage_env['popen']} — это платный консилиум"
+    assert res["auto_fixed"] == [], res
+    assert triage_env["faults"] == [], "triage must not re-journal integrity findings"
+    log = (triage_env["ta"].LOG_FILE).read_text(encoding="utf-8")
+    assert "авто-генерации нет" in log, log
 
 
 def test_warn_genome_update_stays_in_artifact_not_autofixed(triage_env):
@@ -155,21 +166,23 @@ def test_warn_old_labs_asks_user(triage_env):
 def test_idempotent_per_day(triage_env):
     """Повторный вызов в тот же день — no-op (через flag).
 
-    Через GP-провал: genome больше не спавнит Popen (см. выше), а GP — спавнит,
-    поэтому идемпотентность Popen проверяем именно на нём.
+    Popen из триажа больше нет ни у genome, ни у GP (23.10.2026), поэтому
+    идемпотентность судим по журналу: второй вызов пишет только «уже выполнен».
     """
     _write_integrity(triage_env,
                       failures=[["GP-отчёт отсутствует или короткий", "0 chars"]])
+    log_file = triage_env["ta"].LOG_FILE
 
-    # Первый вызов
+    # Первый вызов — полный проход, маркер дня поставлен
     triage_env["ta"].run_triage(send_user_questions=False)
-    first_count = len(triage_env["popen"])
-    assert first_count >= 1, "первый вызов должен был запустить Popen"
+    first = log_file.read_text(encoding="utf-8")
+    assert "DONE:" in first, first
 
-    # Второй вызов в тот же день — flag-файл блокирует
+    # Второй вызов в тот же день — flag-файл блокирует до любой работы
     triage_env["ta"].run_triage(send_user_questions=False)
-    assert len(triage_env["popen"]) == first_count, \
-        "второй вызов триггернул Popen — нет идемпотентности"
+    second = log_file.read_text(encoding="utf-8")[len(first):]
+    assert "уже выполнен сегодня" in second, second
+    assert "DONE:" not in second, "второй вызов прошёл весь триаж — нет идемпотентности"
 
 
 def test_idempotent_flag_filename_uses_today(triage_env):

@@ -137,7 +137,10 @@ def is_model_not_found(exc: BaseException) -> bool:
 # Подстроки отказа по счёту у трёх SDK — по известным текстам ошибок, НЕ замер на живом пустом
 # ключе (05.10): OpenAI — 429 с кодом insufficient_quota, Anthropic — 400 «credit balance is too
 # low», Gemini — 429 RESOURCE_EXHAUSTED (он же бывает при частоте запросов — тогда повтор тоже прав).
-_ACCOUNT_MARKERS = ("insufficient_quota", "credit balance", "resource_exhausted", "billing")
+# «usage limits» — Anthropic 400 «You have reached your specified API usage limits» (лимит,
+# выставленный владельцем ключа в консоли; отчёт с GitHub 23.10, v0.2.4): чинит тоже человек.
+_ACCOUNT_MARKERS = ("insufficient_quota", "credit balance", "resource_exhausted", "billing",
+                    "usage limits")
 
 
 def is_account_problem(exc: BaseException) -> bool:
@@ -458,10 +461,39 @@ def _log_thinking(create, task, kw, resp, attempts):
         logging.getLogger(__name__).warning("учёт думания не записан: %r", e)
 
 
+def _log_plain(task, kw, resp):
+    """Вызов без думания — тоже в журнал расходов (нить triage-cost-leak, 23.10.2026).
+    До этого писался только думающий путь, и по журналу нельзя было увидеть полный
+    расход: отчёт с GitHub (v0.2.4) насчитал по нему ~$17 за неделю, а лимит API
+    кончился раньше — остальное шло мимо. Только числа, текст ответа не пишется;
+    сбой учёта не роняет вызов. count_tokens здесь нет: это был бы платный вызов
+    на каждый ответ (у думающего пути он нужен ради доли думания, здесь делить нечего)."""
+    try:
+        import api_spend_log
+        usage = getattr(resp, "usage", None)
+        api_spend_log.log_call(agent=str(task), model=getattr(resp, "model", kw.get("model")),
+                               tokens_in=getattr(usage, "input_tokens", 0) or 0,
+                               tokens_out=getattr(usage, "output_tokens", 0) or 0,
+                               extra={"mode": "plain", "answer_limit": int(kw.get("max_tokens") or 0),
+                                      "stop": getattr(resp, "stop_reason", None)})
+    except Exception as e:  # noqa: BLE001 — учёт не роняет вызов, но и не молчит
+        import logging
+        logging.getLogger(__name__).warning("учёт вызова не записан: %r", e)
+
+
 def _create_with_mode(create, kw: dict, task):
     first, retry = _thinking_plan(kw, task)
     if retry is None:
-        return create(**first)
+        resp = create(**first)
+        import inspect
+        if inspect.isawaitable(resp):
+            async def _async_plain():
+                r = await resp
+                _log_plain(task, first, r)
+                return r
+            return _async_plain()
+        _log_plain(task, first, resp)
+        return resp
     send = _streamed(create)
     resp = send(**first)
     import inspect

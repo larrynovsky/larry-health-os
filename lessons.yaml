@@ -3729,3 +3729,25 @@ lessons:
   evidence:
   - docs/handoff/bug-report/2026-10-19-440fef3.md
   owner: владелец
+- id: C-183
+  date: '2026-10-23'
+  thread: triage-cost-leak
+  event: 'Авто-фикс триажа «GP-отчёт отсутствует» запускал `gp_agent.py weekly`, чей дефолт — полный консилиум на Opus (35 вызовов, ~750k токенов). У новой установки датчик «GP ≤ 8 дней» красный по построению до первого воскресенья, и консилиум шёл каждое утро, пока gp_weekly не сохранится; причина несохранения жила только в логе процесса (отчёт с GitHub, v0.2.4).'
+  cost: '~$17 за неделю у тенанта, лимит API, бот встал до начала месяца; у владельца ~$14 за один такой запуск'
+  cause: 'авто-ремонт без safe-предиката (§13 (a): ПОЧЕМУ отчёта нет — неизвестно; по логу репортёра — RuntimeError сторожа periods под владельца, уже закрытый в friend-fixes) и с платным повторяемым действием (§13 (d)); датчик не различал «отчётов ещё не было» у новорождённой установки и «отчёт пропал» у взрослой'
+  address:
+    kind: runtime
+    ref: triage_agent.py::run_triage
+  subject:
+  - hypothesis_before_fact
+  - sensor_perimeter
+  - state_lifetime
+  outcome:
+    kind: rule
+    text: 'красный датчик у установки — не триггер платного действия, пока его причина не названа механизмом; «ещё не было» и «пропало» — разные события, различает возраст установки (install.first_run), а не возраст данных; несохранённый результат — событие (notify.fault), не строка лога; оракулы tests/unit/test_triage_cost_leak.py и test_uc_d_04_triage::test_gp_report_absent_launches_nothing, 4 мутации красные'
+  status: adopted
+  adopted_on: '2026-10-23'
+  change: git:598c40d
+  evidence:
+  - docs/explanation/warn_delivery_rail.md
+  owner: владелец

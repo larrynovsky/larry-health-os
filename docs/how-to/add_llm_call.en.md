@@ -5,6 +5,8 @@
 
 1. Get the client via `llm_client.guarded_client()` (or `hai_core.get_client()`). There is no other
    way out to a model: the secrets guard sits on this client.
+   It also records every call in `logs/agent_api_spend.log` (since 23.10 including non-thinking calls,
+   `mode: plain`): do not add your own `api_spend_log.log_call` next to the call — it would write a second line for the same call.
 2. Name the task in the call and set the answer length:
 
    ```python

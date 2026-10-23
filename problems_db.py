@@ -170,12 +170,8 @@ def _plain_llm(text: str) -> str:
     resp = llm_client.guarded_client().messages.create(task="problems_db._plain_llm",
         model=model, max_tokens=200, system=_PLAIN_SYSTEM + __import__("hai_core").answer_language(),
         messages=[{"role": "user", "content": text[:1500]}])
-    try:
-        import api_spend_log
-        api_spend_log.log_call(agent="problem_plain", model=resp.model or model,
-                               tokens_in=resp.usage.input_tokens, tokens_out=resp.usage.output_tokens)
-    except Exception as e:  # noqa: BLE001 — журнал трат не должен ронять предложение
-        log.warning("problem_plain: журнал трат не записан: %s", e)
+    # Журнал трат пишет сам llm_client на каждый вызов (23.10.2026); локальная запись
+    # «problem_plain» давала бы вторую строку на тот же вызов.
     return llm_client.answer_text(resp).strip()
 
 

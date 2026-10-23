@@ -426,7 +426,13 @@ def _save_gp_report(report_type: str, end_date: date, content: str, period_days:
             period_days=period_days,
         )
     except Exception as e:
-        log.warning(f"Не удалось сохранить GP отчёт: {e}")
+        # Несохранённый отчёт — событие, не строка лога (23.10.2026): пока отчёта нет в
+        # agent_reports, датчик «GP ≤ 8 дней» красный, и до этой правки триаж в ответ
+        # гонял платный консилиум каждое утро, а причина жила только в warning, который
+        # никто не читал (отчёт с GitHub: три утра подряд mdt_weekly есть, gp_weekly нет).
+        import notify
+        notify.fault(f"gp_agent._save_gp_report: {report_type} for {end_date} not saved: "
+                     f"{type(e).__name__}: {e}", person_key=None)
 
 
 # ── Публичный API ─────────────────────────────────────────────────────────────
@@ -535,6 +541,20 @@ class _AbsentClaimRejected(RuntimeError):
     """Отказ сторожа «не сдавался»: отчёт не публикуется, прошлый остаётся."""
 
 
+def _rejection_is_an_event(kind: str, rej: BaseException) -> None:
+    """Отказ сторожа — в журнал сбоев, не только в лог (23.10.2026, §13 «детект без
+    доставки недопустим»). Отклонённый отчёт нигде не сохраняется, датчик «GP ≤ 8 дней»
+    краснеет через неделю, и единственное объяснение жило в ERROR-строке лога процесса,
+    который у Docker-установки никто не открывает. Ключ человеку не нужен: текст «⛔ …»
+    получатель уже видит в ответе, а здесь — след для ночного цикла и отчёта о сбое."""
+    try:
+        import notify
+        notify.fault(f"gp_agent.{kind}: report rejected by the absent-claims guard: {rej}",
+                     person_key=None)
+    except Exception as _e:  # noqa: BLE001 — учёт отказа не должен прятать сам отказ
+        log.warning(f"gp {kind}: отказ не записан в журнал сбоев: {_e!r}")
+
+
 def generate_weekly_report(end_date: date = None, run_mdt: bool = True) -> str:
     """
     Еженедельный GP отчёт.
@@ -597,6 +617,7 @@ def generate_weekly_report(end_date: date = None, run_mdt: bool = True) -> str:
         report = _guard_absent_claims(report, context, _build_gp_system_prompt(), client,
                                       hai_core.get_model("sonnet"), 4096, "weekly")
     except _AbsentClaimRejected as _rej:
+        _rejection_is_an_event("weekly", _rej)
         return f"⛔ {_rej}"
 
     # 5. Сохраняем
@@ -658,6 +679,7 @@ def generate_monthly_report(end_date: date = None) -> str:
         report = _guard_absent_claims(report, context, _build_gp_monthly_prompt(), client,
                                       hai_core.get_model("sonnet"), 6000, "monthly")
     except _AbsentClaimRejected as _rej:
+        _rejection_is_an_event("monthly", _rej)
         return f"⛔ {_rej}"
 
     # data-in-code-9 инкремент 4: месячная сводка-diff сгенерированного рулбука (обзор, НЕ гейт).

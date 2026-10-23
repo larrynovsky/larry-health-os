@@ -167,3 +167,57 @@ be written under the same condition — or one of them cannot serve as an oracle
 this is cheap: ask each artifact under what conditions it will NOT be written, and
 compare the answers. If they differ and a reader compares the artifacts against each other, divergence
 is not hypothetical — it is a matter of time.
+
+## Triage repairs nothing: how an auto-fix paid for someone else's silence (2026-10-23)
+
+A GitHub report (v0.2.4, Docker): on a fresh install, triage launched `gp_agent.py weekly`
+every morning, and that command defaults to a full Opus consilium (35 calls, ~750k input
+tokens; ~$14 per run for the owner, ~$4 for a new tenant). A week cost ~$17, hit the API
+limit, and the bot stopped until the next month.
+
+The mechanism is not a bug in the auto-fix code but in its premise. The sensor "GP report
+exists and is ≤ 8 days old" is red **by construction** on an install made on Wednesday: the
+first report is born on Sunday (Sat 23:00 `specialists_run` → Sun 07:00 `weekly_report`).
+Triage read that red as breakage and "repaired" it — paid, every morning, until `gp_weekly`
+got saved. And if the Sunday path did not save (the "never tested" guard refused, a write
+failed), the reason lived only in `log.error`/`log.warning` of a process nobody opens on a
+Docker install — the loop had no end.
+
+What exactly kept `gp_weekly` from being saved on the reporter's install was measured from his
+`gp_agent_triage.log` (18, 19, 20.10): the consilium ran and was paid for, `mdt_weekly` was
+written, then `generate_weekly_report` crashed **before calling the model** —
+`gp_context._build_clinical_history` raised `RuntimeError` on an empty `periods` table ("migrate
+on Studio was not run" — a guard written for the owner). The bot's Sunday path on 18.10 07:00
+failed in the same place. That is the same person's report of 20.10, closed in the `friend-fixes`
+thread (owner decision 20.10: an empty history fails nobody's report) and shipped in v0.2.4; the
+18–20.10 runs were on an earlier version, and on 23.10 with v0.2.4 `gp_weekly` was saved. Two
+defects, one loop: a guard written for the owner made the report impossible for a newcomer, and
+triage paid for every attempt.
+
+The owner never hit the loop: in six months the auto-fix fired once (25.04), and since June
+the Sunday path produced 21 of 21 `mdt_weekly → gp_weekly` pairs. That is the argument
+against "repair less often": the event a regeneration cures has a measured frequency of
+zero on a mature install, and on a newborn it is not an event but the normal state.
+
+Under §13 the auto-repair failed the envelope twice: (a) no safe predicate — triage does not
+know *why* the report is missing (same case as `genome_update` on 2026-06-29:
+Diagnose-don't-Repair); (d) a paid, repeatable action with no recurrence trace. Done:
+
+- `triage_agent` launches nothing on "GP report…": a line in `triage.log`; the failure stays
+  in `integrity_latest.json`, which the night cycle reads (a second fault entry would be a
+  duplicate, owner decision 28.09);
+- an unsaved report is an event: guard refusal and write failure call `notify.fault`
+  (`gp_agent.weekly`, `gp_agent._save_gp_report`), not only the log;
+- the "GP ≤ 8 days" sensor knows the install's age: key `install.first_run` (seeded once by
+  `init_db`) — an install younger than the threshold with no report at all gets a warn, not
+  a fail; a mature install that lost its report still fails. The age of **data** cannot
+  serve here: the owner and any tenant importing history carry 2015 rows from day one;
+- the spend journal `agent_api_spend.log` records every model call (`mode: plain` and
+  `think`), not only thinking ones: before, the full spend could not be counted from it;
+- "You have reached your specified API usage limits" is an account problem
+  (`llm_client.is_account_problem`), not a document problem.
+
+Oracles: `tests/integration/test_uc_d_04_triage.py::test_gp_report_absent_launches_nothing`,
+`tests/unit/test_triage_cost_leak.py`, `tests/unit/test_llm_task_modes.py` (plain-call
+journal). Mutations "restore Popen", "refusal without event", "grace by window instead of
+ever", "drop plain accounting" — all red.

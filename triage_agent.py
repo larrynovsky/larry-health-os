@@ -5,7 +5,7 @@ triage_agent.py — автономный разбор integrity-предупре
 Вызывается из ночного цикла (run_triage_guarded); до 13.07 — из morning_report.py, модуль удалён 30.09.
 Логика:
   - Читает logs/integrity_latest.json
-  - Авто-фиксит то, что можно (GP отчёт, genome_update_agent)
+  - Ничего не чинит сам: авто-фиксы GP-отчёта и genome_update сняты (§13, 29.06 и 23.10)
   - Возвращает вопросы, требующие решения пользователя
   - Технические находки остаются в артефакте для ночного цикла
 
@@ -16,7 +16,6 @@ import json
 import i18n
 import notify
 import re
-import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -415,21 +414,21 @@ def run_triage(send_user_questions: bool = True, require_today: bool = False) ->
 
     failure_names = {f[0] for f in failures}
 
-    # ── Авто-фикс: GP отчёт отсутствует или слишком короткий ────────────────
-    gp_broken = any("GP-отчёт" in n for n in failure_names)
-    if gp_broken:
-        log_path = SCRIPT_DIR / "logs" / "gp_agent_triage.log"
-        _log("AUTO: gp_agent.py weekly — запуск")
-        try:
-            subprocess.Popen(
-                [sys.executable, str(SCRIPT_DIR / "gp_agent.py"), "weekly"],
-                stdout=open(log_path, "a"), stderr=subprocess.STDOUT,
-                cwd=str(SCRIPT_DIR)
-            )
-            auto_fixed.append("GP отчёт: генерация запущена (готово ~2 мин)")
-            _log("AUTO: gp_agent.py weekly — запущен")
-        except Exception as e:
-            _log(f"AUTO ERROR: gp_agent: {e}")
+    # ── GP-отчёт отсутствует: НЕ авто-фиксим (CLAUDE.md §13, конверт (a) и (d)) ──
+    # До 23.10.2026 здесь стоял `Popen(gp_agent.py weekly)` — а дефолт weekly зовёт
+    # ПОЛНЫЙ консилиум на Opus (35 вызовов, ~750k токенов, ~$14 у владельца; ~$4 у
+    # нового тенанта). Отчёт о сбое с GitHub (v0.2.4, Docker): у свежей установки
+    # датчик «GP ≤ 8 дней» красный ПО ПОСТРОЕНИЮ до первого воскресенья, триаж
+    # принимал это за поломку и запускал консилиум каждое утро, пока gp_weekly не
+    # сохранился; за неделю — ~$17 и лимит API, бот встал. Замер на Studio 23.10:
+    # у владельца авто-фикс сработал один раз за полгода (25.04) — воскресный путь
+    # (сб 23:00 specialists_run → вс 07:00 weekly_report, run_mdt=False) дал 21/21
+    # пар mdt_weekly→gp_weekly с июня. Чинить здесь нечего: причина отсутствия
+    # отчёта неизвестна (нет тотального safe-предиката), действие платное и
+    # повторяемое. Провал остаётся в integrity_latest.json — его читает ночной
+    # цикл (решение владельца 28.09); второй раз в журнал сбоев не кладём.
+    if any("GP-отчёт" in n for n in failure_names):
+        _log("INFO: GP-отчёт отсутствует — авто-генерации нет (§13), читает ночной цикл")
 
     # ── genome_update: НЕ авто-фиксим (CLAUDE.md §13: Diagnose-don't-Repair) ─
     # До 2026-06-29 здесь был subprocess.Popen genome_update_agent с пометкой

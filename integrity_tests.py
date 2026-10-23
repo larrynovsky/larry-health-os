@@ -349,6 +349,25 @@ def check_gp_reports():
     # — тот же дрейф, что чинил Q-1 у соседнего check_report_content.
     gp_window = today - timedelta(days=GP_WEEKLY_MAX_AGE_DAYS)
     reports = db.get_reports_with_findings(str(gp_window), agent_type="gp")
+    if not reports:
+        # Грейс новорождённой установки (нить triage-cost-leak, 23.10.2026). У тенанта,
+        # поставившего систему в среду, GP-отчёта нет по построению до воскресенья, и
+        # красный датчик здесь был не находкой, а триггером: триаж «чинил» его полным
+        # консилиумом на Opus каждое утро (отчёт с GitHub, v0.2.4: ~$17 за неделю, лимит
+        # API). Возраст — от install.first_run (сид init_db), НЕ от возраста данных:
+        # импорт истории Apple Health приносит строки 2015 года в первый же день.
+        # Грейс только когда отчётов НЕТ ВОВСЕ (не в окне, а вообще): пропавший отчёт у
+        # взрослой установки по-прежнему красный.
+        import config_db as _cfg
+        born = _cfg.get_config("install.first_run")
+        any_report = db.get_reports_with_findings("1970-01-01", agent_type="gp")
+        if born and not any_report:
+            age = (today - date.fromisoformat(str(born)[:10])).days
+            if age <= GP_WEEKLY_MAX_AGE_DAYS:
+                warn("GP-отчёт есть и не старше 8 дней",
+                     f"установка младше {GP_WEEKLY_MAX_AGE_DAYS} дн. ({age} дн.), отчётов ещё "
+                     f"не было — первый ждём в воскресенье")
+                return None
     assert reports, "нет ни одного GP-отчёта в agent_reports"
     # До 21.09 get_reports_with_findings сортировала по (agent_type, agent_name), не
     # по дате. Теперь — свежие первыми; явная сортировка оставлена: датчик не должен

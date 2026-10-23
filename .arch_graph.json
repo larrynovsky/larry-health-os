@@ -458,6 +458,7 @@
     "lifestyle_agents",
     "llm_client",
     "location_signal",
+    "notify",
     "patient_context",
     "promethease_context",
     "safety_net",
@@ -1159,7 +1160,6 @@
   ],
   "problems_db": [
     "_time_inject",
-    "api_spend_log",
     "clinical_kb",
     "hai_core",
     "health_db",

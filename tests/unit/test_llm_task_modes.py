@@ -205,13 +205,50 @@ def test_thinking_call_streams_and_records_thinking(monkeypatch, tmp_path):
     assert rec["agent"] == "monthly_consilium._run_coordinator" and rec["think_tokens"] == 10
 
 
-def test_read_call_stays_a_plain_create(monkeypatch, tmp_path):
+def test_read_call_stays_a_plain_create_and_is_still_counted(monkeypatch, tmp_path):
+    """Вызов без думания идёт обычным create — и ТОЖЕ попадает в журнал расходов
+    (нить triage-cost-leak, 23.10.2026): до этого журнал видел только думающий путь, и
+    по нему нельзя было сосчитать полный расход (отчёт с GitHub, v0.2.4)."""
     log = _spend_log(monkeypatch, tmp_path)
     monkeypatch.setattr(llm_client, "reasoning_reserve", lambda m: 30000)
-    fake = StreamingFake([TEXT])
+    fake = StreamingFake([NS(stop_reason="end_turn", model="claude-opus-5",
+                             usage=NS(input_tokens=7, output_tokens=3),
+                             content=[NS(type="text", text="ok")])])
     llm_client._GuardedMessages(fake, "anthropic").create(
         task="weekly_digest._judge_leaks", model="claude-opus-5", max_tokens=5, messages=[])
-    assert fake.created and not fake.streamed and not log.exists()
+    assert fake.created and not fake.streamed
+    rec = json.loads(log.read_text().splitlines()[-1])
+    assert rec["agent"] == "weekly_digest._judge_leaks" and rec["mode"] == "plain"
+    assert (rec["tokens_in"], rec["tokens_out"], rec["model"]) == (7, 3, "claude-opus-5")
+
+
+def test_async_plain_call_is_counted_too(monkeypatch, tmp_path):
+    """Консилиум — асинхронный клиент и самый дорогой путь: без учёта здесь журнал снова
+    слеп ровно там, где уходят деньги."""
+    log = _spend_log(monkeypatch, tmp_path)
+    monkeypatch.setattr(llm_client, "reasoning_reserve", lambda m: 0)
+    reply = NS(stop_reason="end_turn", model="claude-opus-5",
+               usage=NS(input_tokens=11, output_tokens=2), content=[NS(type="text", text="ok")])
+
+    class AsyncFake:
+        async def create(self, **kw):
+            return reply
+
+    r = asyncio.run(llm_client._GuardedMessages(AsyncFake(), "anthropic").create(
+        task="wellally_consult._call_medical_specialist_async", model="claude-opus-5",
+        max_tokens=400, messages=[]))
+    assert r is reply
+    rec = json.loads(log.read_text().splitlines()[-1])
+    assert rec["agent"] == "wellally_consult._call_medical_specialist_async"
+    assert rec["mode"] == "plain" and rec["tokens_in"] == 11
+
+
+def test_plain_call_counting_never_breaks_the_call(monkeypatch, tmp_path):
+    """Ответ без usage (фейк, чужой SDK) — вызов возвращается, учёт не роняет."""
+    _spend_log(monkeypatch, tmp_path)
+    monkeypatch.setattr(llm_client, "reasoning_reserve", lambda m: 0)
+    g, fake = _msgs([TEXT], monkeypatch, reserve=0)
+    assert g.create(task="hai_chat.chat", model="some-unknown-model", max_tokens=10, messages=[]) is TEXT
 
 
 def test_async_thinking_call_streams(monkeypatch, tmp_path):

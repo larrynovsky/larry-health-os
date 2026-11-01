@@ -834,12 +834,13 @@ def main(argv: list[str] | None = None) -> int:
         print(_EFLM_ABSENT_LINE)
     if a.fetch_ctcae:
         # Документ берётся у NCI на машине установки, в репозиторий не кладётся (коды MedDRA,
-        # NOTICE.md; решение владельца 2026-09-25). Сеть упала — установка не падает: safety_net
-        # честно работает на резерве, а повтор — та же команда с --fetch-ctcae.
+        # NOTICE.md; решение владельца 2026-09-25). Сеть упала — установка не падает,
+        # но у свежей установки без прежнего снимка CTCAE нет и резерва порогов.
         r = subprocess.run([sys.executable, "-c", "import norm_documents; print(norm_documents.fetch_ctcae())"],
                            cwd=ROOT, env=env)
         if r.returncode:
-            print("CTCAE: скачать не удалось — пороги safety_net будут на резерве; "
+            print("CTCAE: скачать не удалось — без ранее загруженного снимка срочные сигналы "
+                  "по абсолютным порогам анализов выключены; "
                   "повторите установку с --fetch-ctcae, когда будет сеть")
     if a.files_only:
         # Сборка образа (docker-install, этап 5): машина сборки не основная, и предохранитель

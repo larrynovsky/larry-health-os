@@ -124,6 +124,45 @@ def test_база_установки_только_владельцу(tmp_path):
     assert stat.S_IMODE(db.stat().st_mode) == 0o600
 
 
+@pytest.mark.parametrize("existing_snapshot", [False, True])
+def test_failed_ctcae_fetch_does_not_promise_fallback(tmp_path, monkeypatch, capsys, existing_snapshot):
+    """A fresh install has no CTCAE fallback; a failed update must also preserve existing data."""
+    import subprocess
+    import sys
+    import norm_documents
+
+    root = tmp_path / "repo"
+    snapshot = root / norm_documents.CTCAE_SNAPSHOT.relative_to(install.ROOT)
+    previous = '{"synthetic": true}\n'
+    if existing_snapshot:
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_text(previous)
+    monkeypatch.setattr(install, "ROOT", root)
+    monkeypatch.setattr(install, "exclude_from_git", lambda paths: [])
+    called = []
+
+    def unavailable(command, **kwargs):
+        assert command == [sys.executable, "-c", "import norm_documents; print(norm_documents.fetch_ctcae())"]
+        called.append(command)
+        return subprocess.CompletedProcess(command, 1)
+
+    monkeypatch.setattr(install.subprocess, "run", unavailable)
+    assert install.main([
+        "--apply", "--non-interactive", "--files-only", "--fetch-ctcae", "--tz", "UTC",
+        "--data-dir", str(tmp_path / "data"), "--secrets-dir", str(tmp_path / "secrets"),
+    ]) == 0
+    message = next(line for line in capsys.readouterr().out.splitlines() if line.startswith("CTCAE:"))
+    assert "без ранее загруженного снимка" in message
+    assert "выключены" in message
+    assert "--fetch-ctcae" in message
+    assert "на резерве" not in message
+    assert len(called) == 1
+    if existing_snapshot:
+        assert snapshot.read_text() == previous
+    else:
+        assert not snapshot.exists()
+
+
 # ── Второй человек (--tenant, 28.09) ─────────────────────────────────────────
 _T = {**_V, "DATA": "/Users/zz/health_t2", "SECRETS": "/Users/zz/.health_secrets_t2",
       "TZ": "Europe/Berlin"}

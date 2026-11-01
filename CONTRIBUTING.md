@@ -52,6 +52,12 @@ It installs pinned dependencies in a virtual environment and generates missing
 runtime templates before tests. Choose tests for the affected behavior and its
 failure paths; broaden validation when the change warrants it.
 
+Public `tutorial` CI also runs selected MCP authorization, tool, and bug-report
+contract tests in the image built from the proposed revision. That test container
+has no installation volumes or live credentials, and external networking is
+disabled. The selected test files and command live in
+[the workflow](.github/workflows/tutorial.yml).
+
 Tests marked `owner_data` are skipped in the public copy because the author's
 private data is absent. Tell us what you ran and what passed or failed.
 

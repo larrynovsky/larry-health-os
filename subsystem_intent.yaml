@@ -3125,7 +3125,7 @@
         file: health_mcp.py
         present: ["if not store.verify(tok, res):"]
     - id: redirect_exact_list
-      claim: "Код входа уходит только на адреса возврата Claude и ChatGPT из точного списка; поддомен-двойник, http, «..» и параметры в пути отвергаются — иначе открытый редирект отдал бы код чужому. Вход требует PKCE S256 и наш resource; код одноразовый и привязан к клиенту и адресу. Тесты test_redirect_allowlist, test_code_needs_pkce_and_is_single_use, test_begin_requires_s256_registered_redirect_and_own_resource."
+      claim: "Код входа уходит только на адреса возврата Claude и ChatGPT из точного списка; поддомен-двойник, http, «..» и параметры в пути отвергаются — иначе открытый редирект отдал бы код чужому. Вход требует PKCE S256 и наш resource; код одноразовый и привязан к клиенту и адресу. Одновременный обмен одного кода или refresh-токена имеет одного победителя через условную запись в SQLite, в том числе между разными Store; ротация refresh и выдача новой пары атомарны (01.11.2026). Тесты test_redirect_allowlist, test_code_needs_pkce_and_is_single_use, test_begin_requires_s256_registered_redirect_and_own_resource, test_concurrent_grant_has_only_one_winner, test_issue_failure_leaves_no_partial_tokens."
       status: holds
       check:
         file: mcp_auth.py

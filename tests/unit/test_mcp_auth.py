@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import sqlite3
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
@@ -181,6 +183,108 @@ def test_tokens_stored_only_as_hash(store, tmp_path):
     t = store.token(_code_grant(cid, v, code), RES)
     raw = (tmp_path / "a.sqlite").read_bytes()
     assert t["access_token"].encode() not in raw and t["refresh_token"].encode() not in raw
+
+
+class _ReadTogether:
+    """Both independent connections observe the grant before either tries to consume it."""
+
+    def __init__(self, connection, barrier, query):
+        self.connection, self.barrier, self.query = connection, barrier, query
+
+    def __enter__(self):
+        self.connection.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        try:
+            return self.connection.__exit__(*args)
+        finally:
+            self.connection.close()
+
+    def execute(self, sql, params=()):
+        cursor = self.connection.execute(sql, params)
+        if sql.startswith(self.query):
+            row = cursor.fetchone()
+            cursor.close()
+            self.barrier.wait(timeout=10)
+            return _ReadRow(row)
+        return cursor
+
+
+class _ReadRow:
+    def __init__(self, row):
+        self.row = row
+
+    def fetchone(self):
+        return self.row
+
+
+@pytest.mark.parametrize("grant", ["authorization_code", "refresh_token"])
+def test_concurrent_grant_has_only_one_winner(store, clock, monkeypatch, grant):
+    cid, verifier, code = _login(store)
+    form = _code_grant(cid, verifier, code)
+    query = "SELECT * FROM codes WHERE"
+    previous_tokens = 0
+    if grant == "refresh_token":
+        initial = store.token(form, RES)
+        form = {"grant_type": grant, "refresh_token": initial["refresh_token"], "client_id": cid}
+        query = "SELECT * FROM tokens WHERE token_hash=? AND kind='refresh'"
+        previous_tokens = 2
+
+    # Separate Store instances exercise independent connections, rather than a shared Store lock.
+    peer = mcp_auth.Store(store.path, now=clock)
+    barrier = threading.Barrier(2)
+    for candidate in (store, peer):
+        connect = candidate._c
+        monkeypatch.setattr(candidate, "_c", lambda connect=connect: _ReadTogether(connect(), barrier, query))
+
+    def exchange(candidate):
+        try:
+            return candidate.token(dict(form), RES)
+        except mcp_auth.AuthError as error:
+            assert error.error == "invalid_grant"
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(exchange, (store, peer), timeout=15))
+    winners = [token for token in outcomes if token is not None]
+    winner_count = len(winners)
+    assert winner_count == 1
+    assert store.verify(winners[0]["access_token"], RES) == cid
+    with sqlite3.connect(store.path) as connection:
+        assert connection.execute("SELECT count(*) FROM tokens").fetchone()[0] == previous_tokens + 2
+
+
+@pytest.mark.parametrize("grant", ["authorization_code", "refresh_token"])
+def test_issue_failure_leaves_no_partial_tokens(store, monkeypatch, grant):
+    cid, verifier, code = _login(store)
+    form = _code_grant(cid, verifier, code)
+    previous_tokens = 0
+    if grant == "refresh_token":
+        initial = store.token(form, RES)
+        form = {"grant_type": grant, "refresh_token": initial["refresh_token"], "client_id": cid}
+        previous_tokens = 2
+
+    issue = store._issue
+
+    def fail_after_insert(*args):
+        issue(*args)
+        raise sqlite3.OperationalError("synthetic token write failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(store, "_issue", fail_after_insert)
+        with pytest.raises(sqlite3.OperationalError, match="synthetic token write failure"):
+            store.token(form, RES)
+    with sqlite3.connect(store.path) as connection:
+        assert connection.execute("SELECT count(*) FROM tokens").fetchone()[0] == previous_tokens
+    if grant == "authorization_code":
+        # Code consumption commits before validation/issuance, including rejected PKCE.
+        with pytest.raises(mcp_auth.AuthError):
+            store.token(form, RES)
+    else:
+        # Rotation and issuance share one transaction, so the original refresh grant survives.
+        retried = store.token(form, RES)
+        assert store.verify(retried["access_token"], RES) == cid
 
 
 # ── HTTP: сервер целиком ──

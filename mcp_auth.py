@@ -204,8 +204,11 @@ class Store:
         if gt == "authorization_code":
             with self._c() as c:
                 r = c.execute("SELECT * FROM codes WHERE code_hash=?", (_h(form.get("code", "")),)).fetchone()
-                if r:
-                    c.execute("DELETE FROM codes WHERE code_hash=?", (r["code_hash"],))   # одноразовый
+                # SELECT не резервирует строку: второй процесс мог прочитать тот же код.
+                # Только удаливший его вправе выдать токены. Отказ PKCE ниже, как и раньше,
+                # сжигает код: удаление коммитится до проверки и выдачи.
+                if r and not c.execute("DELETE FROM codes WHERE code_hash=?", (r["code_hash"],)).rowcount:
+                    r = None
             if not r:
                 raise AuthError("invalid_grant", "код неизвестен или уже использован")
             if self.now() - r["created"] > CODE_TTL:
@@ -225,7 +228,12 @@ class Store:
                 if (not r or r["revoked"] or r["expires"] < self.now()
                         or form.get("client_id", r["client_id"]) != r["client_id"]):
                     raise AuthError("invalid_grant", "refresh недействителен")
-                c.execute("UPDATE tokens SET revoked=1 WHERE token_hash=?", (r["token_hash"],))   # ротация
+                # Проверка revoked выше могла устареть, пока другой процесс вращал токен
+                # или отзывал клиента. Условная запись выбирает одного победителя; сама
+                # ротация и новая пара токенов коммитятся одной транзакцией.
+                if not c.execute("UPDATE tokens SET revoked=1 WHERE token_hash=? AND revoked=0",
+                                 (r["token_hash"],)).rowcount:
+                    raise AuthError("invalid_grant", "refresh уже использован или отозван")
                 return self._issue(c, r["client_id"], r["resource"])
         raise AuthError("unsupported_grant_type")
 

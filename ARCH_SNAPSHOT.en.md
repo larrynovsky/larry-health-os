@@ -2,7 +2,7 @@
 **English** · [Русский](ARCH_SNAPSHOT.md)
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Version:** 15.452 | **Date:** 2026-11-09
+**Version:** 15.453 | **Date:** 2026-11-09
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. The line above is written by doc_agent on post-commit
      (moved from BLUEPRINT.md on 2026-08-03; that file was deleted) — do not edit manually. -->

@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.452 | **Дата:** 2026-11-09
+**Версия:** 15.453 | **Дата:** 2026-11-09
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->

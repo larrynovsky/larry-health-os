@@ -375,8 +375,10 @@ save_provider() {  # выбор поставщика — в .env, чтобы о�
     sed "s#^HEALTH_LLM_PROVIDER=.*#HEALTH_LLM_PROVIDER=${PROVIDER}#" .env > .env.part && mv .env.part .env
   else printf 'HEALTH_LLM_PROVIDER=%s\n' "$PROVIDER" >> .env; fi
 }
-save_provider
+# Не назван и не выбран — Anthropic, и это тоже выбор: пишется в .env явно (08.11 рендер .env
+# перестал подставлять anthropic, и пустая строка оставляла выбор рантайму по ключам).
 PROVIDER="${PROVIDER:-anthropic}"
+save_provider
 ok "поставщик моделей: ${PROVIDER}" "model provider: ${PROVIDER}"
 # Повтор установки вопроса не задаёт — и человек не знал, как сменить выбор (отчёт с Windows 05.10).
 [ "$ENV_FRESH" = 1 ] || say "  сменить: bash install.sh --provider anthropic|openai|gemini" \

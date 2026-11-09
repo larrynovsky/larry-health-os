@@ -62,7 +62,7 @@ def main():
     ai._ensure_history_table()
 
     app = build_app(get_token())
-    log.info("Бот запущен (Claude API backend)")
+    log.info("Бот запущен")
     app.run_polling(drop_pending_updates=True)
 
 
@@ -103,6 +103,35 @@ class _TracedRequest(BaseRequest):
         return code, body
 
 
+async def _post_init(app) -> None:
+    """Keep the bot usable with broken LLM config; acknowledge notice after send.
+
+    One notice per unresolved episode, including restarts. A failed/ambiguous
+    send is retried on the next startup; exactly-once delivery is not promised.
+    """
+    import config_db
+    import i18n
+    import llm_client
+    from jobs.scheduled import deliver_unsent_outcomes
+
+    notice = "llm.provider_config_notified"
+    try:
+        selected = llm_client.provider()
+    except llm_client.ProviderConfigurationError:
+        try:
+            if not config_db.get_config(notice, 0):
+                await app.bot.send_message(
+                    chat_id=owner_chat_id(), text=i18n.t("person.llm.provider_configuration"))
+                config_db.upsert_config(notice, value_num=1, category="llm", source="bot.startup")
+        except Exception:
+            log.exception("LLM configuration notice not acknowledged; retry on next startup")
+    else:
+        log.info("LLM provider: %s", selected)
+        if config_db.get_config(notice, 0):
+            config_db.upsert_config(notice, value_num=0, category="llm", source="bot.startup")
+    await deliver_unsent_outcomes(app)
+
+
 def build_app(token: str, request=None) -> Application:
     """Приложение бота со всеми обработчиками — ровно то, что слушает Telegram.
 
@@ -114,8 +143,7 @@ def build_app(token: str, request=None) -> Application:
     # Outbox заключений консилиума: на старте — и далее каждые 5 мин
     # (jobs.scheduled.deliver_unsent_outcomes_job). Переехало из этого
     # файла 2026-08-29: одна функция, два вызова.
-    from jobs.scheduled import deliver_unsent_outcomes
-    builder = Application.builder().token(token).post_init(deliver_unsent_outcomes)
+    builder = Application.builder().token(token).post_init(_post_init)
     if request is not None:
         builder = builder.request(_TracedRequest(request)).get_updates_request(request)
     else:

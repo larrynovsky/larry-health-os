@@ -62,7 +62,6 @@ Each source lands in one of two stores:
 03:00        воскресенье → integrity_tests.py --pubmed-only
 07:00 мест.  понедельник → send_weekly_report()
 
-каждые 1ч   LaunchAgent → calendar_sync.py
 каждые 3ч   LaunchAgent → reminders_sync.py (8:00–23:00)
 каждые 3ч   LaunchAgent → import_oura.py 2 (8:00, 11:00, 14:00, 17:00, 20:00)
 каждые 6ч   LaunchAgent → icloud_conflict_check.sh

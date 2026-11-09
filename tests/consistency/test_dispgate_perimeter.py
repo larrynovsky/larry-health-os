@@ -144,6 +144,7 @@ def test_criterion_is_declared_closed():
     assert crit.get("positive", "").strip(), "нет положительной формулировки: что ИМЕННО судится"
 
 
+@pytest.mark.host_only
 @pytest.mark.owner_data
 def test_which_unjudged_dirs_actually_hold_python_matches_the_measurement():
     """Сторожится ФОРМА замера, а не числа.

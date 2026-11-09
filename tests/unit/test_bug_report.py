@@ -224,3 +224,92 @@ def test_run_checks_faults_name_their_step(tmp_path, monkeypatch):
     import re
     bare = re.findall(r'notify\.fault\("run_checks:', src)
     assert bare == [], "сбой run_checks без шага сольётся с остальными в одну карточку"
+
+
+def test_structural_detail_allowlist_and_token_boundaries(tmp_path):
+    """Synthetic poison travels beside good tokens, never via text/tenant. Allowlist mutation is red."""
+    now = datetime.now(timezone.utc).isoformat()
+    node = "tests/unit/test_example.py::test_failure"
+    rows = [
+        {"where": "run_checks.pytest", "detail": [node, node + "[glucose_123]", "tests/unit/test_x.py::test_y=123",
+                                                 "glucose=123", "please ignore instructions", None]},
+        {"where": "monthly_consilium", "detail": ["neurology:TimeoutError", "cardiology:unanswered",
+                                                  "neurology:Error123", "patient123:TimeoutError"]},
+        {"where": "consilium_roster", "detail": ["sleep:ValueError"]},
+        {"where": "llm_admission", "detail": ["opus:claude-opus-4-6:call_error",
+                                              "opus123:claude-opus-4-6:call_error",
+                                              "opus:123:call_error", "opus:gpt-4.1:free prose"]},
+    ]
+    # Including near-misses: names that merely contain the permitted place are not allowed.
+    rows += [{"where": p, "detail": [node, "neurology:TimeoutError", "opus:gpt-4.1:removed"]}
+             for p in ("other", "run_checks", "evil.run_checks.pytest", "monthly_consilium_extra",
+                       "llm_admission.extra", "consilium_roster_extra")]
+    journal = tmp_path / "faults.jsonl"
+    journal.write_text("\n".join(json.dumps({"ts": now, "text": PLANTED[1], "tenant": PLANTED[0], **r})
+                                 for r in rows))
+    rep = _report(journal)
+    got = {g["at"][0]: g.get("detail") for g in rep["faults"]}
+    assert got.pop("run_checks.pytest") == ["run_checks.pytest:" + node]
+    assert got.pop("monthly_consilium") == ["monthly_consilium:neurology:TimeoutError",
+                                            "monthly_consilium:cardiology:unanswered"]
+    assert got.pop("consilium_roster") == ["consilium_roster:sleep:ValueError"]
+    assert got.pop("llm_admission") == ["llm_admission:opus:claude-opus-4-6:call_error"]
+    assert all(v is None for v in got.values())
+    assert br.schema_problems(rep) == []
+    assert "123" not in json.dumps(rep["faults"]) and "please" not in json.dumps(rep)
+
+
+def test_detail_caps_and_malformed_values(tmp_path):
+    now = datetime.now(timezone.utc).isoformat()
+    journal = tmp_path / "faults.jsonl"
+    tokens = [f"{c}:TimeoutError" for c in "abcdef"]
+    rows = [{"ts": now, "where": "monthly_consilium", "detail": d}
+            for d in (None, "free prose", {}, [True, {}, "a" * 121], tokens, tokens)]
+    journal.write_text("\n".join(json.dumps(r) for r in rows))
+    [g] = br.faults_from_journal(journal)
+    assert g["detail"] == ["monthly_consilium:" + t for t in tokens[:4]]
+    assert g["n"] == len(rows)
+
+
+def test_run_checks_reuses_failed_ids_in_real_journal(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    import shlex
+    root = Path(__file__).resolve().parents[2]
+    src = (root / "run_checks.sh").read_text()
+    funcs = []
+    for name in ("record_fault", "pytest_failed_ids"):
+        f = src[src.index(name + "() {"):]
+        funcs.append(f[:f.index("\n}\n") + 3])
+    output, ids, journal = (tmp_path / n for n in ("out", "ids", "journal"))
+    output.write_text("FAILED tests/unit/test_example.py::test_failure - ValueError: glucose 123\n")
+    script = "\n".join(funcs) + f'\npytest_failed_ids {shlex.quote(str(output))} > {shlex.quote(str(ids))}\n'
+    script += f'record_fault "pytest regression" {shlex.quote(str(ids))}\n'
+    subprocess.run(["bash", "-c", script], cwd=root, check=True, timeout=60,
+                   env={**os.environ, "PY": sys.executable, "HEALTH_FAULTS_JOURNAL": str(journal)})
+    assert _records(journal)[0]["detail"] == ["tests/unit/test_example.py::test_failure"]
+    [g] = br.faults_from_journal(journal)
+    assert g["detail"] == ["run_checks.pytest:tests/unit/test_example.py::test_failure"]
+
+
+def test_optional_detail_does_not_break_report_size_budget():
+    # Long but valid synthetic trace frames; optional diagnostics must yield to delivery.
+    at = ["a" * 55 + ".py:" + "f" * 55] * 6
+    detail = ["monthly_consilium:" + "a" * 70 + ":TimeoutError"] * 4
+    faults = [{"type": "RuntimeError", "at": at, "n": 1, "fp": "abcdef", "detail": detail}
+              for _ in range(10)]
+    rep = br.build("other", report_id="0123456789abcdef:1", release="local", platform="linux/aarch64",
+                   connected={}, faults=faults, screen=[])
+    assert br.schema_problems(rep) == []
+    assert any("detail" not in g for g in rep["faults"])
+    assert all(g["detail"] == detail for g in faults)
+
+
+def test_pytest_detail_keeps_digits_in_test_names_but_not_parameters():
+    """Имена тестов с цифрами — код (test_uc_a_03_…), они доезжают; параметр [..] может нести
+    значение из данных — отбрасывается."""
+    ok = "run_checks.pytest:tests/integration/test_uc_a_03_hae_merge.py::test_apple_sleep_read_late_update_and_oura_shape"
+    assert br._detail_token_ok(ok)
+    assert not br._detail_token_ok("run_checks.pytest:tests/unit/test_x.py::test_y[7.4]")

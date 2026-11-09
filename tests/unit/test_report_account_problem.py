@@ -26,6 +26,13 @@ import triage_agent as _tri
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def isolated_key_directory(monkeypatch, tmp_path):
+    import llm_client
+    monkeypatch.setattr(llm_client, "_KEY_FILE", tmp_path / "anthropic_key")
+    return tmp_path
+
+
 def _bad_request(text: str):
     req = httpx.Request("POST", "https://api.example/v1/messages")
     return anthropic.BadRequestError(text, response=httpx.Response(400, request=req), body=None)
@@ -112,3 +119,58 @@ def test_rate_limit_is_not_called_a_balance_problem(monkeypatch):
     assert llm_client.fault_person_key(rate, "jobs.morning.failed") == ("jobs.morning.failed", {})
     assert llm_client.fault_person_key(quota, "jobs.morning.failed") == (
         "person.llm.key_problem", {"provider": "Gemini"})
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+@pytest.mark.parametrize("current,others", [
+    ("anthropic", ["openai"]), ("anthropic", ["openai", "gemini", "deepseek"]),
+    ("openai", ["anthropic"])])
+def test_account_refusal_names_other_keys_without_reading_them(
+        monkeypatch, isolated_key_directory, lang, current, others):
+    import llm_client as lc
+    from pathlib import Path
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", current)
+    monkeypatch.setattr(i18n, "lang_of", lambda: lang)
+    profiles = lc.profiles()
+    for name in [current, *others]:
+        (isolated_key_directory / profiles[name]["key_file"]).write_text("synthetic-secret")
+    # Guard the filesystem boundary: detecting a key must never read its value.
+    read_text = Path.read_text
+
+    def guarded_read(path, *args, **kw):
+        assert path.parent != isolated_key_directory, "key contents were read"
+        return read_text(path, *args, **kw)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read)
+    exc = anthropic.PermissionDeniedError(
+        "refused", response=httpx.Response(403, request=httpx.Request("POST", "https://api.example")), body=None)
+    key, kw = lc.fault_person_key(exc, "jobs.morning.failed")
+    assert key == "person.llm.key_problem_other_keys"
+    message = i18n.t(key, **kw)
+    assert message.startswith(i18n.t("person.llm.key_problem", provider=lc.provider_title(current)))
+    for name in others:
+        assert lc.provider_title(name) in message
+        assert f"HEALTH_LLM_PROVIDER={name}" in message
+    assert f"HEALTH_LLM_PROVIDER={current}" not in message
+    assert ".env" in message and "docker compose up -d" in message
+    assert "synthetic-secret" not in message
+    rate = RuntimeError("429 RESOURCE_EXHAUSTED per minute; retry in 30s")
+    assert lc.fault_person_key(rate, "jobs.morning.failed") == ("jobs.morning.failed", {})
+
+
+def test_current_key_alone_keeps_old_message(monkeypatch, isolated_key_directory):
+    import llm_client as lc
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    (isolated_key_directory / "anthropic_key").touch()
+    # A directory bearing a key filename is not a key file.
+    (isolated_key_directory / "openai_key").mkdir()
+    assert lc.fault_person_key(_bad_request("credit balance"), "jobs.morning.failed") == (
+        "person.llm.key_problem", {"provider": "Anthropic"})
+
+
+def test_morning_report_delivers_other_key_hint(monkeypatch, tg, fault_journal, isolated_key_directory):
+    (isolated_key_directory / "openai_key").touch()
+    sent = _morning(monkeypatch, tg, _bad_request("credit balance"))
+    assert len(sent) == 1
+    assert "Anthropic" in sent[0] and "OpenAI" in sent[0]
+    assert "HEALTH_LLM_PROVIDER=openai" in sent[0]

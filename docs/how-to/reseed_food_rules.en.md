@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/reseed_food_rules.md sha256:2699f35452b9 -->
+<!-- translation-of: docs/how-to/reseed_food_rules.md sha256:b61ee443b8ad -->
 **English** · [Русский](reseed_food_rules.md)
 
 # How-to: extend food rules (medical record/genome → diet)
@@ -36,3 +36,32 @@ The food rules test (`tests/unit/test_food_profile.py`, in the private part of t
 - The medical record MUST override the genome: if you add a genetic calorie/fat constraint, add it to the suppression set.
 - Do not treat weak SNPs as facts (honesty): use only established associations.
 
+
+## Public installs without a clinical pack (owner decision, 2026-11-08)
+
+The public `_index.yaml` declares `clinical_pack: not_installed`. This is not a
+successful clinical assessment. `clinical_kb.readiness(conn)` owns the read-only
+verdict across YAML and the tenant's SQLite replica: `ready`, `not_installed`, or
+`failed`, with a reason. It compares the existing source/table content hashes;
+missing or corrupt files/tables, drift, or fewer than two usable floor entries
+fail closed. Runtime retirement/review dates can make a floor unusable.
+
+Both integrity checks use this verdict. Only explicit, intact public absence emits
+`clinical_kb: свод не установлен` (WARN, standing); seed failures remain FAIL.
+The food profile, MCP nutrition frame, brief card and nutrition constitution say
+that clinical restrictions are not assessed. Generated proposals are stored as
+rejected, never `floor_ok=True`; already-active rules are skipped with the floor
+failure logged. Nutrition constitution generation returns the notice without a
+model call. No clinical rules or thresholds are added by this change.
+
+For an older public template, add the declaration only after confirming that this
+installation intentionally has no clinical pack. Do not use it to suppress a seed
+failure: a mismatched replica still fails. To install a reviewed clinical pack,
+remove the declaration, supply conditions and at least two usable floor entries,
+and run the existing seed procedure. Existing complete packs need no marker and
+no schema migration. Source and replica must agree. A rollback restores the old
+code/templates; it also restores the old fail-open behavior and is not a safety fix.
+
+Regression oracle: `tests/unit/test_clinical_kb_phase2.py` (in the private part of the project) exercises public templates,
+synthetic seeded packs, corruption, consumers and rejected-rule storage. These are
+software checks, not validation of clinical rules or production delivery.

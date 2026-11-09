@@ -23,11 +23,20 @@ corpus в project_context.json — без причины, адреса и исх
 группы, записанный позже неё, красит проверку. Обязательность даты — ключ проекта
 `adoption_dates: required` (соседний проект его не ставит — паритет формы не меняется).
 
+ОБЩИЙ СЛОВАРЬ КЛАССОВ ПОЛОМОК (решение владельца 2026-11-04). Урок «лог вырос до 441 МБ» в
+одном проекте и «дамп растёт» в другом — один механизм, но в словарях проектов назывались
+по-своему, и подача по предмету в чужом проекте их не находила. Строка шапки
+`shared_subjects: <путь>` подключает общий словарь (~/Projects/infra/failure_classes.yaml):
+его ключи законны в `subject`, а `--subject K --everywhere` подаёт уроки по ключу из ВСЕХ
+корней, перечисленных в нём. Нечитаемый корень — «не знаю: <корень>», а не пустота (C-44).
+Деревья-копии одного репозитория сводятся к одному корню по git-common-dir.
+
 ГРАНИЦА. Страж проверяет ФОРМУ. Честна ли причина и меняет ли что-то названная
 практика — суждение человека на выборке, машине недоступно.
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -41,6 +50,10 @@ STATUSES = ("observation", "in_work", "adopted", "failed", "confirmed")
 OUTCOME_KINDS = ("rule", "check", "none")
 NEEDS_CHANGE = ("adopted", "failed", "confirmed")
 DEFAULT_DELIVER = ("adopted", "failed")
+# Адрес и исход — объекты ровно с этими ключами. Лишний ключ почти всегда — текст, разрезанный
+# YAML по запятой без кавычек: исход подаётся урезанным, и этого никто не видит (урок соседнего
+# проекта L-2026-10-15, 25 уроков; проверка перенесена в общий движок 2026-11-04).
+PART_KEYS = {"address": {"kind", "ref"}, "outcome": {"kind", "text"}}
 # Причина, сведённая к исполнителю, ничего не даёт изменить (SRE: «человеческий фактор»).
 BLAMEFUL = ("невнимател", "человеческий фактор", "модель ошиб", "забыл", "халатн")
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -74,6 +87,36 @@ def _home_keys(root: Path, spec) -> set | None:
         return None
     entries = doc.get(spec.get("section")) if isinstance(doc, dict) else None
     return set(entries) if isinstance(entries, dict) else None
+
+
+def _shared(doc: dict, root=".") -> tuple[dict | None, str | None]:
+    """Общий словарь из `shared_subjects`: (документ, ошибка). Не подключён — (None, None).
+    Объявлен, но не читается — ошибка с путём, а не тихое «ключей нет».
+    Путь — абсолютный, от домашней папки (`~/…`) или ОТ КОРНЯ ПРОЕКТА: проект, чья проверка
+    идёт на чужой машине (соседний проект — GitHub Actions), держит копию словаря у себя."""
+    spec = doc.get("shared_subjects")
+    if not spec:
+        return None, None
+    path = Path(os.path.expanduser(str(spec)))
+    if not path.is_absolute():
+        path = Path(root) / path
+    try:
+        shared = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError) as e:
+        return None, f"общий словарь {spec} не читается ({type(e).__name__})"
+    if not isinstance(shared, dict) or not isinstance(shared.get("classes"), dict):
+        return None, f"общий словарь {spec}: нет раздела classes"
+    return shared, None
+
+
+def _common_dir(root: Path) -> str:
+    """Один репозиторий = один корень: деревья-копии (worktrees) делят git-common-dir."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), "rev-parse", "--path-format=absolute",
+                            "--git-common-dir"], capture_output=True, text=True)
+    except OSError:
+        r = None
+    return r.stdout.strip() if r is not None and r.returncode == 0 else str(Path(root).resolve())
 
 
 def _in_git(root: Path) -> bool:
@@ -134,10 +177,18 @@ def lesson_problems(root) -> list[str]:
     root = Path(root)
     doc = load(root)
     kinds = set(doc.get("address_kinds") or ())
-    vocab = set(doc.get("subjects") or {})
-    out: list[str] = []
+    local = set(doc.get("subjects") or {})
+    shared, shared_err = _shared(doc, root)
+    common = set((shared or {}).get("classes") or {})
+    vocab = local | common
+    out: list[str] = [shared_err] if shared_err else []
+    for key in sorted(local & common):
+        out.append(f"ключ предмета «{key}» есть и в общем словаре — второй дом; убери из subjects")
     if not kinds:
         out.append("address_kinds пуст — адрес урока некуда вести")
+    for status in doc.get("deliver_statuses") or ():
+        if status not in STATUSES:
+            out.append(f"deliver_statuses: «{status}» не из {list(STATUSES)}")
     homes = {}
     for kind, spec in _homes(doc).items():
         if kind not in kinds:
@@ -159,6 +210,11 @@ def lesson_problems(root) -> list[str]:
         if lid in seen:
             out.append(f"{lid}: id не уникален")
         seen.add(lid)
+        for part, allowed in PART_KEYS.items():
+            value = raw.get(part)
+            if isinstance(value, dict) and set(value) - allowed:
+                out.append(f"{lid}: в {part} лишний ключ {sorted(set(value) - allowed)} — "
+                           "текст обрезан; возьми значение в кавычки")
         address = raw.get("address") or {}
         if address.get("kind") not in kinds:
             out.append(f"{lid}: адрес «{address.get('kind')}» не из закрытого списка {sorted(kinds)}")
@@ -235,6 +291,26 @@ def for_subject(root, key: str) -> list[dict]:
     statuses = tuple(doc.get("deliver_statuses") or DEFAULT_DELIVER)
     return [r for r in doc.get("lessons") or ()
             if key in (r.get("subject") or ()) and r.get("status") in statuses]
+
+
+def for_subject_everywhere(root, key: str) -> tuple[list[tuple[Path, dict]], list[tuple[Path, str]]]:
+    """Подача по ключу из всех корней общего словаря (и из своего): (уроки, «не знаю»).
+    Политика подачи (deliver_statuses) — каждого корня своя."""
+    shared, err = _shared(load(root), root)
+    if err or shared is None:
+        raise ValueError(err or "общий словарь не подключён (shared_subjects в шапке lessons.yaml)")
+    roots = [Path(root)] + [Path(os.path.expanduser(str(r))) for r in shared.get("roots") or ()]
+    rows, unknown, seen = [], [], set()
+    for r in roots:
+        cd = _common_dir(r)
+        if cd in seen:
+            continue
+        seen.add(cd)
+        try:
+            rows += [(r, x) for x in for_subject(r, key)]
+        except (OSError, yaml.YAMLError, AttributeError, TypeError) as e:
+            unknown.append((r, type(e).__name__))
+    return rows, unknown
 
 
 def for_modules(root, modules) -> list[dict]:
@@ -318,6 +394,9 @@ def selftest() -> str:
     red(lambda doc: doc["subjects"].update({"Стенд": "кириллица"}), "латиница")
     red(lambda doc: doc["lessons"][0].update(modules="m"), "modules")
     red(lambda doc: doc.update(address_kinds=[]), "address_kinds пуст")
+    red(lambda doc: doc["lessons"][0]["outcome"].update({"что уходит само": None}), "лишний ключ")
+    red(lambda doc: doc["lessons"][0]["address"].update(note="x"), "лишний ключ")
+    red(lambda doc: doc.update(deliver_statuses=["adopted", "принят"]), "deliver_statuses")
 
     def adopted(doc, on=None):
         doc["lessons"][0].update(status="adopted", change="ritual:the-end, редакция")
@@ -372,6 +451,54 @@ def selftest() -> str:
         (root / "products.yaml").write_text(accepted % "2026-09-23", encoding="utf-8")
         assert lesson_problems(root) == [], lesson_problems(root)
         n += 1
+    # общий словарь классов поломок
+    with tempfile.TemporaryDirectory() as d:
+        base = Path(d)
+        a = make(base / "a", yaml.safe_load(yaml.safe_dump(good)))
+        b = make(base / "b", yaml.safe_load(yaml.safe_dump(good)))
+        dict_file = base / "classes.yaml"
+        dict_file.write_text(yaml.safe_dump({"classes": {"steady_state": {"page": "Steady State"}},
+                                             "roots": [str(a), str(b), str(base / "nope")]}), encoding="utf-8")
+        for root, lid in ((a, "A-1"), (b, "B-1")):
+            doc = load(root)
+            doc["shared_subjects"] = str(dict_file)
+            doc["deliver_statuses"] = ["observation"]
+            doc["lessons"][0].update(id=lid, subject=["stand", "steady_state"])
+            write(root, doc)
+        assert lesson_problems(a) == [], lesson_problems(a)           # общий ключ законен
+        rows, unknown = for_subject_everywhere(a, "steady_state")
+        assert sorted(x["id"] for _, x in rows) == ["A-1", "B-1"], rows   # урок второго корня найден
+        assert [str(r) for r, _ in unknown] == [str(base / "nope")], unknown  # нечитаемый — «не знаю»
+        subprocess.run(["git", "-C", str(a), "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "x"], capture_output=True)
+        subprocess.run(["git", "-C", str(a), "worktree", "add", "-q", str(base / "a-wt")], capture_output=True)
+        (base / "a-wt" / LESSONS).write_text((a / LESSONS).read_text(encoding="utf-8"), encoding="utf-8")
+        rows, _ = for_subject_everywhere(base / "a-wt", "steady_state")
+        assert sorted(x["id"] for _, x in rows) == ["A-1", "B-1"], rows   # дерево-копия не двоит
+        home = os.environ.get("HOME")
+        os.environ["HOME"] = d
+        try:
+            doc = load(a); doc["shared_subjects"] = "~/classes.yaml"; write(a, doc)
+            assert lesson_problems(a) == [], lesson_problems(a)        # ~ раскрывается
+            (a / "vendored.yaml").write_text(dict_file.read_text(encoding="utf-8"), encoding="utf-8")
+            doc = load(a); doc["shared_subjects"] = "vendored.yaml"; write(a, doc)
+            assert lesson_problems(a) == [], lesson_problems(a)        # относительный — от корня проекта
+        finally:
+            if home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = home
+        n += 3
+    red(lambda doc: doc.update(shared_subjects="/nonexistent/classes.yaml"), "не читается")
+    for body, expect in (("roots: []\n", "нет раздела classes"),            # словарь без classes
+                         ("classes:\n  stand: {page: x}\n", "второй дом")):  # ключ в обоих словарях
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "c.yaml"
+            f.write_text(body, encoding="utf-8")
+            root = make(Path(d) / "r", yaml.safe_load(yaml.safe_dump(good)))
+            doc = load(root); doc["shared_subjects"] = str(f); write(root, doc)
+            assert any(expect in p for p in lesson_problems(root)), (expect, lesson_problems(root))
+            n += 1
     return f"lessons selftest: {n} поломок — {n} красных; чистый корень, дом адреса, свежее описание зелёные"
 
 
@@ -392,6 +519,22 @@ def main(argv, root=".") -> int:
             mark = "созрела" if len(rows) >= RIPE else f"копится ({len(rows)}/{RIPE})"
             print(f"{address} · {key}: {mark} — " + ", ".join(r["id"] for r in rows))
         return 0
+    if "--subject" in argv and "--everywhere" in argv:
+        key = argv[argv.index("--subject") + 1]
+        try:
+            rows, unknown = for_subject_everywhere(root, key)
+        except ValueError as e:
+            print(e)
+            return 2
+        for r, x in rows:
+            cd = Path(_common_dir(r))                  # дерево-копия печатается именем проекта
+            name = cd.parent.name if cd.name == ".git" else r.name
+            print(f"{name}: {x['id']} ({x['status']}): {x['outcome']['text']} — оплачено: {x['cost']}")
+        for r, why in unknown:
+            print(f"не знаю: {r} — уроки не читаются ({why})")
+        if not rows and not unknown:
+            print(f"по предмету «{key}» нигде подавать нечего")
+        return 0
     if "--subject" in argv:
         key = argv[argv.index("--subject") + 1]
         rows = for_subject(root, key)
@@ -406,8 +549,14 @@ def main(argv, root=".") -> int:
             print(f"{r['id']} ({r['status']}): {r['outcome']['text']}")
         return 0
     if "--subjects" in argv:
-        for k, v in sorted((load(root).get("subjects") or {}).items()):
+        doc = load(root)
+        for k, v in sorted((doc.get("subjects") or {}).items()):
             print(f"{k}: {v}")
+        shared, err = _shared(doc, root)
+        for k, v in sorted(((shared or {}).get("classes") or {}).items()):
+            print(f"{k} (общий): {(v or {}).get('meaning', '')}")
+        if err:
+            print(err)
         return 0
     found = lesson_problems(root)
     for p in found:

@@ -202,6 +202,9 @@ def anthropic_mock(monkeypatch: pytest.MonkeyPatch) -> AnthropicMock:
     # работала только там, где на диске лежит настоящий ключ владельца — 12 тестов были
     # красными в чистой копии и зелёными на Studio (§20; репетиция экспорта 2026-09-24).
     import llm_client
-    monkeypatch.setattr(llm_client, "api_key", lambda: "sk-test-anthropic-mock")
+    monkeypatch.setattr(llm_client, "api_key", lambda prov=None: "sk-test-anthropic-mock")
+    # Заглушка Anthropic — явный выбор провайдера: без файла ключа provider() иначе громко
+    # отказывает (нет ключей и нет переменной), а заглушка не должна зависеть от машины (§20).
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
 
     return mock

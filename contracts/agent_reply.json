@@ -1,0 +1,94 @@
+{
+  "module": "agent_reply",
+  "public": [
+    "reply_to_letter",
+    "compose",
+    "allowed_peers",
+    "queue_fact_questions"
+  ],
+  "depends_on": [
+    {
+      "module": "agent_mail",
+      "uses": [
+        "send",
+        "sent_count",
+        "answered"
+      ],
+      "why": "единственный путь письма наружу: заявка в мост, redact и гард секретов там"
+    },
+    {
+      "module": "mcp_tools",
+      "uses": [
+        "call"
+      ],
+      "why": "то же окно в данные, что у облачных помощников (one_window_with_bot): бриф, метрики, проблемы, рамка питания с заголовком источника и словарём личных слов"
+    },
+    {
+      "module": "llm_client",
+      "uses": [
+        "guarded_client"
+      ],
+      "why": "единый выход к модели: гард секретов, режим думания по ключу задачи"
+    },
+    {
+      "module": "hai_core",
+      "uses": [
+        "get_model"
+      ],
+      "why": "модель роли из цепочки допуска"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config"
+      ],
+      "why": "адресат ответов и предел часа — данные (§9)",
+      "legacy": "config_db до гейта одноразовости; контракт не заводился"
+    },
+    {
+      "module": "gp_context",
+      "uses": [
+        "judge_absence_claims"
+      ],
+      "why": "Общий судья отсутствия; reply_to_letter приписывает поправку до send, без блокировки. В log и notify.fault только число хитов, без персональных данных."
+    },
+    {
+      "module": "hai_chat",
+      "uses": [
+        "extract_artifacts"
+      ],
+      "why": "shared read-only dialogue extraction; never run_arbiter writes",
+      "legacy": "existing module without sidecar"
+    },
+    {
+      "module": "tasks_db",
+      "uses": [
+        "save_task",
+        "ASSISTANT_FACT_SOURCE"
+      ],
+      "why": "owner of question outbox writes, all-status deduplication and source cap",
+      "legacy": "existing domain module without sidecar"
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "localized confirmation question"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — ответ health на письмо ассистента своего хозяина. Показ человеку и транспорт — не здесь (jobs/scheduled.deliver_agent_mail_job, agent_mail); Ответ и приём утверждений ассистента: только вопросы владельцу, не запись памяти. Транспорт и доставка вопросов остаются в существующих владельцах.",
+      "D2": "reply_to_letter(letter) — вход; compose и allowed_peers публичны ради теста шага; остальное приватное; reply_to_letter / queue_fact_questions — независимые входы письма; compose / allowed_peers сохранены.",
+      "D3": "только публичные контракты agent_mail, mcp_tools, llm_client, hai_core, config_db. Судья — публичный gp_context.judge_absence_claims; политика доставки остаётся здесь; Публичные операции зависимостей перечислены в depends_on; извлечение без записи через hai_chat, запись вопросов через tasks_db.",
+      "D4": "~75 строк, из них треть — системная инструкция модели; Один существующий модуль; извлекатель переиспользован из hai_chat, очередь из tasks_db.",
+      "D5": "tests/unit/test_agent_reply.py — 7 тестов на заглушке модели; plans/mutate_agent_reply_2026-11-05.sh — 6 мутаций красные (05.11); tests/unit/test_agent_reply.py: синтетические записи, подменённая модель и транспорт; plans/mutate_assistant_facts_2026-11-07.sh исполняет пять мутаций границы подтверждения.",
+      "D6": "общий с agent_mail инвариант: письмо — данные, наружу только через send; общий с mcp_gateway — одно окно в данные (mcp_tools). Поправка судьи проходит redact/visible_names в send вместе с ответом; отказ судьи не задерживает письмо; общий с agent_mail инвариант: письмо — данные, наружу только через send; общий с mcp_gateway — одно окно в данные (mcp_tools)."
+    },
+    "rationale": "Переписывается за час по контракту: собрать окно mcp_tools, позвать модель с письмом как user-данными, НЕТ_ОТВЕТА/обрезка — не слать, иначе send(kind=answer, reply_to).",
+    "date": "2026-11-07",
+    "oracle": "мутации «любой адресат», «НЕТ_ОТВЕТА уходит», «обрезанный уходит», «второй ответ», «предел не действует», «письмо в системный промпт» красные — прогон 2026-11-05; 07.11.2026: все пять мутаций assistant-facts убиты утверждениями о сохранённых вопросах/памяти. Поведение реальной LLM не проверялось."
+  }
+}

@@ -238,6 +238,7 @@ content is sent in requests as listed below — worth knowing up front:
 |---|---|---|
 | Anthropic API (the default model provider) | your medical context in the request text: profile, metrics, labs, document excerpts, scanned lab pages | briefs, consilium, reading labs |
 | OpenAI or Google Gemini — only if you installed with that provider instead of Anthropic | the same as the Anthropic row: it goes to the provider you chose | the same |
+| TypeSafe AI (task guard, when a tenant key is configured) | redacted task pairs: type, text, deadline and origin | shadow duplicate/conflict audit; never blocks tasks |
 | Telegram | bot messages and the files you send | interface |
 | Oura API | a request for your data with your token | import |
 | PubMed (NCBI) | search queries with condition names, no name of yours | literature search |

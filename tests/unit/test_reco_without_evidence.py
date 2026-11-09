@@ -81,7 +81,7 @@ def test_task_text_gets_last_date_and_sensor_goes_quiet(clock, monkeypatch):
     import gp_context as gc
     monkeypatch.setattr(gc._ldb, "get_recent_labs",
                         lambda n: [{"test_name": "Ferritin", "date": "2040-04-09"}])
-    monkeypatch.setattr(gc._ldb, "get_effective_lab_schedule", lambda: SCHED)
+    monkeypatch.setattr(gc._ldb, "tenant_lab_schedule", lambda: SCHED)
     out = gc.annotate_lab_recency("Сдать кровь: ферритин")
     assert out.endswith("(последний раз сдано: Ferritin — 09.04.2040)")
     assert gc.recommendations_without_evidence(out, {"Ferritin": "2040-04-09"}, SCHED) == []

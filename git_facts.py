@@ -65,6 +65,21 @@ MACHINE_REGENERATED_FILES = (
     STAGED_BY_DOC_AGENT + STAGED_BY_SECURITY + REGENERATED_BY_ARCH_GUARD
 )
 
+# ДЖОБЫ MacBook, КОТОРЫМ РАЗРЕШЕНО ИСПОЛНЯТЬ health_scripts (06.11, нить
+# macbook-kayak-oura). MacBook — машина-писатель КОДА: всё, что на нём законно
+# крутится по расписанию, — гигиена репозитория (снимки, ротация журналов,
+# конфликты iCloud). Джоб данных здесь — ошибка по построению (§8: база только на
+# Studio): он либо падает на R1/R2, либо пишет мимо канона. Факт «что загружено»
+# везёт снимок `backup.sh` (поле health_jobs=), судит
+# `integrity_tests.check_macbook_health_jobs`. Замер 06.11 после снятия двух
+# мёртвых джобов: на MacBook загружены ровно эти четыре.
+MACBOOK_ALLOWED_JOBS = (
+    "com.larry.health.backup",           # backup.sh — суточный снимок вне main
+    "com.larry.health.backup-wip",       # backup.sh --wip — снимок раз в 3 ч, он и везёт этот факт
+    "com.larry.health.conflict-check",   # icloud_conflict_check.sh
+    "com.larry.health.logrotate",        # log_rotate.py
+)
+
 
 def _git(args: list[str]) -> str | None:
     """Ответ настоящего git или None. Отсутствие git и ошибка git здесь

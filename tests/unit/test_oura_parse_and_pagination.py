@@ -147,3 +147,36 @@ def test_oura_get_hits_safety_limit_at_20_pages():
 
     # Должно остановиться на 20 страницах (защитник от infinite loop)
     assert len(result) == 20, f"safety limit не сработал: {len(result)} pages"
+
+
+# ── 07.11: форма дня (сидит/ходит) и сегодняшняя активность ───────────────
+
+def test_day_shape_still_and_last_active():
+    from import_oura import day_shape
+    # 04:00 + 6 слотов: покой, покой, ходьба, ходьба, сидя, сидя → до 04:30, сидит 10 мин
+    a = {"timestamp": "2040-01-02T04:00:00.000+02:00", "class_5_min": "113322",
+         "sedentary_time": 600, "inactivity_alerts": 1}
+    s = day_shape(a)
+    assert s["data_until"] == "2040-01-02T04:30+02:00"
+    assert s["last_active_at"] == "2040-01-02T04:20+02:00"
+    assert s["still_min"] == 10 and s["ring_off_tail_min"] == 0
+    assert s["sedentary_min"] == 10 and s["inactivity_alerts"] == 1
+    # кольцо снято в хвосте — это не «сидит»
+    off = day_shape({**a, "class_5_min": "1133200"})
+    assert off["ring_off_tail_min"] == 10 and off["still_min"] == 5
+    assert day_shape({"class_5_min": ""})["class_5_min"] is None
+
+
+def test_activity_requested_through_tomorrow():
+    """end_date Oura не включает конец для daily_activity: без +1 день сегодня пропадал."""
+    import datetime as dt
+    import import_oura
+    calls = []
+    def fake(endpoint, start, end):
+        calls.append((endpoint, start, end))
+        return []
+    with mock.patch.object(import_oura, "oura_get", side_effect=fake), \
+         mock.patch.object(import_oura._hdb_status, "set_import_status"):
+        import_oura.import_oura(dt.date(2040, 1, 1), dt.date(2040, 1, 2))
+    act = [c for c in calls if c[0] == "daily_activity"]
+    assert act == [("daily_activity", "2040-01-01", "2040-01-03")]

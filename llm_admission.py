@@ -589,7 +589,8 @@ def _drop_failed_members(client, results: list[dict], fresh: dict | None = None)
         if not keep:
             notify.fault(f"llm_admission: роль {role} — все модели цепочки {before} провалили допуск "
                          f"дважды; цепочка оставлена как была (без модели функция не работает). "
-                         f"Вердикты: system_config llm.admission.<модель>", person_key=None)
+                         f"Вердикты: system_config llm.admission.<модель>", person_key=None,
+                         detail=[f"{role}:{m}:all_failed" for m in sorted(failed)])
             out.append({"role": role, "before": before, "after": before, "all_failed": True})
             continue
         head = _canonical_id(client, keep[0])
@@ -598,14 +599,17 @@ def _drop_failed_members(client, results: list[dict], fresh: dict | None = None)
         if not admitted:   # снятие только на проверенную: следующая не судилась — не снимаю
             notify.fault(f"llm_admission: роль {role} — {sorted(failed)} провалили допуск дважды, но "
                          f"следующая модель цепочки {keep[0]} не прошла допуск в этом прогоне "
-                         f"(не судилась или провалила); цепочка {before} оставлена как была", person_key=None)
+                         f"(не судилась или провалила); цепочка {before} оставлена как была", person_key=None,
+                         detail=[f"{role}:{head}:next_not_admitted"])
             out.append({"role": role, "before": before, "after": before, "all_failed": False,
                         "next_not_admitted": True})
             continue
         _put(f"model.{role}", value_json=keep)
+        removed = sorted(failed & {_canonical_id(client, m) for m in before})
         notify.fault(f"llm_admission: роль {role} — сняты с цепочки после двух провалов допуска подряд: "
-                     f"{sorted(failed & {_canonical_id(client, m) for m in before})}; было {before}, стало {keep}. "
-                     f"Откат: system_config model.{role} = {json.dumps(before)}", person_key=None)
+                     f"{removed}; было {before}, стало {keep}. "
+                     f"Откат: system_config model.{role} = {json.dumps(before)}", person_key=None,
+                     detail=[f"{role}:{m}:removed" for m in removed])
         out.append({"role": role, "before": before, "after": keep, "all_failed": False})
     return out
 
@@ -624,6 +628,13 @@ def run_admission(force: bool = False, dry_run: bool = False, notify: bool = Fal
     if b is None:
         return {"skipped": "бюджет допуска не задан (llm.admission.budget) — без денег владельца не прогоняю"}
     import hai_core
+    import llm_client
+    if client is None and llm_client.provider() != provider:
+        # This entry point uses the owner's admission corpus. Never send it to
+        # an inferred foreign provider; foreign admission has its own entry point.
+        reason = "installation provider differs from admission corpus; use --provider explicitly"
+        logging.getLogger(__name__).warning(reason)
+        return {"skipped": reason}
     client = client or hai_core.get_client()
     listed = [{"id": m.id, "created_at": str(getattr(m, "created_at", ""))} for m in client.models.list(limit=100)]
     corpus = load_admission_corpus()
@@ -666,7 +677,7 @@ def run_admission(force: bool = False, dry_run: bool = False, notify: bool = Fal
             import notify
             report.setdefault("errors", []).append({"model": model, "role": role, "error": f"{type(e).__name__}: {e}"[:300]})
             notify.fault(f"llm_admission: {model} ({role}) — сбой вызова, не вердикт: {type(e).__name__}: {str(e)[:200]}",
-                         person_key=None)
+                         person_key=None, detail=[f"{role}:{model}:call_error"])
             continue
         passed = _role_passed(suites, need)
         v = verdicts.get(model) or {"model": model, "roles": {}}
@@ -795,14 +806,19 @@ def owner_verdicts() -> dict:
 
 
 def table_drift(table_file: Path | None = None) -> list[str]:
-    """Чем раздел anthropic таблицы выпуска отстал от допуска владельца (пусто — не отстал)."""
+    """Чем раздел anthropic таблицы выпуска отстал от допуска владельца (пусто — не отстал).
+    Модель, которую эта база не судила, — не отставание: на чужой установке вердиктов
+    владельца нет, и каждая строка таблицы давала ежедневный сбой (карточка report:f3bc9d,
+    12 отчётов с трёх установок, 08.11)."""
     want = export_anthropic_verdicts(owner_verdicts())
     have = json.loads((table_file or _TABLE_FILE).read_text(encoding="utf-8")).get("anthropic") or {}
     out = []
     for role in sorted(set(want) | set(have)):
         for model in sorted(set(want.get(role, {})) | set(have.get(role, {}))):
             w, h = want.get(role, {}).get(model), have.get(role, {}).get(model)
-            if (w or {}).get("passed") != (h or {}).get("passed"):
+            if w is None:
+                continue
+            if w.get("passed") != (h or {}).get("passed"):
                 out.append(f"{role}/{model}: в базе {w and w['passed']}, в таблице {h and h['passed']}")
     return out
 

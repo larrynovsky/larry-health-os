@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/data_ingestion_paths.md sha256:7a230161f813 -->
+<!-- translation-of: docs/reference/data_ingestion_paths.md sha256:162beec57a4f -->
 **English** · [Русский](data_ingestion_paths.md)
 
 # Data ingestion — paths, trigger conditions, schedules
@@ -43,6 +43,27 @@ Processed files are archived with `shutil.copy2()` into `hae_archive/`.
 Settings → Metrics in the HAE app. The workaround is parsing the binary `.hae`
 from AutoSync: regex on the ASCII markers `systol` / `iastol`, a cutoff range of
 60–200 mmHg (C-34).
+
+### Sleep reads and late exports (contract 2026-11-08)
+
+`metrics_db` owns the read/write boundary, exposed through the `health_db` facade.
+When `raw.sleep` is absent, `get_day()` reconstructs sleep from flat columns in
+hours, with unknown stages left as `None`. Its source is `AppleHealth` when the
+Apple witness matches the total, otherwise `flat`. An existing Oura block stays
+unchanged. HAE can replace its own previous sleep values, but cannot replace an
+Oura sleep block. The daily JSON format is unchanged. `migrate_all_json()` passes the complete
+file in one upsert: Oura if the file or sleep block has `source=Oura`, sleep has
+`contributors`, or any of `readiness_score`, `resilience`, `stress`, `hrv_balance`,
+`body_temperature`, `recovery_index`, `breathing_disturbance` is present;
+otherwise AppleHealth. Mixed files retain the Oura path.
+Previously mislabelled database rows are not repaired automatically.
+
+`get_day()` reads current SQLite data on every call. Replacing partial Apple
+sleep makes fresh data visible to the next consumer without a dirty flag,
+report rewrite, or automatic resend. SQLite failures roll back the write;
+the importer logs a warning and retains the JSON archive for replay.
+
+Oracle: `tests/integration/test_uc_a_03_hae_merge.py::test_apple_sleep_read_late_update_and_oura_shape`.
 
 ## Lab reports (JPEG/PDF)
 

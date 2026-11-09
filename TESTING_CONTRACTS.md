@@ -36,7 +36,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 - Источник: **только документ от врача** после консультации
 - Валидность: до даты `next_appointment`
 - Тревога: если `next_appointment` прошла и `periods` не обновлены
-- Поездки (calendar_sync): обновляются hourly, тревога если > 2ч без синка при наличии активной поездки
+- Поездки в `periods` не хранятся с 06.11.2026 (решение владельца, нить macbook-kayak-oura): их знает только бриф — из Google Calendar (`calendar_cache.json`, свежесть судит `check_calendar_freshness`). Исторические строки `type='travel'` остаются как история.
 
 ### Схемы требующие реализации
 - `problem_list`: нужно поле `review_date TEXT` — обязательно при создании записи
@@ -114,7 +114,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 
 <!-- BEGIN AUTOGEN: integrity-sensors (gen_testing_contracts.py) -->
 
-### Реестр датчиков целостности (190 шт., генерируется)
+### Реестр датчиков целостности (198 шт., генерируется)
 
 > Источник: `integrity_tests.py`. Таблица построена из AST — не редактировать руками, менять код. launchd 07:50 → triage 08:00.
 
@@ -131,6 +131,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | открытые проблемы описаны простыми словами | `check_problem_plain_summary` | Открытая проблема несёт описание простыми словами (27.09, волна 4). Медицинский текст — |
 | протоколы читаются | `check_protocols` | — |
 | задачи читаются (open + overdue) | `check_tasks_pipeline` | — |
+| <dynamic> | `check_lab_task_pairs` | Conflicting or duplicate open lab requests need reconciliation, not auto-close. |
 | активность задач за 14 дней | `check_recent_task_activity` | — |
 | канал вопрос→ответ целостен | `check_question_answer_integrity` | Вопрос, закрытый без ответа; недоставленный вопрос; ответ без следа в памяти. |
 | очередь вопросов сливается за свой срок | `check_question_queue_drains` | Очередь вопросов обязана СЛИВАТЬСЯ за время, которое сама себе назначает. |
@@ -157,6 +158,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | живость uncommitted_watchdog (§14) | `check_watchdog_liveness` | WARN: §14 terminus — сам uncommitted_watchdog мог тихо умереть (launchd |
 | незакоммиченная работа на MacBook (по снимку) | `check_macbook_uncommitted` | НЕЗАКОММИЧЕННАЯ РАБОТА НА MacBook — судится отсюда, по снимку, а не по опросу ноутбука. |
 | код MacBook доехал до Studio (по снимку) | `check_macbook_head_deployed` | КОД С MacBook НЕ ДОЕХАЛ ДО STUDIO — и об этом никто не сказал (27.09, решение владельца). |
+| на MacBook только разрешённые джобы (по снимку) | `check_macbook_health_jobs` | ДЖОБ ДАННЫХ НА MacBook — падает «громко», но в журнал, который никто не читает. |
 | копия работы нитей (не один экземпляр) | `check_thread_work_has_a_second_copy` | РАБОТА НИТИ В ОДНОМ ЭКЗЕМПЛЯРЕ — вопрос ПОСТРАДАВШЕГО, не строителя. |
 | нить без строки в реестре (сирота) | `check_threads_have_index_row` | НИТЬ-СИРОТА: ветка жива, а в реестре нитей её нет — её не видит ни одна сессия. |
 | захват чужого файла в коммит (по ленте снимков) | `check_captured_files` | ЗАХВАТ ЧУЖОГО ФАЙЛА В КОММИТ — вопрос человеку, не вердикт машины. |
@@ -193,9 +195,9 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | давление: дневное значение — среднее замеров Withings, второго писателя нет | `check_bp_day_is_withings` | WARN: дневное давление разошлось с замерами Withings (нить bp-withings-owner, 06.10). |
 | архив сырья HAE сжат (ротатор, старше 15 дней) | `check_hae_raw_archive_compressed` | FAIL: в архиве сырья HAE лежат несжатые выгрузки старше 15 дней (решение владельца 26.09). |
 | weekly_digest: доставлен всем тенантам (понедельник) | `check_weekly_digest_delivered` | Нить weekly-digest (2026-09-05). Понедельник: файл дайджеста ПРОШЛОЙ недели есть и |
-| clinical_kb населён (пол/рамка еды не вырождены, Ф2) | `check_clinical_kb_populated` | FAIL: clinical_kb ПУСТ → medical_frame вырождается в standard-рамку И assert_floor молчит → |
+| clinical_kb населён (пол/рамка еды не вырождены, Ф2) | `check_clinical_kb_populated` | WARN only for an explicitly uninstalled, intact public pack; defects FAIL. |
 | покрытие effect_allele (strand) | `check_effect_allele_coverage` | Покрытие strand-резолюции effect_allele (genome strand-fix Ф7). |
-| clinical_kb реплика свежа (source==table, Ф2) | `check_clinical_kb_replica_fresh` | FAIL: clinical_kb в БД тенанта РАЗОШЁЛСЯ с git-источником (yaml сменился, init_db не |
+| clinical_kb реплика свежа (source==table, Ф2) | `check_clinical_kb_replica_fresh` | Use the same readiness verdict; public absence is not a successful assessment. |
 | свежесть lab_results | `check_lab_freshness` | Анализы не старше LAB_ALERT_DAYS (9 мес = тревога, 6 мес = предупреждение). |
 | канон lab_results: нет невозможных значений и конфликтов | `check_lab_canon_health` | Канон lab_results: нет физиологически невозможных значений. |
 | промоут не стоит (очередь staging движется) | `check_promotion_backlog_stale` | Труба распознавания не должна забиваться на ВЫХОДЕ молча. |
@@ -252,7 +254,8 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | Oura-колонки заполняются свежими данными (#169) | `check_oura_column_completeness` | W5K-#169 (2026-05-14): свежесть Oura-колонок в daily_metrics. |
 | все doc-файлы на месте, CHANGELOG и SECURITY.md валидны | `check_doc_structure` | Проверяет что ключевые doc-файлы существуют после Diataxis-реструктуризации. |
 | Переводы документации не отстают от оригинала | `check_translations_fresh` | Английский перевод отстал от русского оригинала (28.09.2026, решение владельца: |
-| survivorship: assessments freshness | `check_assessments_freshness` | Каждый инструмент — последнее заполнение не старше cadence_days + 14. |
+| assessment producer liveness | `check_assessment_producer_liveness` | Fail when production is due but neither a task nor an answer is recent. |
+| survivorship: assessments freshness | `check_assessments_freshness` | Каждый инструмент — последнее заполнение в пределах schedule_policy. |
 | survivorship: PRO-балл в одной размерности | `check_pro_score_unit_single` | PRO-балл под одним именем хранится в ОДНОЙ размерности (§16 клауза идентичности: |
 | литература: literature_search freshness | `check_literature_freshness` | Последний literature_search покрывает последний плановый запуск по живому плисту |
 | литература: literature_search партнёра | `check_literature_freshness_partner` | Поиск литературы партнёра покрывает свой последний плановый запуск (решение владельца 27.09). |
@@ -270,7 +273,12 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | PRS синхронизированы с геномом (WFR, Phase H) | `check_prs_genome_sync` | PRS (Wave 4, Phase H) синхронизированы с последним импортом генома. |
 | Свежесть бэкапа (каждый плановый запуск) | `check_backup_freshness` | Свежайший ежедневный бэкап КАЖДОГО тенанта покрывает последний плановый запуск бэкапа. |
 | Размер DB < 500MB | `check_db_size` | — |
+| Место на диске под докачку справочника PGS | `check_disk_room_for_reference` | Хватит ли диска Studio на следующую докачку справочника PGS (снимок + рост). |
+| У справочника PGS есть живой писатель | `check_reference_has_writer` | Докачка справочника PGS жива: последний прогон, оставивший кандидатов, сменился |
 | Логи вне конфига ротации | `check_logs_all_listed` | Слепое пятно ротации: лог РАСТЁТ, а в конфиге ротации его нет. |
+| Мост почты агентов жив | `check_agent_mail_bridge_alive` | Bridge heartbeat must be readable and no older than ten minutes. |
+| Письма агентов подтверждены | `check_agent_mail_unacked` | A letter may not wait for its owner/ack for more than thirty minutes. |
+| Сигналы ассистенту выполняются | `check_agent_signals_ran` | Enabled assistant channel must complete a daily pass within its configured SLA. |
 | Очередь отчётов о сбоях разбирается | `check_bug_outbox_drains` | Очередь отчётов /bug разбирается (нить bug-report, 19.10). |
 | Сбои бота и служб за сутки | `check_fault_journal` | Решение владельца 2026-09-28: сбои идут в ночной цикл, не в Telegram. |
 | Ротация логов жива и чиста | `check_logrotate_liveness` | Ротатор жив И отработал чисто (§14, находка producer_registry 01.09). |

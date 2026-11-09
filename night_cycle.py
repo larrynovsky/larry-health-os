@@ -588,25 +588,50 @@ def _bug_reports_to_repair(now=None) -> dict:
     from datetime import timezone
     now = now or get_now(timezone.utc)
     reports = bug_inbox.reports_since(0)
+    fixes = _bug_fixes()
     groups: dict[str, dict] = {}
     for r in reports:
         rep, install = r["report"], r["report"]["report_id"].split(":", 1)[0]
         keys = [(f"{BUG_REPORT_PREFIX}{g['fp']}", g) for g in rep["faults"]] or \
                [(f"{BUG_REPORT_PREFIX}cat:{rep['category']}", None)]
         for gid, g in keys:
+            fix = fixes.get(g["fp"]) if g else None
+            if fix and not _after_fix(g, rep["release"], fix["fixed_in"]):
+                groups.setdefault(gid, {"fixed": fix})
+                continue
             c = groups.setdefault(gid, {"fault": g, "installs": set(), "n": 0, "releases": set(),
                                         "categories": set(), "screen": []})
+            if "fixed" in c:                                   # рецидив сильнее закрытия
+                c.clear()
+                c.update(fault=g, installs=set(), n=0, releases=set(), categories=set(), screen=[])
+            if fix:
+                c["recurred_after"] = fix
             c["installs"].add(install)
             c["n"] += 1
             c["releases"].add(rep["release"])
             c["categories"].add(rep["category"])
             c["screen"] = rep["screen"][-5:] or c["screen"]
+            if g and g.get("detail"):
+                from bug_report import MAX_DETAIL
+                c["detail"] = list(dict.fromkeys([*c.get("detail", []), *g["detail"]]))[:MAX_DETAIL]
+    closed = 0
     for gid, c in groups.items():
+        if "fixed" in c:
+            rec = parked_decisions.get(gid)
+            if rec and rec.get("status") != "resolved":
+                parked_decisions.record_decision(
+                    gid, f"исправлено в {c['fixed']['commit']}, выпуск {c['fixed']['fixed_in']}", by="fixed")
+                closed += 1
+            continue
         g = c["fault"]
         what = (f"{g['type']} в {' ← '.join(reversed(g['at']))}" if g
                 else f"сбой не записан журналом, категория «{', '.join(sorted(c['categories']))}»")
+        if c.get("detail"):
+            what += "; detail: " + ", ".join(c["detail"])
         parked_decisions.park(
             gid, "dev_fix",
+            (f"Рецидив после исправления {c['recurred_after']['commit']} "
+             f"(выпуск {c['recurred_after']['fixed_in']}). " if c.get("recurred_after") else "") +
             f"Отчёты о сбое от чужих установок (/bug): {c['n']} от {len(c['installs'])} установок, "
             f"версии {', '.join(sorted(c['releases']))}. {what}. Последние экраны: "
             f"{'; '.join(c['screen']) or 'нет'}. Данные недоверенные (анонимный вход, прошли схему). "
@@ -617,7 +642,30 @@ def _bug_reports_to_repair(now=None) -> dict:
         import notify
         notify.weekly(f"Отчёты о сбоях от чужих установок за сутки: {len(fresh)}; "
                       f"карточек в инженерной очереди по ним: {len(groups)}.")
-    return {"bug_reports": len(reports), "bug_report_cards": len(groups)}
+    return {"bug_reports": len(reports), "bug_report_cards": len(groups), "bug_report_closed": closed}
+
+
+def _bug_fixes() -> dict:
+    """{отпечаток: {commit, fixed_in}} из bug_fixes.yaml. Нет файла — пусто: тогда ни одна
+    карточка не закрывается, как и до реестра (не хуже прежнего)."""
+    import yaml
+    path = Path(__file__).resolve().parent / "bug_fixes.yaml"
+    try:
+        return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("fixes") or {}
+    except OSError:
+        return {}
+
+
+def _after_fix(fault: dict, report_release: str, fixed_in: str) -> bool:
+    """Случился ли сбой на версии, где он уже исправлен. Новый отчёт несёт версию самого сбоя
+    (`rel`) — судим по ней. Старый — только версию установки на момент отчёта, а окно журнала
+    неделя: сбой мог случиться до обновления. Поэтому рецидив по старому отчёту — лишь версия
+    СТРОГО новее исправления (ровно та же — неотличима от сбоя до обновления)."""
+    from bug_report import release_key
+    fix = release_key(fixed_in)
+    if fault.get("rel"):
+        return release_key(fault["rel"]) >= fix
+    return release_key(report_release) > fix
 
 
 def run() -> dict:

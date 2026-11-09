@@ -126,14 +126,8 @@ def frozen_findings(frozen: Path = FROZEN, stamp: Path | None = None,
 
 def _should_send(signature: str, state: Path, now: float) -> bool:
     """Новое расхождение — сразу; то же самое — не чаще раза в REPEAT_S."""
-    try:
-        last = json.loads(state.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        last = {}
-    if last.get("sig") == signature and now - last.get("at", 0) < REPEAT_S:
-        return False
-    state.write_text(json.dumps({"sig": signature, "at": now}), encoding="utf-8")
-    return True
+    from notify import claim_repeat
+    return claim_repeat(signature, state, now, REPEAT_S)
 
 
 def main() -> int:

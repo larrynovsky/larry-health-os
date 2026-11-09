@@ -41,7 +41,6 @@ FILE_TO_UC_GROUP: dict[str, list[str]] = {
     "import_all.py": ["A"],
     "import_oura.py": ["A"],
     "import_apple_health.py": ["A"],
-    "calendar_sync.py": ["A"],
     "import_medical_docs.py": ["A"],
     "lab_extractor.py": ["A"],
 

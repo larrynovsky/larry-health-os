@@ -229,3 +229,41 @@ def test_lab_scope_deferred_changes_label_not_eligibility(tmp_path, monkeypatch)
     monkeypatch.setattr(I, "check_lab_path_scope", lambda: r2)
     I._lab_path_scope_warn()
     assert cap and cap[0].startswith("Lab-путь готов к возврату"), cap
+
+
+@pytest.mark.owner_data
+def test_lab_scope_deferred_by_margin_not_by_date(tmp_path, monkeypatch):
+    """Вариант В владельца (03.11): отсрочка держится, пока хоть один годный аналит не набрал
+    lab_n_min + until_margin; набрали все — снова ежедневный вопрос. Дата тут не участвует."""
+    import shutil
+    import yaml
+    monkeypatch.setenv("HEALTH_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("HEALTH_SECRETS_DIR", str(tmp_path))
+    import integrity_tests as I
+    base = tmp_path / "root"
+    shutil.copytree(ROOT / "methodology", base / "methodology")
+    mp = base / "methodology" / "validation_gate" / "data_manifest.yaml"
+    man = yaml.safe_load(mp.read_text(encoding="utf-8"))
+    man["labs"]["reactivation"]["deferred"] = {"until_margin": 2, "reason": "тест"}
+    mp.write_text(yaml.safe_dump(man, allow_unicode=True), encoding="utf-8")
+    cap = []
+    monkeypatch.setattr(I, "warn", lambda n, d="": cap.append((n, d)))
+
+    real = I.check_lab_path_scope
+    dbp = tmp_path / "d.db"
+    _mk_db(dbp, [("HGB", 21), ("MCV", 18), ("WBC", 18)])      # запаса нет
+    r = real(db_path=str(dbp), base=base)
+    assert r["eligible"] and set(r["margin_short"]) >= {"MCV", "WBC"}
+    monkeypatch.setattr(I, "check_lab_path_scope", lambda: r)
+    I._lab_path_scope_warn()
+    assert cap and cap[0][0].startswith("Lab-путь годен, возврат отложен до запаса"), cap
+    assert "MCV 18" in cap[0][1]
+
+    cap.clear()
+    dbp2 = tmp_path / "d2.db"
+    _mk_db(dbp2, [("HGB", 21), ("MCV", 20), ("WBC", 20)])     # пришёл анализ — запас есть
+    r2 = real(db_path=str(dbp2), base=base)
+    assert r2["margin_short"] == {}
+    monkeypatch.setattr(I, "check_lab_path_scope", lambda: r2)
+    I._lab_path_scope_warn()
+    assert cap and cap[0][0].startswith("Lab-путь готов к возврату"), cap

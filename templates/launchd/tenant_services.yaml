@@ -7,6 +7,8 @@
 # Классификация: plans/tenant_services_survey_2026-09-28.md; разведение общего — этап Б
 # плана plans/PLAN_tenant_install_2026-09-28.md (нити tb-checks, cx-tb-*, tb-pgs).
 # Службы машины (одна на установку: ночной цикл, бэкап, ротация логов…) сюда не входят.
+# Provider environment is inherited from placement.yaml native_environment via render_launchd;
+# --tenant --provider overrides it. Tenant secret paths do not relocate the shared LLM key.
 services:
   bot: ready
   calendar-sync: ready
@@ -21,7 +23,7 @@ services:
   survivorship: ready              # свой каталог и конфиг
   reminders-sync: ready            # свой список Reminders «Health (<имя>)»
   longitudinal: ready              # свои артефакты гейта и замок: belief_contract.artifact_path
-  pgs-discovery: ready             # пересчёт по «не посчитано у меня»
+  pgs-discovery: "excluded: докачку и пересчёт шкал запускает бот человека 2-го (jobs/scheduled.py discover_pgs_monthly); отдельная служба 5-го была вторым запуском того же (решение владельца 02.11)"
   integrity-check: ready           # вердикт в <DATA>/logs, находки — оператору
   consilium: ready                 # пишет только в базу человека
   profile-reconciler: ready        # пишет только в базу человека

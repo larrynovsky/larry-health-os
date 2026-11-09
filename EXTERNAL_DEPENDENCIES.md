@@ -252,7 +252,7 @@ macos_integration:
     - launchd                  # scheduled tasks
   last_checked: null
   impact: infra
-  owner: task_agent.py, calendar_client.py, calendar_sync.py
+  owner: task_agent.py, calendar_client.py
   impacted_uc: [UC-G-01, UC-G-02, UC-A-06]
   notes: |
     macOS major upgrade может сломать osascript синтаксис или launchd plist формат.

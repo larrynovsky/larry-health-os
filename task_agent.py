@@ -50,7 +50,8 @@ TASK_EXTRACTOR_PROMPT = """Ты читаешь медицинский отчёт
   "deadline": "YYYY-MM-DD или null",
   "reason": "клиническое обоснование (1 фраза): зачем это нужно именно сейчас",
   "fingerprint": "канонический ключ для дедупликации",
-  "resolution_type": "self_managed|needs_specialist"
+  "resolution_type": "self_managed|needs_specialist",
+  "early_reason": "только для lab_test: почему сдать РАНЬШЕ планового срока, или null"
 }
 
 Правила fingerprint:
@@ -74,11 +75,175 @@ TASK_EXTRACTOR_PROMPT = """Ты читаешь медицинский отчёт
 - НЕ включай абстрактные советы ("продолжать режим", "следить за самочувствием")
 - НЕ включай визиты, которые уже запланированы (проверяй таблицу consultations)
 - deadline: если в тексте есть "к [дата]", "через N дней", "в апреле" — вычисли дату
+- для lab_test срок по плановому расписанию анализов система поставит сама; твой deadline
+  останется, только если отчёт велит сдать РАНЬШЕ плана — тогда early_reason обязателен
+  (одна фраза: клиническая причина). Без причины early_reason = null
 - resolution_type: "needs_specialist" если задача требует рецепта, назначения специалиста,
   исключения рецидива, или действия лицензированного врача; иначе "self_managed"
 - Если задач нет — верни пустой массив []
 
 Отвечай ТОЛЬКО JSON-массивом."""
+
+
+def deadline_from_schedule(t: dict) -> dict:
+    """Срок задачи на анализ ставит расписание, а не модель (план доделок п.1, 07.11.2026).
+
+    Замер 07.11: из 74 пар «аналит задачи ↔ его срок» с расписанием совпали 15 —
+    модель высчитывала дату из прозы отчёта, и задачи противоречили друг другу и
+    письмам ассистенту. Теперь срок = ближайший плановый срок среди упомянутых
+    аналитов (один забор — одна дата), не раньше сегодняшнего дня. Раньше плана —
+    только с названной причиной (early_reason); тогда дата модели остаётся, а причина
+    и плановый срок дописываются в reason, чтобы читатель видел, что это предложение
+    системы. Аналитов с расписанием в тексте нет — дата модели остаётся с пометкой.
+    """
+    import labs_db
+    import lab_canon
+    today = get_today()
+    try:
+        due = labs_db.lab_due(lab_canon.analytes_mentioned(t["content"]), today)
+    except Exception as e:  # noqa: BLE001 — задачу не теряем, но несверенный срок видно
+        log.error(f"Срок задачи не сверен с расписанием ({e}): {t['content'][:60]}")
+        due = {}
+    reason = (t.get("reason") or "").strip()
+    t["origin"] = "system"
+    if not due:
+        t["reason"] = (reason + " " + i18n.t("tasks.lab_deadline_unplanned")).strip()
+        return t
+    first = min(due.values(), key=lambda v: v["due"])
+    planned = max(first["due"], today).isoformat()
+    early = (t.get("early_reason") or "").strip()
+    model = t.get("deadline")
+    if early and model and model < planned:
+        t["reason"] = (reason + " " + i18n.t("tasks.lab_deadline_early", reason=early, planned=planned)).strip()
+        return t
+    t["deadline"] = planned
+    # Происхождение (п.2): «врач» — только если интервал КАЖДОГО аналита задачи из документа
+    # врача; смешанная задача — система, а врачебная часть названа в reason (ревью 07.11, нах. 6).
+    doctor = sorted(k for k, v in due.items() if labs_db.schedule_origin(v.get("source")) == "doctor")
+    if doctor:
+        t["reason"] = (reason + " " + i18n.t("tasks.lab_deadline_doctor", tests=", ".join(doctor))).strip()
+        # «Врач» — если КАЖДЫЙ запрошенный аналит с врачебным сроком, а не каждый найденный срок:
+        # ферритин без срока не становится назначением врача (повторное ревью 07.11, находка 3).
+        asked = {lab_canon.normalize(n) for n in lab_canon.analytes_mentioned(t["content"])}
+        if asked and asked <= set(doctor):
+            t["origin"] = "doctor"
+    return t
+
+
+def _lab_ask(task: dict) -> set | None:
+    """Канонические аналиты просьбы, если ВСЯ просьба распознана; иначе None.
+
+    Текст без хвоста «последний раз сдано» (справка, не просьба). Если у задачи есть ключ
+    отчёта `lab:A,B,…`, каждый его элемент обязан быть известным аналитом: «lab:CBC,Ferritin»
+    с неизвестным CBC значит, что часть просьбы (панель словом) не распознана, и закрыть
+    задачу одним ферритином нельзя (ревью 07.11, находка 3)."""
+    import gp_context
+    import lab_canon
+    # Полнота просьбы проверяется только по ключу отчёта `lab:A,B`: по свободному тексту не
+    # узнать, что «ОАК» — тоже анализ (повторное ревью 07.11, находка 2). Нет ключа — None.
+    fp = task.get("fingerprint") or ""
+    if not fp.startswith("lab:"):
+        return None
+    items = {lab_canon.normalize(x.strip()) for x in fp[4:].split(",") if x.strip()}
+    if not items or any(x not in lab_canon.CANONICALS for x in items):
+        return None
+    names = {lab_canon.normalize(n) for n in
+             lab_canon.analytes_mentioned(gp_context.strip_lab_recency(task.get("content") or ""))}
+    return items | names
+
+
+def _tenant_zone():
+    """Пояс тенанта — последний, установленный штатным распознавателем пояса брифа
+    (config schedule.active_tz, пишет jobs/scheduled._store_active_tz). Не пояс процесса:
+    в контейнере он может быть любым (повторное ревью 07.11, находка 1). Нет — None."""
+    from zoneinfo import ZoneInfo
+    import config_db
+    name = config_db.get_config("schedule.active_tz")
+    try:
+        if isinstance(name, str) and name:
+            return ZoneInfo(name)
+    except (KeyError, ValueError):
+        pass
+    # Громко, но не чаще раза в сутки: без пояса автозакрытие анализов стоит (ревью №3, 07.11).
+    _report_no_zone(name)
+    return None
+
+
+def _report_no_zone(name) -> None:
+    import health_db
+    import notify
+    from pathlib import Path
+    from _time_inject import get_now
+    try:
+        state = Path(health_db.DB_PATH).parent / "lab_close_zone_fault.json"
+        if notify.claim_repeat(f"no_zone:{name!r}", state, get_now().timestamp(), 24 * 3600):
+            notify.fault(f"lab_task_evidence: пояс тенанта не установлен ({type(name).__name__}) — "
+                         "задачи на анализы не закрываются результатом", person_key=None)
+    except OSError as e:
+        log.warning(f"lab_task_evidence: отметка о поясе не записана ({e})")
+
+
+def _created_local_date(task: dict):
+    """Дата создания задачи по местному времени ТЕНАНТА: created_at пишет SQLite в UTC
+    (22:30 UTC 10-го — уже 11-е по местному времени; ревью 07.11). Пояс неизвестен — None."""
+    from datetime import datetime, timezone
+    raw, zone = task.get("created_at"), _tenant_zone()
+    if not raw or zone is None:
+        return None
+    return datetime.fromisoformat(str(raw).replace(" ", "T")).replace(tzinfo=timezone.utc).astimezone(zone).date()
+
+
+def lab_task_closable_by_result(task: dict) -> bool:
+    """Закроется ли задача сама, когда придёт результат: lab_test, вся просьба распознана и
+    известна дата создания. Такую задачу слово ассистента «сделано» не закрывает. Без даты
+    создания — может (иначе её не закрыть ничем; ревью 07.11, находка 4)."""
+    # Пояс тенанта сюда не входит: без него результат задачу пока не закрывает, но и слово
+    # ассистента не должно (иначе пустой пояс открывал обход правила; ревью №3, 07.11).
+    return task.get("type") == "lab_test" and _lab_ask(task) is not None and bool(task.get("created_at"))
+
+
+def close_lab_tasks_by_results() -> list[int]:
+    """Задача «сдать анализ» закрывается ПРИХОДОМ РЕЗУЛЬТАТА (план доделок п.4, 07.11.2026).
+
+    Замер 07.11: задачи на анализы закрывались галочкой и словом «сделано» — #289 без единого
+    результата, ферритин четыре раза. Закрытие — только когда по КАЖДОМУ аналиту просьбы есть
+    результат, взятый ПОСЛЕ дня создания задачи (тот же день не считается: забор мог быть до
+    задачи) и не позже сегодня. Аналит, у которого в истории больше одного материала (кровь и
+    моча), автоматически не закрывается — какой материал просили, по тексту не установить (§16).
+    Слово ассистента такую задачу не закрывает; ручное закрытие хозяином (/done, дашборд) —
+    его решение и остаётся (ревью 07.11, находка 5: граница названа, не охраняется).
+    """
+    import health_db as db
+    import labs_db
+    today = get_today()
+    # Отложенные тоже: ночной сторож пар читает open+snoozed (повторное ревью 07.11, находка 5).
+    with db.get_conn() as conn:
+        tasks = [dict(r) for r in conn.execute(
+            "SELECT * FROM tasks WHERE type='lab_test' AND status IN ('open','snoozed')")]
+    if not tasks:
+        return []
+    latest = labs_db.latest_result_by_specimen()
+    closed = []
+    for t in tasks:
+        names, made = _lab_ask(t), _created_local_date(t)
+        if not names or made is None:
+            continue
+        got = {}
+        for n in names:
+            by_spec = latest.get(n) or {}
+            if len([c for c in by_spec if c is not None]) > 1:
+                break                                   # кровь и моча в истории — неоднозначно
+            d = max(by_spec.values(), default="")
+            if not d or not (made.isoformat() < d <= today.isoformat()):
+                break
+            got[n] = d
+        else:
+            parts = ", ".join(f"{n} {got[n]}" for n in sorted(got))
+            if db.resolve_task(t["id"], i18n.t("tasks.closed_by_result", parts=parts), "completed"):
+                closed.append(t["id"])
+    if closed:
+        log.info(f"Задачи на анализы закрыты результатом: {closed}")
+    return closed
 
 
 def _notify_specialist(text: str):
@@ -256,6 +421,35 @@ def _parse_tasks_json(raw: str) -> list:
         return objs
 
 
+def _assessment_requested(content, instruments):
+    """Conservative request match: catalogue names/ids, never clinical literals.
+
+    Only explicit fill/repeat/take requests; ambiguity retains the original task.
+    Normalize punctuation so an id with underscores matches its printed hyphens.
+    """
+    from assessment_importer import instrument_source_id
+    def words(value):
+        return " ".join(re.findall(r"[^\W_]+", value.casefold()))
+    text = words(content)
+    if not re.search(r"\b(?:заполн\w*|прой\w*|пройти|повтор\w*|перезаполн\w*|fill|complete|repeat|retake|take)\b", text):
+        return None
+    if re.search(r"\b(?:не|not|don t)\b", text):
+        return None
+    matches = []
+    for ins in instruments:
+        aliases = [ins["id"], instrument_source_id(ins["id"])]
+        for key in ("name", "title", "title_ru", "name_ru", "aliases"):
+            value = ins.get(key, [])
+            aliases.extend(value.values() if isinstance(value, dict) else
+                           value if isinstance(value, list) else [value])
+        if any(isinstance(a, str) and words(a) and
+               f" {words(a)} " in f" {text} " for a in aliases):
+            matches.append(ins)
+    if len(matches) > 1:
+        log.warning("Assessment request is ambiguous; retaining text task")
+    return matches[0] if len(matches) == 1 else None
+
+
 def extract_tasks_from_report(report_text: str, source: str,
                                source_date: str = None, report_date: date = None) -> list[dict]:
     """
@@ -298,6 +492,28 @@ def extract_tasks_from_report(report_text: str, source: str,
     except Exception as e:
         log.warning(f"Task extractor parse error: {e}")
         return []
+
+    # Catalogue routing precedes semantic dedup: an old text reminder must not
+    # suppress the executable questionnaire that replaces it (C-191).
+    import assessment_scheduler
+    for task in tasks_raw:
+        task.pop("_assessment", None)  # internal routing evidence cannot come from the model
+    try:
+        catalogue = assessment_scheduler.load_instruments()
+        applicable = None
+        for task in tasks_raw:
+            ins = _assessment_requested(task.get("content") or "", catalogue)
+            if ins is not None:
+                if applicable is None:
+                    applicable = {item["id"] for item in
+                                  assessment_scheduler.load_instruments(applicable_only=True)}
+                if ins["id"] in applicable:
+                    task["_assessment"] = ins
+                    task["type"] = "assessment"
+                else:
+                    log.warning("Assessment %s is not applicable; retaining text task", ins["id"])
+    except (OSError, ValueError) as exc:
+        log.warning("Assessment catalogue unavailable; retaining text tasks: %s", exc)
 
     # Кто из кандидатов в question ДЕЙСТВИТЕЛЬНО адресован человеку — решает тот же
     # судья, что и на подъёме из памяти. Экстрактор ставил тип сам и путал действие
@@ -362,11 +578,21 @@ def extract_tasks_from_report(report_text: str, source: str,
                     log.warning(f"Сбой следа не записан в журнал ({e2})")
             t["content"] = None
 
+    import task_guard
+    guard_batch = task_guard.start_batch()
     saved = []
     for t in tasks_raw:
         if not t.get("content"):
             continue
         try:
+            if t.get("_assessment") is not None:
+                assessment = assessment_scheduler.ensure_task(
+                    t["_assessment"], source=source, source_date=source_date,
+                    deadline=t.get("deadline"), reason=t.get("reason", ""),
+                    priority=t.get("priority", "medium"))
+                if assessment is not None:
+                    saved.append(assessment)
+                continue
             resolution_type = t.get("resolution_type", "self_managed")
             # Дедупликация save_task смотрит только на ОТКРЫТЫЕ задачи, поэтому
             # закрытый вопрос GP задаёт заново на следующей неделе. Срок годности
@@ -377,7 +603,15 @@ def extract_tasks_from_report(report_text: str, source: str,
                 if not ask:
                     log.info(f"Вопрос не перезадаётся ({why}): {t['content'][:60]}")
                     continue
+            # Происхождение ставит код, не модель: поле из ответа экстрактора отбрасывается
+            # (ревью 07.11, находка 7 — модель могла объявить своё предложение назначением врача).
+            t.pop("origin", None)
+            if t.get("type") == "lab_test":
+                t = deadline_from_schedule(t)
+            # Сторож видит задачу уже со сроком из расписания и происхождением (п.3б после п.1–2).
+            guard_verdicts = _shadow_task_guard({**t, "source": source}, guard_batch)
             task_id = db.save_task(
+                guard_verdicts=guard_verdicts,
                 source=source,
                 type_=t.get("type", "action"),
                 content=t["content"],
@@ -393,6 +627,7 @@ def extract_tasks_from_report(report_text: str, source: str,
                 # «таких задач не приходило».
                 judge_verdict=(t.get("_judge") or {}).get("verdict"),
                 judge_reason=(t.get("_judge") or {}).get("reason"),
+                origin=t.get("origin") or "system",   # отчёт GP — вывод системы, если не доказано иное
             )
             if task_id is None:
                 log.info(f"Task skipped (duplicate): {t['content'][:60]}")
@@ -410,6 +645,7 @@ def extract_tasks_from_report(report_text: str, source: str,
                 "reason": t.get("reason", ""),
                 "fingerprint": t.get("fingerprint", ""),
                 "resolution_type": resolution_type,
+                "origin": t.get("origin") or "system",
             })
             log.info(f"Task saved #{task_id}: [{t.get('type')}] {t['content'][:60]}")
         except Exception as e:
@@ -544,6 +780,17 @@ def _dedup_once(new_items: list[dict], known: list[dict]) -> dict:
                                      {int(k["id"]) for k in known})
 
 
+def _shadow_task_guard(task: dict, batch) -> list[dict]:
+    """Optional audit boundary: no provider/config/snapshot failure can lose a task."""
+    import task_guard
+    try:
+        return task_guard.audit_new_task(task, batch=batch)
+    except Exception:  # optional subsystem boundary; never log payloads/exceptions
+        log.warning("task_guard: evaluation unavailable; task retained without pair audit")
+        task_guard.report_failure()
+        return []
+
+
 def judge_task_duplicates(new_items: list[dict], known: list[dict]) -> dict:
     """{id_новой: {verdict, ids, reason}} для каждой новой задачи, которую судья рассудил.
 
@@ -675,7 +922,9 @@ def _format_tasks_summary(tasks: list[dict], reminders_created: int) -> str:
 
     sorted_tasks = summary_tasks(tasks)
 
-    lines = [i18n.t("tasks.summary.heading", count=len(tasks), reminders_created=reminders_created)]
+    import task_route
+    heading = "tasks.summary.heading_assistant" if task_route.route() == "assistant" else "tasks.summary.heading"
+    lines = [i18n.t(heading, count=len(tasks), reminders_created=reminders_created)]
     for number, t in enumerate(sorted_tasks, 1):
         icon = TYPE_EMOJI.get(t.get("type", "action"), "\U0001f4cb")
         deadline = i18n.t("tasks.deadline", deadline=t['deadline']) if t.get("deadline") else ""
@@ -833,6 +1082,15 @@ def create_reminders_for_tasks(tasks: list[dict]) -> int:
 
     Задачи, у которых ответ — текст, а не факт делания, ремайндера не получают:
     два носителя одного предмета разъезжаются (закрыл галочкой — ответа нет)."""
+    import task_route
+    if task_route.route() == "assistant":   # решение владельца 07.11: дела — ассистенту
+        try:
+            return task_route.hand_over(tasks)
+        except (OSError, ValueError) as exc:
+            import notify
+            notify.fault(f"task_route: дела ассистенту не переданы ({type(exc).__name__}: {exc})",
+                         person_key=None)
+            return 0
     created = 0
     for task in tasks:
         if task.get("type") in REMINDER_TYPES_EXCLUDED:
@@ -857,6 +1115,8 @@ def record_answer(task_id: int, answer_text: str,
     сырой текст остаётся сырым (R3 плана — модель уже сочиняла даты химии, и
     переформулировать ответ пациента ей здесь нечего).
 
+    Для source=assistant_fact:* только явное да/yes сохраняется тем же путём;
+    нет/no → dismissed без памяти, иной ответ оставляет вопрос открытым.
     Ключ факта = fingerprint вопроса, поэтому повторный ответ вытесняет прежний
     (supersede-by-key), а не ложится рядом. Временной класс проставляет
     memory_facts_db структурно (class_from_structure), дефолт standing.
@@ -878,7 +1138,17 @@ def record_answer(task_id: int, answer_text: str,
         log.warning(f"record_answer: задача #{task_id} не найдена среди открытых")
         return False
 
-    db.resolve_task(task_id, text, status="completed")
+    from tasks_db import ASSISTANT_FACT_SOURCE
+    if (task.get("source") or "").startswith(ASSISTANT_FACT_SOURCE):
+        import i18n
+        answer = text.casefold().strip(" .!")
+        if any(answer == i18n.t("tasks.assistant_fact.no", lang=lang) for lang in i18n.LANGS):
+            return db.resolve_task(task_id, text, status="dismissed")
+        if not any(answer == i18n.t("tasks.assistant_fact.yes", lang=lang) for lang in i18n.LANGS):
+            return False  # ambiguous is not consent; keep the question open
+
+    if not db.resolve_task(task_id, text, status="completed"):
+        return False
 
     # Ремайндера у вопроса нет по построению, но задача другого типа могла прийти
     # тем же путём (/done с текстом) — тогда её ремайндер надо закрыть.
@@ -1191,6 +1461,8 @@ def promote_memory_questions(limit: int | None = None) -> list[dict]:
 
     open_keys = {_dedup_key(r["content"]) for r in db.get_open_questions()}
 
+    import task_guard
+    guard_batch = task_guard.start_batch()
     created = []
     for mem_id, v in verdicts.items():
         if v["verdict"] not in ASKING_VERDICTS:
@@ -1220,7 +1492,11 @@ def promote_memory_questions(limit: int | None = None) -> list[dict]:
             mf.retire_fact(int(mem_id), "дубль уже открытого вопроса")
             continue
         open_keys.add(key)
+        guard_verdicts = _shadow_task_guard({"type": "question", "content": text,
+                                             "source": "memory_question", "origin": str(mem_id)},
+                                           guard_batch)
         task_id = db.save_task(
+            guard_verdicts=guard_verdicts,
             source="memory_question",
             type_="question",
             content=text,

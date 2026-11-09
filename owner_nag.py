@@ -2,7 +2,7 @@
 есть нерешённые гейты, и повторяет, пока решение не ЗАПИСАНО.
 
 Раз в вызов смотрит открытые гейты владельца (owner_gates: parked_decisions.list_open()
-без инженерной очереди dev_fix); если они есть И
+без инженерной очереди dev_fix); если ремонт доступен, они есть И
 сейчас окно 08–20 (местное время дома) — шлёт ОДНО служебное сообщение оператору
 (notify_operator), консолидируя все гейты в один звонок. Кнопок нет: действие —
 в сессии Claude, не в боте. Звонок раз в день (28.09); запуски launchd после
@@ -189,27 +189,23 @@ def _compose(gates: list[dict], today: Optional[date] = None) -> str:
     одна фраза для Claude: она открывает полные карточки с вариантами и ценой.
     """
     today = today or get_now(HOME_TZ).date()
-    lines = [f"🔔 Ждут твоего решения: {len(gates)}"]
+    lines = [i18n.t("owner.nag.heading", count=len(gates))]
     for i, g in enumerate(gates[:_MAX_LINES], 1):
         lines.append(f"{i}. {_question(g, today)}")
     if len(gates) > _MAX_LINES:
-        lines.append(f"…и ещё {len(gates) - _MAX_LINES}")
+        lines.append(i18n.t("owner.nag.more", count=len(gates) - _MAX_LINES))
     due = sorted((g["auto_after"], g.get("default") or "")
                  for g in gates if g.get("auto_after") and g.get("default"))
     if due:
         d = date.fromisoformat(due[0][0])
-        lines.append(f"Если промолчишь — {d.strftime('%d.%m')} одно решится само: «{due[0][1]}».")
+        lines.append(i18n.t("owner.nag.default", date=d.strftime("%d.%m"), decision=due[0][1]))
     lines.append("")
-    lines.append("Чтобы решить, напиши Claude в проекте health: «разбери решения». "
-                 "Он покажет каждое с вариантами.")
+    lines.append(i18n.t("owner.nag.action"))
     return "\n".join(lines)
 
 
 def _memory_lost_text(now_ids: int, known: int) -> str:
-    return (f"⚠️ Стол решений потерял память: карточек {now_ids}, а было {known}. "
-            "Вопросы со стола не шлю — среди них были бы уже решённые тобой. "
-            "Ночной цикл остановлен до починки. Напиши Claude в проекте health: "
-            "«стол решений потерял память».")
+    return i18n.t("owner.nag.memory_lost", count=now_ids, known=known)
 
 
 def _rang_today(now: datetime) -> bool:
@@ -233,11 +229,15 @@ def _write_receipt(now: datetime, rang: bool, via: Optional[str], open_count: in
 def run(now: Optional[datetime] = None) -> dict:
     """Один проход колокола. now инъектируется (Дом А: окно тестируемо кодом).
 
-    Звонит ТОЛЬКО если есть открытые гейты И сейчас окно 08–20 по местному времени дома. Всегда
+    Звонит при наличии ремонтной сессии, открытых гейтах и окне 08–20 по местному времени дома. Всегда
     пишет квитанцию пульса — даже когда молчит (иначе «не звонил» и «сдох» не
     различить, §14). Возвращает квитанцию."""
     now = now or get_now(HOME_TZ)
-    gates = owner_gates(now.date())
+    import notify
+    # Checked 2026-11-08: all KINDS require a repair session, with no bot resolution.
+    # Gate delivery only: retain the desk and its decisions for the repairer.
+    repair_available = notify.repair_provisioned()
+    gates = owner_gates(now.date()) if repair_available else []
     in_window = WINDOW_START <= now.hour <= WINDOW_END
     rang, via = False, None
     if _cycle_pending(now):
@@ -247,12 +247,11 @@ def run(now: Optional[datetime] = None) -> dict:
                    "open_count": len(gates), "waiting_for": "night_cycle"}
         _write_receipt(now, False, None, len(gates))
         return receipt
-    lost = parked_decisions.memory_lost()
+    lost = parked_decisions.memory_lost() if repair_available else None
     if lost and in_window and not _rang_today(now):
         # Стол забыл карточки (нить desk-guard, 30.09): список со стола был бы ложью —
         # решённое читалось бы как новое. Одна строка вместо списка, раз в день; гейтов
         # может не быть вовсе (пустой стол после переезда) — звоним всё равно.
-        import notify
         via = notify.notify_operator(_memory_lost_text(*lost))
         _write_receipt(now, True, via, len(gates))
         return {"ran_at": now.isoformat(), "rang": True, "via": via,
@@ -264,7 +263,6 @@ def run(now: Optional[datetime] = None) -> dict:
         _write_receipt(now, True, "earlier_today", len(gates))
         return receipt
     if gates and in_window:
-        import notify
         via = notify.notify_operator(_compose(gates, now.date()))
         rang = True
     receipt = {"ran_at": now.isoformat(), "rang": rang, "via": via, "open_count": len(gates)}

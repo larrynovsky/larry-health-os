@@ -1,4 +1,4 @@
-<!-- install-provenance: sha256:98a2e61064dc -->
+<!-- install-provenance: sha256:9e80aa681225 -->
 [English](first_install.en.md) · **Русский**
 
 # Первая установка Larry Health OS

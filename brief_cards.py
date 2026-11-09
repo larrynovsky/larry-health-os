@@ -183,6 +183,10 @@ def from_trail(trail: dict) -> Card:
 def from_season_food(item: dict) -> Card:
     """Сезон×геном (S3): продукт в сезоне И полезный тенанту → карта. item из
     food_genome.beneficial_this_month. Кулдаун per-продукт (tag) даёт ротацию ~месяц."""
+    if item.get("assessment") == "not_assessed":
+        return Card(provider="food", semantic_key="food:not_assessed", lane="routine",
+                    origin="curated", importance=0.5, severity=0.4,
+                    evidence_summary=item["why"], allowed_claims=[item["why"]])
     food = item.get("food", "продукт")
     tag = item.get("tag", "food")
     why = item.get("why", "")

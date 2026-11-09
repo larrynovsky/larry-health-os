@@ -226,3 +226,15 @@ def test_far_future_bound_would_silence_git(tmp_path, monkeypatch):
     _repo_with_commits(tmp_path, monkeypatch)
     assert wd._collect(date(2000, 1, 1), date(2099, 12, 31)) == []
     assert len(wd._collect(date(2000, 1, 1), date.today() + timedelta(days=1))) == 3
+
+
+def test_doctor_pattern_survives_move_from_literal(monkeypatch, tmp_path):
+    """Invented name: bounded regex must remain guarded by the digest reader."""
+    import pii_census as pc
+    (tmp_path / 'private').mkdir()
+    (tmp_path / 'private/pii_terms.yaml').write_text(
+        "patterns:\n  doctor: ['\\bzorblax\\b']\n")
+    original = pc.pattern
+    monkeypatch.setattr(pc, 'pattern', lambda classes: original(classes, root=tmp_path))
+    assert wd.gate_text('Dr. Zorblax', frozenset()).verdict == 'blocked'
+    assert wd.gate_text('azorblaxish', frozenset()).verdict == 'pass'

@@ -162,6 +162,7 @@ def test_guarded_subsystem_holds_carry_a_confirmation_date():
         f"перестало кого-либо стеречь")
 
 
+@pytest.mark.host_only
 def test_staged_change_to_guarded_code_requires_reconfirmation():
     """Р-1 на настоящем индексе. Вне git-контекста молчим ЯВНО (skip с причиной),
     а не притворяемся зелёными: staging-дерево без .git даёт именно этот случай."""

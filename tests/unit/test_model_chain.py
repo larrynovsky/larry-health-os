@@ -41,19 +41,19 @@ def test_pick_without_snapshot_or_with_none_available_takes_first():
 
 
 def test_get_model_follows_chain_with_fresh_snapshot(monkeypatch):
-    _cfg(monkeypatch, {"model.opus": ["m-old", "m-new"], "llm.available": _fresh(["m-new"])})
-    assert hai_core.get_model("opus") == "m-new"
+    _cfg(monkeypatch, {"model.opus": ["claude-m-old", "claude-m-new"], "llm.available": _fresh(["claude-m-new"])})
+    assert hai_core.get_model("opus") == "claude-m-new"
 
 
 def test_get_model_ignores_stale_snapshot(monkeypatch):
     old = (datetime.now(timezone.utc) - timedelta(hours=hai_core._AVAILABILITY_MAX_AGE_H + 1)).isoformat()
-    _cfg(monkeypatch, {"model.opus": ["m-old", "m-new"], "llm.available": {"checked_at": old, "ids": ["m-new"]}})
-    assert hai_core.get_model("opus") == "m-old"
+    _cfg(monkeypatch, {"model.opus": ["claude-m-old", "claude-m-new"], "llm.available": {"checked_at": old, "ids": ["claude-m-new"]}})
+    assert hai_core.get_model("opus") == "claude-m-old"
 
 
 def test_get_model_string_config_and_default_unchanged(monkeypatch):
-    _cfg(monkeypatch, {"model.sonnet": "m-x"})
-    assert hai_core.get_model("sonnet") == "m-x"
+    _cfg(monkeypatch, {"model.sonnet": "claude-m-x"})
+    assert hai_core.get_model("sonnet") == "claude-m-x"
     _cfg(monkeypatch, {})
     assert hai_core.get_model("haiku") == hai_core.MODEL_DEFAULTS["haiku"]
     with pytest.raises(KeyError):
@@ -195,7 +195,7 @@ def test_table_never_makes_the_two_recognizer_passes_meet(monkeypatch):
     assert not set(hai_core.model_chain("opus")) & set(hai_core.model_chain("sonnet"))
 
 
-@pytest.mark.parametrize("bases", [{}, {"model.opus": ["base-opus"], "model.sonnet": ["base-sonnet"]}],
+@pytest.mark.parametrize("bases", [{}, {"model.opus": ["claude-base-opus"], "model.sonnet": ["claude-base-sonnet"]}],
                          ids=["defaults", "explicit_bases"])
 def test_shared_release_only_model_is_excluded_from_both_chains(monkeypatch, tmp_path, bases):
     """Ревью #4: X только в таблице обеих ролей — не запасная ни одного прохода."""
@@ -214,7 +214,7 @@ def test_shared_release_only_model_is_excluded_from_both_chains(monkeypatch, tmp
 @pytest.mark.parametrize("stored", [False, True], ids=["default", "stored_base"])
 def test_broken_release_json_preserves_base_or_default(monkeypatch, tmp_path, reader, stored):
     """Ревью #5: реальный reader битого JSON не выводит из строя базовую модель."""
-    base = ["base-opus", "base-fallback"] if stored else [hai_core.MODEL_DEFAULTS["opus"]]
+    base = ["claude-base-opus", "claude-base-fallback"] if stored else [hai_core.MODEL_DEFAULTS["opus"]]
     _cfg(monkeypatch, {"model.opus": base} if stored else {})
     monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
     table = tmp_path / "broken.json"
@@ -230,3 +230,42 @@ def test_foreign_provider_does_not_take_anthropic_successors(monkeypatch):
     _cfg(monkeypatch, {"model.opus": ["gpt-x"]})
     _table(monkeypatch, provider="openai")
     assert hai_core.model_chain("opus") == ["gpt-x"]
+
+
+def test_base_chain_filters_current_provider(monkeypatch, caplog, tmp_path):
+    """Synthetic IDs: filtering is read-only and precedes admission."""
+    from unittest.mock import Mock
+
+    write = Mock(side_effect=AssertionError("selection must not write config"))
+    monkeypatch.setattr(hai_core.db, "upsert_config", write)
+    claude = ["claude-opus-4-8", "claude-opus-4-7"]
+    for provider, stored, expected in [
+        ("openai", claude, ["gpt-5.6-sol"]),
+        ("anthropic", claude, claude),
+        ("openai", [claude[0], "gpt-second", "gpt-first", claude[1]],
+         ["gpt-second", "gpt-first"]),
+        ("anthropic", ["gpt-second", *claude], claude),
+        ("openai", claude[0], ["gpt-5.6-sol"]),
+    ]:
+        monkeypatch.setenv("HEALTH_LLM_PROVIDER", provider)
+        store = {"model.opus": stored}
+        before = json.dumps(store)
+        _cfg(monkeypatch, store)
+        caplog.clear()
+        assert hai_core.base_chain("opus") == expected
+        assert json.dumps(store) == before
+        dropped = [m for m in (stored if isinstance(stored, list) else [stored])
+                   if m not in expected]
+        warnings = [r for r in caplog.records if r.name == "hai_core" and r.levelname == "WARNING"]
+        assert len(warnings) == bool(dropped)
+        if dropped:
+            assert "opus" in warnings[0].getMessage()
+            assert all(m in warnings[0].getMessage() for m in dropped)
+    table = tmp_path / "admission.json"
+    table.write_text(json.dumps({"openai": {"opus": {"gpt-5.6-sol": {"passed": True}}}}))
+    monkeypatch.setattr(hai_core, "_ADMISSION_TABLE", table)
+    assert hai_core.get_model("opus") == "gpt-5.6-sol"
+    table.write_text("{}")
+    with pytest.raises(hai_core.ModelNotAdmitted):
+        hai_core.get_model("opus")
+    write.assert_not_called()

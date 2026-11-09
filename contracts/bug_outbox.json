@@ -41,7 +41,7 @@
       "D3": "stdlib (urllib, fcntl, secrets) + схема bug_report + путь данных health_db.",
       "D4": "~130 строк.",
       "D5": "tests/unit/test_bug_channel.py (9, настоящий HTTP на localhost к настоящему bug_inbox). ИСПОЛНЕННЫЕ негативные контроли 2026-10-19, /tmp/mutate_bug_channel.sh: C3 «доставлено» без квитанции — красный. Итоги: C3 «доставлено» без квитанции — 3 failed.",
-      "D6": "общий с bug_inbox: номер отчёта рождает установка, повтор с тем же номером — та же квитанция; «доставлено» человеку — только при номере R-… от приёмника."
+      "D6": "общий с bug_inbox: номер отчёта рождает установка, повтор с тем же номером — та же квитанция; «доставлено» человеку — только при номере R-… от приёмника. Optional detail: HTTP 400 triggers one retry without detail and with the same report_id, for send and drain; no retry on other 4xx. Oracle: test_optional_detail_old_receiver_retry_and_queue."
     },
     "rationale": "Переписывается по контракту и тестам; протокол — три кода ответа (2xx+номер, 429, прочие 4xx) и очередь на всё остальное.",
     "date": "2026-10-19",

@@ -19,6 +19,8 @@ def test_check_assessments_freshness_warns_when_no_filling(db, tmp_path, monkeyp
     }))
     import integrity_tests as it
     monkeypatch.setattr(it, "SX_INSTRUMENTS_DIR", cat)
+    import assessment_scheduler as scheduler
+    monkeypatch.setattr(scheduler, "BUNDLED_INSTRUMENTS_DIR", cat)
     # warn() пишет в _warnings — проверим что добавилась запись
     initial = list(it._warnings)
     it.check_assessments_freshness()
@@ -33,6 +35,8 @@ def _isi_catalog(tmp_path, monkeypatch):
                                               "items": [], "subscales": []}))
     import integrity_tests as it
     monkeypatch.setattr(it, "SX_INSTRUMENTS_DIR", cat)
+    import assessment_scheduler as scheduler
+    monkeypatch.setattr(scheduler, "BUNDLED_INSTRUMENTS_DIR", cat)
     return it
 
 

@@ -114,14 +114,14 @@ def test_admit_persists_only_base_chain_with_nonempty_release_table(store, monke
     """Ревью #7: уже зелёный на 06edf2d; base_chain→model_chain обязан его покраснить."""
     import hai_core
     monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
-    store["model.opus"] = ["base-opus"]
-    store["model.sonnet"] = ["base-sonnet"]
+    store["model.opus"] = ["claude-base-opus"]
+    store["model.sonnet"] = ["claude-base-sonnet"]
     hai_core._ADMISSION_TABLE.write_text(json.dumps({"anthropic": {
         "opus": {"table-only": {"passed": True}},
         "sonnet": {"other-table-only": {"passed": True}}}}), encoding="utf-8")
-    assert hai_core.model_chain("opus") == ["base-opus", "table-only"]
-    expected = ["base-opus", "newly-judged"]
-    assert la.admit_to_chain("opus", "newly-judged") == expected
+    assert hai_core.model_chain("opus") == ["claude-base-opus", "table-only"]
+    expected = ["claude-base-opus", "claude-newly-judged"]
+    assert la.admit_to_chain("opus", "claude-newly-judged") == expected
     assert store["model.opus"] == expected, "запасная таблицы вросла в базу"
     assert hai_core.model_chain("opus") == expected + ["table-only"]
 
@@ -242,7 +242,8 @@ def test_end_to_end_pass_lands_in_chain_and_fail_does_not(store, monkeypatch):
 
     store2 = {k: v for k, v in store.items()
               if not k.startswith(("llm.admission.claude", "llm.admission.suite."))}
-    store.clear(); store.update(store2)
+    store.clear()
+    store.update(store2)
     store["model.opus"] = ["claude-opus-4-7"]
     store["model.sonnet"] = ["claude-sonnet-4-6"]
     rep = la.run_admission(force=True, client=_FakeClient(LISTED[:5], wrong_text=True), now=NOW)
@@ -807,7 +808,7 @@ class _Flaky(_FakeClient):
 def faults(monkeypatch):
     import notify
     got = []
-    monkeypatch.setattr(notify, "fault", lambda msg, person_key=None: got.append(msg))
+    monkeypatch.setattr(notify, "fault", lambda msg, person_key=None, **kw: got.append(msg))
     return got
 
 
@@ -964,3 +965,39 @@ def test_failed_twice_before_a_crash_is_dropped_on_the_next_run(store, monkeypat
     rep = la.run_admission(force=True, now=NOW, client=_Flaky([]))
     assert rep["members"] == []
     assert store["model.opus"] == ["claude-opus-4-6"]
+
+
+def test_table_drift_ignores_models_this_install_never_judged(monkeypatch, tmp_path):
+    """Карточка report:f3bc9d (08.11): на чужой установке вердиктов владельца нет, и каждая
+    строка таблицы выпуска шла в сбой каждый день. Не судила — не отставание; судила и
+    разошлась — отставание по-прежнему. Мутация «снять пропуск w is None» — красная."""
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"anthropic": {"haiku": {"m1": {"passed": True}, "m2": {"passed": False}}}}))
+    monkeypatch.setattr(la, "owner_verdicts", lambda: {})
+    assert la.table_drift(table) == []
+    monkeypatch.setattr(la, "owner_verdicts", lambda: {
+        "m1": {"roles": {"haiku": {"passed": False, "date": "d", "corpus": "c"}}}})
+    assert la.table_drift(table) == ["haiku/m1: в базе False, в таблице True"]
+
+
+def test_admission_writer_structural_detail(store, monkeypatch, tmp_path):
+    import bug_report
+    journal = tmp_path / "faults.jsonl"
+    monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(journal))
+    _chains(store)
+    results = [{"model": "claude-opus-4-7", "role": "opus", "passed": False, "member": True}]
+    la._drop_failed_members(_FakeClient([]), results, {})
+    [g] = bug_report.faults_from_journal(journal)
+    assert g["detail"] == ["llm_admission:opus:claude-opus-4-6:next_not_admitted"]
+
+def test_inferred_foreign_provider_never_receives_owner_admission(monkeypatch, tmp_path):
+    import llm_client
+    import llm_admission as admission
+    import hai_core
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    monkeypatch.setattr(llm_client, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / "openai_key").touch()
+    monkeypatch.setattr(admission, "_cfg", lambda *a: None)
+    monkeypatch.setattr(admission, "admission_budget", lambda: {"cap": 1})
+    monkeypatch.setattr(hai_core, "get_client", lambda: pytest.fail("foreign transport opened"))
+    assert "--provider" in admission.run_admission()["skipped"]

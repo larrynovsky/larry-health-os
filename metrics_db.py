@@ -13,6 +13,14 @@ from _time_inject import get_today
 log = logging.getLogger(__name__)
 
 
+# Durations are hours, efficiency is a percentage; missing measurements remain None.
+_SLEEP_COLUMNS = {
+    "totalSleep": "sleep_total", "deep": "sleep_deep", "rem": "sleep_rem",
+    "core": "sleep_core", "awake": "sleep_awake", "inBed": "sleep_inbed",
+    "sleepStart": "sleep_start", "sleepEnd": "sleep_end", "sleep_score": "sleep_score",
+}
+
+
 def get_day(day_str: str) -> dict:
     with _hdb.get_conn() as conn:
         row = conn.execute(
@@ -63,10 +71,14 @@ def get_day(day_str: str) -> dict:
     if "spo2" not in raw and _row.get("spo2_avg") is not None:
         raw["spo2"] = {"avg": _row["spo2_avg"], "unit": "%", "source": "flat"}
 
-    # Sleep НЕ реконструируем: raw['sleep'] — многоключевой dict (totalSleep/deep/
-    # rem/efficiency), flat это отдельные колонки sleep_*. Частичная сборка дала бы
-    # потребителям dict без под-ключей, которые они читают → хуже, чем отсутствие.
-    # Если понадобится — отдельный маппер flat→nested с полным набором ключей.
+    if not raw.get("sleep") and _row.get("sleep_total") is not None:
+        raw["sleep"] = {key: _row.get(col) for key, col in _SLEEP_COLUMNS.items()}
+        # Audited 2026-11-08: get_day outputs are read models, never written to daily JSON/metrics.
+        raw["sleep"]["contributors"] = {"efficiency": _row.get("sleep_efficiency")}
+        apple = raw.get("apple_health") or {}
+        raw["sleep"]["source"] = (
+            "AppleHealth" if apple.get("sleep_total") == _row["sleep_total"] else "flat"
+        )
     return raw
 
 
@@ -356,14 +368,14 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
     OURA_RAW_KEYS = {
         "sleep", "hrv", "resting_heart_rate", "spo2", "stress", "resilience",
         "readiness_score", "hrv_balance", "body_temperature", "recovery_index",
-        "breathing_disturbance",
+        "breathing_disturbance", "activity",
     }
     owned = OURA_RAW_KEYS if source == "Oura" else APPLE_RAW_KEYS
     incoming = {k: data[k] for k in owned if k in data and data[k] is not None}
 
     # ── Variant B (2026-06-01): Apple Health как fallback для биометрики ─────
     # Когда Oura мертва, Apple Health может дать HRV, sleep, resting_hr.
-    # Стратегия: flat-колонки обновляются через COALESCE (не перезаписывают Oura).
+    # Vitals доливаются через COALESCE; сон обновляет свои поля только без Oura-блока.
     # Данные сохраняются в raw["apple_health"] для маркировки источника в GP-промпте.
     apple_bio: dict = {}
     if source == "AppleHealth":
@@ -378,12 +390,8 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
         if isinstance(rhr_d, dict) and rhr_d.get("value"):
             apple_bio["resting_hr"]  = rhr_d["value"]
         if isinstance(sleep_d, dict):
-            if sleep_d.get("totalSleep"):
-                apple_bio["sleep_total"] = sleep_d["totalSleep"]
-            if sleep_d.get("deep"):
-                apple_bio["sleep_deep"]  = sleep_d["deep"]
-            if sleep_d.get("sleep_score"):
-                apple_bio["sleep_score"] = sleep_d["sleep_score"]
+            apple_bio.update({col: sleep_d[key] for key, col in _SLEEP_COLUMNS.items()
+                              if sleep_d.get(key) is not None})
             if sleep_d.get("source"):
                 apple_bio["sleep_source"] = sleep_d["source"]
         if isinstance(spo2_d, dict) and spo2_d.get("avg"):
@@ -414,7 +422,7 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
                 existing_raw = {}
         # Записываем Apple Health биометрику под отдельным ключом
         if apple_bio:
-            existing_raw["apple_health"] = apple_bio
+            existing_raw["apple_health"] = {**(existing_raw.get("apple_health") or {}), **apple_bio}
         # Давление: у кого подключён Withings, хозяин дневного давления — он (решение владельца
         # 06.10; пишет import_withings). «Здоровье» хранит удалённые в Withings замеры и подмешивало
         # их в среднее дня (живой случай, 06.10). Значения «Здоровья» не теряются — уходят свидетелем.
@@ -450,6 +458,12 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
                 f"UPDATE daily_metrics SET {fb_clause} WHERE date = ?",
                 list(fb_values.values()) + [day_str]
             )
+
+        # Apple may replace its own partial night, never an Oura sleep block.
+        if source == "AppleHealth" and not existing_raw.get("sleep"):
+            sleep_values = {col: apple_bio[col] for col in _SLEEP_COLUMNS.values()
+                            if col in apple_bio}
+            values.update(sleep_values)
 
         set_clause = ", ".join(f"{k} = ?" for k in values)
         params = list(values.values()) + [day_str]

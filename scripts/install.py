@@ -125,14 +125,34 @@ def _fill(text: str, values: dict[str, str], name: str) -> str:
     return text
 
 
+def _native_environment(provider: str | None = None) -> dict[str, str]:
+    """Shared native defaults; explicit installation selection overrides them."""
+    import yaml
+    env = yaml.safe_load((TPL / "launchd" / "placement.yaml").read_text())["native_environment"]
+    if provider is not None:
+        env["HEALTH_LLM_PROVIDER"] = provider
+    return env
+
+
 def render_launchd(values: dict[str, str]) -> dict[str, str]:
     """templates/launchd/*.plist.tmpl → {имя плиста: текст} с путями этой установки.
     Незаполненный {{…}} — отказ: плист с чужим/пустым путём молча читал бы не тот каталог
     (для второго тенанта это чужая база). Метки сервисов com.larry.health.* — имя продукта."""
+    import plistlib
     values = {"PYTHON": NATIVE_PYTHON, **values}
+    # Плисты получают переменную только при явном выборе (--provider): живые плисты владельца
+    # её пока не несут, их миграция — BL-LLM-PROVIDER-STRICT-1; до неё держит переходный режим
+    # llm_client.provider() (есть anthropic_key — Anthropic).
+    shared_env = ({"HEALTH_LLM_PROVIDER": values["LLM_PROVIDER"]}
+                  if values.get("LLM_PROVIDER") else {})
     out = {}
     for tpl in sorted((TPL / "launchd").glob("*.plist.tmpl")):
-        out[tpl.name.removesuffix(".tmpl")] = _fill(tpl.read_text(encoding="utf-8"), values, tpl.name)
+        text = _fill(tpl.read_text(encoding="utf-8"), values, tpl.name)
+        if shared_env:   # без явного выбора — шаблон байт в байт, как живой плист
+            pl = plistlib.loads(text.encode("utf-8"))
+            pl.setdefault("EnvironmentVariables", {}).update(shared_env)
+            text = plistlib.dumps(pl).decode("utf-8")
+        out[tpl.name.removesuffix(".tmpl")] = text
     return out
 
 
@@ -233,7 +253,11 @@ def _shell(pl: dict) -> str:
     (список ротации один, log_rotation.one_home_of_the_list). PATH плиста выбрасывается:
     это пути Homebrew, и в образе python3 по нему не нашёлся бы."""
     import shlex
-    env = {k: v for k, v in pl.get("EnvironmentVariables", {}).items() if k != "PATH"}
+    # Container commands inherit the provider from Compose, never the native
+    # template default. Otherwise `env HEALTH_LLM_PROVIDER=anthropic` would undo
+    # an explicit OpenAI setting for cron jobs and service entry points.
+    env = {k: v for k, v in pl.get("EnvironmentVariables", {}).items()
+           if k not in {"PATH", "HEALTH_LLM_PROVIDER"}}
     cmd = " ".join(shlex.quote(a) for a in pl["ProgramArguments"])
     if env:
         cmd = "env " + " ".join(f"{k}={shlex.quote(v)}" for k, v in sorted(env.items())) + " " + cmd
@@ -303,14 +327,14 @@ def docker_summary(tz: str = "UTC") -> str:
     return ", ".join(f"{k} {n}" for k, n in kinds.items()) + f" (всего {len(places)})"
 
 
-def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_IMAGE) -> dict[str, str]:
+def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_IMAGE, provider: str = "") -> dict[str, str]:
     """Файлы для контейнера: crontab (supercronic), at_start.sh (задачи с RunAtLoad — в cron
     запуска при старте нет), compose.yaml (постоянные службы и планировщик), .env.
     Пояс задаётся явно: часы в шаблонах местные, а контейнер по умолчанию в UTC."""
     import plistlib
     import yaml
     image = _image_ref(image)
-    values = {**DOCKER_VALUES, "PRIMARY_HOST": hostname, "TZ": tz}
+    values = {**DOCKER_VALUES, "PRIMARY_HOST": hostname, "TZ": tz, "LLM_PROVIDER": provider}
     plan = docker_plan(values)
     cron, at_start, services = [], [], {}
     # Плисты того, что исполняет контейнер, — с путями контейнера: их читают датчики ритма,
@@ -321,7 +345,7 @@ def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_
     env = {"TZ": tz, "HEALTH_TZ": tz, "HEALTH_DATA_DIR": values["DATA"], "HEALTH_PY": "python3",
            "HEALTH_SECRETS_DIR": values["SECRETS"],
            "HEALTH_LAUNCHAGENTS_DIR": plists_dir, "HEALTH_RUNTIME": "container",
-           "HEALTH_LLM_PROVIDER": "anthropic"}   # выбор — install.sh --provider (docs/how-to/llm_provider.md)
+           "HEALTH_LLM_PROVIDER": provider}   # выбор — install.sh --provider (docs/how-to/llm_provider.md)
     def _no_path(pl: dict) -> dict:
         env_ = {k: v for k, v in pl.get("EnvironmentVariables", {}).items() if k != "PATH"}
         return {**pl, "EnvironmentVariables": env_} if "EnvironmentVariables" in pl else pl
@@ -401,6 +425,8 @@ def render_docker(tz: str, hostname: str = "health-os", *, image: str = DEFAULT_
                                           + f"env HEALTH_DATA_DIR={values['DATA']} python3 /app/ingest_lan.py"
                                           " >> /app/logs/ingest.out.log 2>> /app/logs/ingest.err.log"],
                               "ports": ["${HEALTH_INGEST_BIND:-127.0.0.1}:8011:8011"]}
+    for service in services.values():
+        service.setdefault("environment", {})["HEALTH_LLM_PROVIDER"] = "${HEALTH_LLM_PROVIDER:-}"
     return {
         "crontab": head + "\n".join(cron) + "\n",
         "at_start.sh": head + "".join(f"{c} &\n" for c in at_start) + "wait\n",
@@ -476,7 +502,7 @@ def install_doc_problem(page: str, text: str) -> str | None:
 COLIMA_PROFILE = "health"
 
 
-def render_colima_agent(home: str) -> str:
+def render_colima_agent(home: str, provider: str | None = None) -> str:
     """Агент launchd Мака-хоста, поднимающий свой профиль Colima при входе (волна Б, этап 8).
     Не шаблон templates/launchd: там службы Health OS, их ставит и нативная установка, где Colima нет.
     --activate=false обязателен: без него старт профиля переключает ОБЩИЙ контекст Докера, и
@@ -508,6 +534,8 @@ TAILSCALE_IMAGE_TAG = "v1.102.3"   # = версия Tailscale на Studio (за�
 MCP_TS_VOLUME = "health_mcp-ts"     # состояние узла health-mcp (вход в tailnet)
 HOST_LOGS = "/app/host_logs"   # журналы хоста в контейнере владельца (только чтение)
 DIGEST_DIR = "/app/outputs/weekly_digest"   # = weekly_digest.OUT_DIR в образе (ROOT=/app)
+AGENT_MAIL_REL = "agent_mail/owner"
+INFRA_REL = "Projects/infra"   # каталог infra: lessons.yaml::shared_subjects = ~/Projects/infra/failure_classes.yaml   # каталог моста почты агентов у владельца = private/agent_mail.yaml
 
 
 REPORTS_NODE = "health-reports"          # узел приёмника отчётов о сбоях (нить bug-report)
@@ -517,7 +545,7 @@ INBOX_URL = "http://bug-inbox:8766/report"  # приёмник изнутри с
 
 
 def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp_base: "str | None" = None,
-                          reports_base: bool = False) -> dict[str, str]:
+                          reports_base: bool = False, *, provider: str | None = None) -> dict[str, str]:
     """Настройки контейнера ВЛАДЕЛЬЦА на Studio (волна Б, этап 11): compose.override.yaml и infra.yaml
     контейнера. Не для посторонних — у них слоя владельца нет. Что и почему (замеры этапа 9):
     - имя машины = primary_host установки (решение владельца «Имя Studio»): иначе запись запрещена;
@@ -549,7 +577,16 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp
             # дайджест недели: генератор — на хосте (launchd сб 22:00, ему нужен git), бот — здесь.
             # Запись нужна: бот кладёт рядом свой вердикт <неделя>.gate.<тег>.json. Без тома бот
             # с 30.09 видел «дайджеста нет» и молчал — W40 владельцу потерян (нить digest-container)
-            f"{repo}/outputs/weekly_digest:{DIGEST_DIR}"]
+            f"{repo}/outputs/weekly_digest:{DIGEST_DIR}",
+            # почта агентов (нить agent-post, 05.11): каталог моста на хосте. Почтамт в контейнер не
+            # монтируется — он не удостоверяет отправителя; мост ставит его сам (docs/reference/agent_mail_bridge.md)
+            f"{home}/{AGENT_MAIL_REL}:{DOCKER_VALUES['DATA']}/agent_mail",
+            # общий словарь классов поломок (lessons.yaml → shared_subjects: ~/Projects/infra/…) — один дом
+            # в infra, решение владельца 04.11 и 06.11 «смонтировать, не копировать»: ночной прогон идёт
+            # в контейнере, где ~ = /home/health, и без тома словарь «не читается» (ночные починки 06.11).
+            # Каталог, а не файл: git пишет файл заново, и том отдельного файла держал бы старую версию.
+            # Только чтение; корень почтамта (~/agent_post) отдельно и сюда не входит.
+            f"{home}/{INFRA_REL}:{DOCKER_VALUES['HOME']}/{INFRA_REL}:ro"]
     services = {name: {"hostname": primary_host, "volumes": list(vols)} for name in base}
     # HEALTH_HOST_LOGS — где в контейнере журналы хоста: по ним ночная проверка судит хостовые
     # службы владельца (сторож незакоммиченного, нить host-container-split 03.10).
@@ -631,6 +668,13 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp
             "TCP": {"443": {"HTTPS": True}},
             "Web": {"${TS_CERT_DOMAIN}:443": {"Handlers": {"/report": {"Proxy": INBOX_URL}}}},
             "AllowFunnel": {"${TS_CERT_DOMAIN}:443": True}}, indent=2)
+    shared_env = _native_environment(provider)
+    # Owner fallback is explicit in the resolved Compose environment, but an
+    # existing .env / shell choice must still win over the migration default.
+    selected = shared_env["HEALTH_LLM_PROVIDER"]
+    shared_env["HEALTH_LLM_PROVIDER"] = "${HEALTH_LLM_PROVIDER:-" + selected + "}"
+    for service in services.values():
+        service.setdefault("environment", {}).update(shared_env)
     head = "# сгенерировано scripts/install.py --owner-override (этап 11 волны Б) — руками не править\n"
     doc = {"services": services}
     if mcp_base:
@@ -641,7 +685,7 @@ def render_owner_override(home: str, repo: Path, primary_host: str, tz: str, mcp
             "infra.yaml": head + yaml.safe_dump({"primary_host": primary_host}), **extra}
 
 
-def render_shadow_agent(home: str) -> str:
+def render_shadow_agent(home: str, provider: str | None = None) -> str:
     """Агент хоста: теневой сторож срочных тревог раз в час на время пилота (волна Б, этап 10).
     Грузится на этапе 11, вместе с контейнером владельца: без контейнера сторож честно шлёт «не смог
     сравнить». PATH с Homebrew обязателен: под launchd (как и по ssh) docker иначе не находится
@@ -652,7 +696,8 @@ def render_shadow_agent(home: str) -> str:
         "Label": "com.larry.health.pilot-shadow",
         "ProgramArguments": [NATIVE_PYTHON, f"{home}/health_scripts/pilot_shadow.py"],
         "WorkingDirectory": f"{home}/health_scripts",
-        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "EnvironmentVariables": {**({"HEALTH_LLM_PROVIDER": provider} if provider else {}),
+                                 "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
                                  "HEALTH_DATA_DIR": f"{home}/health",
                                  "HEALTH_SHADOW_CONTAINER": f"{COMPOSE_PROJECT}-cron-1",
                                  "HEALTH_SHADOW_CONTEXT": f"colima-{COLIMA_PROFILE}"},
@@ -733,7 +778,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="пилот волны Б: какие службы владельца выгружаются с хоста, какие остаются (печать)")
     ap.add_argument("--owner-override", action="store_true",
                     help="пилот волны Б: build/docker/compose.override.yaml владельца (с --tz; на машине владельца)")
+    providers = [name for name in json.loads((ROOT / "methodology" / "llm_providers.json").read_text())
+                 if not name.startswith("_")]
+    ap.add_argument("--provider", choices=providers,
+                    default=os.environ.get("HEALTH_LLM_PROVIDER") or None,
+                    help="explicit provider for native/tenant plists or Docker; native default: placement.yaml")
     a = ap.parse_args(argv)
+    if a.provider is not None and a.provider not in providers:
+        ap.error("invalid HEALTH_LLM_PROVIDER")
     if a.image is not None and not a.docker:
         ap.error("--image используется с --docker")
     if a.pilot_split:
@@ -757,7 +809,7 @@ def main(argv: list[str] | None = None) -> int:
                     if (Path.home() / ".health_mcp").is_dir() and "." in tn else None)
         # Приёмник отчётов о сбоях — только если владелец его завёл: каталог ~/.health_reports.
         reports = (Path.home() / ".health_reports").is_dir()
-        out = render_owner_override(str(Path.home()), ROOT, infra_config.PRIMARY_HOST, a.tz, mcp_base, reports)
+        out = render_owner_override(str(Path.home()), ROOT, infra_config.PRIMARY_HOST, a.tz, mcp_base, reports, provider=a.provider)
         (dest / "compose.override.yaml").write_text(out["compose.override.yaml"], encoding="utf-8")
         for name in ("mcp_serve.json", "reports_serve.json"):
             if name in out:
@@ -770,16 +822,17 @@ def main(argv: list[str] | None = None) -> int:
             ap.error("--docker требует --tz: часы в шаблонах местные, контейнер по умолчанию в UTC")
         dest = ROOT / "build" / "docker"
         dest.mkdir(parents=True, exist_ok=True)
-        for name, text in render_docker(a.tz, image=a.image if a.image is not None else DEFAULT_IMAGE).items():
+        for name, text in render_docker(a.tz, image=a.image if a.image is not None else DEFAULT_IMAGE,
+                                        provider=a.provider or "").items():
             (dest / name).parent.mkdir(parents=True, exist_ok=True)
             (dest / name).write_text(text, encoding="utf-8")
         (ROOT / ".dockerignore").write_text(render_dockerignore(), encoding="utf-8")   # в .gitignore
         if sys.platform == "darwin":   # хост Мака; внутри контейнера (cron рендерит заново) не нужен
             (dest / "host").mkdir(exist_ok=True)
             (dest / "host" / "com.larry.health.colima.plist").write_text(
-                render_colima_agent(str(Path.home())), encoding="utf-8")
+                render_colima_agent(str(Path.home()), a.provider), encoding="utf-8")
             (dest / "host" / "com.larry.health.pilot-shadow.plist").write_text(
-                render_shadow_agent(str(Path.home())), encoding="utf-8")
+                render_shadow_agent(str(Path.home()), a.provider), encoding="utf-8")
         print(f"собрано в {dest}: " + docker_summary(a.tz))
         print("дальше — сборка образа и запуск: docs/how-to/install_docker.md "
               "(English: docs/how-to/install_docker.en.md)")
@@ -805,6 +858,8 @@ def main(argv: list[str] | None = None) -> int:
               "REPO": str(ROOT), "HOME": str(Path.home()),
               "USER": getpass.getuser(), "DATA": str(data_dir), "SECRETS": str(secrets_dir),
               "TZ": a.tz or os.environ.get("HEALTH_TZ", "UTC")}
+    if a.provider is not None:
+        values["LLM_PROVIDER"] = a.provider
     steps = plan_install(data_dir, secrets_dir, values)
     for action, path, _ in steps:
         print(f"{ {'write': '+ запишу', 'keep': '= есть, не трогаю', 'mkdir': '+ создам'}[action]:18} {path}")

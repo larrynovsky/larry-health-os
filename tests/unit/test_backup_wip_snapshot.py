@@ -452,3 +452,53 @@ def test_неслитая_потерянная_ветка_не_переноси�
     assert "refs/backups/thread/потерянная" in рефы, (
         f"КОПИЯ ПОТЕРЯННОЙ РАБОТЫ исчезла из списка риска:\n{рефы}\n{лог}")
     assert "thread-closed/потерянная" not in рефы, "не слитая нить не может считаться закрытой"
+
+
+# ── ДЖОБЫ MacBook В СНИМКЕ (06.11, нить macbook-kayak-oura) ──────────────────
+# Исполняется НАСТОЯЩИЙ backup.sh с подставным launchctl на PATH: судится, что
+# писатель берёт загруженное из launchd (print), а не плисты с диска, и что
+# «launchctl не ответил» ≠ «джобов нет».
+
+_ФЕЙК_LAUNCHCTL = """#!/bin/bash
+case "$1" in
+  list) [ -n "$LC_FAIL" ] && exit 1
+        printf 'PID\\tStatus\\tLabel\\n-\\t0\\tcom.larry.health.backup-wip\\n-\\t1\\tcom.larry.calendar-sync\\n-\\t0\\tcom.larry.kimpa.grower\\n' ;;
+  print) case "$2" in
+    */com.larry.health.backup-wip) echo "arguments = { /Users/x/health_scripts/backup.sh --wip }" ;;
+    */com.larry.calendar-sync)     echo "arguments = { /Users/x/health_scripts/calendar_sync.py }" ;;
+    *) echo "arguments = { /Users/x/kimpa/grow.py }" ;;
+  esac ;;
+esac
+"""
+
+
+def _с_фейком(tmp_path, repo, home, **env):
+    bin_ = tmp_path / "bin"
+    bin_.mkdir(exist_ok=True)
+    (bin_ / "launchctl").write_text(_ФЕЙК_LAUNCHCTL, encoding="utf-8")
+    (bin_ / "launchctl").chmod(0o755)
+    src = СКРИПТ.read_text(encoding="utf-8")
+    src = src.replace('cd $HOME/health_scripts', f'cd "{repo}"')
+    src = src.replace('git push -f studio "$SNAP_REF"', 'true')
+    копия = tmp_path / "backup_lc.sh"
+    копия.write_text(src, encoding="utf-8")
+    e = _env(tmp_path)
+    e.update(env)
+    e["PATH"] = f"{bin_}:{e['PATH']}"
+    (tmp_path / "health_scripts" / "logs").mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(["bash", str(копия), "--wip"], capture_output=True, text=True,
+                       timeout=60, env=e, cwd=str(repo))
+    assert r.returncode == 0, r.stderr
+    return _git(repo, "log", "-1", "--format=%B", "refs/backups/wip", home=home).stdout
+
+
+def test_снимок_называет_джобы_с_кодом_проекта(стенд, tmp_path):
+    repo, home = стенд
+    msg = _с_фейком(tmp_path, repo, home)
+    assert "health_jobs=com.larry.calendar-sync,com.larry.health.backup-wip" in msg, msg
+
+
+def test_launchctl_молчит_значит_неизвестно(стенд, tmp_path):
+    repo, home = стенд
+    msg = _с_фейком(tmp_path, repo, home, LC_FAIL="1")
+    assert "health_jobs=неизвестно" in msg, msg

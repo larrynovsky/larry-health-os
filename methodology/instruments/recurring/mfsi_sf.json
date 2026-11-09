@@ -1,0 +1,284 @@
+{
+  "id": "mfsi_sf",
+  "name": "Multidimensional Fatigue Symptom Inventory — Short Form (Stein 2004)",
+  "version": "v1.0_paraphrase_initial",
+  "source": "Stein KD et al. 2004 — wording paraphrased, замена на сверенный английский оригинал или валидированный русский перед production trend",
+  "validation_status": "paraphrase",
+  "applies_when": ["oncology"],
+  "cadence_days": 90,
+  "cadence_offset_days": 60,
+  "recall_period": "past_week",
+  "response_scale": {
+    "min": 0,
+    "max": 4,
+    "labels": {
+      "0": "not at all",
+      "1": "a little",
+      "2": "moderately",
+      "3": "quite a bit",
+      "4": "extremely"
+    }
+  },
+  "items": [
+    {
+      "id": "g1",
+      "text": "Я устал",
+      "subscale": "general_fatigue"
+    },
+    {
+      "id": "g2",
+      "text": "У меня нет энергии",
+      "subscale": "general_fatigue"
+    },
+    {
+      "id": "g3",
+      "text": "Я изнурён",
+      "subscale": "general_fatigue"
+    },
+    {
+      "id": "g4",
+      "text": "Я измотан / rundown",
+      "subscale": "general_fatigue"
+    },
+    {
+      "id": "g5",
+      "text": "Я вялый / listless",
+      "subscale": "general_fatigue"
+    },
+    {
+      "id": "g6",
+      "text": "Я выжат / pooped",
+      "subscale": "general_fatigue"
+    },
+    {
+      "id": "p1",
+      "text": "Руки были слабыми",
+      "subscale": "physical_fatigue"
+    },
+    {
+      "id": "p2",
+      "text": "Ноги были слабыми",
+      "subscale": "physical_fatigue"
+    },
+    {
+      "id": "p3",
+      "text": "Мышцы болели",
+      "subscale": "physical_fatigue"
+    },
+    {
+      "id": "p4",
+      "text": "Чувствовал общую слабость по телу",
+      "subscale": "physical_fatigue"
+    },
+    {
+      "id": "p5",
+      "text": "Тяжесть в теле / ходил как свинцовый",
+      "subscale": "physical_fatigue"
+    },
+    {
+      "id": "p6",
+      "text": "Тело саднило / ныло",
+      "subscale": "physical_fatigue"
+    },
+    {
+      "id": "e1",
+      "text": "Я был грустным",
+      "subscale": "emotional_fatigue"
+    },
+    {
+      "id": "e2",
+      "text": "Я чувствовал уныние / discouraged",
+      "subscale": "emotional_fatigue"
+    },
+    {
+      "id": "e3",
+      "text": "Я чувствовал подавленность / depressed",
+      "subscale": "emotional_fatigue"
+    },
+    {
+      "id": "e4",
+      "text": "Я чувствовал безнадёжность / hopeless",
+      "subscale": "emotional_fatigue"
+    },
+    {
+      "id": "e5",
+      "text": "Я чувствовал себя несчастным / unhappy",
+      "subscale": "emotional_fatigue"
+    },
+    {
+      "id": "e6",
+      "text": "Я чувствовал нервозность / nervous",
+      "subscale": "emotional_fatigue"
+    },
+    {
+      "id": "m1",
+      "text": "Были трудности с памятью",
+      "subscale": "mental_fatigue"
+    },
+    {
+      "id": "m2",
+      "text": "Трудности с концентрацией",
+      "subscale": "mental_fatigue"
+    },
+    {
+      "id": "m3",
+      "text": "Трудности с удержанием внимания",
+      "subscale": "mental_fatigue"
+    },
+    {
+      "id": "m4",
+      "text": "Мышление было замедленным",
+      "subscale": "mental_fatigue"
+    },
+    {
+      "id": "m5",
+      "text": "Чувствовал спутанность / confused",
+      "subscale": "mental_fatigue"
+    },
+    {
+      "id": "m6",
+      "text": "Делал ошибки в простых делах",
+      "subscale": "mental_fatigue"
+    },
+    {
+      "id": "v1",
+      "text": "Я чувствовал живость / lively",
+      "subscale": "vigor"
+    },
+    {
+      "id": "v2",
+      "text": "Я чувствовал energetic",
+      "subscale": "vigor"
+    },
+    {
+      "id": "v3",
+      "text": "Я был активен",
+      "subscale": "vigor"
+    },
+    {
+      "id": "v4",
+      "text": "Я чувствовал refreshed",
+      "subscale": "vigor"
+    },
+    {
+      "id": "v5",
+      "text": "Я был бодрым / cheerful",
+      "subscale": "vigor"
+    },
+    {
+      "id": "v6",
+      "text": "Я был vigorous",
+      "subscale": "vigor"
+    }
+  ],
+  "subscales": [
+    {
+      "id": "general_fatigue",
+      "items": [
+        "g1",
+        "g2",
+        "g3",
+        "g4",
+        "g5",
+        "g6"
+      ],
+      "direction": "symptom_higher_worse",
+      "label_ru": "общая"
+    },
+    {
+      "id": "physical_fatigue",
+      "items": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "direction": "symptom_higher_worse",
+      "label_ru": "физическая"
+    },
+    {
+      "id": "emotional_fatigue",
+      "items": [
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5",
+        "e6"
+      ],
+      "direction": "symptom_higher_worse",
+      "label_ru": "эмоциональная"
+    },
+    {
+      "id": "mental_fatigue",
+      "items": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6"
+      ],
+      "direction": "symptom_higher_worse",
+      "label_ru": "умственная"
+    },
+    {
+      "id": "vigor",
+      "items": [
+        "v1",
+        "v2",
+        "v3",
+        "v4",
+        "v5",
+        "v6"
+      ],
+      "direction": "vigor_reverse_higher_better",
+      "label_ru": "бодрость"
+    }
+  ],
+  "scoring_formula": "subscale_score = sum(items); total = general + physical + emotional + mental - vigor; range [-24, +96]",
+  "thresholds": {
+    "general_fatigue_clinically_meaningful": 4
+  },
+  "shadow_rules": [
+    {
+      "item_or_subscale": "general_fatigue",
+      "proxies": [
+        "hrv",
+        "readiness",
+        "sleep_score",
+        "sleep_deep"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.5,
+      "note": "ВНИМАНИЕ: shadow тут переоценивает фатигу когда метрики плохие — нужна персональная база, не литературные целевые (см. dry test 2026-05-18)"
+    },
+    {
+      "item_or_subscale": "physical_fatigue",
+      "proxies": [
+        "active_kcal",
+        "steps"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.4,
+      "note": "физическая фатига vs активность"
+    },
+    {
+      "item_or_subscale": "vigor",
+      "proxies": [
+        "readiness",
+        "hrv"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.4,
+      "note": "vigor vs Oura recovery"
+    }
+  ],
+  "wording_version_hash": "mfsi_sf_v1_2026_05_18",
+  "title_ru": "Усталость (MFSI-SF)"
+}

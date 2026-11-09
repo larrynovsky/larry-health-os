@@ -24,6 +24,8 @@ def _setup(tmp_path, monkeypatch):
                            "min_window_days": 7,
                            "divergence_threshold": 0.5}],
     }, ensure_ascii=False))
+    import assessment_scheduler as sched
+    monkeypatch.setattr(sched, "BUNDLED_INSTRUMENTS_DIR", cat)
     import survivorship_analyzer as sa
     monkeypatch.setattr(sa, "INSTRUMENTS_DIR", cat)
     monkeypatch.setattr(sa, "CONFIG", cfg)

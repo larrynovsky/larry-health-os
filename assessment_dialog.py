@@ -35,30 +35,22 @@ import health_db as db
 
 log = logging.getLogger(__name__)
 
-from assessment_scheduler import tenant_data_path
-INSTRUMENTS_DIR = tenant_data_path("instruments")  # каталог опросников ЭТОГО человека (28.09, этап Б)
-# Опросники проекта (не лицензионные, не данные человека) — в репозитории. Планировщик и
-# датчик свежести читают только INSTRUMENTS_DIR: у опросника проекта нет ритма повторения,
-# и попади он туда — ночной датчик звал бы «знакомство просрочено» каждую ночь (2026-09-23).
+from assessment_scheduler import tenant_data_path, load_instrument
+INSTRUMENTS_DIR = tenant_data_path("instruments")  # tenant overrides; shared bundle resolved by assessment_scheduler
+# One-shot project forms stay separate from the recurring catalogue.
 REPO_INSTRUMENTS_DIR = Path(__file__).resolve().parent / "methodology" / "instruments"
 
 
 def _load_instrument_by_source_id(source_id):
-    """source_id: короткий id опросника (isi, mfsi_sf, …) — найти JSON-файл.
-    Сначала опросники проекта (репозиторий), затем каталог установки."""
-    for base in (REPO_INSTRUMENTS_DIR, INSTRUMENTS_DIR):
-        p = base / f"{source_id}.json"
-        if p.exists():
-            return json.loads(p.read_text())
-    # Поиск по id внутри файлов
-    for f in [*REPO_INSTRUMENTS_DIR.glob("*.json"), *INSTRUMENTS_DIR.glob("*.json")]:
-        try:
-            d = json.loads(f.read_text())
-            if d.get("id") == source_id:
-                return d
-        except Exception:  # silent-ok: broken JSON
-            continue
-    return None
+    """One-shot project forms, then the shared recurring catalogue."""
+    p = REPO_INSTRUMENTS_DIR / f"{source_id}.json"
+    if p.is_file():
+        return json.loads(p.read_text())
+    try:
+        return load_instrument(source_id, INSTRUMENTS_DIR)
+    except FileNotFoundError:
+        log.error("Instrument unavailable: %s", source_id)
+        return None
 
 
 def _instrument_from_fingerprint(fingerprint):

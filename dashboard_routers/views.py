@@ -641,9 +641,10 @@ def genome(request: Request):
             total = d.get("snps_total") or 0
             matched = d.get("snps_matched") or 0
             d["coverage_pct"] = round(100.0 * matched / total, 1) if total else 0
-            if d["coverage_pct"] >= 70:
+            from prs_context import COVERAGE_OK_PCT, COVERAGE_USABLE_PCT  # один дом уровней
+            if d["coverage_pct"] >= COVERAGE_OK_PCT:
                 d["coverage_tier"] = "ok"
-            elif d["coverage_pct"] >= 40:
+            elif d["coverage_pct"] >= COVERAGE_USABLE_PCT:
                 d["coverage_tier"] = "warn"
             else:
                 d["coverage_tier"] = "low"

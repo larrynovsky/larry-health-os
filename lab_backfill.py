@@ -327,12 +327,17 @@ def _record_recognized(sha: str, source_file: str, run_id: str) -> None:
 def run_backfill(run_id: str, max_docs: int | None = None,
                  only: str | None = None, doc_path: str | None = None,
                  date: str | None = None, force: bool = False,
-                 pages: list[int] | None = None) -> dict:
+                 pages: list[int] | None = None, reraise: bool = False) -> dict:
     """`pages` — адресное перечитывание конкретных страниц (номера с 1).
 
     Позволяет исправить отдельную страницу без vision-прогона всего документа.
     Промоут удаляет только покрытое новым, поэтому частичный прогон заменяет
     ровно прочитанное.
+
+    `reraise` — сбой документа пробрасывается как есть, а не уходит в счётчик errors.
+    Нужен приёмнику одного файла (lab_intake_watcher): из счётчика он мог поднять только
+    свой RuntimeError, и журнал сбоев терял тип и кадры настоящей причины — отчёты /bug
+    сливались в один отпечаток «RuntimeError в process_once» (карточка report:ecaba4, 03.11).
     """
     health_db.init_db()
     refs = labs_db.get_lab_refs()
@@ -391,7 +396,7 @@ def run_backfill(run_id: str, max_docs: int | None = None,
             # И временный отказ поставщика (обрыв, перегрузка): проглоченный, он становился
             # .failed навсегда, а человека просили прислать файл заново (нить file-outcome, 06.10).
             if isinstance(e, (hai_core.ModelNotAdmitted, lab_recognizer.PageLimitExceeded)) \
-                    or llm_client.is_account_problem(e) or llm_client.is_transient(e):
+                    or llm_client.is_account_problem(e) or llm_client.is_transient(e) or reraise:
                 raise
             summary["errors"] += 1
             summary.setdefault("first_error", llm_client.safe_cause(e))   # причина — в сайдкар

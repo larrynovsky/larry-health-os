@@ -13,7 +13,7 @@ tests/integration/test_bot_sprint6c.py — Sprint 6c integration тесты.
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -169,7 +169,11 @@ def test_job_run_specialists_with_followup_sends_message():
     assert ctx.bot.send_message.call_args.kwargs["reply_markup"].inline_keyboard[0][0].callback_data == "act:td:5"
 
 
-def test_job_send_weekly_report_happy_path():
+def test_job_send_weekly_report_happy_path(monkeypatch, tmp_path):
+    from _time_inject import set_test_clock
+    set_test_clock("2026-11-01T12:00")
+    monkeypatch.setenv("HEALTH_TZ", "UTC")
+    monkeypatch.setenv("HEALTH_DATA_DIR", str(tmp_path))
     from jobs.scheduled import send_weekly_report
 
     ctx = _make_job_context()
@@ -185,7 +189,11 @@ def test_job_send_weekly_report_happy_path():
     assert "Недельный отчёт" in ctx.bot.send_message.call_args_list[0].kwargs["text"]
 
 
-def test_job_send_monthly_check_happy_path():
+def test_job_send_monthly_check_happy_path(monkeypatch, tmp_path):
+    from _time_inject import set_test_clock
+    set_test_clock("2026-11-01T12:00")
+    monkeypatch.setenv("HEALTH_TZ", "UTC")
+    monkeypatch.setenv("HEALTH_DATA_DIR", str(tmp_path))
     from jobs.scheduled import send_monthly_check
 
     ctx = _make_job_context()
@@ -442,7 +450,7 @@ def test_handle_text_in_checkin_force_end(tg):
     ctx = SimpleNamespace()
 
     with patch("handlers.messages.ck.checkin_state") as state_mock, \
-         patch("bot.helpers._finalize_checkin_background", new_callable=AsyncMock) as mock_fin:
+         patch("bot.helpers._finalize_checkin_background", new_callable=AsyncMock):
         state_mock.active = True
         state_mock.should_force_end.return_value = True
         state_mock.conversation = []

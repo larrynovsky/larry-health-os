@@ -1,0 +1,1050 @@
+# housekeeping.yaml — Studio footprint registry for health_scripts
+# Source: external inventory (2026-11-02) reviewed and corrected by project Claude agent.
+# EVERYTHING status: declared. restart_safe is agent-declared, NOT owner-confirmed.
+# Subsystem ids verified against subsystem_intent.yaml (2026-11-02).
+# Rule: any task that adds a Studio-side artifact MUST update this file in the same commit.
+project: health_scripts
+registry: subsystem_intent.yaml
+studio_paths:
+- ~/health_scripts (working tree, updateInstead)
+- ~/health
+- ~/health_partner
+- ~/.health_reference
+- ~/container_backups/health
+- ~/health/backups
+subsystems:
+  data_ingestion:
+    owns:
+      services:
+      - label: com.larry.health.backup
+        plist: ~/Library/LaunchAgents/com.larry.health.backup.plist
+        state: loaded
+        schedule: 03:00
+        program: /bin/bash ~/health_scripts/backup_studio.sh
+        log: ~/health/logs/backup.log
+        note: DB backups of all tenants (backup_studio.sh); no closer subsystem id; consider code_backup or a new db_backup id
+        map_confidence: guess
+        restart_safe: false
+        restart_safe_note: false while 03:00 run is in progress (corrupt backup), true otherwise
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.import-poll
+        plist: ~/Library/LaunchAgents/com.larry.health.import-poll.plist
+        state: not_loaded
+        schedule: every 5 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/import_all.py
+        log: ~/health_import_poll.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.import-watchdog
+        plist: ~/Library/LaunchAgents/com.larry.health.import-watchdog.plist
+        state: not_loaded
+        schedule: every 120 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/import_watchdog.py
+        workdir: ~/health_scripts
+        log: ~/health/logs/import_watchdog.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.watcher
+        plist: ~/Library/LaunchAgents/com.larry.health.watcher.plist
+        state: not_loaded
+        schedule: KeepAlive
+        program: /bin/zsh ~/health_scripts/watch_and_import.sh
+        log: ~/health_watcher.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.calendar-sync.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.calendar-sync.partner.plist
+        state: loaded
+        schedule: :05 hourly
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/google_calendar_fetcher.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/calendar_sync_partner.log
+        map_confidence: guess
+      - label: com.larry.health.calendar-sync
+        plist: ~/Library/LaunchAgents/com.larry.health.calendar-sync.plist
+        state: not_loaded
+        schedule: :05 hourly
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/google_calendar_fetcher.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/calendar_sync.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+      - label: com.larry.health.oura-import.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.oura-import.partner.plist
+        state: loaded
+        schedule: 08:00; 11:00; 14:00; 17:00; 20:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/import_oura.py 2 >> ~/health_oura_import_partner.log 2>&1
+        log: ~/health_oura_import_partner.log
+        map_confidence: high
+      - label: com.larry.health.oura-import
+        plist: ~/Library/LaunchAgents/com.larry.health.oura-import.plist
+        state: not_loaded
+        schedule: 08:00; 11:00; 14:00; 17:00; 20:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/import_oura.py 2 >> ~/health_oura_import.log 2>&1
+        log: ~/health_oura_import.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.withings-import
+        plist: ~/Library/LaunchAgents/com.larry.health.withings-import.plist
+        state: not_loaded
+        schedule: 09:10; 21:10
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/import_withings.py >> ~/health_withings_import.log 2>&1
+        log: ~/health_withings_import.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.wellally-check
+        plist: ~/Library/LaunchAgents/com.larry.health.wellally-check.plist
+        state: not_loaded
+        schedule: wd1 10:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/check_wellally_updates.py --notify
+        log: ~/health/logs/wellally_check.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+      containers:
+      - name: health-ingest-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up
+        map_confidence: high
+        restart_safe: unknown
+        restart_safe_note: port 8011, role not described in subsystem_intent
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - name: health-caldav-1
+        image: python:3.11-slim
+        docker_context: colima-health
+        state: Up
+        map_confidence: guess
+        note: CalDAV server, bind ~/.health_caldav
+        restart_safe: false
+        restart_safe_note: live CalDAV connections
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      ports:
+      - port: 8011
+        proto: tcp
+        bind: 127.0.0.1
+        via: colima-health container health-ingest-1 (ssh tunnel to host)
+      - port: 5232
+        proto: tcp
+        bind: 127.0.0.1
+        via: health-caldav-1; Tailscale Serve https :5232 tailnet-only
+      dirs:
+      - path: ~/health/data
+        kind: data
+        size_mb: 2028
+        last_modified: '2026-11-02'
+        retention_proposal: never auto-clean (live health.db). hae_rest/ follows existing log_rotation compression after 14d
+        note: contains health.db 99 MB + presnap_profile_20260926.db 97 MB + health.pre-waitingroom-20260921-*.db 97 MB = manual one-off copies
+          (candidates once owner says so)
+        status: declared
+      - path: ~/health_partner/data
+        kind: data
+        size_mb: 438
+        last_modified: '2026-11-02'
+        retention_proposal: never auto-clean (partner tenant live DB)
+        status: declared
+      - path: ~/health_partner/backups
+        kind: backup
+        size_mb: 1824
+        last_modified: '2026-11-02'
+        retention_proposal: 'health_partner_YYYY-MM-DD.db: keep 30 d (backup_studio.sh already deletes >30 d). before_discovery_*: no longer expected
+          here (see genome_effect_allele). pre_fitness_backfill_20260926.db: 37 d old, candidate for deletion if the job is closed (owner/agent
+          decision).'
+        note: 98 files; 88% of the size is 3 before_discovery snapshots
+        status: declared
+      - path: ~/container_backups/health
+        kind: backup
+        size_mb: 4029
+        last_modified: '2026-11-02'
+        retention_proposal: health_YYYY-MM-DD.db keep 30 d; one-off pre_* by owner decision
+        status: declared
+        note: 'Independent collection (NOT a mirror): written rw by 4 containers (health-bot/cron/lab-intake/ingest via bind mount /home/health/health/backups);
+          health_partner_* are in ~/health_partner/backups (different tenant, different inodes, no APFS clone). before_discovery files gone as
+          of 2026-11-02.'
+      - path: ~/health_data
+        kind: data
+        size_mb: 692
+        last_modified: 2026-08-13 (vcf_import.log)
+        retention_proposal: owner decision (last write 2026-06-26)
+        status: declared
+        never_touch_note: ULGEDCBG2561.vcf (689 MB genome source) is irreplaceable without re-download
+      - path: ~/health_staging_runs
+        kind: tmp
+        size_mb: 1262
+        last_modified: '2026-10-18'
+        retention_proposal: 13 run dirs; delete runs older than 30d when no running job references them
+        status: declared
+      - path: ~/health_staging
+        kind: tmp
+        size_mb: 435
+        last_modified: '2026-09-28'
+        retention_proposal: owner decision
+        status: declared
+      - path: ~/health/backups
+        kind: backup
+        size_mb: 3946
+        file_count: 121
+        last_modified: 2026-09-30 (daily dbs); -shm files touched 2026-10-31
+        retention_proposal: 'PRE-CONTAINERIZATION path, superseded by ~/container_backups/health. Daily health_*.db all >30 d: delete after owner
+          confirmation; one-off pre_* (Aug 30): owner decision; check why -shm files were touched 2026-10-31 before deleting.'
+        status: declared
+    never_touch:
+    - ~/health/data/health.db
+    - ~/health_partner/data
+    - ~/.health_secrets*
+    - ~/.health_caldav
+    - ~/health_data/ULGEDCBG2561.vcf
+    schedule_windows:
+    - busy 03:00-05:30 (backup 03:00, assessment 03:30, survivorship Mon 03:30, literature 04:00/04:30, consilium 1st 04:00) and 07:40-09:00 (machine-check
+      07:40, integrity 07:50, night-cycle 08:00, night-repair 08:40); pgs before_discovery snapshot (16.5 GB) created ~07:00
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  norm_from_documents:
+    owns:
+      dirs:
+      - path: ~/health_reference
+        kind: data
+        size_mb: 232
+        last_modified: '2026-07-29'
+        retention_proposal: owner decision (reference norms, 2026-07-29)
+        status: declared
+      - path: ~/health_review_533
+        kind: tmp
+        size_mb: 13
+        last_modified: '2026-07-26'
+        retention_proposal: one-off review dir, 2026-07-26; candidate tmp 30d
+        status: declared
+    never_touch:
+    - ~/health_reference
+    restart_safe: unknown
+    status: declared
+  genome_effect_allele:
+    owns:
+      services:
+      - label: com.larry.health.pgs-discovery.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.pgs-discovery.partner.plist
+        state: retired_2026-11-02
+        retired_note: 'removed (thread pgs-coverage, owner decision 02.11): the bot job discover_pgs_monthly
+          (day 2) is the single trigger per tenant; repo copy launchd/…partner.plist deleted, tenant_services.yaml
+          pgs-discovery excluded, placement.yaml none. Unloaded from launchd after deploy.'
+        schedule: day5 03:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/pgs_discovery.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/pgs_discovery_partner.log
+        note: 'Triggers pgs_discovery for partner tenant, day 5 03:00. A SECOND trigger is the bot job discover_pgs_monthly in health-bot-1 (jobs/scheduled.py:1421,
+          day=2 07:00 tenant TZ) -> explains snapshots at 2026-10-02 07:01 and 2026-11-02 07:01. Purpose of before_discovery_*.db: rollback of
+          ~/.health_reference/pgs.db if PRAGMA quick_check fails (pgs_discovery.py:238-247).'
+        map_confidence: guess
+        restart_safe: true
+        restart_safe_note: batch, idempotent, misfire_grace_time=86400; not on day 2 / day 5 03:00-10:00 (quick_check on 16.5 GB takes hours)
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.pgs-discovery
+        plist: ~/Library/LaunchAgents/com.larry.health.pgs-discovery.plist
+        state: not_loaded
+        schedule: day5 03:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/pgs_discovery.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/pgs_discovery.log
+        note: 'not loaded; superseded by discover_pgs_monthly in health-bot-1 (jobs/scheduled.py:1421). Do NOT load: would duplicate the bot job.
+          Candidate for _retired (owner/agent confirms).'
+        map_confidence: guess
+        restart_safe: true
+        restart_safe_note: batch, idempotent, misfire_grace_time=86400; not on day 2 / day 5 03:00-10:00 (quick_check on 16.5 GB takes hours)
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: 'bot-job: discover_pgs_monthly'
+        container: health-bot-1
+        source: jobs/scheduled.py:1421
+        schedule: day=2 07:00 tenant TZ
+        note: calls pgsd.discover_and_import_new_scores()
+        state: running_in_container
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: part of health-bot-1
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      dirs:
+      - path: ~/.health_reference
+        kind: data
+        size_mb: 2
+        last_modified: '2026-11-02'
+        retention_proposal: never (pgs.db 1.7 MB after pruning 778 useless scores + VACUUM on 2026-11-02 23:05; was 16.5 GB)
+        status: declared
+        note: 'snapshots: ~/.health_reference/snapshots/ (committed 489fa2e, 02.11: snapshot auto-deleted after successful quick_check,
+          0 files at rest). A non-empty snapshots/ = failed quick_check -> NEVER clean automatically, needs rollback decision.
+          Size: pruned to scores usable for at least one tenant (thread pgs-coverage, 02.11) — see pgs_rejected / discovery_runs tables.'
+    never_touch:
+    - ~/.health_reference/pgs.db
+    - '~/.health_reference/snapshots/ (if non-empty: leftover = failed run)'
+    schedule_windows:
+    - ~07:00 on day 2 (bot job, both tenants); never run cleanup while discovery runs
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  patient_answer_channel:
+    owns:
+      services:
+      - label: com.larry.health.assessment-scheduler.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.assessment-scheduler.partner.plist
+        state: loaded
+        schedule: 03:30
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/assessment_scheduler.py
+        workdir: ~/health_scripts
+        log: ~/health_partner/logs/assessment-scheduler_partner.log
+        map_confidence: guess
+      - label: com.larry.health.assessment-scheduler
+        plist: ~/Library/LaunchAgents/com.larry.health.assessment-scheduler.plist
+        state: not_loaded
+        schedule: 03:30
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/assessment_scheduler.py
+        workdir: ~/health_scripts
+        log: ~/health/logs/assessment-scheduler.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+    never_touch: []
+    schedule_windows:
+    - 03:30 daily
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  lab_intake_gate:
+    owns:
+      services:
+      - label: com.larry.health.lab-intake.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.lab-intake.partner.plist
+        state: loaded
+        last_exit: -15
+        schedule: KeepAlive
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/lab_intake_watcher.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/lab_intake_partner.log
+        map_confidence: high
+      - label: com.larry.health.lab-intake
+        plist: ~/Library/LaunchAgents/com.larry.health.lab-intake.plist
+        state: not_loaded
+        schedule: KeepAlive
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/lab_intake_watcher.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/lab_intake.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      containers:
+      - name: health-lab-intake-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: KeepAlive file-watcher; events may be lost during restart
+        restart_safe_by: project_claude_agent_review_2026-11-02
+    never_touch: []
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  lab_recognizer:
+    owns: {}
+    never_touch: []
+    restart_safe: unknown
+    notes: no Studio-specific footprint found; staging dirs (~/health_staging*) probably belong here - owner to confirm
+    status: declared
+  telegram_bot:
+    owns:
+      services:
+      - label: com.larry.health.bot.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.bot.partner.plist
+        state: loaded
+        schedule: KeepAlive
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/telegram_bot.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/bot_partner.log
+        map_confidence: high
+      - label: com.larry.health.bot
+        plist: ~/Library/LaunchAgents/com.larry.health.bot.plist
+        state: not_loaded
+        schedule: KeepAlive
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/telegram_bot.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/bot.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      containers:
+      - name: health-bot-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: live bot, in-flight JobQueue jobs, scheduled-task misfire
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      dirs:
+      - path: ~/health_scripts/logs
+        kind: logs
+        size_mb: 79
+        last_modified: '2026-11-02'
+        retention_proposal: existing log_rotation (log_rotate.py every 30 min, newsyslog copytruncate)
+        status: declared
+    never_touch: []
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  dashboard:
+    owns:
+      services:
+      - label: com.larry.health.dashboard.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.dashboard.partner.plist
+        state: loaded
+        last_exit: -15
+        schedule: KeepAlive
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/dashboard.py
+        log: ~/health_scripts/logs/dashboard.out_partner.log
+        map_confidence: high
+      - label: com.larry.health.dashboard
+        plist: ~/Library/LaunchAgents/com.larry.health.dashboard.plist
+        state: not_loaded
+        schedule: KeepAlive
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/dashboard.py
+        log: ~/health_scripts/logs/dashboard.out.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      containers:
+      - name: health-dashboard-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: active dashboard connections drop
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      ports:
+      - port: 8002
+        proto: tcp
+        bind: <tailnet-ip> (tailnet IP)
+        via: launchd health.dashboard.partner
+      - port: 8001
+        proto: tcp
+        bind: 127.0.0.1
+        via: container health-dashboard-1; Tailscale Serve tcp :8001 tailnet-only
+    never_touch: []
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  mcp_gateway:
+    owns:
+      containers:
+      - name: health-mcp-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: MCP gateway, active agent sessions drop
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - name: health-mcp-funnel-1
+        image: tailscale/tailscale:v1.102.3
+        docker_context: colima-health
+        state: Up
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: tailscale funnel; short outage for MCP clients
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - name: health-reports-funnel-1
+        image: tailscale/tailscale:v1.102.3
+        docker_context: colima-health
+        state: Up
+        map_confidence: guess
+        note: reports funnel; may belong to public_zone
+        restart_safe: false
+        restart_safe_note: tailscale funnel
+        restart_safe_by: project_claude_agent_review_2026-11-02
+    never_touch:
+    - volume health_mcp-ts
+    - volume health_reports-ts (tailscale node identity)
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  night_decision_loop:
+    owns:
+      services:
+      - label: com.larry.health.night-cycle
+        plist: ~/Library/LaunchAgents/com.larry.health.night-cycle.plist
+        state: not_loaded
+        schedule: 08:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/night_cycle.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/night_cycle.log
+        note: not loaded on Studio; unclear whether health-cron-1 runs night_cycle - agent to confirm before retiring
+        map_confidence: high
+      - label: com.larry.health.night-repair
+        plist: ~/Library/LaunchAgents/com.larry.health.night-repair.plist
+        state: loaded
+        schedule: 08:40
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/night_repair.py run
+        workdir: ~/health_scripts
+        log: ~/Library/Logs/health-night-repair.log
+        map_confidence: guess
+        restart_safe: false
+        restart_safe_note: applies patches; interruption = partial apply
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.owner-nag
+        plist: ~/Library/LaunchAgents/com.larry.health.owner-nag.plist
+        state: not_loaded
+        schedule: 08:00; 11:00; 14:00; 17:00; 20:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/owner_nag.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/owner_nag.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.owner-weekly
+        plist: ~/Library/LaunchAgents/com.larry.health.owner-weekly.plist
+        state: not_loaded
+        schedule: wd1 09:10
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/owner_weekly.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/owner_weekly.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.weekly-digest
+        plist: ~/Library/LaunchAgents/com.larry.health.weekly-digest.plist
+        state: loaded
+        schedule: wd6 22:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/weekly_digest.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/weekly_digest.log
+        map_confidence: guess
+        restart_safe: false
+        restart_safe_note: sends report
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.triage
+        plist: ~/Library/LaunchAgents/com.larry.health.triage.plist
+        state: not_loaded
+        schedule: 08:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/triage_agent.py --send
+        log: ~/health_scripts/logs/triage_agent.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+      containers:
+      - name: health-cron-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up (healthy)
+        map_confidence: guess
+        note: runs scheduled jobs inside container; overlaps with launchd .partner jobs - owner to confirm who runs what
+        restart_safe: true
+        restart_safe_note: idempotent cron jobs; not in 03:00-08:40 window
+        restart_safe_by: project_claude_agent_review_2026-11-02
+    never_touch: []
+    schedule_windows:
+    - 08:00 night-cycle, 08:40 night-repair (loaded); Sun 22:00 weekly-digest
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  morning_brief:
+    owns:
+      services:
+      - label: com.larry.healthbot.morningwake
+        plist: ~/Library/LaunchAgents/com.larry.healthbot.morningwake.plist
+        state: loaded
+        schedule: 06:45
+        program: /bin/bash ~/health_scripts/morning_wake.sh
+        log: ~/health_scripts/logs/morning_wake.log
+        map_confidence: guess
+      - label: com.larry.regenerate-lifestyle-prompts
+        plist: ~/Library/LaunchAgents/com.larry.regenerate-lifestyle-prompts.plist
+        state: loaded
+        schedule: day1 09:05
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/_create_lifestyle_prompts.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/lifestyle_prompts_regen.log
+        map_confidence: guess
+    never_touch: []
+    schedule_windows:
+    - 06:45 morning_wake; 1st of month 09:05 lifestyle prompts
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  consilium:
+    owns:
+      services:
+      - label: com.larry.health.consilium.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.consilium.partner.plist
+        state: loaded
+        schedule: day1 04:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/monthly_consilium.py 30 >> ~/health_scripts/logs/consilium_partner.log
+          2>&1
+        log: ~/health_scripts/logs/consilium_partner.log
+        map_confidence: high
+      - label: com.larry.health.consilium
+        plist: ~/Library/LaunchAgents/com.larry.health.consilium.plist
+        state: not_loaded
+        schedule: day1 04:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/monthly_consilium.py 30 >> ~/health_scripts/logs/consilium.log 2>&1
+        log: ~/health_scripts/logs/consilium.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+    never_touch: []
+    schedule_windows:
+    - 1st of month 04:00
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  constitutions:
+    owns:
+      services:
+      - label: com.larry.health.constitutions.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.constitutions.partner.plist
+        state: loaded
+        schedule: wd0 05:30
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/generate_constitutions.py --if-changed >> ~/health_constitutions_partner.log
+          2>&1
+        workdir: ~/health_scripts
+        log: ~/health_constitutions_partner.log
+        map_confidence: high
+      - label: com.larry.health.constitutions
+        plist: ~/Library/LaunchAgents/com.larry.health.constitutions.plist
+        state: not_loaded
+        schedule: wd0 05:30
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/generate_constitutions.py --if-changed >> ~/health_constitutions.log
+          2>&1
+        workdir: ~/health_scripts
+        log: ~/health_constitutions.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      dirs:
+      - path: ~/health_constitutions_partner.log
+        kind: logs
+        retention_proposal: move under ~/health_scripts/logs so log_rotation covers it; root-level *.log files in ~ are not rotated
+        status: declared
+    never_touch: []
+    schedule_windows:
+    - Sun 05:30
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  proactivity:
+    owns:
+      services:
+      - label: com.larry.health.longitudinal.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.longitudinal.partner.plist
+        state: loaded
+        schedule: wd0 03:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/longitudinal_analysis.py >> ~/health_longitudinal_partner.log 2>&1
+        log: ~/health_longitudinal_partner.log
+        map_confidence: guess
+      - label: com.larry.health.longitudinal
+        plist: ~/Library/LaunchAgents/com.larry.health.longitudinal.plist
+        state: not_loaded
+        schedule: wd0 03:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/longitudinal_analysis.py >> ~/health_longitudinal.log 2>&1
+        log: ~/health_longitudinal.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+      - label: com.larry.health.survivorship.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.survivorship.partner.plist
+        state: loaded
+        schedule: wd1 03:30
+        program: /bin/bash ~/health_scripts/scripts/run_survivorship_pipeline.sh
+        workdir: ~/health_scripts
+        log: ~/health_partner/logs/survivorship_partner.log
+        map_confidence: guess
+      - label: com.larry.health.survivorship
+        plist: ~/Library/LaunchAgents/com.larry.health.survivorship.plist
+        state: not_loaded
+        schedule: wd1 03:30
+        program: /bin/bash ~/health_scripts/scripts/run_survivorship_pipeline.sh
+        workdir: ~/health_scripts
+        log: ~/health/logs/survivorship.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+    never_touch: []
+    schedule_windows:
+    - Sun 03:00 longitudinal; Mon 03:30 survivorship
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  hypothesis_experiment:
+    owns:
+      services:
+      - label: com.larry.health.literature-search.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.literature-search.partner.plist
+        state: loaded
+        schedule: wd0 04:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/pubmed_searcher.py
+        workdir: ~/health_scripts
+        log: ~/health_partner/logs/literature-search_partner.log
+        map_confidence: guess
+      - label: com.larry.health.literature-search
+        plist: ~/Library/LaunchAgents/com.larry.health.literature-search.plist
+        state: not_loaded
+        schedule: wd0 04:00
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/pubmed_searcher.py
+        workdir: ~/health_scripts
+        log: ~/health/logs/literature-search.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+      - label: com.larry.health.literature-read.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.literature-read.partner.plist
+        state: loaded
+        schedule: 04:30
+        program: /bin/bash ~/health_scripts/scripts/run_literature_pipeline.sh
+        workdir: ~/health_scripts
+        log: ~/health_partner/logs/literature-read_partner.log
+        map_confidence: guess
+      - label: com.larry.health.literature-read
+        plist: ~/Library/LaunchAgents/com.larry.health.literature-read.plist
+        state: not_loaded
+        schedule: 04:30
+        program: /bin/bash ~/health_scripts/scripts/run_literature_pipeline.sh
+        workdir: ~/health_scripts
+        log: ~/health/logs/literature-read.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+    never_touch: []
+    schedule_windows:
+    - Sun 04:00 search; daily 04:30 read
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  memory_temporal_axis:
+    owns:
+      services:
+      - label: com.larry.health.profile-reconciler.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.profile-reconciler.partner.plist
+        state: loaded
+        schedule: 06:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/profile_reconciler.py >> ~/health_scripts/logs/profile_reconciler_partner.log
+          2>&1
+        log: ~/health_scripts/logs/profile_reconciler_partner.log
+        map_confidence: guess
+        restart_safe: true
+        restart_safe_note: idempotent; avoid 06:00
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.profile-reconciler
+        plist: ~/Library/LaunchAgents/com.larry.health.profile-reconciler.plist
+        state: not_loaded
+        schedule: 06:00
+        program: /bin/bash -c /opt/homebrew/bin/python3.11 ~/health_scripts/profile_reconciler.py >> ~/health_scripts/logs/profile_reconciler.log
+          2>&1
+        log: ~/health_scripts/logs/profile_reconciler.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+        restart_safe: true
+        restart_safe_note: idempotent; avoid 06:00
+        restart_safe_by: project_claude_agent_review_2026-11-02
+    never_touch: []
+    schedule_windows:
+    - 06:00
+    restart_safe: true
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  self_monitoring:
+    owns:
+      services:
+      - label: com.larry.health.integrity-check.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.integrity-check.partner.plist
+        state: loaded
+        schedule: 07:50
+        program: /bin/bash ~/health_scripts/run_checks.sh --scheduled
+        log: ~/health_scripts/logs/integrity_check_partner.log
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: sends Telegram alerts; double run = duplicates
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.integrity-check
+        plist: ~/Library/LaunchAgents/com.larry.health.integrity-check.plist
+        state: not_loaded
+        schedule: 07:50
+        program: /bin/bash ~/health_scripts/run_checks.sh --scheduled
+        log: ~/health_scripts/logs/integrity_check.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+        restart_safe: false
+        restart_safe_note: sends Telegram alerts; double run = duplicates
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.machine-check
+        plist: ~/Library/LaunchAgents/com.larry.health.machine-check.plist
+        state: loaded
+        schedule: 07:40
+        program: /bin/bash ~/health_scripts/scripts/machine_check.sh
+        workdir: ~/health_scripts
+        log: ~/Library/Logs/health-machine-check.log
+        map_confidence: high
+        restart_safe: true
+        restart_safe_note: read-only check
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.pipaudit
+        plist: ~/Library/LaunchAgents/com.larry.health.pipaudit.plist
+        state: not_loaded
+        schedule: wd1 03:30
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/scripts/pip_audit_check.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/pip_audit.out.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+      - label: com.larry.health.probes
+        plist: ~/Library/LaunchAgents/com.larry.health.probes.plist
+        state: not_loaded
+        schedule: wd1 06:20
+        program: /bin/bash ~/health_scripts/scripts/run_probes.sh
+        log: ~/health_scripts/logs/probes.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+    never_touch: []
+    schedule_windows:
+    - 07:40 machine-check, 07:50 integrity-check
+    restart_safe: false
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  night_test_triage:
+    owns:
+      services:
+      - label: com.larry.health.test-suite
+        plist: ~/Library/LaunchAgents/com.larry.health.test-suite.plist
+        state: not_loaded
+        schedule: 00:00
+        program: /bin/bash ~/health_scripts/run_full_test_suite.sh
+        workdir: ~/health_scripts
+        log: ~/health_test_suite.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.test-api-report
+        plist: ~/Library/LaunchAgents/com.larry.health.test-api-report.plist
+        state: not_loaded
+        schedule: day1 09:30
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/monthly_api_report.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/test_api_report.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+    never_touch: []
+    schedule_windows:
+    - 00:00 test-suite (not loaded on Studio)
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  multitenancy:
+    owns:
+      services:
+      - label: com.larry.health.multitenant-env
+        plist: ~/Library/LaunchAgents/com.larry.health.multitenant-env.plist
+        state: loaded
+        schedule: RunAtLoad
+        program: /bin/launchctl setenv HEALTH_MULTITENANT 1
+        map_confidence: high
+      - label: com.larry.health.reminders-sync.partner
+        plist: ~/Library/LaunchAgents/com.larry.health.reminders-sync.partner.plist
+        state: loaded
+        schedule: every 180 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/reminders_sync.py
+        log: ~/health_partner/logs/reminders_sync_partner.log
+        map_confidence: high
+      - label: com.larry.health.reminders-sync
+        plist: ~/Library/LaunchAgents/com.larry.health.reminders-sync.plist
+        state: not_loaded
+        schedule: every 180 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/reminders_sync.py
+        log: ~/health/logs/reminders_sync.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: high
+      - label: com.larry.health.pilot-shadow
+        plist: ~/Library/LaunchAgents/com.larry.health.pilot-shadow.plist
+        state: loaded
+        schedule: every 60 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/pilot_shadow.py
+        workdir: ~/health_scripts
+        log: ~/Library/Logs/health-shadow.log
+        map_confidence: guess
+        restart_safe: true
+        restart_safe_note: hourly snapshot; losing one run is harmless
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      dirs:
+      - path: ~/health_shadow
+        kind: data
+        size_mb: 100
+        last_modified: '2026-11-02'
+        retention_proposal: owner decision; written hourly by pilot_shadow (2026-11-02)
+        status: declared
+      - path: ~/health_switch
+        kind: data
+        size_mb: 97
+        last_modified: '2026-09-30'
+        retention_proposal: owner decision (2026-09-30)
+        status: declared
+      - path: ~/health_ops
+        kind: data
+        size_mb: 30
+        last_modified: '2026-10-06'
+        retention_proposal: owner decision (2026-10-06)
+        status: declared
+    never_touch:
+    - ~/health_shadow while pilot-shadow loaded
+    restart_safe: unknown
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  agent_coordination:
+    owns:
+      services:
+      - label: com.larry.health.uncommitted-watchdog
+        plist: ~/Library/LaunchAgents/com.larry.health.uncommitted-watchdog.plist
+        state: loaded
+        schedule: every 60 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/scripts/uncommitted_watchdog.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/uncommitted_watchdog.out.log
+        map_confidence: high
+        restart_safe: true
+        restart_safe_note: read-only monitor
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      - label: com.larry.health.code-watcher
+        plist: ~/Library/LaunchAgents/com.larry.health.code-watcher.plist
+        state: not_loaded
+        schedule: KeepAlive
+        program: /bin/zsh ~/health_scripts/watch_and_test.sh
+        log: ~/health_scripts/logs/code_watcher.log
+        note: plist exists, job not loaded (dead config?)
+        map_confidence: guess
+    never_touch: []
+    restart_safe: unknown
+    notes: 'Studio working tree ~/health_scripts is the push target (receive.denyCurrentBranch=updateInstead): a dirty tree silently breaks `git
+      push studio`. Housekeeping must never create files inside ~/health_scripts outside logs/.'
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  log_rotation:
+    owns:
+      services:
+      - label: com.larry.health.logrotate
+        plist: ~/Library/LaunchAgents/com.larry.health.logrotate.plist
+        state: loaded
+        schedule: every 30 min
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/log_rotate.py
+        workdir: ~/health_scripts
+        log: ~/health_scripts/logs/logrotate.log
+        map_confidence: high
+        restart_safe: true
+        restart_safe_note: idempotent copytruncate
+        restart_safe_by: project_claude_agent_review_2026-11-02
+      dirs:
+      - path: ~/Library/Logs/health-container-deploy.log
+        kind: logs
+        size_mb: 1
+        retention_proposal: 0.9 MB, not in rotation; add to health-logs.newsyslog.conf
+        status: declared
+      - path: ~/health_*.log (root of ~)
+        kind: logs
+        retention_proposal: 7+ files up to 3.2 MB at ~ root, outside the rotation perimeter
+        status: declared
+    never_touch: []
+    restart_safe: true
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  runtime_infra:
+    note_proposed: true
+    owns:
+      services:
+      - label: com.larry.health.colima
+        plist: ~/Library/LaunchAgents/com.larry.health.colima.plist
+        state: loaded
+        schedule: RunAtLoad
+        program: /bin/sh -c export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; colima status --profile health >/dev/null 2>&1 || colima start
+          --profile health --activate=false
+        log: ~/Library/Logs/health-colima.log
+        map_confidence: guess
+      images:
+      - repo: health-os
+        keep_last: 2
+        status: declared
+        note: only tag local seen
+      - repo: tailscale/tailscale
+        keep_last: 1
+        status: declared
+      dirs:
+      - path: ~/.colima/_lima/_disks/colima-health/datadisk
+        kind: data
+        size_mb: 21300
+        last_modified: '2026-09-30'
+        retention_proposal: never while VM runs. Disk is 21.3 GB allocated of 21.5 apparent while `docker system df` in this VM shows ~12.7 GB
+          used -> ~8 GB may be trimmable (fstrim) - unverified
+        status: declared
+      containers:
+      - name: health-bug-inbox-1
+        image: health-os:local
+        docker_context: colima-health
+        state: Up
+        map_confidence: unknown
+        note: missing from draft v1; subsystem not identified
+        restart_safe: unknown
+        restart_safe_by: project_claude_agent_review_2026-11-02
+    never_touch:
+    - volumes health_health-home, health_health-applogs, health_health_reports-data, health_reports-ts, health_mcp-ts
+    restart_safe: unknown
+    notes: 'PROPOSED NEW subsystem id runtime_infra (no registry id covers the Colima profile `health`). 14 anonymous exited containers (pensive_hawking,
+      quizzical_gates, adm_run ... ~156 MB reclaimable) are ad-hoc `docker run` leftovers of agents: see unassigned.'
+    status: declared
+    restart_safe_by: project_claude_agent_review_2026-11-02 (aggregate of children)
+  agent_mail:
+    owns:
+      services:
+      - label: com.larry.health.agent-mail-bridge
+        plist: ~/Library/LaunchAgents/com.larry.health.agent-mail-bridge.plist
+        state: loaded   # 2026-11-06 10:20, launchctl list: exit 0
+        schedule: every 60 s
+        program: /opt/homebrew/bin/python3.11 ~/health_scripts/scripts/agent_mail_bridge.py
+        workdir: ~/health_scripts
+        log: ~/Library/Logs/health-agent-mail-bridge.log
+        map_confidence: high
+        restart_safe: true
+        restart_safe_note: each pass is idempotent (out/ removed only after sent/ written; in/ skipped if present)
+        restart_safe_by: agent-post thread 2026-11-05
+      dirs:
+      - path: ~/agent_mail/owner
+        kind: data
+        retention_proposal: sent/ and acked/ older than 30 d may be removed; in/ and out/ never by housekeeping
+        status: declared
+      - path: ~/health_partner/agent_mail
+        kind: data
+        retention_proposal: same as owner
+        status: declared
+    never_touch:
+    - ~/agent_post   # infra mailbox root, owned by ~/Projects/infra (agent_post)
+    restart_safe: true
+    status: declared
+  unassigned:
+    containers_colima_health_exited:
+    - pensive_hawking
+    - pensive_bartik
+    - quizzical_gates
+    - peaceful_feistel
+    - zealous_lehmann
+    - jolly_banzai
+    - jovial_tesla
+    - adm_run
+    - intelligent_jones
+    - adoring_yonath
+    - +4 more
+    note: 'Exited ad-hoc containers: proposal = remove if exited >14d and no named volume; status declared'
+    unloaded_owner_tenant_plists: 'see services with state: not_loaded (owner-tenant duplicates of .partner jobs; presumably replaced by container
+      health-cron-1) - 31 plists (all unloaded plists in ~/Library/LaunchAgents, all projects); candidates for ~/Library/LaunchAgents/_retired
+      once owner confirms'
+    plists_in_retired_dirs:
+    - ~/Library/LaunchAgents/_retired
+    - ~/Library/LaunchAgents/_retired_backups
+clean_window:
+  safe: 10:00-01:00 Asia/<owner-tz>
+  forbidden:
+  - 'day 2: 06:30-10:00 (bot pgs job + quick_check)'
+  - 'day 5: 02:30-10:00 (launchd pgs job)'
+  - daily 03:00-09:00 (backup + scheduled jobs)
+  precheck: abort if ~/.health_reference/snapshots/ exists and is non-empty
+retention_policy_proposals:
+  before_discovery: auto-managed (0 at rest / 1 during a run in ~/.health_reference/snapshots/); never delete a leftover
+  daily_db_backups: 30 d
+  ~/health_staging_runs/run.*: 30 d if no job references it
+  ~/health_staging: 'never_touch: health.db with live WAL'
+  ~/health_data: owner decision
+agent_corrections_open:
+- health-ingest-1 role (port 8011) not described in subsystem_intent
+- 'health-cron-1 daily jobs (assessment_scheduler.py, gen_schedule.py, lab_schedule_extractor.py) possibly overlap launchd .partner jobs: check
+  for double run'
+- before_discovery snapshot change exists only as an uncommitted working-tree edit at review time; re-verify after commit/deploy
+- ~/.health_reference mount mode for health-ingest-1 not verified (:ro for health-bot-1 confirmed)
+review:
+  by: project_claude_agent_review_2026-11-02
+  note: 'Answers collected from read-only headless Claude sessions run in the project dir; restart_safe is agent-declared, NOT owner-confirmed;
+    everything remains status: declared.'

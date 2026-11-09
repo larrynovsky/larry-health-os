@@ -44,6 +44,14 @@
         "pattern"
       ],
       "why": "словарь личных слов (§23) — имя и идентификаторы вымарываются из ответа"
+    },
+    {
+      "module": "food_profile",
+      "uses": [
+        "medical_frame"
+      ],
+      "why": "Nutrition frame and explicit not_assessed status; no claim of checked restrictions without a ready clinical pack.",
+      "legacy": "Existing module has no sidecar; only medical_frame is used."
     }
   ],
   "disposability": {

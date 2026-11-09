@@ -104,16 +104,16 @@ def _apply_active_generated(frame: dict, conn, med_text: str) -> dict:
     Fail-closed по полу: правило, чьё наложение пробивает пол безопасности, ПРОПУСКАЕТСЯ
     (база уже полу удовлетворяет). Пустой склад → рамка не меняется (поведение прода сейчас)."""
     try:
-        import re as _re
         import generated_food_rules as _gfr
         import food_floor as _ff
         for rule in _gfr.get_active_rules(conn=conn):
             if not rule_fires(rule.get("payload") or {}, med_text):
                 continue
             cand = _merge_frame(frame, (rule.get("payload") or {}).get("frame") or {})
-            if _ff.assert_floor(cand, conn=conn, med_text=med_text):
+            violations = _ff.assert_floor(cand, conn=conn, med_text=med_text)
+            if violations:
                 logging.getLogger(__name__).warning(
-                    "food gen-rule %s пробивает пол — пропущено (fail-closed)", rule.get("rule_key"))
+                    "food gen-rule %s skipped (fail-closed): %s", rule.get("rule_key"), violations)
                 continue
             frame = cand
     except Exception as e:
@@ -125,8 +125,9 @@ def medical_frame(conn=None, profile: dict | None = None, *, lang: str | None = 
     """Детерминированная РАМКА питания тенанта из медкарты+гипотез+генома (per-tenant).
 
     Возвращает {energy, protein, micro:set, constraints:set, reasons:[...]}.
+    Без готового свода: assessment='not_assessed', energy/protein='not_assessed',
+    kb_status/kb_reason описывают причину. Ready-пакет сохраняет прежнюю форму ответа.
     energy: 'gain'|'maintain'|'standard'. Медкарта доминирует над геномом."""
-    lang = lang or clinical_kb_language(conn, profile)
     import health_db as _db
     if conn is None:
         conn = _db.get_conn()
@@ -135,6 +136,15 @@ def medical_frame(conn=None, profile: dict | None = None, *, lang: str | None = 
             profile = _db.get_profile_context()
         except Exception:  # silent-ok: профиль недоступен → рамка по медкарте/геному, дефолт {}
             profile = {}
+
+    lang = lang or clinical_kb_language(conn, profile)
+    import clinical_kb
+    status = clinical_kb.readiness(conn)
+    if status.state != "ready":
+        logging.getLogger(__name__).warning("food frame not assessed: %s", status.reason)
+        return dict(assessment="not_assessed", kb_status=status.state, kb_reason=status.reason,
+                    energy="not_assessed", protein="not_assessed", micro=set(), constraints=set(),
+                    reasons=[i18n.t("food.not_assessed", lang)], bmi=_bmi(profile))
 
     frame = dict(energy="standard", protein="standard",
                  micro=set(), constraints=set(), reasons=[])
@@ -224,6 +234,9 @@ def build_food_profile(conn=None, month: int = 1, profile: dict | None = None, *
     if conn is None:
         conn = _db.get_conn()
     frame = medical_frame(conn, profile, lang=lang)
+    if frame.get("assessment") == "not_assessed":
+        return {"frame": frame, "month": month, "language": lang, "categories": {},
+                "micro": [], "limit": frame_limits(frame, lang), "from_repertoire": None}
 
     try:
         genes = conn.execute(
@@ -291,6 +304,8 @@ def build_food_profile(conn=None, month: int = 1, profile: dict | None = None, *
 def frame_limits(frame: dict, lang: str) -> list[str]:
     """«Ограничить» на языке человека — детерминированно из constraints + energy рамки.
     Читатели: профиль питания (выше) и промпт конституции «Питание» (generate_constitutions)."""
+    if frame.get("assessment") == "not_assessed":
+        return [i18n.t("food.not_assessed", lang)]
     limit: list[str] = []
     c = frame["constraints"]
     if "lactose_free" in c:
@@ -321,6 +336,8 @@ def render_food_document(name: str, model: dict) -> str:
     Каркас «не медназначение» обязателен; при gain — акцент на вес/диетолога."""
     lang = model.get("language", i18n.DEFAULT)
     f = model["frame"]
+    if f.get("assessment") == "not_assessed":
+        return i18n.t("food.not_assessed", lang)
     energy_key = _ENERGY_LABEL_KEYS.get(f["energy"])
     L: list[str] = [i18n.t('food.document.title', lang, name=name), ""]
     L.append(i18n.t('food.document.intro', lang))
@@ -373,6 +390,8 @@ def pick_food_of_day(conn=None, month: int = 1, day_index: int = 0, profile: dic
     if conn is None:
         conn = _db.get_conn()
     frame = medical_frame(conn, profile, lang=lang)
+    if frame.get("assessment") == "not_assessed":
+        return {"assessment": "not_assessed", "why": i18n.t("food.not_assessed", lang)}
     try:
         genes = conn.execute(
             "SELECT gene, significance FROM genetic_variants WHERE gene LIKE 'MTHFR%'").fetchall()

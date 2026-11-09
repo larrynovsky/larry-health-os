@@ -89,9 +89,18 @@ Do not edit the database mark downward: it is the memory.
 
 ## If there is no call
 
-Silence = no pending decisions. This is a guarantee, not a hope: the bell has a heartbeat
-(`check_doorbell_liveness` in the night integrity), and if the channel died — it would go red,
-not silently substitute for the call.
+The bell requires a provisioned repair session (`notify.repair_provisioned()`): the
+`night_repair_seen` file next to the faults journal, of any age. Freshness must not
+silence the owner when repair is late or dead. Without the mark, cards
+stay on the desk but do not ring, including the desk-memory-loss warning.
+As checked on 2026-11-08, none of `parked_decisions.KINDS` can be resolved in the bot;
+they require a repair session. `/bug` can send the developer a fault report
+(the journal and screen trace, not the desk cards themselves).
+
+With the mark present, the usual conditions apply: open non-engineering cards,
+the 08–20 window, once a day, after the night cycle. Suppressed calls still write
+a heartbeat receipt. Oracle: `test_repair_provisioning_controls_bell`
+in `tests/unit/test_owner_nag.py`.
 
 ## Activation (one-time, your "enable")
 

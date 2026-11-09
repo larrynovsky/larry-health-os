@@ -99,6 +99,7 @@ def _k9_environment(energy="gain", tenant_language="en", owner_language="ru"):
             module.__file__ = str(path)
             exec(compile(path.read_text(), str(path), "exec"), module.__dict__)
         ckb, fg, fs, rep, fp, fq = (modules[name] for name in _K9_MODULES)
+        ckb.readiness = Mock(return_value=ckb.Readiness("ready", "synthetic boundary"))
         ckb.active_entries = Mock(return_value=entries)
         # Cover every seasonal label and every reason, independently of the private region pack.
         produce = list(fg.FOOD_BENEFITS)
@@ -112,8 +113,8 @@ def _k9_environment(energy="gain", tenant_language="en", owner_language="ru"):
 
 def test_k9_dictionary_snapshot_placeholders_and_vocabulary():
     tables = _k9_tables()
-    ru = {k: v for k, v in tables["ru"].items() if k.startswith("food.")}
-    en = {k: v for k, v in tables["en"].items() if k.startswith("food.")}
+    ru = {k: v for k, v in tables["ru"].items() if k.startswith("food.") and k != "food.not_assessed"}
+    en = {k: v for k, v in tables["en"].items() if k.startswith("food.") and k != "food.not_assessed"}
     assert set(ru) == set(en) and len(ru) == 176
     assert hashlib.sha256(json.dumps(ru, ensure_ascii=False, sort_keys=True).encode()).hexdigest() == _K9_RU_SHA256
     for key in ru:

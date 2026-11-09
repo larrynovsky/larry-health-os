@@ -1,4 +1,4 @@
-<!-- translation-of: docs/BACKUP_POLICY.md sha256:5b8117032e66 -->
+<!-- translation-of: docs/BACKUP_POLICY.md sha256:b74a3e696aa2 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](BACKUP_POLICY.md)
@@ -77,9 +77,27 @@ ssh <studio_ssh> "cp ~/health/data/health.db \
 - Running `vcf_import_pipeline.py` (full VCF reimport) — manually
 - Any script that performs a bulk INSERT without an explicit limit
 
-`pgs_discovery.py` creates a snapshot automatically before Step 4 (import loop):
-`~/health/backups/health.before_pgs_discovery_YYYYMMDD_HHMM.db`
-via the `sqlite3` online backup API (not `cp` — does not capture an open WAL).
+`pgs_discovery.py` copies the **shared reference** (not the canon) before Step 4 (import loop)
+via the `sqlite3` online backup API (not `cp` — does not capture an open WAL). Design since 2026-11-02
+(owner's decisions of that day):
+- **One writer per machine.** Only the process that can write the reference imports and takes the
+  copy (`pgs_reference.writable()`). The owner's container sees it `:ro` and only runs Phase H. Before
+  that, each of three runs put its own copy into its own `<tenant>/backups/`.
+- **One home for the snapshot:** `~/.health_reference/snapshots/` (`pgs_reference.snapshot_dir()`).
+- **Zero snapshots at rest.** The snapshot is deleted as soon as the reference passes `PRAGMA quick_check`
+  after the import. If it fails, the snapshot stays, `R2_ref_check` goes to the fault channel, and the
+  next run does not import. A snapshot left by an interrupted run is checked and removed by the next run
+  if the reference is intact. The reference can be re-downloaded from the PGS Catalog, so keeping 16 GB
+  between runs serves nothing.
+- **Room is computed, not configured.** An import starts only if free space ≥ reference size + average
+  model × `MAX_IMPORT_PER_RUN` × 2 (`pgs_reference.import_room()`). The same calculation drives the
+  nightly sensor "disk room for the PGS reference top-up". The former literal `DB_SIZE_LIMIT_MB=20000`
+  is gone: it would have stopped the top-up at 20 GB regardless of free space and not stopped it on a
+  full disk.
+- **Only usable scores are kept** (thread pgs-coverage, 2026-11-02): scores useless for every tenant
+  (coverage < `prs_context.COVERAGE_USABLE_PCT`) are removed and remembered in `pgs_rejected`; each writer
+  run leaves a `discovery_runs` receipt, judged by the sensor "the PGS reference has a live writer". If
+  space runs out and there is nothing left to remove: [how-to: Studio disk](how-to/free_studio_disk.md).
 
 **When not needed:**
 - `generate_constitutions.py` (writes only to `constitutions`, does not change raw data)

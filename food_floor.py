@@ -130,7 +130,8 @@ def _violations_of(assertion: dict, frame: dict) -> list[str]:
 
 def assert_floor(frame: dict, conn=None, profile: dict | None = None,
                  med_text: str | None = None) -> list[dict]:
-    """Проверить рамку против пола. Возвращает список нарушений [{id, why, detail}] (пусто = ок).
+    """Проверить рамку против пола. Возвращает список нарушений [{id, why, detail}] (пусто = проверено).
+    Неготовый свод/пол или ошибка проверки → floor_unavailable, никогда не успех.
     НИКОГДА не бросает наружу — гвардиан не должен ронять бриф.
 
     med_text: если задан — берётся ВМЕСТО ре-скана problem_list. Нужно для критики
@@ -145,6 +146,9 @@ def assert_floor(frame: dict, conn=None, profile: dict | None = None,
         # DB-контур + под drift-сторожем (test: clinical_kb floor == food_rules.yaml floor).
         import clinical_kb as _ckb
         c = conn if conn is not None else _db().get_conn()
+        status = _ckb.readiness(c)
+        if status.state != "ready":
+            return [{"id": "floor_unavailable", "why": status.state, "detail": status.reason}]
         bmi = frame.get("bmi")
         mt = str(med_text).lower() if med_text is not None else None
         out = []
@@ -159,4 +163,4 @@ def assert_floor(frame: dict, conn=None, profile: dict | None = None,
         return out
     except Exception as e:  # silent-ok: пол — гвардиан, его сбой не должен ломать профиль
         _log.warning("assert_floor сбой (пол пропущен): %s", e)
-        return []
+        return [{"id": "floor_unavailable", "why": "evaluation_failed", "detail": type(e).__name__}]

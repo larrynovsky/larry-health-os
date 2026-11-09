@@ -130,7 +130,7 @@ dependencies:
     source: macOS system frameworks
     components: [osascript, icalbuddy, launchd]
     impact: infra
-    owner: task_agent.py, calendar_client.py, calendar_sync.py
+    owner: task_agent.py, calendar_client.py
     impacted_uc: [UC-G-01, UC-G-02, UC-A-06]
 
   # ── Medical guideline windows ────────────────────────────────────────────

@@ -488,6 +488,29 @@ def check_tasks_pipeline():
 check("задачи читаются (open + overdue)", check_tasks_pipeline)
 
 
+
+def check_lab_task_pairs():
+    """Conflicting or duplicate open lab requests need reconciliation, not auto-close."""
+    import i18n
+    with db.get_conn() as conn:
+        tasks = [dict(row) for row in conn.execute(
+            "SELECT id, type, status, content, deadline FROM tasks "
+            "WHERE type='lab_test' AND status IN ('open', 'snoozed') ORDER BY id"
+        ).fetchall()]
+    findings = db.lab_task_pairs(tasks)
+    assert not findings, "; ".join(
+        i18n.t("integrity.lab_task_pairs." + finding["kind"],
+               first=finding["task_ids"][0], second=finding["task_ids"][1],
+               analyte=finding["analyte"])
+        for finding in findings
+    )
+    return findings
+
+
+import i18n
+check(i18n.t("integrity.lab_task_pairs.label"), check_lab_task_pairs)
+
+
 def check_recent_task_activity():
     with db.get_conn() as conn:
         row = conn.execute(
@@ -893,7 +916,7 @@ def check_reco_repeats_fresh_lab():
     if not texts:
         return {"текстов": 0}
     last = {r["test_name"]: r["date"] for r in _ldb.get_recent_labs(730 * 5)}
-    sched = _ldb.get_effective_lab_schedule()
+    sched = _ldb.tenant_lab_schedule()
     fresh, no_sched, absent = [], 0, []
     for src, text in texts:
         for hit in _gc.recommendations_without_evidence(text, last, sched):
@@ -3156,6 +3179,67 @@ def check_macbook_head_deployed():
 check("код MacBook доехал до Studio (по снимку)", check_macbook_head_deployed, host_only=True)
 
 
+def macbook_jobs_in_snapshot(message):
+    """Чистая/тестируемая: поле `health_jobs=` из сообщения снимка MacBook.
+
+    Возврат: list[label] (пустой — на MacBook нет ни одного такого джоба) или None —
+    судить не на чем: поля нет (снимок старого backup.sh) или писатель сам сказал
+    `неизвестно` (launchctl не ответил). None и [] — разные вещи: первое «не знаю»,
+    второе «проверил, пусто» (тот же контракт, что у `threads=нет`)."""
+    import re as _re
+    m = _re.search(r"(?:^|\s)health_jobs=(\S+)", message or "")
+    if not m or m.group(1) == "неизвестно":
+        return None
+    if m.group(1) == "нет":
+        return []
+    return [x for x in m.group(1).split(",") if x]
+
+
+def check_macbook_health_jobs():
+    """ДЖОБ ДАННЫХ НА MacBook — падает «громко», но в журнал, который никто не читает.
+
+    Замер 06.11 (нить macbook-kayak-oura): два джоба эпохи «MacBook пишет данные»
+    жили месяцами. Поездки KAYAK — каждый час, падение на R1/R2 в
+    /tmp/calendar_sync_err.log. Импорт Oura — 5 раз в день, ходил в облако с ключом
+    владельца, запись в базу падала с 27.06 (3924 строки «readonly database»). Ни
+    один датчик эту машину не судил: падение без слушателя неотличимо от тишины.
+
+    Судим отсюда по снимку `refs/backups/wip`: `backup.sh --wip` кладёт в сообщение
+    список загруженных launchd-джобов `com.larry.*`, в чьей загрузке launchd видит
+    `health_scripts`. Разрешённое — `git_facts.MACBOOK_ALLOWED_JOBS` (один дом).
+    WARN: данные канона не портятся (запись на не-Studio закрыта), но джоб либо
+    мёртв, либо пишет мимо канона, и это решение человека — выгрузить или узаконить.
+
+    ГРАНИЦЫ: снимок раз в 3 ч — новый джоб виден с задержкой до 3 ч; спящий ноутбук
+    снимка не делает, возраст снимка печатается (§18), его свежесть судит
+    check_macbook_uncommitted. Джоб, исполняющий код проекта из ДРУГОГО каталога
+    (не health_scripts), не виден — принято: таких на 06.11 нет."""
+    import git_facts as _gf
+    out = _gf._git(["log", "-1", "--format=%cs%n%B", "refs/backups/wip"])
+    if out is None:
+        warn("джобы MacBook не судимы",
+             "снимок refs/backups/wip не читается — что крутится на MacBook, отсюда не видно")
+        return None
+    day, _, msg = out.partition("\n")
+    jobs = macbook_jobs_in_snapshot(msg)
+    if jobs is None:
+        warn("джобы MacBook не судимы",
+             f"снимок {day} не несёт health_jobs= (старый backup.sh) или launchctl на MacBook "
+             "не ответил — «не знаю», а не «чисто»")
+        return None
+    extra = sorted(set(jobs) - set(_gf.MACBOOK_ALLOWED_JOBS))
+    if extra:
+        warn(f"на MacBook загружен джоб с кодом health_scripts: {', '.join(extra)}",
+             f"снимок {day}. MacBook пишет код, а не данные (§8): такой джоб падает на R1/R2 "
+             "или пишет мимо канона, в журнал, который никто не читает. Выгрузить: "
+             "launchctl bootout gui/$(id -u)/<метка>, плист → .DISABLED; либо узаконить в "
+             "git_facts.MACBOOK_ALLOWED_JOBS")
+    return {"snapshot": day, "jobs": jobs, "unexpected": extra}
+
+
+check("на MacBook только разрешённые джобы (по снимку)", check_macbook_health_jobs, host_only=True)
+
+
 THREAD_COPY_GRACE_H = 6      # два периода снимка (backup-wip каждые 3ч), решение владельца 16.09
 
 
@@ -3621,80 +3705,35 @@ def check_temporal_class_coverage():
 check("покрытие temporal_class (Ф1)", check_temporal_class_coverage)
 
 
-def check_clinical_kb_populated():
-    """FAIL: clinical_kb ПУСТ → medical_frame вырождается в standard-рамку И assert_floor молчит →
-    пациент после резекции может получить «постное» (fail-open, введён brief-neutralization Ф2 B2.2:
-    рамка/пол еды читаются из clinical_kb, хардкод CONDITION_RULES/food_floor-таблицы больше не
-    страхуют детерминированный путь). Сид seed_clinical_kb в init_db обёрнут в try/except — его сбой
-    БЕЗ этого датчика невидим. §14: liveness критичного хранилища, fail-closed. Проверяемый тенант —
-    БД процесса (ночной прогон = owner-канон); партнёр под своим монитором (долг — см. PLAN_forward)."""
-    # brief-neutralization step0 (2026-07-16): проверяем КАЖДЫЙ тенант (_tenant_db_paths),
-    # не только owner-канон — партнёрская вырожденная рамка/пол еды была невидима (долг закрыт).
-    # Сообщение СТРУКТУРНОЕ (счётчики ОБЩЕГО git-знания, БЕЗ перс. данных) — безопасно owner-доставке.
-    import sqlite3 as _sq
-    bad: list[str] = []
-    ok_counts: dict = {}
-    for _path in _tenant_db_paths(include_current=True):
-        _tag = Path(_path).parent.parent.name
-        try:
-            _rc = _sq.connect(f"file:{_path}?mode=ro", uri=True)
-        except Exception as e:  # noqa: BLE001 — БД тенанта не открылась (нет файла/лок)
-            bad.append(f"[{_tag}] clinical_kb: БД не открылась: {str(e)[:80]}")
-            continue
-        try:
+def check_clinical_kb_populated(conn=None):
+    """WARN only for an explicitly uninstalled, intact public pack; defects FAIL."""
+    import clinical_kb as _ckb
+    import sqlite3
+    from contextlib import closing
+    statuses = []
+    if conn is not None:
+        statuses.append(("passed-conn", _ckb.readiness(conn)))
+    else:
+        for path in _tenant_db_paths(include_current=True):
+            tag = Path(path).parent.parent.name
             try:
-                nc = _rc.execute("SELECT COUNT(*) FROM clinical_kb_conditions").fetchone()[0]
-                nf = _rc.execute("SELECT COUNT(*) FROM clinical_kb WHERE domain='food'").fetchone()[0]
-                nfl = _rc.execute("SELECT COUNT(*) FROM clinical_kb "
-                                  "WHERE domain='food' AND kind='floor'").fetchone()[0]
-            except Exception as e:  # noqa: BLE001 — таблиц нет → сид не прошёл, критично
-                bad.append(f"[{_tag}] clinical_kb недоступен (сид не прошёл?): {str(e)[:80]}")
-                continue
-        finally:
-            _rc.close()
-        if nc <= 0:
-            bad.append(f"[{_tag}] clinical_kb_conditions ПУСТ — рамка/пол еды вырождены")
-        elif nf <= 0:
-            bad.append(f"[{_tag}] clinical_kb food ПУСТ — рамка/каталог еды вырождены")
-        elif nfl < 2:
-            bad.append(f"[{_tag}] clinical_kb floor < 2 — ПОЛ БЕЗОПАСНОСТИ еды пропал: floor={nfl}")
-        else:
-            ok_counts = {"conditions": nc, "food": nf, "floor": nfl}
-    assert not bad, "clinical_kb вырожден у тенант(ов): " + " ; ".join(bad)
-    return {"ok": True, **ok_counts}
-
-
-# check("clinical_kb населён…") ПЕРЕНЕСЁН ниже _tenant_db_paths (forward-def: check() исполняет fn сразу).
+                with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as replica:
+                    statuses.append((tag, _ckb.readiness(replica)))
+            except sqlite3.Error as exc:
+                statuses.append((tag, _ckb.Readiness("failed", f"database unavailable: {type(exc).__name__}")))
+    bad = [f"[{tag}] {s.reason}" for tag, s in statuses if s.state == "failed"]
+    assert statuses and not bad, "clinical_kb unavailable: " + " ; ".join(bad)
+    for tag, status in statuses:
+        if status.state == "not_installed":
+            warn("clinical_kb: свод не установлен", f"[{tag}] {status.reason}")
+    status = next((s for _, s in statuses if s.state != "ready"), statuses[-1][1])
+    return {"ok": status.state == "ready", "state": status.state,
+            "conditions": status.conditions, "food": status.food, "floor": status.floor}
 
 
 def check_clinical_kb_replica_fresh(conn=None):
-    """FAIL: clinical_kb в БД тенанта РАЗОШЁЛСЯ с git-источником (yaml сменился, init_db не
-    ре-сижен на тенанте → СТОЙКАЯ устаревшая реплика МОЛЧА — движок брифа считает по старому
-    клин-знанию). Дополняет населённость: та ловит «пусто», эта — «stale». Сравнивает контент-хеши
-    (seed-стабильные поля; runtime-mutable status/review исключены). §12: зелёный на не-той версии =
-    ложно-зелёный, но для ДАННЫХ."""
-    # brief-neutralization step0/Tier-A: per-tenant. Хеш-сравнение — структурно, без PHI.
-    import clinical_kb as _ckb
-    src = _ckb.source_content_hash()
-    bad: list[str] = []
-    # Тестовый режим: явный conn → проверяем ОДНУ переданную реплику детерминированно, без
-    # обхода живого канона (иначе юнит-тест ловит стаю канона до ре-сида при смене yaml).
-    if conn is not None:
-        if src != _ckb.table_content_hash(conn):
-            bad.append("[passed-conn] реплика разошлась с git-источником")
-        assert not bad, "clinical_kb stale-реплика: " + " ; ".join(bad)
-        return {"ok": True}
-    for _tag, _conn, _cur in _iter_tenant_ro():
-        try:
-            tbl = _ckb.table_content_hash(_conn)
-        except Exception as e:  # noqa: BLE001 — нет clinical_kb у тенанта
-            bad.append(f"[{_tag}] clinical_kb недоступен: {str(e)[:60]}")
-            continue
-        if src != tbl:
-            bad.append(f"[{_tag}] реплика разошлась с git-источником (ре-сид не прогнан?)")
-    assert not bad, "clinical_kb stale-реплика: " + " ; ".join(bad)
-    return {"ok": True}
-# check("clinical_kb реплика свежа ...") ПЕРЕНЕСЁН в блок под _tenant_db_paths.
+    """Use the same readiness verdict; public absence is not a successful assessment."""
+    return check_clinical_kb_populated(conn)
 
 
 def check_frozen_relative_not_current():
@@ -4058,8 +4097,20 @@ def check_lab_path_scope(db_path=None, base=None):
     # датчик её читает и меняет каденцию, но не судит. Битая/отсутствующая дата = нет отсрочки.
     deferred = (man["labs"]["reactivation"] or {}).get("deferred") or {}
     until = str(deferred.get("until") or "")[:10]
+    # Отсрочка по ЗАПАСУ (решение владельца 2026-11-03, вариант В): вопрос снова задаётся,
+    # когда каждый годный аналит набрал ≥ lab_n_min + until_margin замеров — то есть по
+    # событию «пришёл новый анализ», а не по дате. Дата без новых данных возвращала вопрос с
+    # теми же цифрами (31.10: HGB 21, MCV/RDW/WBC/PLT по 18 — как 31.08).
+    margin = deferred.get("until_margin")
+    short = None
+    if margin is not None:
+        need = lab_n_min + int(margin)
+        short = {a: counts.get(lab_canon.normalize(a), 0) for a in labs
+                 if lab_n_min <= counts.get(lab_canon.normalize(a), 0) < need}
     return {"viable": viable, "threshold": thr, "eligible": viable >= thr, "scope": man["labs"]["scope"],
-            "deferred_until": until or None, "deferred_reason": deferred.get("reason")}
+            "deferred_until": until or None, "deferred_reason": deferred.get("reason"),
+            "deferred_margin": int(margin) if margin is not None else None,
+            "margin_short": short}
 
 
 def _lab_path_scope_warn():
@@ -4086,6 +4137,14 @@ def _lab_path_scope_warn():
             warn("отсрочка lab-пути с неразбираемой датой",
                  f"deferred.until={until!r} в data_manifest.yaml — отсрочка не действует")
             still_deferred = False
+        short = r.get("margin_short")
+        if r.get("deferred_margin") is not None and short:
+            # Запаса нет — недельный дайджест (standing), как и при датированной отсрочке.
+            warn("Lab-путь годен, возврат отложен до запаса",
+                 f"нужно ещё +{r['deferred_margin']} замера над порогом; не набрали: "
+                 + ", ".join(f"{a} {n}" for a, n in sorted(short.items()))
+                 + f" — {r.get('deferred_reason') or 'причина в data_manifest.yaml'}")
+            return
         if still_deferred:
             # Решение уже принято и датировано → недельный дайджест (класс standing по
             # подстроке «возврат отложен»), а не ежедневный вопрос на уже решённое (§13).
@@ -6910,7 +6969,7 @@ check("Переводы документации не отстают от ори
 
 
 # ── Survivorship-extension watchdog (SX-08, фаза 8) ─────────────────────────
-# Все шесть проверок пишут только WARN (через warn()), не FAIL.
+# Freshness/delivery findings use WARN; missing catalogue/producer liveness use FAIL.
 # Цель: довести в утренний morning_test_summary список «что система ждёт от тебя».
 
 import json as _json_sx
@@ -6920,14 +6979,46 @@ from assessment_scheduler import INSTRUMENTS_DIR as SX_INSTRUMENTS_DIR  # noqa: 
 
 
 def _sx_instruments_iter():
-    """Итератор по инструментам из каталога. Молча пропускает broken JSON."""
-    if not SX_INSTRUMENTS_DIR.exists():
-        return
-    for f in sorted(SX_INSTRUMENTS_DIR.glob("*.json")):
-        try:
-            yield _json_sx.loads(f.read_text())
-        except Exception as e:  # silent-ok: broken JSON в каталоге — пропуск инструмента
-            warn(f"survivorship instrument parse failed: {f.name}", str(e)[:100])
+    """Use the producer catalogue; absence/corruption must fail the nightly check."""
+    from assessment_scheduler import load_instruments
+    return iter(load_instruments(SX_INSTRUMENTS_DIR, applicable_only=True))
+
+
+def check_assessment_producer_liveness():
+    """Fail when production is due but neither a task nor an answer is recent.
+
+    Open/snoozed tasks inhibit production exactly as in the scheduler; their
+    delivery and response are judged by check_assessments_freshness instead.
+    No history for an applicable instrument is immediately due.
+    """
+    from assessment_scheduler import schedule_policy
+    from assessment_importer import instrument_source_id
+    import i18n
+    today = get_today()
+    missing = []
+    for ins in _sx_instruments_iter():
+        src = instrument_source_id(ins["id"])
+        cadence, grace = schedule_policy(ins)
+        with db.get_conn() as conn:
+            active = conn.execute(
+                "SELECT 1 FROM tasks WHERE fingerprint=? "
+                "AND status IN ('open','snoozed') LIMIT 1",
+                (f"assessment:{src}",)).fetchone()
+            if active:
+                continue
+            answer = conn.execute(
+                "SELECT MAX(date) AS last FROM lab_results WHERE source=?",
+                (f"instrument:{src}",)).fetchone()["last"]
+            task = conn.execute(
+                "SELECT MAX(created_at) AS last FROM tasks WHERE fingerprint=?",
+                (f"assessment:{src}",)).fetchone()["last"]
+        dates = [date.fromisoformat(str(value)[:10]) for value in (answer, task) if value]
+        if not dates or (today - max(dates)).days > cadence + grace:
+            missing.append(src)
+    assert not missing, i18n.t("assessment.monitor.producer_stale", instruments=", ".join(missing))
+
+
+check("assessment producer liveness", check_assessment_producer_liveness)
 
 
 def _assessment_task_state(conn, src_id: str, today) -> dict:
@@ -6950,7 +7041,7 @@ def _assessment_task_state(conn, src_id: str, today) -> dict:
 
 
 def check_assessments_freshness():
-    """Каждый инструмент — последнее заполнение не старше cadence_days + 14.
+    """Каждый инструмент — последнее заполнение в пределах schedule_policy.
 
     Просрочка молчит, пока открытая задача-опросник ДОСТАВЛЕНА боту (sent_at) и её
     deadline не прошёл: вопрос у человека одним каналом (2026-09-03; до этого задача
@@ -6966,8 +7057,9 @@ def check_assessments_freshness():
         # (чек искал полный id, а импортёр пишет короткий). 2026-06-30.
         from assessment_importer import instrument_source_id
         src_id = instrument_source_id(iid)
-        cadence = int(ins.get("cadence_days", 90))
-        max_age = cadence + 14
+        from assessment_scheduler import schedule_policy
+        cadence, grace = schedule_policy(ins)
+        max_age = cadence + grace
         with db.get_conn() as conn:
             row = conn.execute(
                 "SELECT MAX(date) as last FROM lab_results WHERE source = ?",
@@ -7583,8 +7675,38 @@ def check_db_size():
         )
 
 
+def check_disk_room_for_reference():
+    """Хватит ли диска Studio на следующую докачку справочника PGS (снимок + рост).
+
+    02.11.2026: снимки справочника (16 ГБ каждый, по копии на тенанта, до 5 штук)
+    подошли к 72 ГБ свободного — канон и все его бэкапы на том же диске (R2.5), а
+    датчика места не было. Порог вычисляет тот же pgs_reference.import_room(), что
+    и сама докачка: краснеет ровно тогда, когда следующий прогон откажется."""
+    import pgs_discovery
+    import pgs_reference
+    alarm = pgs_reference.room_alarm(pgs_discovery.MAX_IMPORT_PER_RUN)
+    if alarm:
+        raise AssertionError(alarm)
+
+
 check("Свежесть бэкапа (каждый плановый запуск)", check_backup_freshness)
 check("Размер DB < 500MB", check_db_size)
+
+
+def check_reference_has_writer():
+    """Докачка справочника PGS жива: последний прогон, оставивший кандидатов, сменился
+    следующим до своего срока. Квитанции пишет только писатель справочника (02.11.2026):
+    писатель — тот, кому справочник доступен на запись; уйди он с машины — докачка встала
+    бы молча, а все прочие тенанты продолжали бы зеленеть своей Phase H."""
+    import pgs_reference
+    alarm = pgs_reference.writer_alarm()
+    if alarm:
+        raise AssertionError(alarm)
+
+
+check("Место на диске под докачку справочника PGS", check_disk_room_for_reference,
+      host_only=True)
+check("У справочника PGS есть живой писатель", check_reference_has_writer, host_only=True)
 
 
 LOG_UNLISTED_WARN_MB = 1.0   # замер 01.09: вне конфига 160 файлов, НИ ОДНОГО >1 МБ —
@@ -7624,6 +7746,51 @@ def check_logs_all_listed():
 
 
 check("Логи вне конфига ротации", check_logs_all_listed)
+
+
+def check_agent_mail_bridge_alive():
+    """Bridge heartbeat must be readable and no older than ten minutes."""
+    import math
+    import agent_mail
+    from datetime import timezone
+    from _time_inject import get_now
+    try:
+        stamp = float((agent_mail.mail_dir() / "alive").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise AssertionError("agent_mail: bridge heartbeat unavailable/invalid") from None
+    age = get_now(timezone.utc).timestamp() - stamp
+    assert math.isfinite(age) and 0 <= age <= 600, "agent_mail: bridge heartbeat stale/invalid"
+    return {"agent_mail_bridge_age_s": age}
+
+
+check("Мост почты агентов жив", check_agent_mail_bridge_alive)
+
+
+def check_agent_mail_unacked():
+    """A letter may not wait for its owner/ack for more than thirty minutes."""
+    import agent_mail
+    n = agent_mail.unacked_count()
+    assert n == 0, f"agent_mail: {n} letters unacked for over thirty minutes"
+    return {"agent_mail_unacked": n}
+
+
+check("Письма агентов подтверждены", check_agent_mail_unacked)
+
+
+
+def check_agent_signals_ran():
+    """Enabled assistant channel must complete a daily pass within its configured SLA."""
+    import math
+    import agent_signals
+    age = agent_signals.last_run_age_hours()
+    if age is None:
+        return {"agent_signals": "disabled"}
+    limit = agent_signals.policy()["max_age_hours"]
+    assert math.isfinite(age) and 0 <= age <= limit, "agent_signals: daily pass stale/missing"
+    return {"agent_signals_age_hours": age}
+
+
+check("Сигналы ассистенту выполняются", check_agent_signals_ran)
 
 
 def check_bug_outbox_drains():
@@ -7784,8 +7951,11 @@ def check_secret_scope_matches_reality():
     if not owner_dir.is_dir():
         return {"skipped": "каталога секретов владельца нет — судить не на чем"}
 
+    # Служебный файл Finder — не секрет и не класс; его кладёт ОС сама (FAIL 08.11).
+    os_junk = {".DS_Store"}
+
     def _names(d):
-        return {f.name for f in d.iterdir()} if d.is_dir() else None
+        return {f.name for f in d.iterdir() if f.name not in os_junk} if d.is_dir() else None
 
     own, part = _names(owner_dir), _names(partner_dir)
     problems = []
@@ -9173,7 +9343,50 @@ def check_morning_brief_gate_liveness():
             warn(f"morning_brief[{tag}]: гейт замолк",
                  f"context_cards последняя запись {last}, а плановый бриф был {fire:%d.%m %H:%M} — "
                  f"фолбэк ungated?")
+    _brief_net_retry_proof_warn()
     return _brief_provider_failures_warn()
+
+
+def _brief_net_retry_proof_warn():
+    """Машинный признак «повтор брифа сработал в жизни» → просьба поднять обещание (28.10).
+
+    Решение владельца 28.10 (вариант Б): тесты доказывают модель сбоя, а не сбой; живое
+    доказательство — первый бриф, доставленный после НАСТОЯЩЕГО сетевого сбоя. Его пишет бот
+    (`jobs/scheduled._record_net_retry` → system_config `brief.net_retry.first_delivered`).
+    Критерий утверждён владельцем (`closes_when_by: owner`), поэтому подъём механический и
+    человека не ждёт: находка адресована закрывающему, не владельцу. Читатель живёт здесь, у
+    дома живости брифа, а не своим датчиком — второй развёлся бы с ним (прецедент
+    `_brief_provider_failures_warn`). Обещание уже holds → молчим: доказывать нечего."""
+    import json as _json
+    import sqlite3 as _sq
+    import intent_registry as _ir
+    try:
+        rec = next(r for r in _ir.load_registry() if r.get("id") == "morning_brief")
+        inv = next(i for i in rec.get("invariants") or []
+                   if i.get("id") == "transient_net_does_not_lose_brief")
+    except StopIteration:
+        warn("morning_brief: обещание повтора брифа не найдено в реестре",
+             "transient_net_does_not_lose_brief пропал из subsystem_intent.yaml — признак "
+             "«работает в жизни» некому предъявить")
+        return
+    if inv.get("status") == "holds":
+        return
+    for path in _tenant_db_paths(include_current=True):
+        tag = Path(path).parent.parent.name
+        try:
+            conn = _sq.connect(f"file:{path}?mode=ro", uri=True)
+            row = conn.execute("SELECT value_json FROM system_config WHERE key='brief.net_retry'").fetchone()
+            conn.close()
+            first = (_json.loads(row[0]) or {}).get("first_delivered") if row and row[0] else None
+        except Exception as e:  # noqa: BLE001 — «нет таблицы» законно, иное — вслух
+            if not _absent_table(e):
+                warn(f"morning_brief[{tag}]: признак повтора не читается", f"{type(e).__name__}: {str(e)[:80]}")
+            continue
+        if first:
+            warn(f"morning_brief[{tag}]: повтор брифа доказан в жизни ({first})",
+                 "подними morning_brief::transient_net_does_not_lose_brief до holds — критерий "
+                 "утверждён владельцем, вопроса ему не нужно")
+            return
 
 
 def _brief_provider_failures_warn():

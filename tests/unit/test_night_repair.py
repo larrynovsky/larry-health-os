@@ -37,6 +37,7 @@ def repo(tmp_path):
     return r
 
 
+@pytest.mark.host_only
 def test_gate_blocks_main_only_and_passes_on_silence(repo):
     code, text = nr.fix_gate(repo, pending=lambda: (["2026-10-01-abcd"], True, 3))
     assert code == nr.GATE_CODE and "2026-10-01-abcd" in text
@@ -66,6 +67,7 @@ PATCH = ("diff --git a/code.py b/code.py\n--- a/code.py\n+++ b/code.py\n@@ -1 +1
          "@@ -0,0 +1 @@\n+import code\n")
 
 
+@pytest.mark.host_only
 def test_land_requires_red_without_fix_and_green_with_it(repo, tmp_path):
     d = _carrier(tmp_path, nr.KIND_CODE, PATCH, ["tests/test_x.py"])
     seen = []
@@ -82,6 +84,7 @@ def test_land_requires_red_without_fix_and_green_with_it(repo, tmp_path):
     assert nr.fix_gate(repo, pending=lambda: (["rid"], True, 3))[0] == 0, "маркер пропускает коммит слияния"
 
 
+@pytest.mark.host_only
 def test_land_refuses_oracle_that_is_green_without_fix(repo, tmp_path):
     d = _carrier(tmp_path, nr.KIND_CODE, PATCH, ["tests/test_x.py"])
     code, text = nr.land_fix(repo, "rid", run_tests=lambda t, s: True, fetch=lambda rid: d)
@@ -117,6 +120,7 @@ def test_settings_deny_neighbor_secrets_from_config(monkeypatch):
     assert not any("crm" in x for x in s["sandbox"]["filesystem"]["denyRead"])
 
 
+@pytest.mark.host_only
 def test_close_receipt_names_fix_commit_not_later_head(repo, monkeypatch, tmp_path):
     """01.10: после коммита починки post-commit положил коммит doc_agent, и квитанция
     «слито <HEAD>» назвала CHANGELOG вместо починки."""

@@ -48,6 +48,14 @@ def test_undeclared_file_still_fails(tmp_path, monkeypatch):
         it.check_secret_scope_matches_reality()
 
 
+def test_finder_ds_store_is_not_a_secret(tmp_path, monkeypatch):
+    """Ночь 08.11: Finder положил .DS_Store в каталог секретов — датчик не FAIL'ит и не считает его."""
+    _home(tmp_path, monkeypatch, WITHINGS + (".DS_Store",), partner=(".DS_Store",))
+    monkeypatch.setattr(it, "warn", lambda label, detail="": None)
+    r = it.check_secret_scope_matches_reality()
+    assert r["secrets_checked"] == 3
+
+
 def test_partner_without_withings_is_a_warn_not_fail(tmp_path, monkeypatch):
     """У партнёра Withings не подключён: правдивый WARN «tenant-секреты отсутствуют», не FAIL."""
     _home(tmp_path, monkeypatch, WITHINGS, partner=())

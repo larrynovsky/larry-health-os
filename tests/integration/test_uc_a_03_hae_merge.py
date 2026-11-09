@@ -169,3 +169,91 @@ def test_atomic_write_no_partial_state(hae_data_dir):
     assert not (hae_data_dir / f".tmp_{date_str}.json").exists(), \
         "tmp-файл не удалён — нарушение атомарности"
     assert (hae_data_dir / f"{date_str}.json").exists()
+
+
+def test_apple_sleep_read_late_update_and_oura_shape(db, hae_data_dir, monkeypatch):
+    """Synthetic values: the real import/read boundary, no model or delivery."""
+    import health_db
+    import import_apple_health as iah
+    from lifestyle_agents import SleepAgent
+
+    monkeypatch.setattr(health_db, "METRICS_DIR", hae_data_dir)
+    apple = {"totalSleep": 4.0, "source": "Apple Watch", "deep": 0.0}
+    _write_existing(hae_data_dir, "2032-01-02", {"sleep": apple})
+    health_db.migrate_all_json()
+    day = health_db.get_day("2032-01-02")
+    assert SleepAgent().has_data(day)
+    assert day["sleep"]["source"] == "AppleHealth"
+    assert day["sleep"]["deep"] == 0.0
+    assert day["sleep"]["rem"] is None
+    fuller = {**apple, "totalSleep": 7.5, "rem": 1.5}
+    iah.save_daily_summaries({"2032-01-02": {"sleep": fuller}})
+    fresh = health_db.get_day("2032-01-02")
+    assert fresh["sleep"]["totalSleep"] == 7.5
+    assert fresh["sleep"]["rem"] == 1.5
+    assert json.loads((hae_data_dir / "2032-01-02.json").read_text()) == {"sleep": fuller}
+    iah.save_daily_summaries({"2032-01-02": {"sleep": fuller}})
+    assert health_db.get_day("2032-01-02") == fresh
+    health_db.migrate_all_json()
+    assert health_db.get_day("2032-01-02") == fresh
+
+    oura = {"source": "Oura", "totalSleep": 8.0, "deep": 1.2,
+            "contributors": {"efficiency": 92}, "extra": "preserved"}
+    health_db.upsert_metrics_from_json("2032-01-03", {"sleep": oura}, source="Oura")
+    _write_existing(hae_data_dir, "2032-01-03", {"sleep": oura})
+    iah.save_daily_summaries({"2032-01-03": {"sleep": fuller}})
+    health_db.migrate_all_json()
+    assert health_db.get_day("2032-01-03")["sleep"] == oura
+    assert SleepAgent().has_data(health_db.get_day("2032-01-03"))
+
+
+def test_legacy_apple_archive_migration_keeps_source(db, hae_data_dir, monkeypatch):
+    # Synthetic legacy HAE archive: no new provenance envelope.
+    import health_db
+    monkeypatch.setattr(health_db, "METRICS_DIR", hae_data_dir)
+    _write_existing(hae_data_dir, "2032-02-01", {
+        "sleep": {"totalSleep": 6.5, "source": "Apple Watch", "rem": 1.0}})
+    health_db.migrate_all_json()
+    day = health_db.get_day("2032-02-01")
+    assert day["sleep"]["source"] == "AppleHealth"
+    assert day["sleep"]["totalSleep"] == 6.5
+    raw = json.loads(db.fetchone("SELECT raw FROM daily_metrics WHERE date=?",
+                                ("2032-02-01",))["raw"])
+    assert "sleep" not in raw
+
+
+def test_sleep_update_rolls_back_on_storage_failure(db):
+    import sqlite3
+    import health_db
+    db.add_daily_metrics("2032-03-01", sleep_total=4.0, raw="{}")
+    db.execute("""CREATE TRIGGER reject_sleep BEFORE UPDATE OF raw ON daily_metrics
+                  BEGIN SELECT RAISE(ABORT, 'synthetic storage failure'); END""")
+    with pytest.raises(sqlite3.IntegrityError, match="synthetic storage failure"):
+        health_db.upsert_metrics_from_json("2032-03-01", {
+            "sleep": {"totalSleep": 7.0, "deep": 1.0}}, source="AppleHealth")
+    row = db.fetchone("SELECT sleep_total, sleep_deep, raw FROM daily_metrics WHERE date=?",
+                      ("2032-03-01",))
+    assert tuple(row) == (4.0, None, "{}")
+
+
+@pytest.mark.parametrize("evidence", [
+    {"sleep": {"contributors": {}}},
+    {"sleep": {"source": "Oura"}},
+    {"source": "Oura"},
+    *({key: None} for key in (
+        "readiness_score", "resilience", "stress", "hrv_balance",
+        "body_temperature", "recovery_index", "breathing_disturbance")),
+])
+def test_oura_archive_upsert_payload_unchanged(hae_data_dir, monkeypatch, evidence):
+    from unittest.mock import Mock
+    import health_db
+
+    # Synthetic mixed archive: even unrelated/unknown fields must be passed unchanged.
+    payload = {"sleep": {"source": "Apple Watch", "totalSleep": 6.5},
+               "steps": 4200, "weight_kg": 72.0, "extra": {"keep": True}, **evidence}
+    _write_existing(hae_data_dir, "2032-04-01", payload)
+    monkeypatch.setattr(health_db, "METRICS_DIR", hae_data_dir)
+    upsert = Mock()
+    monkeypatch.setattr(health_db, "upsert_metrics_from_json", upsert)
+    health_db.migrate_all_json()
+    upsert.assert_called_once_with("2032-04-01", payload, source="Oura")

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/patient_answer_channel.md sha256:32ad76aaf958 -->
+<!-- translation-of: docs/explanation/patient_answer_channel.md sha256:741fbcf4a65a -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](patient_answer_channel.md)
@@ -7,57 +7,101 @@
 
 ## What changed
 
-- **The invariant `doctor_tasks_judged_against_what_person_holds` has been clarified (status: holding).** When the duplicate judge does not create a "submit the test" task, an invisible trace row remains in the database — hidden from the person — containing the IDs of the tasks that covered it. Why: on 04.10 one person's skipped entry left no trace (the report was rebuilt outside the bot), and there was nothing to verify the judge's work against.
+- **Added invariant `assessment_catalog_and_producer_durable` (status: holds).** It is recorded that the question producer has a liveness signal on its input: the system records the fact of the background job being launched, not the number of questions raised. With rare conversations, "raised zero" is normal, and a sensor that counts questions would give a false alarm on a healthy system.
 
-**Updated:** 2026-10-04
+**Updated:** 2026-11-07
 
 
 ## Why it exists
 
-A doctor ordered a test — and forgot to ask whether it had been done. A person postponed a visit — and forgot to say so. Between two appointments with a doctor there is a gap of weeks, and everything that happens in between stays invisible if no one actively asks.
+When a doctor prescribes something or makes an agreement with a patient, the system is left with a question: did it happen? Was the test taken? Was the medication started? Did the condition change?
 
-The system can ask. But asking and hearing are two different things. A checkbox in a to-do list only says "task closed." It does not say what the person actually answered. If a question lives next to a reminder — say, "submit the test" — it can be accidentally swiped away, and the doctor learns nothing. Silence from the outside looks like completion.
+A superficial way to find out is to send a reminder that the person simply closes with a checkmark. But a checkmark says nothing about what actually happened. The task list empties, while the patient's words never reach the doctor. Things look fine from the outside — silence on the inside.
 
-This channel is designed so that the person's answer necessarily reaches the doctor — in words, not as the mere fact of a closed row.
+This channel exists precisely so that there is no such silence. Its job is to ask a question in such a way that the only way to close it is a text response, and to deliver that response back into the doctor's context.
 
-## What it does, in plain terms
+## What it does, in plain words
 
-**The question lives separately.** The system does not attach a question to the same place where actions and reminders are stored. Every question has its own address: a message in the bot with a return address. That is exactly where a person can reply. That is exactly where the reply travels onward from.
+**A question is not a reminder.** Each question has a dedicated carrier: a bot message with a reply address. Without an address, the question is considered not delivered — even if it is marked as sent. The person simply will not see a field to respond.
 
-**Only text can close a question.** This is not a politeness rule — it is a constraint at the database level. Three different parts of the system can in principle change the state of a task: the bot, the interface, and reminder synchronization. A check inside one of them does not protect against the others. So the guarantee is placed where it cannot be bypassed: the database itself refuses if anyone tries to close a question without an answer.
+**A question can only be closed with text.** This rule is built into the database itself: it physically does not allow a question to be moved to the "closed" state while there is no response text. This restriction applies to all three places that can touch tasks at all — the bot, the dashboard, and synchronization with Reminders. A check inside one of them would not protect against the others.
 
-**A question is considered delivered only when it has a return address, not merely when it has been sent.** A task marked "sent" but with no address for a reply is mute. The person sees it in the list and cannot respond. The system considers such a question undelivered until an address appears.
+**The answer is returned to the doctor.** The patient's text enters the doctor's context as a separate section, marked explicitly as the person's own words. This matters: the same text may enter the system by a second route — through memory — but the sensor intentionally looks for the answer in that specific section; otherwise the second route would give a false sense that everything was delivered.
 
-**The answer reaches the doctor as the person's words.** Not as a technical instruction from the model, not as an anonymous fact — but as a separate section in the doctor's context, framed so it is clear: this was said by the person. And the same text goes into memory — by two paths, so it is not lost.
+**Questions have one home.** During a conversation, the assistant may accumulate several possible questions — they exist as candidates. A candidate becomes a real question only through explicit selection. This prevents an avalanche: the system does not overwhelm the person with everything it noticed.
 
-**Questions are not pulled from thin air.** The system maintains a single place where questions live — the task table. The assistant in a conversation can accumulate candidates, but they remain candidates until they pass explicit selection. This is not a strictness filter but a defense against noise: an extra question costs one message, a missed important one costs silence that is invisible from the outside.
+**Question production is limited by data state.** New questions are not raised while too many undelivered ones remain in the queue. Therefore, the frequency of the background job is not of principal importance — the flow is regulated not by a timer, but by actual load.
 
-**Who decides that a question is for the person.** The same judge decides this for both paths: when a task is born from a conversation, and when a candidate is raised from memory. Its silence reads as "not for the patient" — the system will sooner stay quiet than send something unnecessary.
+**Whether to re-ask a question is decided by memory.** The system looks at the nature of the answer: was it a one-time fact, a stable state, or something that changes quickly? This determines whether asking again is needed. The channel has no calendar of its own.
 
-**Doubt is resolved with a question, not silence.** If the judge is unsure — whether something happened, whether a symptom appeared — a substantive question is asked instead of a blind action or silence. Silence remains only in the event of a complete judge failure.
+**Who a question is addressed to is decided by one judge.** The same function evaluates every formulation for both the task extractor and the raising of candidates from memory. If the judge is silent, the question does not pass — the system would rather stay silent than ask something unnecessary.
 
-**Whether to re-ask a question is decided by memory, not a schedule.** If the person answered something long-term, the system will not ask again a week later. If the answer was about a current state, it may return. This is not based on a clock but on the nature of the answer itself.
+**Duplicates are filtered after the judge, not before.** When two different candidates are rewritten by the judge into one formulation, they become duplicates at that step. The comparison is strict: an extra question costs one message, a lost question is completely invisible from the outside — this is an asymmetric price.
 
-**Question production stops on its own.** The system does not multiply questions while unread ones have accumulated in the queue. The ceiling is one — the same delivery budget as the other channels. How many times per day the raising mechanism runs ceases to matter: new ones are not raised until the old ones have been delivered.
+**Uncertainty is not suppressed.** If the judge is unsure — whether a question is addressed to the patient, whether something happened — it neither stays silent nor acts blindly: the formulation is turned into a substantive question for the person. Silence remains only on a complete judge failure — the system distinguishes between failure and uncertainty.
 
-**Questionnaires are honest about failure.** If a person has completed a questionnaire but not a single subscale could be scored from the answers — that is a failure, not a success. The system says so honestly, and the task remains open. Previously such a case was closed as completed, and no one saw that there were no scores.
+**A doctor's task is verified by meaning.** When a doctor writes "get a test done," the system checks whether there is already an open or recently closed task for the same thing. A duplicate is not created, but a trace remains in the data — a row marked to show the task is covered by an existing one. This matters: a skip without a trace could not be distinguished from a loss.
 
-**Traces remain.** When the judge decides a question is not for the patient, or finds a duplicate task — that is not merely a skip but a record with a reason. Only what exits without a trace counts as a loss. The filter's work is visible.
+**Repeatable questionnaires also live in this channel.** Questionnaires are supplied from a catalog. If a completed questionnaire produced no scores at all — that is not a success, but a failure: the task remains open, the person is told honestly, the system warns. Previously, such an import silently closed the task as completed — there was no result, and no one saw this.
 
-Repetitions of a doctor's request are suppressed only for tests. An example (invented): in July a doctor requested "test A, test B, test C," a week later — "submit test A," and a month after that — "test B." The second and third tasks carry nothing new. The model breaks the new task down into individual tests and for each one names the existing task — open, deferred, or dismissed by the person within the last 90 days — where it already appears. The decision "do not create" is made by code, and only if an existing task was found for every test; a panel as a whole and an individual indicator from it are treated as different requests. A task that was not created remains in the database as an invisible trace row, so that the judge's work can be verified. Actions and questions are not cross-checked this way: on the histories of two people, the model confused a new request with an old one there noticeably more often, and losing such a request is not visible from the outside.
+**The question producer has a liveness signal on its input.** The system records the fact of the launch — not how many questions were raised. With rare conversations, "raised zero today" is normal, and a sensor that counts questions would go red on a healthy system.
 
 ## What is honest to say about its limits
 
-**One place remains open — and that needs to be said plainly.**
+**Unresolved: who a question is addressed to — not yet conclusively verified.**
 
-The decision "who is this wording addressed to" is made by the model. Checks showed: on selected cases the behavior is stable — out of seven runs, six passed without a single label change. Parsing of the model's response was breaking; the cause was found and fixed: lost verdicts are now re-queried once more. On an expanded set of wordings, behavioral divergence between runs is gone where there was previously one instance.
+This is the one place where the system relies on a language model's judgment, and honesty is mandatory here.
 
-But the status "verified" has not been lifted: the reason is drift in the boundary between independent measurements. Two label changes and two drifts out of twenty between measurements — that is not a catastrophe, but it is not confidence either. There are phrasings where the person's preference and the system's rule point to different addressees — and the boundary between them is blurry for the model.
+Measurements were conducted: on seven task sets, behavior matched expectations on six out of seven runs; on an expanded sample of 27 formulations — one behavioral discrepancy within a session, two label changes, and two drifts between measurements. A problem with response parsing was found and fixed. The expanded measurements showed improvement.
 
-This means: the system does everything described above, and does it reliably — but "whether every wording was understood correctly" remains a question with an open answer. The verdict and its reason are saved in the data and are visible on inspection. Only the task text goes to the person in the chat — the machine's judgment does not get there.
+The status remains open — not because the system breaks, but because the boundary between "addressed to the patient" and "not addressed" sometimes drifts between measurements. Fixing the parsing does not eliminate this drifting boundary.
 
-## Where this lives in the system
+Practical meaning: the system would rather miss a borderline question than ask a wrong one — an error on the side of caution. But guaranteeing that every borderline formulation will be parsed the same way is not currently possible. The judge's verdict and its reason are stored in the data — this allows discrepancies to be seen after the fact, rather than guessed at.
 
-The main file where the logic lives is `task_agent.py`. That is where the judge sits (`task_agent.addressed_to_patient`), where tasks are born from conversations and candidates are raised from memory, and where deduplication runs — after the judge, not before.
+**What holds, but has not been verified everywhere.**
 
-The intent of the subsystem as a whole is described in `subsystem_intent.yaml`. This is not a technical specification — it is more a statement of why the channel exists at all: the patient's answer must return to the clinical loop, not settle into a closed checkbox.
+All other invariants — the prohibition on closing a question without text, the reply address, the return of the answer to the doctor, the single home for questions, deduplication after the judge, a trace from uncertainty — are built on mechanisms that do not depend on the model's judgment: the database, data structure, delivery design. They hold. But "holds" and "verified in every possible scenario" are different claims. The limits of testing are the limits of testing.
+
+## Where this is in the system
+
+The channel's logic is concentrated in **`task_agent.py`**: this is where the judge (`task_agent.addressed_to_patient`) lives, where candidates are raised from memory, and where a task receives or does not receive question status.
+
+The intent of the entire subsystem and its place in the architecture are described in **`subsystem_intent.yaml`** — this is the point where the intent is recorded in words, not code.
+
+The channel is intentionally structured as a mirror of `doctor_in_loop`: there the input is the doctor's response, here it is the patient's response. Both channels close the same loop: the doctor speaks → the system hears → asks the person → the person answers → the answer
+
+The intent of the subsystem as a whole is described in `subsystem_intent.yaml`. This is not a technical specification — rather, a statement of why the channel exists at all: the patient's answer must return to the clinical loop, not settle into a closed checkmark.
+
+
+## Personal assistant statements (07.11.2026)
+
+A letter from the assistant is an unverified source. `agent_reply.queue_fact_questions`
+calls the shared `hai_chat.extract_artifacts` without writing memory; `run_arbiter`
+uses this same extractor for dialogue. Statements about the person are taken from the letter
+(profile_updates, observations, taking, experiments), but not questions and recommendations.
+Names and identifiers pass through `mcp_tools.redact` before the model and before the queue.
+
+`tasks_db.save_task` creates questions with source `assistant_fact:<hash of letter>` and
+fingerprint from the letter and the normalized statement. Checking of all statuses and
+the limit is performed under a SQLite write transaction. The config_db key
+`agent_mail.max_fact_questions_per_letter` sets the limit; the sole default is
+in `queue_fact_questions`. A repeat with a different model formulation may be counted as
+a different statement, but the overall per-letter limit is preserved. This is textual, not
+semantic, deduplication.
+
+The queue `deliver_unsent_question_tasks` delivers the question with ForceReply and saves
+the reply address. `task_agent.record_answer` accepts only explicit `да`/`yes` or `нет`/`no`
+(case and trailing punctuation do not matter). A `да` answer saves the answer via the existing path:
+the memory key is the fingerprint, the source is task:<id>. A `нет` answer closes it as dismissed without
+writing to memory. Any other answer leaves the question open. Clinical tables and the profile
+are not changed by this path. Refusal is not a medical fact.
+
+The mail job confirms receipt after posting questions: on extraction or write error, the letter
+remains received for a retry. Before that confirmation, questions already received may be
+waiting in the queue; a retry does not add exact duplicates.
+The response system prompt prohibits presenting the letter's statements as confirmed
+facts. This is a model instruction, not a proven guarantee of its behavior.
+
+Boundary oracle: `tests/unit/test_agent_reply.py` checks letter → question → answer,
+absence of memory before confirmation/on refusal, retries after closing, the limit, and failure
+before the mail receipt; LLM and transport are stubbed, data is synthetic.

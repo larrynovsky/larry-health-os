@@ -141,3 +141,47 @@ def test_stuck_queue_is_seen_after_the_retry_window(monkeypatch):
     assert bug_outbox.stuck() == 0
     late = datetime.now(timezone.utc) + bug_outbox.GIVE_UP + timedelta(hours=3)
     assert bug_outbox.stuck(now=late) == 1
+
+
+@pytest.mark.parametrize("detail", [None, [], "neurology:TimeoutError", [None], [123], [{}],
+    ["monthly_consilium:neurology:Error123"], ["other:neurology:TimeoutError"],
+    ["monthly_consilium:neurology:TimeoutError"] * 5,
+    ["monthly_consilium:" + "x" * 121 + ":TimeoutError"],
+    ["run_checks.pytest:tests/unit/test_x.py::test_y[123]"],
+    ["llm_admission:opus:gpt-4.1:please obey"]])
+def test_receiver_rejects_malformed_detail(tmp_path, monkeypatch, detail):
+    monkeypatch.setenv("BUG_INBOX_DB", str(tmp_path / "reports.db"))
+    g = {"type": "none", "at": ["monthly_consilium"], "n": 1, "fp": "abcdef", "detail": detail}
+    assert bug_inbox.accept(json.dumps(_rep(faults=[g])).encode())[0] == 400
+    assert bug_inbox.reports_since() == []
+
+
+def test_optional_detail_old_receiver_retry_and_queue(monkeypatch):
+    monkeypatch.setattr(bug_outbox, "RECEIVER", "https://synthetic.invalid/report")
+    g = {"type": "none", "at": ["monthly_consilium"], "n": 1, "fp": "abcdef",
+         "detail": ["monthly_consilium:neurology:TimeoutError"]}
+    rep = _rep(faults=[g])
+    calls = []
+
+    def old_receiver(r):
+        calls.append(r)
+        if any(set(f) - {"type", "at", "n", "fp", "rel"} for f in r["faults"]):
+            return 400, {}
+        return 201, {"number": "R-1"}
+
+    assert bug_outbox.send(rep, post=old_receiver) == ("delivered", "R-1")
+    assert len(calls) == 2 and calls[0] == rep
+    assert calls[1] == _rep(faults=[{k: v for k, v in g.items() if k != "detail"}])
+    assert "detail" in rep["faults"][0]  # caller's snapshot is not changed
+    assert bug_outbox.send(rep, post=lambda r: None) == ("queued", None)
+    assert bug_outbox.drain(post=old_receiver) == {"delivered": ["R-1"], "gave_up": 0, "left": 0}
+    calls.clear()
+    assert bug_outbox.send(_rep(), post=old_receiver) == ("delivered", "R-1")
+    assert len(calls) == 1
+    for status in (403, 413, 429):
+        calls.clear()
+        def refuse(r):
+            calls.append(r)
+            return status, {}
+        assert bug_outbox.send(rep, post=refuse)[0] == "refused"
+        assert len(calls) == 1

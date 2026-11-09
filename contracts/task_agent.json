@@ -30,8 +30,32 @@
         "get_tasks_known_to_person"
       ],
       "why": "дом задач; судья дублей сверяет новую задачу врача с тем, что человек уже держит (нить task-dedup, 02.10)"
+    },
+    {
+      "module": "task_guard",
+      "uses": [
+        "start_batch",
+        "audit_new_task",
+        "report_failure"
+      ],
+      "why": "one explicit guard batch per report or memory promotion loop; independent of old blocking judge"
+    },
+    {
+      "module": "assessment_scheduler",
+      "uses": [
+        "load_instruments",
+        "ensure_task"
+      ],
+      "why": "Catalogue matching and tenant applicability precede task dedup; all questionnaire writes reuse the scheduler path."
     }
   ],
   "disposability": null,
-  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился. depends_on заполнен при касании 02.10 (нить task-dedup)."
+  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился. depends_on заполнен при касании 02.10 (нить task-dedup).",
+  "assessment_requests": {
+    "owner": "assessment_scheduler.ensure_task",
+    "input": "Explicit fill/repeat/take request in extracted content; unique catalogue id/source id/name/title/title_ru/name_ru/aliases, including localized names. Punctuation and case normalized; no fuzzy match.",
+    "output": "New assessment with canonical fingerprint, localized intro and report source/date/deadline; open/snoozed fingerprint skips creation and text fallback.",
+    "failure": "Inapplicable, ambiguous or unrecognized request retains original text. Invalid/missing catalogue logs and retains text. Write failure is logged by extraction; no text substitute claiming an executable assessment.",
+    "oracle": "tests/unit/test_assessment_scheduler.py::test_report_request_uses_scheduler_writer"
+  }
 }

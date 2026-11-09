@@ -108,11 +108,13 @@ def lifestyle_prompt(domain_key: str, patient_brief: str = "") -> str:
 # молчит и после повтора — консилиума нет: исключение, а не урезанный вывод.
 
 class ConsiliumIncomplete(RuntimeError):
-    """Не все участники ответили и после повтора. str() — человеческая строка."""
+    """Не все ответили после повтора. missing — роли, reasons — классы ошибок либо
+    unanswered последней попытки; без текста исключений. str() — человеческая строка."""
 
-    def __init__(self, label: str, missing: list[str], total: int):
+    def __init__(self, label: str, missing: list[str], total: int, *, reasons: dict[str, str] | None = None):
         import i18n
         self.label, self.missing, self.total = label, list(missing), total
+        self.reasons = reasons or {}
         super().__init__(i18n.t("consilium.error.incomplete", missing=len(missing), total=total))
 
 
@@ -142,5 +144,8 @@ async def ask_all(askers: dict, answered, label: str) -> dict:
         missing = silent(results)
     if missing:
         log.error("%s: не ответили и после повтора: %s", label, ", ".join(missing))
-        raise ConsiliumIncomplete(label, missing, len(names))
+        raise ConsiliumIncomplete(label, missing, len(names), reasons={
+            n: (type(results[n]).__name__ if isinstance(results[n], Exception)
+                else results[n].get("exc_type", "unanswered") if isinstance(results[n], dict)
+                else "unanswered") for n in missing})
     return results

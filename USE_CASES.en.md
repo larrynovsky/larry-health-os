@@ -150,7 +150,7 @@ in this file.
 | `UC-A-03` | Apple Health / HAE → `daily_metrics`, merge without overwriting Oura | P0 | integration | implemented | confirmed |
 | `UC-A-04` | Oura: sleep by wake-up date, activity/HRV by the correct date | P0 | check | implemented | confirmed |
 | `UC-A-05` | Withings BP freshness and an alert on sync failure | P1 | check | intended | proposed |
-| `UC-A-06` | Calendar/KAYAK trips → `periods`, manual periods are not overwritten | P1 | integration | partial | proposed |
+| `UC-A-06` | Calendar/KAYAK trips → `periods` — retired 2026-11-06: only the brief knows trips (Google Calendar), `periods` holds medical periods | P1 | integration | intended | rejected |
 | `UC-A-07` | Financial documents do not enter medical data | P1 | check | implemented | proposed |
 
 ### B. Analytics and reports

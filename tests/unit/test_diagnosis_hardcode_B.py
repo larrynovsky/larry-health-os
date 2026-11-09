@@ -120,10 +120,10 @@ class TestLabFreshnessPrecedence:
     перекрывал бы boost (ALT остался бы medium у онко-тенанта)."""
 
     def test_condition_boost_beats_code_seed(self, monkeypatch):
-        import gp_context, health_db, clinical_kb
+        import gp_context, labs_db, clinical_kb
         from datetime import date
         monkeypatch.setattr(clinical_kb, "active_conditions", lambda *a, **k: {"oncology"})
-        monkeypatch.setattr(health_db, "get_effective_lab_schedule",
+        monkeypatch.setattr(labs_db, "get_effective_lab_schedule",
                             lambda *a, **k: {"ALT": {"interval_days": 90, "priority": "medium", "source": "code_seed"}})
         recent = [{"test_name": "ALT", "date": "2026-01-01"}]
         _block, overdue = gp_context._check_lab_freshness(recent, date(2026, 7, 1))
@@ -131,10 +131,10 @@ class TestLabFreshnessPrecedence:
         assert alt and alt[0]["priority"] == "high", f"code_seed перекрыл онко-boost: {alt}"
 
     def test_manual_override_still_wins(self, monkeypatch):
-        import gp_context, health_db, clinical_kb
+        import gp_context, labs_db, clinical_kb
         from datetime import date
         monkeypatch.setattr(clinical_kb, "active_conditions", lambda *a, **k: {"oncology"})
-        monkeypatch.setattr(health_db, "get_effective_lab_schedule",
+        monkeypatch.setattr(labs_db, "get_effective_lab_schedule",
                             lambda *a, **k: {"ALT": {"interval_days": 30, "priority": "critical", "source": "manual"}})
         recent = [{"test_name": "ALT", "date": "2026-01-01"}]
         _block, overdue = gp_context._check_lab_freshness(recent, date(2026, 7, 1))

@@ -1,0 +1,92 @@
+{
+  "module": "agent_mail",
+  "public": [
+    "mail_dir",
+    "send",
+    "poll_sent",
+    "pull_inbox",
+    "record_taken",
+    "mark_shown",
+    "budget_left",
+    "delivery_slot",
+    "unacked_count",
+    "default_root",
+    "sent_count",
+    "answered",
+    "task_handover_times"
+  ],
+  "depends_on": [
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn",
+        "DB_PATH"
+      ],
+      "why": "Tenant schema and connection; init_db owns migration, agent_mail exclusively owns lifecycle writes"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config"
+      ],
+      "why": "Read tenant hourly budget from system_config",
+      "legacy": "Existing configuration reader has no sidecar (2026-11-05)"
+    },
+    {
+      "module": "mcp_tools",
+      "uses": [
+        "redact"
+      ],
+      "why": "Reuse the personal-word redactor on outgoing body and subject"
+    },
+    {
+      "module": "secret_guard",
+      "uses": [
+        "find_secret_values"
+      ],
+      "why": "Existing tenant secret guard; any finding blocks publication",
+      "legacy": "Existing security boundary has no sidecar (2026-11-05)"
+    },
+    {
+      "module": "notify",
+      "uses": [
+        "fault"
+      ],
+      "why": "Report refused/non-delivered receipt once per letter without letter contents",
+      "legacy": "Existing fault channel has no sidecar (2026-11-05)"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "UTC timestamps, rolling-hour budget and unacked age",
+      "legacy": "Existing clock seam has no sidecar (2026-11-05)"
+    }
+  ],
+  "contract": {
+    "wire": "docs/reference/agent_mail_bridge.md (unchanged; authoritative)",
+    "ownership": "agent_mail owns tenant agent_mail lifecycle. health_db.init_db installs schema and INSERT OR IGNORE system_config seed. jobs/scheduled invokes public operations; integrity_tests consumes mail_dir and unacked_count.",
+    "input": "Tenant comes from process paths only. Bridge filenames, envelope identity, field types, status vocabulary and recipient coverage validated. No sender accepted by send. kind follows wire contract. Body >8000 characters before or after redaction raises ValueError. Optional task_ids for kind=task only: nonempty list of positive non-bool integers. hand_over stores these links in detail before publication; task_handover_times returns the first request UTC epoch for each linked task regardless of transport/ack state. No body or task IDs added to wire payload.",
+    "output": "send returns request id. pull_inbox returns validated pending dictionaries including transient wrapped; rows have metadata only. Duplicate (direction,message_id) does not insert or redeliver acknowledged mail. Same message_id under a different key is a loud error.",
+    "state": "out: requested -> sent:delivered|sent:failed|refused (request_failed on publication OSError). in: received -> shown (taken by health, shown_at persisted; no Telegram echo since 06.11) -> acked (ack file published). acked means health queued acknowledgement, not proof bridge moved it to acked/.",
+    "effects": "Atomic tmp+replace for out and ack. Bodies never in SQLite or logs. delivery_slot serializes delivery with a nonblocking tenant-local flock in DB directory. One process consumes a tenant directory.",
+    "time": "UTC epoch seconds; created_at is ingestion/request time. detail.shown_at is the durable rolling-hour quota timestamp. ack retry does not reset quota time. Received or shown older than 1800s is unacked.",
+    "failures": "Missing/incomplete mount, malformed files, unavailable DB/config/secret scan fail loudly. Files retained. shown retries ack without resending. Death between record_taken and reply loses that reply (acked, fault not raised): no exactly-once claim. Crash between requested commit and file publication can leave an unpublished request; inspect out/sent by id, do not resend automatically. fault_reported is committed before notify.fault: at most one attempt, crash in that gap can lose that journal notification.",
+    "privacy": "No LLM or post.py calls. Foreign-owner recipient enforcement belongs exclusively to host bridge. Redaction is the existing dictionary-based mechanism; no new clinical data export policy is added. Incoming text is shown as untrusted plain text."
+  },
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "One domain: tenant mail lifecycle over a bridge spool and metadata ledger; no Telegram transport (owner sees the post office).",
+      "D2": "Explicit public operations listed above. Helpers private; record_taken persists intake, mark_shown checks it durably and independently.",
+      "D3": "stdlib filesystem/SQLite lock and existing public connection, redactor, secret guard, configuration, fault and clock interfaces; no new dependency.",
+      "D4": "One module below 400 lines; nine public operations include lifecycle, serialized delivery and integrity read model.",
+      "D5": "tests/unit/test_agent_mail.py exercises synthetic bridge files and SQLite; plans/mutate_agent_mail_2026-11-05.sh removes protections and requires failing behavioral assertions.",
+      "D6": "Wire contract is docs/reference/agent_mail_bridge.md. Intake is persisted before ack; quota survives retry. Bridge authenticates sender/owner; health never chooses from."
+    },
+    "rationale": "Replaceable using the wire contract, the declared lifecycle and behavioral tests; no dependency on bridge implementation or model behavior.",
+    "date": "2026-11-05",
+    "oracle": "tests/unit/test_agent_mail.py"
+  }
+}

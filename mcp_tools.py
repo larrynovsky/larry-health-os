@@ -56,6 +56,12 @@ TOOLS = [
          "test_name": {"type": "string", "description": "имя теста из lab_tests"},
          "days": {"type": "integer", "description": "за сколько дней назад, по умолчанию 1825"}},
          "required": ["test_name"]}},
+    {"name": "lab_schedule",
+     "description": ("Плановые сроки анализов — тот же источник, что у задач и писем о сроках: для каждого "
+                     "анализа интервал, кто его задал (врач по документу / вручную без документа / по "
+                     "умолчанию системы), последняя сдача, срок следующей и просрочка. Про «когда сдавать» "
+                     "и «срочно ли» отвечай отсюда, а не выводи из дат lab_tests."),
+     "inputSchema": {"type": "object", "properties": {}}},
     {"name": "day_metrics",
      "description": ("Показатели одного дня с приборов (сон, пульс покоя, ВСР, шаги, давление и др.) "
                      "в том виде, как их хранит Health OS, с источником каждого показателя, где он записан."),
@@ -89,9 +95,12 @@ def _redactor():
     return _redactor_cache[0]
 
 
-def redact(text: str) -> str:
+def redact(text: str, keep: frozenset[str] = frozenset()) -> str:
+    """keep — точные формы (в нижнем регистре), которые хозяин разрешил показывать этому адресату."""
     rx = _redactor()
-    return rx.sub("[скрыто]", text) if rx else text
+    if not rx:
+        return text
+    return rx.sub(lambda m: m.group(0) if m.group(0).lower() in keep else "[скрыто]", text)
 
 
 def _days(args: dict, default: int) -> int:
@@ -199,6 +208,30 @@ def _tool_lab_results(args: dict) -> str:
     return _with_note(_envelope(f"анализ «{name}», дата — дата забора", out), note)
 
 
+def _tool_lab_schedule(args: dict) -> str:
+    import labs_db
+    today = get_today()
+    sched = labs_db.tenant_lab_schedule()
+    if not sched:
+        return _none("планового расписания анализов")
+    due = labs_db.lab_due(sched, today)
+    rows = []
+    import i18n
+    import lab_canon
+    for test, cfg in sorted(sched.items()):
+        d = due.get(lab_canon.normalize(test))     # lab_due отдаёт канонический ключ (ревью 07.11, нах. 10)
+        origin = labs_db.schedule_origin(cfg["source"])
+        row = {"test": test, "interval_days": cfg["interval_days"],
+               "set_by": i18n.t(f"labs.schedule_origin.{origin}"),
+               "note": cfg.get("note") or ""}
+        if d:
+            row.update(last=d["last"], due=d["due"].isoformat(), overdue_days=max((today - d["due"]).days, 0))
+        else:
+            row["last"] = "сдачи в Health OS нет — срок не вычисляется"
+        rows.append(row)
+    return _envelope("плановое расписание анализов (labs_db.tenant_lab_schedule)", {"schedule": rows})
+
+
 def _tool_day_metrics(args: dict) -> str:
     d = args.get("date")
     if not isinstance(d, str) or not _DATE.match(d):
@@ -261,6 +294,9 @@ def _tool_nutrition_frame(args: dict) -> str:
     import food_profile
     import generated_food_rules
     f = food_profile.medical_frame()
+    if f.get("assessment") == "not_assessed":
+        return _envelope(f["reasons"][0], {"assessment": "not_assessed",
+                         "kb_status": f["kb_status"], "reason": f["reasons"][0]})
     frame = {k: (sorted(v) if isinstance(v, (set, frozenset)) else v) for k, v in f.items()}
     shadow = []
     for r in generated_food_rules.get_rules(status="shadow"):
@@ -277,7 +313,7 @@ def _tool_nutrition_frame(args: dict) -> str:
 
 _DISPATCH = {"health_brief": _tool_health_brief, "nutrition_frame": _tool_nutrition_frame,
              "lab_tests": _tool_lab_tests, "lab_results": _tool_lab_results, "day_metrics": _tool_day_metrics,
-             "problems": _tool_problems, "facts": _tool_facts}
+             "problems": _tool_problems, "facts": _tool_facts, "lab_schedule": _tool_lab_schedule}
 
 
 def call(name: str, args: dict | None) -> tuple[str, bool]:

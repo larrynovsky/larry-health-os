@@ -1,0 +1,142 @@
+{
+  "id": "isi",
+  "name": "Insomnia Severity Index (Morin)",
+  "version": "v1.0_paraphrase_initial",
+  "source": "Morin et al. — wording paraphrased, заменить на сверенный русский валидированный перевод перед production trend",
+  "validation_status": "paraphrase",
+  "applies_when": ["oncology"],
+  "cadence_days": 90,
+  "cadence_offset_days": 30,
+  "recall_period": "past_2_weeks",
+  "response_scale": {
+    "min": 0,
+    "max": 4,
+    "labels": {
+      "0": "none",
+      "1": "mild",
+      "2": "moderate",
+      "3": "severe",
+      "4": "very severe"
+    }
+  },
+  "items": [
+    {
+      "id": "q1",
+      "text": "Насколько выражена трудность заснуть?",
+      "subscale": "total"
+    },
+    {
+      "id": "q2",
+      "text": "Насколько выражена трудность поддерживать сон (пробуждения ночью)?",
+      "subscale": "total"
+    },
+    {
+      "id": "q3",
+      "text": "Насколько выражена проблема слишком раннего пробуждения?",
+      "subscale": "total"
+    },
+    {
+      "id": "q4",
+      "text": "Насколько ты недоволен своим текущим сном?",
+      "subscale": "total"
+    },
+    {
+      "id": "q5",
+      "text": "Насколько заметным окружающим кажется влияние твоей проблемы со сном на качество жизни?",
+      "subscale": "total"
+    },
+    {
+      "id": "q6",
+      "text": "Насколько ты обеспокоен / встревожен своей проблемой со сном?",
+      "subscale": "total"
+    },
+    {
+      "id": "q7",
+      "text": "Насколько проблема со сном влияет на способность функционировать днём (энергия, настроение, концентрация, работа)?",
+      "subscale": "total"
+    }
+  ],
+  "subscales": [
+    {
+      "id": "total",
+      "items": [
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5",
+        "q6",
+        "q7"
+      ],
+      "direction": "symptom_higher_worse",
+      "label_ru": "итог"
+    }
+  ],
+  "scoring_formula": "total = sum(items); ranges: 0-7 no clinical insomnia, 8-14 subthreshold, 15-21 moderate clinical, 22-28 severe clinical",
+  "thresholds": {
+    "subthreshold": 8,
+    "moderate_clinical": 15,
+    "severe_clinical": 22
+  },
+  "shadow_rules": [
+    {
+      "item_or_subscale": "q1",
+      "proxies": [
+        "sleep_onset_latency"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.5,
+      "note": "Oura sleep latency vs perceived onset difficulty"
+    },
+    {
+      "item_or_subscale": "q2",
+      "proxies": [
+        "awakenings_count",
+        "wake_after_sleep_onset"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.5,
+      "note": "ВНИМАНИЕ: эти прокси нужно добавить в shadow_extraction (P-ISI-001 из dry test)"
+    },
+    {
+      "item_or_subscale": "q3",
+      "proxies": [
+        "last_wake_time"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.5,
+      "note": "early-morning waking pattern; прокси нужно добавить"
+    },
+    {
+      "item_or_subscale": "q4",
+      "proxies": [
+        "sleep_score"
+      ],
+      "min_window_days": 14,
+      "persistence_days": 7,
+      "divergence_threshold": 0.4,
+      "note": "общая удовлетворённость сном vs композитный sleep_score"
+    },
+    {
+      "item_or_subscale": "q7",
+      "proxies": [
+        "readiness"
+      ],
+      "min_window_days": 7,
+      "persistence_days": 3,
+      "divergence_threshold": 0.4,
+      "note": "дневное функционирование vs Oura readiness"
+    }
+  ],
+  "wording_version_hash": "isi_v1_2026_05_18",
+  "title_ru": "Сон (ISI)",
+  "threshold_labels_ru": {
+    "below": "клинической бессонницы нет",
+    "subthreshold": "подпороговая бессонница",
+    "moderate_clinical": "умеренная бессонница",
+    "severe_clinical": "тяжёлая бессонница"
+  }
+}

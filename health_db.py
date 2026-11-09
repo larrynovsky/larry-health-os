@@ -2075,26 +2075,45 @@ def _scrub_leaky_seed_reasons():
             pass  # silent-ok: колонки нет (миграция ещё не прошла) — сид/миграция поставят
 
 
-def _derive_metric_percentile(conn, metric: str, pct: int = 10, days: int = 90, min_n: int = 14):
+def _derive_metric_percentile(conn, metric: str, pct: int = 10, days: int = 90, min_n: int = 14,
+                              reference_date: date | None = None):
     """p{pct} метрики из daily_metrics ЭТОГО тенанта за последние `days`. None если < min_n
     ненулевых значений. Личное значение выводится per-tenant — НЕ сидтся литералом
     (brief-neutralization Фаза 3a). Метрика — только из белого списка (не user-input)."""
     import math
     if metric not in ("hrv", "readiness", "sleep_deep", "sleep_score", "sleep_total",
-                      "sleep_awake"):
+                      "sleep_awake", "stress_high_min"):
         return None
-    since = get_today() - timedelta(days=days)
+    since = (reference_date or get_today()) - timedelta(days=days)
     try:
         rows = conn.execute(
-            f"SELECT {metric} AS v FROM daily_metrics WHERE date >= ? AND {metric} IS NOT NULL",
-            (str(since),)).fetchall()
-    except Exception:  # silent-ok: нет колонки/таблицы → нельзя вывести, вернём None
+            f"SELECT {metric} AS v FROM daily_metrics WHERE date >= ? AND {metric} IS NOT NULL"
+            + (" AND date < ?" if reference_date is not None else ""),
+            (str(since), str(reference_date)) if reference_date is not None else (str(since),)).fetchall()
+    except Exception:  # silent-ok: legacy insufficient-data fallback; explicit-date calls raise.
+        if reference_date is not None:
+            raise
         return None
-    vals = sorted(float(r[0]) for r in rows if r[0] is not None and float(r[0]) > 0)
+    vals = sorted(float(r[0]) for r in rows if r[0] is not None
+                  and math.isfinite(float(r[0]))
+                  and (float(r[0]) >= 0 if metric == "stress_high_min" else float(r[0]) > 0))
     if len(vals) < min_n:
         return None
     idx = max(0, math.ceil(pct / 100 * len(vals)) - 1)
     return vals[idx]
+
+
+def get_metric_percentile(metric: str, pct: int, days: int, min_n: int,
+                          reference_date: date) -> float | None:
+    """Nearest-rank personal percentile over [reference_date-days, reference_date).
+
+    Same estimator as personal floors; zero stress is valid, nonfinite samples
+    are excluded. Missing history returns None; unavailable storage raises.
+    """
+    if not 0 < pct <= 100 or days < 1 or min_n < 1:
+        raise ValueError("invalid percentile window")
+    with get_conn(read_only=True) as conn:
+        return _derive_metric_percentile(conn, metric, pct, days, min_n, reference_date)
 
 
 def _personalize_absolute_floors(conn=None):
@@ -2454,6 +2473,7 @@ def init_db():
     _migrate_daily_metrics_v2()
     _ensure_data_repair_log()       # журнал вмешательств в значения (2026-07-31)
     _migrate_patient_profile_and_config()
+    _migrate_agent_mail()
     _migrate_consultation_sessions()
     _migrate_visual_intake()        # symptom-intake WP0: visual_case/photo/domains (domain-agnostic)
     _migrate_pending_doc_reviews()
@@ -2733,6 +2753,18 @@ def _migrate_tasks():
                 followup_sent_at TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS task_guard_journal (
+                new_task_id INTEGER NOT NULL REFERENCES tasks(id),
+                open_task_id INTEGER NOT NULL REFERENCES tasks(id),
+                evaluated_at TEXT NOT NULL,
+                verdict TEXT NOT NULL CHECK (verdict IN ('duplicate','contradicts','new','unjudged')),
+                confidence REAL CHECK (confidence BETWEEN 0 AND 1),
+                judge TEXT NOT NULL CHECK (judge IN ('det','jev')),
+                reason TEXT NOT NULL,
+                PRIMARY KEY (new_task_id, open_task_id)
+            )
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_source_date ON tasks(source_date)")
         # Добавляем колонки если таблица уже существовала без них
@@ -2752,6 +2784,10 @@ def _migrate_tasks():
             ("tg_message_id", "INTEGER"),  # квитанция доставки вопроса: к чему прилетит реплай
             ("judge_verdict", "TEXT"),     # patient|unsure|not_patient|unparsed — суждение, НЕ публикация
             ("judge_reason",  "TEXT"),     # своими словами судьи; человеку не показывается
+            # Кто предложил дело (план доделок п.2, 07.11): врач — срок из назначения в документе;
+            # система — вывод модели или дефолт расписания; хозяин — его решение. NULL — старые строки,
+            # происхождение не размечено. Гарантию держит база, а не каждый писатель.
+            ("origin", "TEXT CHECK (origin IN ('doctor','system','owner'))"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE tasks ADD COLUMN {col} {definition}")
@@ -2836,7 +2872,15 @@ def migrate_all_json():
     for f in files:
         try:
             data = json.loads(f.read_text())
-            upsert_metrics_from_json(f.stem, data)
+            # Route the whole archive once; Oura/mixed payloads remain unchanged.
+            sleep = data.get("sleep") or {}
+            oura = (data.get("source") == "Oura"
+                    or (isinstance(sleep, dict)
+                        and ("contributors" in sleep or sleep.get("source") == "Oura"))
+                    or any(key in data for key in (
+                        "readiness_score", "resilience", "stress", "hrv_balance",
+                        "body_temperature", "recovery_index", "breathing_disturbance")))
+            upsert_metrics_from_json(f.stem, data, source="Oura" if oura else "AppleHealth")
         except Exception as e:
             log.warning(f"  Ошибка {f.name}: {e}")
     log.info("Миграция завершена")
@@ -3825,6 +3869,61 @@ CONIT_LIMITS_HOURS = {
 # PATIENT PROFILE — единый conit профиля пациента (replaces profile_context.json)
 # ─────────────────────────────────────────────────────────────────────────────
 
+AGENT_MAIL_PRIVATE = Path(__file__).resolve().parent / "private" / "agent_mail.yaml"
+
+
+def _owner_assistant() -> str:
+    """Адрес ассистента владельца из приватного справочника; нет файла или поля — пусто."""
+    try:
+        import yaml
+        return str((yaml.safe_load(AGENT_MAIL_PRIVATE.read_text(encoding="utf-8")) or {})
+                   .get("owner_assistant") or "")
+    except OSError:
+        return ""
+
+
+def _migrate_agent_mail():
+    """Metadata only; agent_mail owns lifecycle writes. Reentrant fresh/upgrade migration."""
+    with get_conn() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS agent_mail (
+            id TEXT PRIMARY KEY,
+            direction TEXT NOT NULL CHECK(direction IN ('out','in')),
+            message_id TEXT,
+            peer TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            state TEXT NOT NULL,
+            detail TEXT NOT NULL DEFAULT '{}',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            UNIQUE(direction, message_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_mail_pending ON agent_mail(direction,state,created_at);
+        INSERT OR IGNORE INTO system_config(key,value_num,category,source)
+            VALUES ('agent_mail.max_per_hour',6,'agent_mail','owner_2026-11-05');
+        INSERT OR IGNORE INTO system_config(key,value_num,category,source)
+            VALUES ('agent_mail.max_answers_per_hour',4,'agent_mail','agent-post_2026-11-05');
+        """)
+
+        # Адрес ассистента — данные установки, не код (08.11): is_owner() истинно у ЛЮБОЙ
+        # установки (оператор своей системы), и зашитый адрес владельца получила бы каждая
+        # публичная установка. Адрес берётся из приватного private/agent_mail.yaml
+        # (owner_assistant), которого в публичной копии нет; нет файла — почта выключена.
+        from secrets_paths import is_owner
+        conn.execute("INSERT OR IGNORE INTO system_config(key,value_text,category,source) "
+                     "VALUES ('agent_mail.assistant',?,'agent_mail','owner_2026-11-05')",
+                     (_owner_assistant() if is_owner() else "",))
+        policy = dict(baseline_days=90, min_samples=14, stress_min_samples=30,
+                      sleep_nights=3, sleep_percentile=50, stress_percentile=90,
+                      lab_lead_days=14, morning_offset_minutes=15,
+                      stress_import_hour=17, stress_offset_minutes=15,
+                      max_age_hours=26)
+        conn.execute("INSERT OR IGNORE INTO system_config(key,value_json,category,source) "
+                     "VALUES ('agent_signals.policy',?,'agent_mail','agent_signals_seed_2026-11-05')",
+                     (json.dumps(policy),))
+
+
 def _migrate_patient_profile_and_config():
     """Создаёт таблицы patient_profile и system_config если не существуют."""
     with get_conn() as conn:
@@ -3849,6 +3948,17 @@ def _migrate_patient_profile_and_config():
         );
         """)
     with get_conn() as conn:
+        conn.execute("""INSERT OR IGNORE INTO system_config
+                        (key, value_text, category, source)
+                        VALUES ('tasks.guard_mode', 'shadow', 'tasks', 'task_guard')""")
+        conn.execute("""INSERT OR IGNORE INTO system_config
+                        (key, value_num, category, source)
+                        VALUES ('tasks.guard_timeout_seconds', 2.0, 'tasks', 'task_guard')""")
+        from config_db import TASK_GUARD_BUDGET_SECONDS
+        conn.execute("""INSERT OR IGNORE INTO system_config
+                        (key, value_num, category, source)
+                        VALUES ('tasks.guard_budget_seconds', ?, 'tasks', 'task_guard')""",
+                     (TASK_GUARD_BUDGET_SECONDS,))
         # Раздел строки профиля — префикс ключа. Если category потеряна,
         # её можно восстановить из ключа, не меняя содержимое записи.
         conn.execute("UPDATE patient_profile SET category = substr(key, 1, instr(key, '.') - 1) "
@@ -4610,11 +4720,11 @@ from consultations_db import (  # noqa: E402
 
 # ── Поток C (2026-06-27): домен tasks → tasks_db.py ──
 from tasks_db import (  # noqa: E402
-    save_task, resolve_task, get_open_tasks, get_overdue_tasks, mark_task_sent,
+    lab_task_pairs, save_task, resolve_task, get_open_tasks, get_overdue_tasks, mark_task_sent,
     get_unsent_assessment_tasks, get_unsent_tasks, get_task_by_tg_message,
     wake_snoozed_assessment_tasks,
     get_questions_needing_delivery, get_open_questions, get_tasks_known_to_person,
-    record_duplicate_skip,
+    record_duplicate_skip, get_unanswered_bot_tasks, mark_followup_sent, get_task,
 )
 
 
@@ -4632,14 +4742,14 @@ from agent_reports_db import (  # noqa: E402
 
 # ── Поток C (2026-06-27): домен genome → genome_db.py ──
 from genome_db import (  # noqa: E402
-    get_significant_variants, get_carrier_variants, get_variants_by_genes, genome_summary_counts, get_snps_batch, upsert_genetic_variant, save_genome_update_log, get_raw_snp, mark_genome_log_sent,
+    get_significant_variants, get_carrier_variants, get_variants_by_genes, genome_present, genome_summary_counts, get_snps_batch, upsert_genetic_variant, save_genome_update_log, get_raw_snp, mark_genome_log_sent,
     carrier_status_null_allele_violations,
 )
 
 
 # ── Поток C (2026-06-27): домен labs → labs_db.py ──
 from labs_db import (  # noqa: E402
-    get_recent_labs, canon_window_note, declared_boundary, get_lab_series, get_modal_reference, compute_bank_refs, get_lab_refs_meta, get_lab_trend, get_lab_trend_by_component, trend_members, get_labs_by_date, get_lab_history, get_lab_refs, get_effective_lab_schedule, build_lab_history_context, build_specialized_context, build_codraw_context, draw_key, upsert_monitoring_rule, get_lab_format_by_name, get_lab_format_by_id, get_confirmed_aliases, get_confirmed_aliases_all, confirmed_alias_conflicts, confirmed_alias_targets, domain_verdicts, domain_home, analyte_norm_verdicts, set_analyte_norm_verdict, get_all_canonical_names, get_all_lab_dates, effective_freshness, result_text,
+    get_recent_labs, tenant_lab_schedule, lab_due, schedule_origin, latest_result_by_specimen, canon_window_note, declared_boundary, get_lab_series, get_modal_reference, compute_bank_refs, get_lab_refs_meta, get_lab_trend, get_lab_trend_by_component, trend_members, get_labs_by_date, get_lab_history, get_lab_refs, get_effective_lab_schedule, build_lab_history_context, build_specialized_context, build_codraw_context, draw_key, upsert_monitoring_rule, get_lab_format_by_name, get_lab_format_by_id, get_confirmed_aliases, get_confirmed_aliases_all, confirmed_alias_conflicts, confirmed_alias_targets, domain_verdicts, domain_home, analyte_norm_verdicts, set_analyte_norm_verdict, get_all_canonical_names, get_all_lab_dates, effective_freshness, result_text,
     unrepeated_draw, build_unrepeated_draw_context,
     draw_summaries, flag_direction,
 )

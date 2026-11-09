@@ -902,12 +902,163 @@
           "verdict": "ПОКРАСНЕЛ"
         }
       ]
+    },
+    "check_disk_room_for_reference": {
+      "harness": "plans/mutate_disk_room_2026-11-02.sh",
+      "ran_at": "2026-11-02",
+      "mutations": [
+        {
+          "tag": "alarm-silenced",
+          "statement": "предикат датчика молчит при любом месте",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "need-without-snapshot",
+          "statement": "потребность прогона считается без снимка справочника",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "free-ignored",
+          "statement": "свободное место не сравнивается с потребностью",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "any-writer",
+          "statement": "импорт и снимок у любого процесса, а не у писателя справочника",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "snapshot-kept-at-rest",
+          "statement": "снимок не удаляется после проверки целого справочника",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_reference_has_writer": {
+      "harness": "plans/mutate_pgs_coverage_2026-11-02.sh",
+      "ran_at": "2026-11-02",
+      "mutations": [
+        {
+          "tag": "writer-alarm-silenced",
+          "statement": "предикат датчика молчит при опоздавшем прогоне",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "receipt-not-written",
+          "statement": "писатель не оставляет квитанцию прогона",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_agent_mail_bridge_alive": {
+      "harness": "plans/mutate_agent_mail_2026-11-05.sh",
+      "ran_at": "2026-11-05",
+      "mutations": [
+        {
+          "tag": "bridge_condition_removed",
+          "statement": "Убрано условие свежести heartbeat: тест на старом alive обязан падать",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_agent_mail_unacked": {
+      "harness": "plans/mutate_agent_mail_2026-11-05.sh",
+      "ran_at": "2026-11-05",
+      "mutations": [
+        {
+          "tag": "unacked_condition_removed",
+          "statement": "Убрано условие отсутствия старых received/shown: тест обязан падать",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_agent_signals_ran": {
+      "harness": "plans/mutate_agent_signals_2026-11-05.sh",
+      "ran_at": "2026-11-06",
+      "mutations": [
+        {
+          "tag": "sensor_condition_removed",
+          "statement": "Удаление условия свежести даёт ложный зелёный, контроль пропущенного утреннего прохода падает.",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_macbook_health_jobs": {
+      "harness": "plans/mutate_macbook_jobs_2026-11-06.sh",
+      "ran_at": "2026-11-06",
+      "mutations": [
+        {
+          "tag": "plists-not-launchd",
+          "statement": "писатель снимка читает файлы плистов вместо загруженного в launchd — джоб с битым файлом невидим",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "silent",
+          "statement": "находка «лишний джоб на MacBook» не доставляется",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unknown-as-clean",
+          "statement": "«launchctl не ответил» читается молча как «чисто»",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_assessment_producer_liveness": {
+      "harness": "tests/unit/test_assessment_scheduler.py",
+      "ran_at": "2026-11-07",
+      "mutations": [
+        {
+          "tag": "B-muted-staleness",
+          "statement": "В check_assessment_producer_liveness заменить days > cadence + grace на days > 100000: test_producer_liveness_red_and_interval_boundary падает DID NOT RAISE на просроченной задаче; pytest exit 1.",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "filter-removed",
+          "statement": "Отключён applies_when-фильтр: test_applicability_gates_producer_and_monitor красный для тенанта без классов (3 failed, 2 passed; exit 1).",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "all-becomes-any",
+          "statement": "ALL-of заменён на ANY-of: Выдуманный demo_instrument ошибочно применяется при наличии только одного из demo_condition_a/b (2 failed, 3 passed; exit 1).",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_lab_task_pairs": {
+      "harness": "tests/unit/test_task_dedup.py",
+      "ran_at": "2026-11-07",
+      "mutations": [
+        {
+          "tag": "sensor-disabled",
+          "statement": "Отключение assert датчика проваливает проверку FAIL на синтетической БД.",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "deadline-ignored",
+          "statement": "Игнорирование срока проваливает классификацию противоречия.",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "history-counted",
+          "statement": "Учёт аналита только из исторического хвоста проваливает отрицательный пример.",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "snoozed-lost",
+          "statement": "Исключение snoozed из чтения проваливает проверку FAIL.",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
     }
   },
   "_harm": "Кого задевает поломка, которую ловит датчик (нить repair-order, решение владельца 02.10): person — человек получает неверное или не получает нужное (совет, отчёт, бриф, ответ бота); data — портятся или устаревают данные, на которых всё строится; system — только внутренняя кухня (гейты, документы, журналы, тесты). Читатель — night_repair.pick_cards: первое место ночи самой вредной карточке, второе — старейшей. Новый датчик приходит с пометкой: tests/consistency/test_sensor_harm_declared.py краснеет на датчике без неё. Разметка 02.10 — суждение по имени и метке датчика; спорные отнесены к system и перечислены в записке нити.",
   "harm": {
     "person": [
       "check_absence_surface_guarded",
+      "check_agent_mail_bridge_alive",
+      "check_agent_mail_unacked",
+      "check_agent_signals_ran",
       "check_brief_does_not_retell_owner",
       "check_bug_outbox_drains",
       "check_canon_normal_flag_matches_reference",
@@ -918,6 +1069,7 @@
       "check_doorbell_liveness",
       "check_ecg_nonsinus",
       "check_gp_reports",
+      "check_lab_task_pairs",
       "check_llm_answer_parsed",
       "check_morning_brief_gate_liveness",
       "check_no_hardcoded_diagnosis",
@@ -1044,7 +1196,8 @@
       "check_unresolved_evaluations",
       "check_urine_name_convention",
       "check_visual_orphans",
-      "check_wellness_genome_sync"
+      "check_wellness_genome_sync",
+      "check_macbook_health_jobs"
     ],
     "system": [
       "check_arbiter_liveness",
@@ -1100,7 +1253,10 @@
       "check_validation_gate_methodology_present",
       "check_watchdog_liveness",
       "check_machine_judge_alive",
-      "check_skipped_probes_reviewed"
+      "check_skipped_probes_reviewed",
+      "check_disk_room_for_reference",
+      "check_reference_has_writer",
+      "check_assessment_producer_liveness"
     ]
   }
 }

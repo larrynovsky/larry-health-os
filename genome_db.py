@@ -110,6 +110,17 @@ def get_variants_by_genes(genes: list, limit: int = 100) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def genome_present() -> bool:
+    """Загружен ли геном у этой установки (есть хоть одна строка raw_snps).
+    Нет таблицы или базы — генома нет. Читатели: отчёт /bug и ежемесячные генетические
+    задачи (карточка report:44f643, 06.11: скан PGS сбоил у установки без генома)."""
+    try:
+        with _hdb.get_conn() as conn:
+            return conn.execute("SELECT 1 FROM raw_snps LIMIT 1").fetchone() is not None
+    except Exception:  # silent-ok: нет таблицы или базы — генома нет
+        return False
+
+
 def genome_summary_counts() -> dict:
     """Сводные счётчики для genome_context (Ф5). 'patho' = Pathogenic/Likely
     (LIKE %athogenic%, без Conflicting). carrier = resolved И аллель в генотипе."""

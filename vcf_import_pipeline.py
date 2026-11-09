@@ -32,11 +32,17 @@ from datetime import datetime
 
 # ── Config ───────────────────────────────────────────────────────────────────────
 
-def _default_vcf() -> Path:
+def _default_vcf(samples: "Path | None" = None) -> Path:
     """Дефолт --vcf: путь к геному тенанта — из private/local_samples.yaml (имя файла —
-    идентификатор набора, личное); нет записи — <каталог данных>/data/genome.vcf."""
-    p = Path(__file__).resolve().parent / "private" / "local_samples.yaml"
-    if p.exists():
+    идентификатор набора, личное); нет записи — <каталог данных>/data/genome.vcf.
+
+    local_samples.yaml — файл ВЛАДЕЛЬЦА (один на репозиторий), поэтому читается только на
+    данных владельца. До 02.11.2026 он читался всеми: Phase E на данных партнёра 13.08
+    завела в его базе запись genome_imports с путём к VCF владельца (данные при этом были
+    партнёра — генотипы и фармакофенотипы с владельцем не совпадают; ложной была метка)."""
+    import secrets_paths
+    p = samples or Path(__file__).resolve().parent / "private" / "local_samples.yaml"
+    if p.exists() and secrets_paths.is_owner_data():
         import yaml
         v = (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("genome_vcf")
         if v:

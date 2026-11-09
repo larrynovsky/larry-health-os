@@ -14,6 +14,7 @@ import types
 import pytest
 
 import health_mcp
+import labs_db as _real_labs
 import mcp_tools
 
 pytestmark = pytest.mark.unit
@@ -27,7 +28,10 @@ def fake_readers(monkeypatch):
     labs = types.SimpleNamespace(get_lab_series=lambda name, n_days: state["series"],
                                  get_lab_history=lambda days: state["history"],
                                  get_lab_trend_by_component=lambda name, n: state["trend"],
-                                 declared_boundary=lambda n_days, **kw: f"ГРАНИЦА ОКНА: {n_days} дн. (синтетика)")
+                                 declared_boundary=lambda n_days, **kw: f"ГРАНИЦА ОКНА: {n_days} дн. (синтетика)",
+                                 tenant_lab_schedule=lambda: state.get("sched", {}),
+                                 lab_due=lambda names, day: state.get("due", {}),
+                                 schedule_origin=_real_labs.schedule_origin)
     metrics = types.SimpleNamespace(get_day=lambda d: state["day"])
     probs = types.SimpleNamespace(get_problem_list=lambda st=None: state["problems"])
     mem = types.SimpleNamespace(get_facts=lambda mem_class=None: state["facts"])
@@ -173,3 +177,20 @@ def test_lab_tests_declare_their_boundary(fake_readers):
     assert not err and "ГРАНИЦА ОКНА: 7300" in text and "LDL" in text
     # Текст границы говорит «выше показан» — значит, перечень обязан стоять до неё (18.10).
     assert text.index('"tests"') < text.index('"boundary"'), "граница стоит перед перечнем, а говорит «выше»"
+
+
+def test_lab_schedule_names_who_set_interval_and_overdue(fake_readers, monkeypatch):
+    """П.6 (07.11): «не срочно» про анализ с прошедшим сроком врача — окно не видело расписания."""
+    from datetime import date
+    monkeypatch.setattr(mcp_tools, "get_today", lambda: date(2040, 3, 1))
+    fake_readers["sched"] = {
+        "Example_A": {"interval_days": 105, "priority": "critical", "source": "encounter:7", "note": "каждые 3-4 мес"},
+        "Example_B": {"interval_days": 180, "priority": "medium", "source": "default", "note": ""}}
+    fake_readers["due"] = {"Example_A": {"due": date(2040, 2, 1), "last": "2039-10-19"}}
+    text, err = mcp_tools.call("lab_schedule", {})
+    body = json.loads(text.split("\n", 1)[1])["schedule"]
+    a, b = body
+    assert not err and a["set_by"] == "назначение врача (документ)" and a["overdue_days"] == 29
+    assert b["set_by"] == "по умолчанию системы" and "не вычисляется" in b["last"]
+    fake_readers["sched"] = {}
+    assert mcp_tools.call("lab_schedule", {})[0].startswith("нет данных")

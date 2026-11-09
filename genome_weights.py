@@ -193,16 +193,19 @@ def download_and_import(
 
     col_headers = data_lines[0].split("\t")
     col_idx = {c.strip(): i for i, c in enumerate(col_headers)}
+    # Неаддитивная форма шкалы (веса по дозе генотипа dosage_0/1/2_weight вместо одного
+    # effect_weight) — считать её этот конвейер не умеет; это не сбой загрузки (03.11.2026).
+    if "effect_weight" not in col_idx and any(c.startswith("dosage_") for c in col_idx):
+        log.info("PGS %s: неаддитивный формат (%s) — не импортируется", pgs_id,
+                 ",".join(c for c in col_idx if c.startswith("dosage_")))
+        if owned:
+            _conn.close()
+        return {"status": "unsupported_format", "pgs_id": pgs_id}
 
-    # ── Step 5: register in pgs_catalog ─────────────────────────────────────
-    _conn.execute(
-        "INSERT OR REPLACE INTO pgs_catalog "
-        "(pgs_id, trait_name, trait_label, num_variants, ancestry_broad, downloaded_at, trait_efo_ids) "
-        "VALUES (?,?,?,?,?,?,?)",
-        (pgs_id, reported_trait, reported_trait,
-         num_variants or len(data_lines) - 1,
-         ancestry_str, get_utcnow().isoformat(), efo_ids_json),
-    )
+    # ── Step 5: старые веса этой шкалы — вон (повторная загрузка) ─────────────
+    # Запись в pgs_catalog — ПОСЛЕ весов (02.11.2026). Прежде она коммитилась первой, и
+    # прогон, оборвавшийся на весах, оставлял шкалу без единого веса: 26 таких записей
+    # от 02–05.08 числились «уже скачанными» и не скачивались и не судились никогда.
     _conn.execute("DELETE FROM pgs_weights WHERE pgs_id=?", (pgs_id,))
     _conn.commit()
 
@@ -274,6 +277,21 @@ def download_and_import(
     n_inserted += _flush(batch)
 
     log.info("PGS %s: %d inserted, %d skipped", pgs_id, n_inserted, n_skipped)
+    if n_inserted == 0:     # шкала без весов не регистрируется
+        if owned:
+            _conn.close()
+        return {"status": "empty_weights", "pgs_id": pgs_id, "n_skipped": n_skipped}
+
+    # ── Step 7: register in pgs_catalog — только когда веса уже лежат ────────
+    _conn.execute(
+        "INSERT OR REPLACE INTO pgs_catalog "
+        "(pgs_id, trait_name, trait_label, num_variants, ancestry_broad, downloaded_at, trait_efo_ids) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (pgs_id, reported_trait, reported_trait,
+         num_variants or len(data_lines) - 1,
+         ancestry_str, get_utcnow().isoformat(), efo_ids_json),
+    )
+    _conn.commit()
     if owned:
         _conn.close()
 

@@ -1,0 +1,89 @@
+{
+  "module": "task_guard",
+  "public": [
+    "judge_pair",
+    "audit_new_task",
+    "report_failure",
+    "start_batch"
+  ],
+  "depends_on": [
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config",
+        "TASK_GUARD_BUDGET_SECONDS"
+      ],
+      "why": "tenant mode, per-request timeout and one shared batch-budget default",
+      "legacy": "Existing module has no sidecar; public operations named here and exercised by guard integration tests."
+    },
+    {
+      "module": "tasks_db",
+      "uses": [
+        "get_open_tasks",
+        "lab_task_pairs"
+      ],
+      "why": "one owner for task snapshot and deterministic policy",
+      "legacy": "Existing module has no sidecar; public operations named here and exercised by guard integration tests."
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "DB_PATH"
+      ],
+      "why": "tenant-scoped fault throttle state next to database"
+    },
+    {
+      "module": "notify",
+      "uses": [
+        "claim_repeat",
+        "fault"
+      ],
+      "why": "shared rolling-day throttle and non-patient fault journal",
+      "legacy": "Existing module has no sidecar; public operations named here and exercised by guard integration tests."
+    },
+    {
+      "module": "secrets_paths",
+      "uses": [
+        "secrets_dir"
+      ],
+      "why": "tenant credential boundary",
+      "legacy": "Existing module has no sidecar; public operations named here and exercised by guard integration tests."
+    },
+    {
+      "module": "mcp_tools",
+      "uses": [
+        "redact"
+      ],
+      "why": "existing identity redaction"
+    },
+    {
+      "module": "llm_client",
+      "uses": [
+        "guard_outgoing"
+      ],
+      "why": "existing fail-closed secret egress guard"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "explicit injectable evaluation and throttle time",
+      "legacy": "Existing module has no sidecar; public operations named here and exercised by guard integration tests."
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "One capability: optional shadow comparison of task pairs; task ownership stays in tasks_db.",
+      "D2": "start_batch() returns run-local state; pass it to audit_new_task(new, batch=...) for every task in one creation loop. judge_pair returns verdict/confidence/judge/reason; report_failure emits throttled operational fault.",
+      "D3": "Only named public operations; HTTP is stdlib and fixed endpoint. No private neighbor calls.",
+      "D4": "One module; mutable breaker/budget/configuration state is explicit and run-scoped. Only log suppression is process-scoped, keyed by tenant secret path.",
+      "D5": "tests/unit/test_task_guard.py exercises real SQLite, mocked HTTP, redaction, missing key, invalid responses, off, enforce, both producers and throttle.",
+      "D6": "Same-tenant snapshot; det always precedes model guards. First transport error opens breaker for the entire batch. Monotonic budget gates HTTP admission and caps socket timeout by remaining time. Missing key file is not_configured, no fault; empty key is a fault. Every skipped pair remains a journal row, countable by reason and saved task IDs."
+    },
+    "rationale": "Can replace the pair judge using the documented mapping contract; no client SDK, UI, or lifecycle decisions.",
+    "date": "2026-11-07",
+    "oracle": "tests/unit/test_task_guard.py; executed mutations recorded in docs/handoff/task-guard-jev/LATEST.md"
+  }
+}

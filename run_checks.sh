@@ -61,7 +61,7 @@ cd "$SCRIPT_DIR"
 # карточка report:0caa7b): python -c не даёт кадра, и без шага pytest, integrity и arch_guard
 # сливались в отчёте /bug в один отпечаток «none в run_checks» — что сломано, не видно.
 record_fault() {
-    "$PY" -c 'import notify, re, sys; m = sys.argv[1]; step = re.sub(r"[^a-z0-9_]", "_", m.split()[0].lower()); notify.fault(f"run_checks.{step}: {m}", person_key=None)' "$1"
+    "$PY" -c 'from pathlib import Path; import notify, re, sys; m = sys.argv[1]; step = re.sub(r"[^a-z0-9_]", "_", m.split()[0].lower()); notify.fault(f"run_checks.{step}: {m}", person_key=None, detail=Path(sys.argv[2]).read_text().splitlines() if sys.argv[2] else None)' "$1" "${2:-}"
 }
 
 # --- pytest_diff begin ---
@@ -278,18 +278,17 @@ if [[ "$SCHEDULED" == "true" ]]; then
         # Новое против хронического: состояние в logs/ (не /tmp — macOS чистит его, и
         # «хроническое» каждый раз рождалось бы заново как «новое»).
         _FAILED_DIFF="$(pytest_failed_diff "$SCRIPT_DIR/logs/pytest_failed_state.tsv" "$_FAILED_LIST" | cut -c1-900)"
-        rm -f "$_FAILED_LIST"
         # МОЛЧАНИЕ — ЛЕГАЛЬНЫЙ ИСХОД: набор упавших не изменился, нового факта нет.
         # Состояние recovery пишется ТОЛЬКО здесь, поэтому «снова зелёный» закрывает
         # ровно ту петлю, которую владельцу открыли, и не выдумывает своих.
         if [ -n "$_FAILED_DIFF" ]; then
-            record_fault "pytest regression; see run_checks.log"
+            record_fault "pytest regression; see run_checks.log" "$_FAILED_LIST"
             echo "${_PYTEST_HEAD} @ $(date '+%Y-%m-%d %H:%M')" > "$_PYTEST_FAIL_STATE"
         else
             echo "$(date '+%H:%M:%S') ⏭ pytest красный, но набор упавших не изменился — молчим" >> "$LOG"
         fi
     fi
-    rm -f "$_PYTEST_OUT"
+    rm -f "$_PYTEST_OUT" "${_FAILED_LIST:-}"
 
     if [[ "$FAIL_COUNT" -gt 0 ]]; then
         # СООБЩЕНИЕ ГОВОРИТ ТО, ЧТО ПРОИСХОДИТ (2026-08-11). Прежний текст —

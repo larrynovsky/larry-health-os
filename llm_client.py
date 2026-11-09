@@ -76,14 +76,41 @@ def profiles() -> dict:
             if not k.startswith("_")}
 
 
+class ProviderConfigurationError(ValueError):
+    """No unambiguous provider; no model request may proceed."""
+
+
 def provider() -> str:
-    """Провайдер УСТАНОВКИ (решение человека при установке, переменная HEALTH_LLM_PROVIDER
-    из .env; нет — anthropic, как до 2026-10-02). Неизвестный — громкий отказ."""
+    """Explicit environment wins; otherwise infer with a staged legacy migration.
+
+    Legacy installer defaults have no provenance: a nonempty value must be
+    treated as explicit. Inspect filenames only, never key contents.
+    """
+    import logging
     import os
-    p = (os.environ.get("HEALTH_LLM_PROVIDER") or "anthropic").strip().lower()
-    if p not in profiles():
-        raise ValueError(f"HEALTH_LLM_PROVIDER={p!r}: такого провайдера нет в methodology/llm_providers.json")
-    return p
+    choices = profiles()
+    p = (os.environ.get("HEALTH_LLM_PROVIDER") or "").strip().lower()
+    if not p:
+        found = [name for name, profile in choices.items()
+                 if (_KEY_FILE.parent / profile["key_file"]).is_file()]
+        if "anthropic" in found:
+            # Migration release: native launchd jobs predate the variable and can
+            # share an Anthropic key with optional admission keys. Remove only
+            # after installed AND loaded job environments have been migrated.
+            logging.getLogger(__name__).warning(
+                "HEALTH_LLM_PROVIDER is unset: keeping legacy Anthropic because anthropic_key exists; "
+                "set HEALTH_LLM_PROVIDER=anthropic in launchd/compose before strict provider selection")
+            return "anthropic"
+        if len(found) == 1:
+            return found[0]
+        reason = "no provider key files" if not found else "multiple provider key files"
+    elif p in choices:
+        return p
+    else:
+        reason = "unknown provider"
+    message = f"{reason}; set HEALTH_LLM_PROVIDER to one of: {', '.join(choices)}"
+    logging.getLogger(__name__).error(message)
+    raise ProviderConfigurationError(message)
 
 
 def api_key(prov: str | None = None) -> str:
@@ -174,7 +201,17 @@ def fault_person_key(exc: BaseException, default: str) -> "tuple[str, dict]":
     Частота запросов — не счёт: «RESOURCE_EXHAUSTED … per minute, retry in 30s» у Gemini
     ловит общий маркер is_account_problem, но совет «пополните баланс» там ложный."""
     if is_account_problem(exc) and not any(m in str(exc).lower() for m in _RATE_MARKERS):
-        return "person.llm.key_problem", {"provider": provider_title()}
+        current = provider()
+        title = provider_title(current)
+        others = [name for name, profile in profiles().items()
+                  if name != current and (_KEY_FILE.parent / profile["key_file"]).is_file()]
+        if others:
+            import i18n
+            return "person.llm.key_problem_other_keys", {
+                "message": i18n.t("person.llm.key_problem", provider=title),
+                "alternatives": "; ".join(
+                    f"{provider_title(name)} — HEALTH_LLM_PROVIDER={name}" for name in others)}
+        return "person.llm.key_problem", {"provider": title}
     return default, {}
 
 
@@ -406,14 +443,19 @@ def _fill(param, reserve: int):
     return reserve if param == "{reserve}" else param
 
 
-def _thinking_plan(kw: dict, task) -> "tuple[dict, dict | None]":
+def _thinking_plan(kw: dict, task, prov: str = "anthropic") -> "tuple[dict, dict | None]":
     """→ (kwargs первого вызова, kwargs повтора при голодном ответе или None)."""
     if "thinking" in kw:          # вызывающий решил сам — не трогаем
         return kw, None
-    prof = thinking_profile(kw.get("model"))
-    reserve = reasoning_reserve(kw.get("model"))
-    if task_mode(task) == "think" and prof.get("think") and reserve > 0:
+    foreign = prov != "anthropic"
+    prof = {} if foreign else thinking_profile(kw.get("model"))
+    reserve = (int(profiles()[prov].get("reasoning_reserve_tokens", 0)) if foreign
+               else reasoning_reserve(kw.get("model")))
+    if reserve > 0 and (foreign or (task_mode(task) == "think" and prof.get("think"))):
         def think(r):
+            if foreign:
+                # Переводчик сам добавляет исходный запас; здесь только разница.
+                return {**kw, "max_tokens": int(kw["max_tokens"]) + r - reserve}
             # С думанием API не принимает temperature ≠ 1: убираем, а не падаем.
             base = {k: v for k, v in kw.items() if k != "temperature"}
             return {**base, "thinking": _fill(prof["think"], r),
@@ -444,7 +486,6 @@ def _streamed(create):
     """Думающий вызов идёт ПОТОКОМ (замер 04.10): с запасом под думание лимит велик, и SDK
     отказывает обычному вызову («Streaming is required for operations that may take longer
     than 10 minutes»). Поток возвращает то же сообщение целиком — читатели не меняются."""
-    import inspect
     inner = getattr(create, "__self__", None)
     if inner is None or not hasattr(inner, "stream"):
         return create
@@ -465,7 +506,6 @@ def _log_thinking(create, task, kw, resp, attempts):
     думание пересчитывался по рабочим вызовам, а не по разовому замеру. Сбой учёта не роняет
     вызов; текст ответа в журнал не пишется — только числа."""
     try:
-        import inspect
         import api_spend_log
         text = "".join(getattr(b, "text", "") for b in (resp.content or []) if getattr(b, "type", "") == "text")
         inner = getattr(create, "__self__", None)
@@ -506,19 +546,25 @@ def _log_plain(task, kw, resp):
         logging.getLogger(__name__).warning("учёт вызова не записан: %r", e)
 
 
+def _plain_logged(resp, task, kw):
+    """Ответ (или корутина ответа) — в журнал расходов после получения. Общий путь
+    для Anthropic без думания и для чужих провайдеров: до 08.11 вызовы OpenAI/Gemini
+    шли мимо журнала (отчёт пользователя с OpenAI, 04.11)."""
+    import inspect
+    if inspect.isawaitable(resp):
+        async def _async_plain():
+            r = await resp
+            _log_plain(task, kw, r)
+            return r
+        return _async_plain()
+    _log_plain(task, kw, resp)
+    return resp
+
+
 def _create_with_mode(create, kw: dict, task):
     first, retry = _thinking_plan(kw, task)
     if retry is None:
-        resp = create(**first)
-        import inspect
-        if inspect.isawaitable(resp):
-            async def _async_plain():
-                r = await resp
-                _log_plain(task, first, r)
-                return r
-            return _async_plain()
-        _log_plain(task, first, resp)
-        return resp
+        return _plain_logged(create(**first), task, first)
     send = _streamed(create)
     resp = send(**first)
     import inspect
@@ -571,7 +617,18 @@ class _GuardedMessages:
         if self._prov == "anthropic":
             call = _create_with_mode(self._inner.create, kw, task)
         else:
-            call = self._inner.create(**kw)
+            first, retry = _thinking_plan(kw, task, self._prov)
+            call = _plain_logged(self._inner.create(**first), task, first)
+            import inspect
+            if inspect.isawaitable(call):
+                async def _foreign(first_call):
+                    resp = await first_call
+                    if retry is not None and _starved(resp):
+                        return await _plain_logged(self._inner.create(**retry), task, retry)
+                    return resp
+                call = _foreign(call)
+            elif retry is not None and _starved(call):
+                call = _plain_logged(self._inner.create(**retry), task, retry)
         return _with_deadline(call, deadline, kw, task)
 
     def stream(self, **kw):
@@ -839,4 +896,4 @@ def guarded_client(async_=False, prov: str | None = None):
         return _GuardedClient(_ForeignClient(prov, async_))
     import anthropic
     ctor = anthropic.AsyncAnthropic if async_ else anthropic.Anthropic
-    return _GuardedClient(ctor(api_key=api_key()))
+    return _GuardedClient(ctor(api_key=api_key(prov)))

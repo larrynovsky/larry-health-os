@@ -128,7 +128,12 @@ def run_check(notify: bool = False, client=None, persist: bool = False) -> dict:
     """Публичная точка входа. notify=True → журнал отказов и карточки владельцу;
     persist=True (ежедневный запуск из run_checks.sh) → снимок доступности для
     get_model и уведомление о самопереключении. Возвращает полный отчёт."""
-    res = check_models(client=client)
+    import llm_client
+    try:
+        res = check_models(client=client)
+    except llm_client.ProviderConfigurationError as exc:
+        log.error("model_health_check: %s", exc)
+        return {"configuration": {"ok": False, "detail": str(exc)}}
     roles = {r: v for r, v in res.items() if not r.startswith("_")}
     account = res.get("_account") or []
     if account:

@@ -19,8 +19,11 @@ pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
-def base(db):
+def base(db, monkeypatch, tmp_path):
     """Свежая база, засеянная как на установке (init_db) — то, что видит бот после урока."""
+    import logging
+    handler = logging.FileHandler
+    monkeypatch.setattr(logging, "FileHandler", lambda *a, **kw: handler(tmp_path / "bot.log"))
     import health_db
     health_db.init_db()
     return db
@@ -148,3 +151,43 @@ def test_night_repair_mark_is_read_by_the_bot(tmp_path, monkeypatch):
     assert night_repair._mark_repairer_seen()
     _cycle_ran(tmp_path / "repo" / "logs")
     assert notify.repairer_alive()
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+@pytest.mark.parametrize("keys", [[], ["openai_key", "gemini_key"]])
+def test_provider_notice_once_after_ack_and_retry(base, monkeypatch, tmp_path, lang, keys):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    import bot.main as main
+    import config_db
+    import i18n
+    import llm_client
+    import jobs.scheduled as scheduled
+    from telegram.error import NetworkError
+
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    monkeypatch.setattr(llm_client, "_KEY_FILE", tmp_path / "anthropic_key")
+    for key in keys:
+        (tmp_path / key).touch()
+    monkeypatch.setattr(i18n, "lang_of", lambda: lang)
+    monkeypatch.setattr(main, "owner_chat_id", lambda: 123)
+    outbox = AsyncMock()
+    monkeypatch.setattr(scheduled, "deliver_unsent_outcomes", outbox)
+    bot = SimpleNamespace(send_message=AsyncMock(side_effect=NetworkError("offline")))
+    app = SimpleNamespace(bot=bot)
+    startup = main.build_app("123:synthetic-test-token").post_init
+    asyncio.run(startup(app))
+    assert not config_db.get_config("llm.provider_config_notified", 0)
+    bot.send_message.side_effect = None
+    asyncio.run(startup(app))
+    assert config_db.get_config("llm.provider_config_notified") == 1
+    assert bot.send_message.call_args.kwargs == {
+        "chat_id": 123, "text": i18n.t("person.llm.provider_configuration", lang=lang)}
+    assert "HEALTH_LLM_PROVIDER" in bot.send_message.call_args.kwargs["text"]
+    asyncio.run(startup(app))
+    assert bot.send_message.call_count == 2
+    assert outbox.await_count == 3
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    asyncio.run(startup(app))
+    assert config_db.get_config("llm.provider_config_notified") == 0
+    assert bot.send_message.call_count == 2

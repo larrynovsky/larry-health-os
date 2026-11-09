@@ -26,7 +26,8 @@
     {
       "module": "notify",
       "uses": [
-        "notify_operator"
+        "notify_operator",
+        "claim_repeat"
       ],
       "why": "служебное сообщение пилота — оператору (владельцу), с резервом через healthchecks",
       "legacy": "легаси без сайдкара; опора — notify_operator(msg) → 'telegram'|'fallback'|'none', никогда не бросает"

@@ -139,6 +139,7 @@ STUDIO_AGENTS = [
     # плист в ~/Library/LaunchAgents/_retired/, шаблон удалён).
     "com.larry.health.reminders-sync",
     "com.larry.health.watcher",
+    "com.larry.health.agent-mail-bridge",   # мост почты агентов (нить agent-post, 05.11)
 ]
 studio_result = subprocess.run(
     ["ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes",

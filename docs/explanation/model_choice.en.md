@@ -1,55 +1,61 @@
-<!-- translation-of: docs/explanation/model_choice.md sha256:7a2eb4de2d93 -->
+<!-- translation-of: docs/explanation/model_choice.md sha256:93be1b9636c7 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](model_choice.md)
 
-# Exit to the Model: One Guard, One Translator, Model Switching — Only to a Verified One
+# Model Exit: One Guard, One Translator, Model Switch Only to a Verified One — Explanation
 
 ## What Changed
 
 The meaning did not change; the page was regenerated.
 
-**Updated:** 2026-10-06
+**Updated:** 2026-11-08
 
 
 ## Why It Exists
 
-The system calls the language model in seventy-five different places — reading lab results, assembling a brief, preparing questions for a doctor, calculating request budgets. All these places are different, but in every one of them the same quiet failure can happen: something goes wrong, and nobody finds out.
+When the system asks a language model something about health, it does so in 75 different places — recognizing test results, assembling a brief, preparing questions for a doctor, and much else. Each of those places is an exit point to an external server.
 
-Silent failures here have a particular shape. A provider takes a model offline — and lab results stop being recognized that very day. The person finds out first, not the system. A model is swapped for a fallback without verification — responses keep coming, look plausible, but contain errors: a number on the form is read incorrectly, and this is invisible to the eye. The translator between formats reads a truncated response as complete — a task list is lost, and no error is raised. A reasoning model counts money after the call, not before — and a single request jumps over the monthly budget.
+The problem is not that something will break loudly. The problem is that everything here breaks quietly.
 
-This layer exists precisely because failures of this kind do not announce themselves by nature. They need to be caught in advance — by design, not by reaction.
+A provider discontinues a model — and test results stop being recognized that same day. But there is no error, just silence. Or a provider silently substitutes the model with a fallback — responses keep coming, they look reasonable, but they misread a number from a form. Or the translator between formats decides that a truncated response is a finished one, and tasks simply vanish without a trace. Or a reasoning model starts thinking and spends more in a single request than the owner is prepared to spend in a month.
 
-## What It Does, in Plain Terms
+None of this is theory. Each of these things has either happened or was reproduced deliberately.
 
-Everything the system wants to say to a model goes through one exit point — `llm_client.guarded_client`. Not through several parallel paths, not through an external intermediary, but through one of its own.
+The model-exit subsystem exists because 75 independent exit points are 75 places where each of these quiet failures can happen in its own way. One exit — one place where everything can be kept under control.
 
-**The guard stands first.** Before the request text goes anywhere — to Anthropic or to any other provider — it passes a secrets check. Uniformly, without exceptions. If a translator for an external provider stood before the guard, it would become a way around the protection. That is why the order is strict: guard first, then format translation, then transport.
+## What It Does, in Plain Language
 
-**The translator is ours, one.** Anthropic speaks in its own message format; an external provider may speak in another. The translation is done by one translator of our own — not an external library, not an intermediary. This matters: if we do the translation ourselves, we also verify ourselves what it does with a truncated response. When a response is cut off at a provider's limit, the translator does not pretend the response is complete — it says "truncated", and readers in the system use that marker to distinguish incomplete JSON from complete.
+All 75 places in the system that need to ask the model something speak one language and go through one channel — `llm_client.guarded_client`. This is the only point through which requests leave.
 
-**A model switches only to a verified one.** If the current model stops responding, the system switches on its own — but only to the next one in a pre-composed chain. A model does not simply end up in this chain: it goes through clearance — verification against real tasks. Only a model that has passed clearance can appear in the chain, and only at the end, not anywhere. The order in the chain is decided by the owner; clearance does not rearrange it.
+**The guard stands first.** Before any text goes to the model — whether Anthropic or anyone else — it passes a secrets check. This happens before any translation and before sending, always, identically for all providers. Otherwise there would be a way to bypass the check through a different branch.
 
-The owner's own forms during the clearance process go only to Anthropic — to the same destination they go to in normal operation. An external provider during clearance sees only synthetics. If a role for an external provider has not passed clearance, it does not fail silently — the system refuses explicitly, with an intelligible reason.
+**One translator, ours.** Anthropic and other providers speak slightly different formats. There are multiple ways to translate between them, and the seam in that translation is where things get lost. So there is one translator here, written inside the system, and its seams are covered by our tests. In particular: if a provider truncated a response at a limit, the translator says so explicitly — in a way that makes it clear to anyone reading the code that the JSON may be incomplete. Otherwise data loss would look like success.
 
-**Money is reserved before the call.** Before a request goes to the model, the system checks whether it fits within the budget. For reasoning models, the reasoning reserve is accounted for as well. If it does not fit — the call does not happen, and the reason is stated directly.
+**Money is reserved before the call.** Before calling the model, the system estimates what it will cost on a pessimistic count. If it does not fit within the owner's monthly limit, the request does not go out at all, with an explanation. Not after the money is spent.
 
-**Name and date of birth do not go into the model's context.** Context assemblers — the brief, the visit header, the lifestyle profile, and others — write age and location, but not the name and not the exact date of birth. A model that reasons about health does not need a name. This does not mean the model cannot encounter a name at all — if the person wrote it in chat or it appears on a lab form, the model sees it. But the context assemblers do not deliberately place it there.
+**A model is only switched to a verified one.** If the current model stops responding or behaves badly, the system can switch on its own — but only to the next model in the chain of admitted models. A model enters the chain only through admission, and only at the end. The order of the chain is the owner's decision; the system does not change it. If all models in the chain have failed — the chain stays as is; the system does not invent a replacement.
 
-**Two passes — two different models.** Lab result photos are read twice: first by one model, then by another. If both models turn out to be the same one — the recognizer refuses to work on its own. A provider that does not have a second model for reading images is left without photo recognition — but does not get one model for both passes.
+Admission is a separate verification procedure. For an external provider it runs only on synthetic data. The owner's own forms are sent during admission only to Anthropic — the same destination they go to in real operation. An external provider does not see them.
 
-## What Is Honest to Say About Its limits
+If a provider reports that one model responded, but the behavior clearly indicates it is a different one — this is counted as the required model being absent, not as success. This matters: otherwise the system would record a verdict from a different model, and then would not notice when the required model disappears.
 
-Everything described above holds. But "holds" and "verified everywhere" are different claims, and it is important to be honest here.
+**Two passes over test results — always different models.** Lab result photos are read twice, by two different models. This is not redundancy for its own sake — it is protection against one model consistently making the same kind of error. If the same model ends up on both passes from any source, the recognizer refuses on its own.
 
-**The clearance table for partners and new installations.** When someone deploys the system without their own clearance — a partner, an installation from GitHub — the system appends models from the release table, which the owner compiles on their own machine, to the chain. This works and is confirmed by measurement. But between when the owner ran clearance and when the updated table reaches a specific installation, there is a delay. The system notices this and writes it to the log — but does not close the delay on its own. This is a boundary, not fine print.
+**A person's name does not go into the model's context.** Context builders — the parts of the system that gather information before sending it to the model — write age and location, but not name and not exact date of birth. The model judging health does not need a name. This does not resolve the matter fully — a name may appear inside the documents themselves or in the person's own words in the chat, and the model sees it there. But what the system assembles on its own does not contain a name.
 
-**Name in the model's context.** The check is designed to see when a context assembler reads a name by known keys, and catches that. But if a name is passed inside a structure as a whole — for example, a profile is passed into a prompt as an object — that path is caught only by a behavior test, and only for the listed assemblers. If a new assembler appears, it needs to be checked separately. A name inside documents — on a lab form, in a discharge summary — and in the words of the person themselves in chat, the model still sees: the rule is about assemblers, not about content.
+## What to Say Honestly About Its Limits
 
-**Model substitution at an external provider.** Some providers silently serve an unknown model name with one of their own. The system catches this during a normal call and treats such a response as the absence of the requested model. But streaming calls are not covered by this check — because there are no streaming calls in the code at present. If they appear, the check will need to be extended to cover them.
+Everything described above holds — in the sense that it has been verified and works. But "holds" and "verified everywhere" are different things, and it is important to state that difference honestly here.
+
+**The admission table for a partner: lag between verification and release.** A partner installation and a GitHub installation do not run their own admission — they read the table written by a session on the owner's MacBook. Between the owner running admission and the partner receiving the updated table, there is a lag — until the next thread close. The system notices this lag and writes about it to the log, but does not close the lag itself. The guarantee holds — verified after deploy `0045cd9` — but only within the bounds of this lag.
+
+**Name in context: the ratchet sees keys, not the full profile.** The protection against transmitting a name works like this: the system checks whether code accesses the name field by key. This means that if a profile is passed into a prompt in full — that path is caught only by a behavior test, and only for those builders listed in it. Beyond that list there is no guarantee. In addition, a name inside the document itself — a lab form, a discharge summary — and in the person's own words in the chat is still visible to the model. The rule applies to what the system assembles, not to the content of documents. Verified on the owner's database after deploy `7b4aa4c`: in the brief, GP header, reviewer, lifestyle profile, and consilium package — zero matches with name or date of birth. In chat context, two matches were found — both in calendar event titles, meaning in content.
+
+These limits are not fine print. This is what the system knows about itself and states directly.
 
 ## Where This Lives in the System
 
-The central point is `llm_client.py`: this is where `guarded_client` lives, through which all calls pass, and where the guard and translator reside.
+All the subsystem's logic lives in `llm_client.py`. Also there: `_GuardedClient`, which wraps both the native Anthropic client and the external provider's client — the guard stands in one place for all of them.
 
-The intentions and decisions that led to this design — why one exit, why an in-house translator, why clearance before the chain — are described in `subsystem_intent.yaml`. This is not code and not an instruction; it is an explanation of why the system is built the way it is, and not some other way.
+The subsystem's intent — why it is structured this way at all — is described in `subsystem_intent.yaml`. This is not a technical file in the usual sense: it explains the decisions that were made, and why those decisions rather than others.

@@ -243,6 +243,30 @@ def test_async_plain_call_is_counted_too(monkeypatch, tmp_path):
     assert rec["mode"] == "plain" and rec["tokens_in"] == 11
 
 
+def test_foreign_provider_calls_are_counted_sync_and_async(monkeypatch, tmp_path):
+    """Отчёт пользователя с OpenAI (04.11): вызовы чужих провайдеров шли мимо журнала
+    расходов — ветка не-Anthropic в _GuardedMessages.create не звала учёт. Мутация «снять
+    _plain_logged с ветки else» — красная в обоих путях."""
+    log = _spend_log(monkeypatch, tmp_path)
+    reply = NS(stop_reason="end_turn", model="gpt-5", usage=NS(input_tokens=9, output_tokens=4),
+               content=[NS(type="text", text="ok")])
+    fake = FakeMessages([reply])
+    assert llm_client._GuardedMessages(fake, "openai").create(
+        task="hai_chat.chat", model="gpt-5", max_tokens=10, messages=[]) is reply
+
+    class AsyncFake:
+        async def create(self, **kw):
+            return reply
+
+    assert asyncio.run(llm_client._GuardedMessages(AsyncFake(), "gemini").create(
+        task="wellally_consult._call_medical_specialist_async", model="g", max_tokens=10,
+        messages=[])) is reply
+    recs = [json.loads(x) for x in log.read_text().splitlines()]
+    assert [(r["agent"], r["mode"], r["tokens_in"], r["tokens_out"]) for r in recs] == [
+        ("hai_chat.chat", "plain", 9, 4),
+        ("wellally_consult._call_medical_specialist_async", "plain", 9, 4)]
+
+
 def test_plain_call_counting_never_breaks_the_call(monkeypatch, tmp_path):
     """Ответ без usage (фейк, чужой SDK) — вызов возвращается, учёт не роняет."""
     _spend_log(monkeypatch, tmp_path)
@@ -394,3 +418,58 @@ def test_a_newer_model_does_not_inherit_an_older_models_profile(monkeypatch, tmp
     _measured(monkeypatch, tmp_path, {"claude-opus-5": M5})
     assert llm_client.reasoning_reserve("claude-opus-5-5") == 0
     assert llm_client.reasoning_reserve("claude-opus-5-20260101") == 1000, "датированный снимок — та же модель"
+
+
+@pytest.mark.parametrize("prov", ["openai", "gemini"])
+@pytest.mark.parametrize("async_", [False, True])
+@pytest.mark.parametrize("twice", [False, True])
+def test_foreign_starvation_retries_once_and_logs_both(monkeypatch, tmp_path, prov, async_, twice):
+    """Synthetic SDK replies: translation → recovery → caller, with real spend writes."""
+    log = _spend_log(monkeypatch, tmp_path)
+    profile = tmp_path / "profiles.json"
+    profile.write_text(json.dumps({prov: {"reasoning_reserve_tokens": 1000}}))
+    monkeypatch.setattr(llm_client, "_PROFILES_FILE", profile)
+    # Values are invented; no provider, patient data or credentials are used.
+    if prov == "openai":
+        starved = {"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"},
+                   "output": [{"type": "reasoning", "summary": []}],
+                   "usage": {"input_tokens": 7, "output_tokens": 1400}, "model": "test-model"}
+        text = {**starved, "status": "completed", "incomplete_details": None,
+                "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}]}
+        replies = [dict(starved, id="first"), dict(starved if twice else text, id="second")]
+    else:
+        starved = {"candidates": [{"finish_reason": "MAX_TOKENS", "content": {
+            "parts": [{"thought": True, "text": "reasoning"}]}}],
+            "usage_metadata": {"prompt_token_count": 7, "thoughts_token_count": 1400},
+            "model_version": "test-model"}
+        text = {**starved, "candidates": [{"finish_reason": "STOP", "content": {
+            "parts": [{"text": "ok"}]}}]}
+        replies = [dict(starved, response_id="first"),
+                   dict(starved if twice else text, response_id="second")]
+    fake = FakeMessages(replies)
+
+    async def send_async(**kw):
+        return fake.create(**kw)
+
+    send = send_async if async_ else fake.create
+    sdk = NS(responses=NS(create=send), models=NS(generate_content=send),
+             aio=NS(models=NS(generate_content=send)))
+    client = llm_client._GuardedMessages(llm_client._ForeignMessages(prov, sdk, async_), prov)
+    result = client.create(task="monthly_consilium._run_coordinator", model="test-model",
+                           max_tokens=400, messages=[{"role": "user", "content": "Synthetic question"}])
+    result = asyncio.run(result) if async_ else result
+    assert len(fake.calls) == 2
+    assert result.id == "second"
+    assert [(c if prov == "openai" else c["config"])["max_output_tokens"]
+            for c in fake.calls] == [1400, 2400]
+    if twice:
+        assert result.stop_reason == "max_tokens" and result.content == []
+        with pytest.raises(llm_client.NoTextInAnswer):
+            llm_client.answer_text(result)
+    else:
+        assert llm_client.answer_text(result) == "ok"
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    assert len(records) == 2
+    assert [r["stop"] for r in records] == ["max_tokens", "max_tokens" if twice else "end_turn"]
+    assert all((r["agent"], r["model"], r["tokens_in"], r["tokens_out"]) ==
+               ("monthly_consilium._run_coordinator", "test-model", 7, 1400) for r in records)

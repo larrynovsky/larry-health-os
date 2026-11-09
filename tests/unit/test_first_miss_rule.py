@@ -69,6 +69,64 @@ def test_brief_gate_unjudgeable_is_loud(tmp_path, monkeypatch):
     assert any("не судима" in n for n in _brief_warns(monkeypatch, db, datetime(2026, 9, 23, 7, 50)))
 
 
+# ── признак «повтор брифа сработал в жизни» (нить brief-net-retry, 28.10) ──────────
+# Решение владельца 28.10 (вариант Б): обещание transient_net_does_not_lose_brief поднимается
+# по первому брифу, доставленному после настоящего сетевого сбоя. Признак пишет бот, просьбу
+# поднять — этот читатель. Пара «признак есть — просит / нет — молчит» + holds молчит.
+
+def _with_retry_proof(db_path, first_delivered):
+    c = sqlite3.connect(db_path)
+    v = {"last": {"date": first_delivered, "attempt": 1, "outcome": "delivered"},
+         "first_delivered": first_delivered}
+    c.execute("INSERT INTO system_config VALUES ('brief.net_retry', NULL, ?)", (json.dumps(v),))
+    c.commit()
+    c.close()
+
+
+def _promise_status(monkeypatch, status):
+    import intent_registry as ir
+    reg = [{"id": "morning_brief", "invariants": [
+        {"id": "transient_net_does_not_lose_brief", "status": status}]}]
+    monkeypatch.setattr(ir, "load_registry", lambda: reg)
+
+
+def test_retry_proof_asks_to_raise_the_promise(tmp_path, monkeypatch):
+    db = _tenant(tmp_path, "2026-10-28")
+    _with_retry_proof(db, "2026-10-29")
+    _promise_status(monkeypatch, "open")
+    warns = _brief_warns(monkeypatch, db, datetime(2026, 10, 29, 7, 50))
+    assert any("повтор брифа доказан в жизни" in n for n in warns), warns
+
+
+def test_no_retry_proof_is_silent(tmp_path, monkeypatch):
+    db = _tenant(tmp_path, "2026-10-28")
+    _promise_status(monkeypatch, "open")
+    assert not any("повтор" in n for n in _brief_warns(monkeypatch, db, datetime(2026, 10, 29, 7, 50)))
+
+
+def test_retry_proof_silent_once_promise_holds(tmp_path, monkeypatch):
+    db = _tenant(tmp_path, "2026-10-28")
+    _with_retry_proof(db, "2026-10-29")
+    _promise_status(monkeypatch, "holds")
+    assert not any("повтор" in n for n in _brief_warns(monkeypatch, db, datetime(2026, 10, 29, 7, 50)))
+
+
+def test_promise_missing_from_registry_is_loud(tmp_path, monkeypatch):
+    import intent_registry as ir
+    db = _tenant(tmp_path, "2026-10-28")
+    monkeypatch.setattr(ir, "load_registry", lambda: [{"id": "morning_brief", "invariants": []}])
+    warns = _brief_warns(monkeypatch, db, datetime(2026, 10, 29, 7, 50))
+    assert any("обещание повтора брифа не найдено" in n for n in warns), warns
+
+
+def test_live_registry_carries_the_promise_with_owner_criterion():
+    """Живой реестр: обещание есть и критерий — владельца (иначе подъём отобьёт гейт кодом 9)."""
+    import intent_registry as ir
+    rec = next(r for r in ir.load_registry() if r["id"] == "morning_brief")
+    inv = next(i for i in rec["invariants"] if i["id"] == "transient_net_does_not_lose_brief")
+    assert inv["status"] == "holds" or inv.get("closes_when_by") == "owner"
+
+
 # ── reschedule: ритм в квитанции ──────────────────────────────────────────────
 
 def _resched_warns(monkeypatch, hours_ago, every_s=43200):

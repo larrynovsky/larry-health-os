@@ -140,6 +140,13 @@ end tell'''
 
 def sync_completed_reminders():
     db.init_db()
+    # Задачи этого тенанта ведёт ассистент (tasks.route=assistant): в Reminders их нет, а
+    # старые выполненные ремайндеры там остаются. Без этой ветки каждый проход заново закрывал
+    # переоткрытую задачу «completed via Reminders.app» (#289, 07.11).
+    import task_route
+    if task_route.route() == "assistant":
+        log.info("tasks.route=assistant — Reminders не канал задач, синхронизация пропущена")
+        return
     task_ids = get_completed_task_ids()
 
     if not task_ids:

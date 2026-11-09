@@ -134,3 +134,48 @@ def test_buttons_vanish_before_the_handler_runs(monkeypatch):
     assert order == ["removed", "handler"] and len(edits) == 1, (order, edits)
     left = [[b.callback_data for b in row] for row in edits[0].inline_keyboard]
     assert left == [["act:t_slow:6"]], left              # чужой предмет остался
+
+
+@pytest.mark.unit
+def test_stale_query_answer_does_not_drop_the_press(monkeypatch):
+    """report:cdbe78 (v0.2.6): нажатие, разобранное позже ~15 с — обновления идут по одному
+    (concurrent_updates не задан), и кнопка ждёт за долгим обработчиком, — Telegram отбивает
+    query.answer() «Query is too old…». Это не повод терять нажатие: действие обязано дойти
+    до обработчика, а не уйти в общий error_handler (экран сбоя self_hosted)."""
+    import bot.filters
+    from telegram.error import BadRequest
+    monkeypatch.setattr(bot.filters, "owner_chat_id", lambda: 7)
+    got = []
+
+    @actions.action("t_stale")
+    async def _handler(query, context, target):
+        got.append(target)
+
+    async def stale_answer():
+        raise BadRequest("Query is too old and response timeout expired or query id is invalid")
+
+    sent = []
+    upd = _cb_update(7, "act:t_stale:9", sent)
+    upd.callback_query.answer = stale_answer
+    asyncio.run(actions.handle_callback(upd, None))
+    assert got == ["9"]
+
+    sent2 = []
+    upd = _cb_update(7, "act:nope:1", sent2)                # и «кнопка устарела» доходит
+    upd.callback_query.answer = stale_answer
+    asyncio.run(actions.handle_callback(upd, None))
+    assert len(sent2) == 1
+
+
+@pytest.mark.unit
+def test_no_bare_query_answer_left():
+    """Все шесть кнопочных входов (bot/actions + handlers/callbacks) ходят через safe_answer:
+    голый await query.answer() — та же дверь, что report:cdbe78 закрыл в одном месте."""
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    bare = [f"{p.relative_to(root)}:{i}" for p in [*(root / "bot").glob("*.py"), *(root / "handlers").glob("*.py")]
+            for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+            if re.search(r"await\s+\w*query\.answer\(\s*\)", line)]
+    assert [b for b in bare if not b.startswith("bot/utils.py:")] == [], bare   # кроме самого safe_answer
+    assert len(bare) == 1, bare

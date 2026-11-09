@@ -1,0 +1,125 @@
+{
+  "module": "agent_signals",
+  "public": [
+    "policy",
+    "state_signals",
+    "run",
+    "last_run_age_hours"
+  ],
+  "depends_on": [
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn",
+        "get_window",
+        "get_absolute_thresholds_for_person",
+        "get_metric_percentile"
+      ],
+      "why": "Tenant storage, personal rules and the existing nearest-rank estimator."
+    },
+    {
+      "module": "agent_mail",
+      "uses": [
+        "send"
+      ],
+      "why": "Only outgoing transport; redaction and secret guard remain at this boundary."
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config",
+        "upsert_config"
+      ],
+      "why": "Policy, recipient, ledger and completed-pass timestamps; caller-owned transactions.",
+      "legacy": "Existing domain API has no sidecar as of 2026-11-05; behavior exercised by tests/unit/test_agent_signals.py."
+    },
+    {
+      "module": "labs_db",
+      "uses": [
+        "tenant_lab_schedule",
+        "lab_due",
+        "schedule_origin"
+      ],
+      "why": "Canonical due date and interval provenance from the lab schedule owner.",
+      "legacy": "Existing domain API has no sidecar as of 2026-11-05; behavior exercised by tests/unit/test_agent_signals.py."
+    },
+    {
+      "module": "lab_canon",
+      "uses": [
+        "normalize",
+        "synonyms_for"
+      ],
+      "why": "Shared identity and existing Russian names; no independent name dictionary.",
+      "legacy": "Existing domain API has no sidecar as of 2026-11-05; behavior exercised by tests/unit/test_agent_signals.py."
+    },
+    {
+      "module": "treatment_db",
+      "uses": [
+        "get_medications"
+      ],
+      "why": "Active supplements including proposed entries; notes copied verbatim.",
+      "legacy": "Existing domain API has no sidecar as of 2026-11-05; behavior exercised by tests/unit/test_agent_signals.py."
+    },
+    {
+      "module": "profile_db",
+      "uses": [
+        "get_patient_profile"
+      ],
+      "why": "Fasting preference from this process database.",
+      "legacy": "Existing domain API has no sidecar as of 2026-11-05; behavior exercised by tests/unit/test_agent_signals.py."
+    },
+    {
+      "module": "safety_net",
+      "uses": [
+        "check_lifestyle_alerts"
+      ],
+      "why": "Reuse illness indications with initialize=False after startup migrations."
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "Clock seam for completed-pass age in UTC.",
+      "legacy": "Existing domain API has no sidecar as of 2026-11-05; behavior exercised by tests/unit/test_agent_signals.py."
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t",
+        "lang_of"
+      ],
+      "why": "Interval origin and urgency labels in the profile language."
+    }
+  ],
+  "contract": {
+    "ownership": "agent_signals owns only system_config keys agent_signals.*. config_db owns writes/transactions. health_db migration owns INSERT OR IGNORE policy and assistant seeds. No agent_mail lifecycle writes here.",
+    "tenant": "The existing tenant_from_process invariant means health_db.get_conn / HEALTH_DATA_DIR. There is no multitenancy.tenant_from_process function at base 4be16d9. No API accepts a patient, database path or recipient override. Empty agent_mail.assistant disables all evaluation and send calls. Seed uses secrets_paths.is_owner, partner empty. Host bridge remains the foreign-owner guard.",
+    "input": "state_signals(day: date) reads that exact day, including night of waking. Personal absolute sleep_total/readiness floors only from active p10_personal absolute default-variant rows. No bootstrap floor promoted to personal. A missing observation or personal history yields no finding for that rule. Invalid finite numeric inputs raise.",
+    "percentile": "get_metric_percentile delegates to health_db._derive_metric_percentile in its own module. Explicit [day-baseline_days, day) history excludes observation day and future rows. Stress includes valid zeros. Policy contains min samples and nearest-rank percentile. Consecutive nights include day and demand every calendar date.",
+    "illness": "Only returned HRV and ЧСС покоя findings from safety_net.check_lifestyle_alerts(day, initialize=False). No relative rule copied here. Existing evaluator fallback behavior is inherited. Model/Telegram failures cannot affect this path.",
+    "output": "Signal TypedDict has key, what, why, proposal, urgency, facts. Russian fields what/why/proposal/urgency rendered once per block, facts include observation dates and rule evidence. Footer leaves decision to assistant and user. No normal state letter. Urgency is rendered text, not a transport enum; lab values today/this_week/next_draw are translated by i18n (Russian: сегодня / на неделе / при ближайшем заборе).",
+    "regimen": "One sorted snapshot of all active modality=supplement medications (confirmed/manual/proposed). Name/dosage/frequency/notes define SHA256 fingerprint; notes copied verbatim, including lack of physician agreement. First invocation sends a card even if empty; later only changes. A->B->A sends each transition. Changed names include old scheme and complete new card. Duplicate names retained. Rejected confirmation entries are excluded by the treatment owner reader, even if their status still says active.",
+    "labs": "labs_db.tenant_lab_schedule and lab_due own effective intervals and due dates. schedule_origin(source) classifies encounter:* as doctor, manual* as manual, all other values as system; labels are i18n. Missing last date produces no signal. Uppercase only the first character of the lab synonym, preserving acronyms. System-origin overdue dates older than interval_days get next_draw urgency; equality, doctor and manual retain today, future due dates this_week. facts retain source and origin. The threshold is the effective interval, not a new clinical constant. Tests: test_lab_letter_origin_urgency_and_acronym, test_lab_overdue_fingerprint_survives_next_day.",
+    "dedup": "Ledger is recipient-scoped system_config JSON, BEGIN IMMEDIATE read/compare/reserve in one caller-owned transaction. State keys contain observation day; one reserved morning slot, afternoon only new stress key. Labs dedup by canonical analyte + due date and one group per day. Regimen by complete snapshot. No in-memory delivery state.",
+    "failure": "At most one ATTEMPT, reservation committed BEFORE agent_mail.send. A crash/failure after reservation can lose a letter; it is deliberately not retried. send return means spool publication, not delivery/acceptance. Existing transport reports bridge failures. A failed pass does not update its heartbeat. Completed later pass may follow a lost optional notification. No exactly-once delivery claim.",
+    "schedule": "jobs.scheduled.register -> _apply_morning_schedule -> _apply_agent_signals_schedule. Same brief time and GPS timezone plus policy offset; rescheduled with brief after timezone changes. Afternoon after policy stress_import_hour in installation HEALTH_TZ/region timezone plus offset. Morning also sends regimen and labs. No additional infra job. Time/config edits take effect when schedules are reapplied or bot restarts. Registration errors are logged and cannot prevent scheduling the required brief.",
+    "liveness": "last_run_age_hours is morning completed-pass age (not mail delivery). None if disabled, infinity if never completed. check_agent_signals_ran rejects nonfinite/negative or >max_age_hours. Afternoon completion cannot hide failed morning regimen/labs. Existing night integrity reader consumes it.",
+    "seeds": "baseline_days=90, min_samples=14, stress_min_samples=30, sleep_nights=3, sleep_percentile=50, stress_percentile=90, lab_lead_days=14, morning_offset_minutes=15, stress_import_hour=17, stress_offset_minutes=15, max_age_hours=26; editable JSON in agent_signals.policy, no runtime numeric fallbacks.",
+    "limitations": "State evaluation reads several snapshots; concurrent ingestion may update between reads. Optional hints are not an atomic clinical decision. Missing metrics are not reassurance. A delayed brief can finish after the separately scheduled signal slot. Post-office, deployed cron, GPS rescheduling and clinical usefulness require maintainer acceptance; no live verification in this task."
+  },
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "One capability: decide when optional assistant mail has an actionable change.",
+      "D2": "Four public operations and an explicit Signal record; all rendering/lifecycle helpers private.",
+      "D3": "Existing public domain APIs plus stdlib. Estimator exposed through owner health_db, no cross-module private access.",
+      "D4": "Single module below the 400-line guide. Schedule and integrity stay in existing entry points.",
+      "D5": "tests/unit/test_agent_signals.py exercises synthetic SQLite, real spool publisher, thresholds, boundaries, retries and concurrent runs. Mutation harness removes five required protections.",
+      "D6": "Database process chooses tenant; ledger records attempts, not delivery. Shared percentile, illness evaluator, schedule precedence and bridge contracts explicit above."
+    },
+    "rationale": "Replaceable from this contract and synthetic behavioral tests, retaining existing domain readers and transport.",
+    "date": "2026-11-05",
+    "oracle": "tests/unit/test_agent_signals.py; plans/mutate_agent_signals_2026-11-05.sh"
+  }
+}

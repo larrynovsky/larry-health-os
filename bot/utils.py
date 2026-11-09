@@ -16,6 +16,20 @@ from telegram.error import BadRequest
 log = logging.getLogger(__name__)
 
 
+async def safe_answer(query) -> None:
+    """Гасит «часики» на кнопке — и только. Telegram отбивает answer() BadRequest, если нажатие
+    разобрано позже ~15 с. Дорога к этому — очередь: concurrent_updates в bot/main.build_app не
+    задан, обновления разбираются по одному, и нажатие ждёт за долгим обработчиком (модель,
+    консилиум). Накопленное за время простоя сюда не доходит — run_polling(drop_pending_updates=True).
+    Нажатие от отбитого answer() не устарело: работа идёт дальше (report:cdbe78 — стек BadRequest
+    обрывается на bot/actions.py:handle_callback, трижды за 20:34 04.11, v0.2.6)."""
+    from telegram.error import BadRequest
+    try:
+        await query.answer()
+    except BadRequest as e:
+        log.warning(f"answer() на {getattr(query, 'data', None)!r} отбит, работа идёт: {e}")
+
+
 async def _send_one(bot, chat_id, text, parse_mode, reply_markup=None):
     """Отправить один кусок. Возвращает message_id (или None, если недоступен).
 

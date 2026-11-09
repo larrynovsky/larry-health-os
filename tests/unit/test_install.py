@@ -208,3 +208,31 @@ def test_бот_человека_судит_бриф_своим_вердикто
     пишет run_checks.sh. Падение = бриф человека снова уходит с BRIEF_NOT_GATED."""
     env = _tenant_plists()["com.larry.health.bot.t2.plist"]["EnvironmentVariables"]
     assert env["HEALTH_TRIAGE_LOGS"] == f"{_T['DATA']}/logs"
+
+
+@pytest.mark.parametrize("tenant", [None, "t2"])
+def test_cli_writes_explicit_provider_to_every_native_plist(monkeypatch, tmp_path, tenant):
+    from types import SimpleNamespace
+    from pathlib import Path
+    import plistlib
+    (tmp_path / "methodology").mkdir()
+    (tmp_path / "methodology/llm_providers.json").write_text(
+        (install.ROOT / "methodology/llm_providers.json").read_text())
+    monkeypatch.setattr(install, "ROOT", tmp_path)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(install, "exclude_from_git", lambda paths: [])
+    # The database initialization subprocess is outside this rendering test.
+    monkeypatch.setattr(install.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=0))
+    args = ["--apply", "--non-interactive", "--launchd", "--tz", "UTC", "--provider", "openai",
+            "--data-dir", str(tmp_path / "health"), "--secrets-dir", str(tmp_path / ".health_secrets")]
+    if tenant:
+        args += ["--tenant", tenant, "--dashboard-port", "8002"]
+    assert install.main(args) == 0
+    dest = tmp_path / "build/launchd"
+    if tenant:
+        dest /= tenant
+    files = list(dest.glob("*.plist"))
+    assert len(files) == (sum(v == "ready" for v in install.tenant_services().values())
+                          if tenant else len(install.placement()))
+    for file in files:
+        assert plistlib.loads(file.read_bytes())["EnvironmentVariables"]["HEALTH_LLM_PROVIDER"] == "openai"

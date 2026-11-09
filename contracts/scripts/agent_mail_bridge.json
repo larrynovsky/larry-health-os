@@ -1,0 +1,45 @@
+{
+  "module": "scripts/agent_mail_bridge",
+  "public": [
+    "run_once",
+    "send_out",
+    "pull_in",
+    "push_acks"
+  ],
+  "depends_on": [
+    {
+      "module": "infra:agent_post/post.py",
+      "uses": [
+        "send",
+        "inbox",
+        "read",
+        "ack"
+      ],
+      "why": "почтамт infra — только через его командную строку (договор infra), не через внутренние функции",
+      "legacy": "чужой репозиторий (~/Projects/infra): договор — его CLI и ADR docs/explanation/agent_post_adr.md; контракт health здесь не заводит"
+    },
+    {
+      "module": "infra:agent_post/addresses.yaml",
+      "uses": [
+        "agents[].id",
+        "agents[].owner"
+      ],
+      "why": "единственный дом адресов и хозяев; проверка «тот же хозяин» стоит здесь, потому что почтамт её не делает",
+      "legacy": "чужой репозиторий (~/Projects/infra): договор — его CLI и ADR docs/explanation/agent_post_adr.md; контракт health здесь не заводит"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — перенос писем между каталогом тенанта и почтамтом с жёстким отправителем. Смысл писем не читает, в базу health не ходит.",
+      "D2": "run_once() — вход службы; send_out/pull_in/push_acks — три шага прохода, публичны ради теста одного шага; остальное приватное.",
+      "D3": "CLI post.py и addresses.yaml infra (их договор), PyYAML; модулей health не импортирует. Тема и Auto-Submitted читаются из файла письма в cur/ ящика — это опора на раскладку ящика infra (boxes/<хозяин>/<агент>/cur), названа в докстринге протокола.",
+      "D4": "~170 строк с докстрингом.",
+      "D5": "tests/unit/test_agent_mail_bridge.py — 12 тестов на поддельном почтамте; plans/mutate_agent_mail_bridge_2026-11-05.sh — 6 мутаций, все красные (05.11).",
+      "D6": "общий с health инвариант — протокол каталога: docs/reference/agent_mail_bridge.md, единственный дом; соответствие тенант→адрес — private/agent_mail.yaml."
+    },
+    "rationale": "Переписывается по протоколу каталога и тестам за час: прочитать out/, позвать send, записать sent/; inbox→read→in/; ack/→ack→acked/.",
+    "date": "2026-11-05",
+    "oracle": "мутации «отправитель из заявки», «чужой хозяин», «ack до показа», «автоответ показывается», «alive при сбое» красные — прогон 2026-11-05."
+  }
+}

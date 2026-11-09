@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sqlite3
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -148,6 +150,52 @@ def table_content_hash(conn=None) -> str:
         out.append("E|" + "|".join([v[0], v[1], v[2], v[3], v[4], v[5] or "",
                     json.dumps(json.loads(v[6]), sort_keys=True, ensure_ascii=False)]))
     return hashlib.sha256("\n".join(out).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class Readiness:
+    """Source/replica status, never inferred from an empty query alone."""
+    state: str  # ready | not_installed | failed
+    reason: str
+    conditions: int = 0
+    food: int = 0
+    floor: int = 0
+
+
+def readiness(conn=None) -> Readiness:
+    """One owner for food-KB readiness. Public absence requires an explicit source
+    declaration AND an intact seeded replica. Missing files/tables, drift and
+    unusable floors fail closed. Existing packs need no new installation marker.
+    Runtime status/review dates remain mutable, but cannot disable the last floor.
+    """
+    try:
+        c = conn if conn is not None else _db().get_conn()
+        index = yaml.safe_load(_INDEX_YAML.read_text(encoding="utf-8"))
+        _load_conditions.cache_clear()
+        _load_domain_entries.cache_clear()
+        conditions = _load_conditions()
+        entries = _load_domain_entries()
+        if source_content_hash() != table_content_hash(c):
+            return Readiness("failed", "source/replica mismatch (seed failure or stale replica)")
+        if not (_KB_DIR / "food.yaml").is_file():
+            return Readiness("failed", "food source missing")
+        food = [e for e in entries if e["domain"] == "food"]
+        floors = [e for e in food if e["kind"] == "floor"]
+        if index.get("clinical_pack") == "not_installed" and not conditions and not floors and food:
+            return Readiness("not_installed", "clinical pack intentionally not installed", food=len(food))
+        if not conditions or len(floors) < 2:
+            return Readiness("failed", "clinical pack incomplete: conditions or floor missing")
+        rows = c.execute("SELECT status, review_date, temporal_class, payload_json FROM clinical_kb "
+                         "WHERE domain='food' AND kind='floor'").fetchall()
+        usable = [r for r in rows if _recency_ok(dict(zip(
+            ("status", "review_date", "temporal_class"), r[:3])))
+            and isinstance(json.loads(r[3]).get("assert"), dict) and json.loads(r[3])["assert"]]
+        if len(usable) < 2:
+            return Readiness("failed", "clinical floor inactive, expired or invalid")
+        return Readiness("ready", "source and usable replica agree", len(conditions), len(food), len(floors))
+    except (OSError, sqlite3.Error, ValueError, TypeError, KeyError, AttributeError, yaml.YAMLError) as exc:
+        _log.warning("clinical KB readiness failed: %s", type(exc).__name__)
+        return Readiness("failed", f"clinical source/replica unavailable: {type(exc).__name__}")
 
 
 # ── Сид (yaml → per-tenant таблицы), паттерн food_floor.seed_floor ────────────

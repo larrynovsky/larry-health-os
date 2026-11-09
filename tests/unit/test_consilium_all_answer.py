@@ -69,3 +69,42 @@ def test_monthly_incomplete_round_is_a_fault_and_no_hypotheses(monkeypatch):
     monkeypatch.setattr(notify, "fault", lambda tech, person_key=None, **kw: faults.append((tech, person_key)))
     assert mc.run(30) == []
     assert len(faults) == 1 and faults[0][1] is None and "neuro" in faults[0][0]
+
+
+def test_incomplete_preserves_only_structural_failure_reasons(tmp_path, monkeypatch):
+    """Final retry outcome, not exception prose, reaches the existing monthly fault writer."""
+    import bug_report
+    import monthly_consilium
+    journal = tmp_path / "faults.jsonl"
+    monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(journal))
+    askers = {"neurology": _asker([ValueError("private 123"), TimeoutError("private 456")]),
+              "sleep": _asker([{"ok": False}, {"ok": False}]),
+              "cardiology": _asker([{"ok": False}, {"ok": False, "exc_type": "RuntimeError"}])}
+    try:
+        asyncio.run(consilium_roster.ask_all(askers, lambda r: r.get("ok"), "synthetic"))
+    except consilium_roster.ConsiliumIncomplete as e:
+        assert e.missing == ["neurology", "sleep", "cardiology"]
+        assert monthly_consilium._incomplete(e) == []
+    else:
+        pytest.fail("incomplete round accepted")
+    [g] = bug_report.faults_from_journal(journal)
+    assert g["detail"] == ["monthly_consilium:neurology:TimeoutError", "monthly_consilium:sleep:unanswered",
+                            "monthly_consilium:cardiology:RuntimeError"]
+
+
+@pytest.mark.parametrize("round_name", ["_call_round_a", "_call_round_b"])
+def test_monthly_call_preserves_exception_class(monkeypatch, round_name):
+    from types import SimpleNamespace
+    import monthly_consilium as mc
+    monkeypatch.setattr(mc.hai_core, "model_for", lambda *a: "synthetic")
+
+    def fail(**kw):
+        raise TimeoutError("synthetic private 123")
+
+    client = SimpleNamespace(messages=SimpleNamespace(create=fail))
+    args = [client, "neurology", "role", "input"]
+    if round_name == "_call_round_b":
+        args += [[]]
+    args += [asyncio.Semaphore(1)]
+    result = asyncio.run(getattr(mc, round_name)(*args))
+    assert result["ok"] is False and result["exc_type"] == "TimeoutError"

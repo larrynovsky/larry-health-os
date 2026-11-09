@@ -69,6 +69,16 @@ def _post(report: dict) -> tuple[int, dict] | None:
         return None
 
 
+def _post_compatible(report: dict, post) -> tuple[int, dict] | None:
+    """Old receivers reject optional detail with 400; retry once without it, same id."""
+    res = post(report)
+    if res is not None and res[0] == 400 and any("detail" in g for g in report["faults"]):
+        legacy = {**report, "faults": [{k: v for k, v in g.items() if k != "detail"}
+                                      for g in report["faults"]]}
+        return post(legacy)
+    return res
+
+
 def send(report: dict, post=_post) -> tuple[str, str | None]:
     """('delivered', 'R-…') | ('queued', None) | ('refused', причина-ключ).
 
@@ -79,7 +89,7 @@ def send(report: dict, post=_post) -> tuple[str, str | None]:
         return "refused", "schema"
     if not RECEIVER:
         return "refused", "no_receiver"
-    res = post(report)
+    res = _post_compatible(report, post)
     if res is not None:
         code, body = res
         number = body.get("number") if isinstance(body, dict) else None
@@ -119,7 +129,7 @@ def drain(post=_post, now: datetime | None = None) -> dict:
                 age = now - datetime.fromisoformat(item["queued_at"])
             except (ValueError, KeyError, TypeError):
                 continue                              # битая строка очереди — выбросить
-            res = post(item["report"])
+            res = _post_compatible(item["report"], post)
             if res is not None and res[0] in (200, 201) and str(res[1].get("number", "")).startswith("R-"):
                 out["delivered"].append(res[1]["number"])
             elif res is not None and 400 <= res[0] < 500:

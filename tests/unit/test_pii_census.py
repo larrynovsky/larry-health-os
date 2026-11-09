@@ -178,3 +178,15 @@ def test_без_самого_git_ответ_из_манифеста(monkeypatch)
     monkeypatch.setattr(git_facts, "source", lambda: "manifest")
     monkeypatch.setattr(git_facts, "tracked", lambda *g: ["private/x.yaml", "code.py"])
     assert pc._tracked(git_facts.ROOT) == ["private/x.yaml", "code.py"]
+
+
+@pytest.mark.owner_data
+def test_private_doctor_word_boundary_probes():
+    """Private examples stay in the private dictionary, never in public test source."""
+    positive = pc.probes('doctor_word_positive')
+    negative = pc.probes('doctor_word_negative')
+    assert positive and negative
+    pattern = pc.pattern(['doctor'])
+    assert pattern is not None
+    assert all(pattern.search(text) for text in positive)
+    assert not any(pattern.search(text) for text in negative)

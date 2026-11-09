@@ -149,7 +149,7 @@ UC без записи в `uc_index.yaml` считается **не покрыт
 | `UC-A-03` | Apple Health / HAE → `daily_metrics`, merge без затирания Oura | P0 | integration | implemented | confirmed |
 | `UC-A-04` | Oura: сон по дате пробуждения, активность/HRV по правильной дате | P0 | check | implemented | confirmed |
 | `UC-A-05` | Withings BP freshness и тревога при рассинхроне | P1 | check | intended | proposed |
-| `UC-A-06` | Calendar/KAYAK trips → `periods`, manual periods не перезаписываются | P1 | integration | partial | proposed |
+| `UC-A-06` | Calendar/KAYAK trips → `periods` — снят 06.11: поездки знает только бриф (Google Calendar), `periods` хранит медицинские периоды | P1 | integration | intended | rejected |
 | `UC-A-07` | Финансовые документы не попадают в медицинские данные | P1 | check | implemented | proposed |
 
 ### B. Аналитика и Отчеты

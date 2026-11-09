@@ -14,3 +14,6 @@
 #     labs:                             # необязательно: анализы, которые класс делает нужными
 #       Ferritin: {days: 90, priority: high}
 conditions: []
+
+# Explicit public-install declaration; remove when installing a clinical pack.
+clinical_pack: not_installed

@@ -1,57 +1,56 @@
-<!-- translation-of: docs/explanation/lab_intake_gate.md sha256:3245837bda86 -->
+<!-- translation-of: docs/explanation/lab_intake_gate.md sha256:2c9a5a200cb9 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](lab_intake_gate.md)
 
-# Parsing incoming lab results: a missing dictionary match is not the final word
+# Parsing Incoming Lab Results: When No Template Match Occurs, More Than a Dictionary Decides
 
-## What changed
+## What Changed
 
-Nothing changed in substance; the page was regenerated.
+- **New invariant: a clarifying question when no numbers are found.** The promise `zero_rows_question` has been added (status: holds): if lab results were not parsed but the document was accepted as a lab result, the system asks a clarifying question instead of staying silent.
+- **The wording about the combined outcome from both readers has been refined.** The description of the `one_outcome_after_both_readers` invariant has been adjusted; the direction of the change was not determined automatically — it is recorded as a wording clarification, with no conclusion about whether the guarantee was strengthened or weakened.
 
 **Updated:** 2026-10-06
 
+**Updated:** 2026-11-07
 
-## Why it exists
 
-When you forward a file to the bot, the system has no advance knowledge of what you sent. It could be a lab results form, a doctor's letter, a certificate, a discharge summary — or something entirely unrelated. Running every file through expensive recognition makes no sense: it costs money and time. So before recognition there is a filter — a gate — that decides whether it is worth treating the file as lab results at all.
+## Why It Exists
 
-But a filter is dangerous in its own right. If it makes a mistake and says "no" where it should say "yes", your lab results simply disappear. Silently: the system does not complain, does not warn, it just does not add anything to the health record. That is exactly what used to happen, and the subsystem is structured the way it is now precisely so that it does not happen again.
+When you send a file to the bot, the system has to decide: is this a form with lab numbers, or something else — a referral, a doctor's report, a receipt? Paid recognition is only triggered for forms, and something has to stand at the door and decide.
 
-## What it does, in plain terms
+That gatekeeper is the intake parser. The problem is that the gatekeeper can fail silently. It looks at the words in the file and checks them against its dictionary. If the dictionary is empty — and on a fresh install it is empty by default — a genuine lab result form gets rejected, and the person is told "couldn't read it, please send a clearer copy." The model never saw the file at all. That is neither honest nor useful.
 
-**The filter does not make decisions alone.**
+The subsystem exists to fix exactly this: a dictionary rejection is not a verdict, a failure is not a permanent dead end, resending the same file is not a blind "duplicate" but a chance to sort things out, and the person always hears the real reason rather than a brush-off.
 
-The first thing the system does is look at the words in the file — whether any of them are characteristic of lab result forms. This is fast and free. If the words are found, the file goes straight to recognition with no additional check needed. But if the words are not found, that is not yet a verdict.
+## What It Does, in Plain Terms
 
-A "no" from the dictionary is re-checked with the model. The system takes the first page of the file and asks the language model: does this look like a lab results form? The model is told in advance: if you are not sure, treat it as a form. It is better to check one extra time than to lose real results.
+When you send a file, several things happen — not one after another like steps on a staircase, but more like several questions the system asks in parallel and honestly reconciles at the end.
 
-**Failures do not become silent losses.**
+**The gatekeeper does not decide alone.** First it looks at the words in the file and checks them against the dictionary. If no words matched — it does not say "not a form" and stop. It passes the first page of the file to a language model and asks it. When in doubt, the model treats the file as a form — this is a deliberate choice: it is better to run recognition one extra time than to miss a genuine lab result. If the words matched immediately — the model is not called, and no extra cost is incurred.
 
-If the model provider does not respond due to transient problems — network issues, overload, timeout — the system does not give up. It waits and tries again, several times, over the course of several hours. Throughout this time you hear nothing: there is no need to worry about each individual attempt. If nothing worked in the end, the system will tell you plainly: "There was a failure on my side; I tried for several hours and it did not work." Not "please send a clearer copy" — but honestly, what exactly went wrong.
+**A failure is not a permanent answer.** If something went wrong on the provider's side — the account ran out of funds, a key expired, the service is overloaded — the system does not write "failed" forever. The file is placed in a waiting state. For transient failures the system silently retries several times, with pauses. If nothing worked after all attempts — you receive a message that says exactly that: "failure on my side, tried for several hours, will not retry on my own." If the problem is a key or balance issue — you are told so directly, once and in plain words. Not "please send a clearer copy."
 
-If the problem is with the key or the balance, that is treated as a separate situation, and you will hear about that specifically. The file waits; it does not disappear.
+**Resending the same file is not always a duplicate.** If you send the same file again after a rejection or failure — the system clears the previous rejection and processes the file from scratch. If you resend it and wrote "these are lab results" — the file goes straight to recognition, bypassing the gatekeeper. Something counts as a duplicate only if the file was already successfully parsed.
 
-**Resubmission works sensibly.**
+**Two readers examine the file, and there is one outcome.** Your file is examined simultaneously: one reader looks for lab numbers, the other reads it as a document — a referral, a report, anything. Previously only the first reader responded — and if it found nothing, you heard "failed to read any values," even though the document might have been read perfectly well by the second. Now the outcome for the file is single, and it is delivered only when both readers have finished. You will hear "nothing was added" only when both are empty. If no lab results were found but the document was accepted — you are told about the document. If the document was read as a lab result but no numbers came out of it — the system does not stay silent: a clarifying question is asked, and you are warned that it will be.
 
-If you send the same file again after a failure or after a rejection, the system understands that you want to try again and takes the file into processing from scratch. If you sent a file the system decided was not a form, but you know it contains lab results — resubmission is treated as your verdict, and the file goes straight to recognition, bypassing the filter. The only exception: if the file has already been successfully parsed and added to the health record, a repeat submission remains a duplicate.
+**The response names the real reason.** This is perhaps the simplest and most important point. A failure on the system's side — that is what is written. A problem with a key or balance — that is what is written. A file accepted as a document — that is what is written. The filename in the response is yours, without internal service tags.
 
-**Two parsers read the file, and you hear one outcome.**
+## What Is Honest to Say About Its Limits
 
-When a file arrives, two "readers" examine it in parallel: one looks for tabular lab values, the other reads the file as a medical document — a conclusion, a doctor's letter, a discharge summary. Previously you could receive a response from only the first reader even if the second had not yet finished or had found something important. Now there is one outcome per file, and it is delivered only once both readers have finished their work.
+All the promises described above hold — they are recorded as invariants and verified by tests. But "holds" and "verified under all conditions" are different things.
 
-If no lab results were found but the document was read and accepted into the health record, you hear exactly that: "accepted into the health record." If both readers found nothing — "nothing was added," and that is an honest outcome, not accidental silence. The hint "try sending it as lab results" appears only when there is a reason for it — for example, when a document looks like a lab result but could not be read in tabular form.
+Several places where verification is incomplete:
 
-The file name in messages is the name you gave it, without any technical suffixes.
+**Key and balance problem detection** works by matching known error messages from the provider. If the provider changes the wording of an error — the system may not recognize it as a key problem. This behavior was not measured on a live empty key under real operating conditions.
 
-## What to say honestly about its limits
+**Delivery of the clarifying question** in the situation "lab results not parsed even though the document was accepted as a result" is protected against re-triggering on ordinary restarts. However, if a crash occurs precisely between the moment the system decided to ask the question and the moment it sent it — redelivery after such a crash is not guaranteed.
 
-All of the behaviours described hold — they are verified by tests and live runs. But "holds" and "verified everywhere" are different things.
+**The gatekeeper's dictionary** is data specific to a particular install. On a fresh install it is empty, and that is exactly what caused the first problem discovered. The language model covers such cases — but that is a safety net, not a replacement for a properly populated dictionary.
 
-**On recognising key and balance failures.** The system can distinguish a key or balance problem from a transient failure — based on known error texts returned by the provider's SDK. This works. But this boundary has not been tested against a live empty key in production conditions — only against known error texts. If the provider changes the format of the error message, the system may not recognise the situation correctly.
+Nothing described above is an undisclosed failure — these are the honest limits of what has been verified.
 
-There are no other disputed or unfulfilled claims as of today.
+## Where This Lives in the System
 
-## Where this lives in the system
-
-The central file of the subsystem is `lab_intake_watcher.py`: it is the one that receives the incoming file, runs the filter, coordinates the two readers, and composes the final message. The logic of what counts as a failure, what counts as a key problem, and what counts as a transient refusal is described in `llm_client`. The intent of the subsystem and the list of promises it is required to keep are recorded in `subsystem_intent.yaml` — this is a living document against which you can check what the system promises and what of that has been verified.
+The core logic lives in `lab_intake_watcher.py` — that is the intake parser, the gatekeeper, and the coordinator between the two readers. The intentions of the subsystem — why it is structured the way it is — are described in `subsystem_intent.yaml`: there you can find which decisions were deliberate and why. If something about the system's behavior seems odd, `subsystem_intent.yaml` is the first place to look before concluding it is a bug.

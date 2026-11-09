@@ -1,6 +1,40 @@
 {
+  "agent_mail": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "mcp_tools",
+    "notify",
+    "secret_guard"
+  ],
+  "agent_reply": [
+    "_time_inject",
+    "agent_mail",
+    "config_db",
+    "gp_context",
+    "hai_chat",
+    "hai_core",
+    "i18n",
+    "llm_client",
+    "mcp_tools",
+    "notify",
+    "patient_context",
+    "tasks_db"
+  ],
   "agent_reports_db": [
     "health_db"
+  ],
+  "agent_signals": [
+    "_time_inject",
+    "agent_mail",
+    "config_db",
+    "health_db",
+    "i18n",
+    "lab_canon",
+    "labs_db",
+    "profile_db",
+    "safety_net",
+    "treatment_db"
   ],
   "alerts_db": [
     "health_db"
@@ -41,6 +75,7 @@
     "_fmt_helpers",
     "_time_inject",
     "assessment_importer",
+    "clinical_kb",
     "health_db",
     "i18n",
     "secrets_paths"
@@ -105,6 +140,7 @@
   ],
   "bug_report": [
     "_time_inject",
+    "genome_db",
     "health_db",
     "notify",
     "screen_trace",
@@ -113,10 +149,6 @@
   "calendar_client": [
     "_time_inject",
     "secrets_paths"
-  ],
-  "calendar_sync": [
-    "_time_inject",
-    "health_db"
   ],
   "cbcr_hypothesis": [
     "_time_inject",
@@ -471,7 +503,6 @@
     "_fmt_helpers",
     "_time_inject",
     "belief_contract",
-    "clinical_kb",
     "correlation_gate",
     "ecg_db",
     "genome_context",
@@ -720,7 +751,9 @@
   ],
   "integrity_tests": [
     "_time_inject",
+    "agent_mail",
     "agent_reports_db",
+    "agent_signals",
     "assessment_importer",
     "assessment_scheduler",
     "belief_contract",
@@ -763,6 +796,7 @@
     "norm_documents",
     "owner_weekly",
     "parked_decisions",
+    "pgs_discovery",
     "pgs_reference",
     "pii_census",
     "plist_env_liveness",
@@ -833,7 +867,8 @@
     "llm_client",
     "notify",
     "plist_env_liveness",
-    "secrets_paths"
+    "secrets_paths",
+    "tasks_db"
   ],
   "lab_oracles": [
     "lab_canon"
@@ -930,6 +965,7 @@
   ],
   "llm_client": [
     "api_spend_log",
+    "i18n",
     "llm_translate",
     "secret_guard"
   ],
@@ -971,6 +1007,8 @@
     "_time_inject",
     "food_profile",
     "generated_food_rules",
+    "i18n",
+    "lab_canon",
     "labs_db",
     "memory_facts_db",
     "metrics_db",
@@ -1056,6 +1094,7 @@
     "_time_inject",
     "agent_reports_db",
     "bug_inbox",
+    "bug_report",
     "finding_identity",
     "i18n",
     "morning_test_summary",
@@ -1139,10 +1178,16 @@
     "health_db"
   ],
   "pgs_discovery": [
+    "_time_inject",
     "genome_weights",
     "health_db",
     "pgs_reference",
-    "prs_pipeline"
+    "prs_context",
+    "prs_pipeline",
+    "secrets_paths"
+  ],
+  "pgs_reference": [
+    "_time_inject"
   ],
   "pharmaco_context": [
     "cpic_reference_db",
@@ -1240,7 +1285,8 @@
     "health_db",
     "notify",
     "reminders_backend",
-    "secrets_paths"
+    "secrets_paths",
+    "task_route"
   ],
   "repertoire": [
     "i18n",
@@ -1316,7 +1362,10 @@
   "task_agent": [
     "_fmt_helpers",
     "_time_inject",
+    "assessment_importer",
+    "assessment_scheduler",
     "config_db",
+    "gp_context",
     "hai_core",
     "health_db",
     "i18n",
@@ -1328,11 +1377,34 @@
     "notify",
     "reminders_backend",
     "reminders_sync",
-    "secrets_paths"
+    "secrets_paths",
+    "task_guard",
+    "task_route",
+    "tasks_db"
+  ],
+  "task_guard": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "llm_client",
+    "mcp_tools",
+    "notify",
+    "secrets_paths",
+    "tasks_db"
+  ],
+  "task_route": [
+    "_time_inject",
+    "agent_mail",
+    "agent_reply",
+    "config_db",
+    "health_db",
+    "task_agent"
   ],
   "tasks_db": [
     "gp_context",
-    "health_db"
+    "health_db",
+    "lab_canon",
+    "notify"
   ],
   "test_failure_handler": [
     "_time_inject",
@@ -1392,6 +1464,7 @@
     "health_db",
     "pharmaco_pipeline",
     "prs_pipeline",
+    "secrets_paths",
     "traits_pipeline",
     "wellness_pipeline"
   ],

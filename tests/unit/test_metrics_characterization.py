@@ -73,12 +73,13 @@ def test_get_day_raw_vitals_win_over_flat(db):
     assert day["spo2"]["avg"] == 97
 
 
-def test_get_day_sleep_not_reconstructed_from_flat(db):
-    # PIN-VERDICT: design — sleep СОЗНАТЕЛЬНО не собирается из flat-колонок
-    # (raw['sleep'] многоключевой; частичная сборка хуже None). Фиксируем решение.
+def test_get_day_sleep_reconstructed_from_flat(db):
+    # Flat sleep is readable; unknown stages remain missing measurements.
     db.add_daily_metrics("2026-05-12", sleep_total=6.0)
     day = health_db.get_day("2026-05-12")
-    assert "sleep" not in day
+    assert day["sleep"]["totalSleep"] == 6.0
+    assert day["sleep"]["source"] == "flat"
+    assert day["sleep"]["deep"] is None
 
 
 def test_get_window_length_and_missing_filled(db):

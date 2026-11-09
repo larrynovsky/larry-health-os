@@ -354,3 +354,15 @@
 | 2026-10-02 | `secrets_paths.referenced_via_provider_profiles` × `llm_client.profiles` × `methodology/llm_providers.json` | **реальный, оставлен** | Второй читатель того же файла профилей. Сканер судит ДЕРЕВО по `root` (песочница теста, дерево нити), `profiles()` читает только свой каталог; импорт `llm_client` в `secrets_paths` дал бы цикл (`llm_client` → `secret_guard` → `secrets_paths`). Читает только `key_file` как улику формы чтения; поставщиков не обслуживает. `methodology/` в целом — совпадение по каталогу. |
 | 2026-10-02 | `llm_admission.owner_verdicts` × `system_config` (config_db, health_db …) | **реальный, оставлен** | Читает строки `llm.admission.claude-%` прямым SELECT мимо `config_db`: у фасада есть чтение по ключу, по префиксу — нет. Писатель тот же (`upsert_config`), значения те же; второго писателя нет. Завести `config_db` чтение по префиксу — когда появится второй такой читатель. |
 | 2026-10-15 | `integrity_tests.check_chain_models_thinking_known` × `methodology/llm_providers.json` (hai_core, llm_client, secrets_paths) | **ложняк** | Датчик файл не открывает: профили и запас читает через `llm_client.thinking_profile` / `reasoning_reserve`, цепочки — через `hai_core.model_chain`. Совпадение по данным — путь в докстринге. |
+| 2026-11-02 | `pgs_reference.import_room` × `pgs_catalog` (genome_weights, integrity_tests, jobs/scheduled, pgs_discovery) | **ложняк** | Читает только `COUNT(*)` справочника, чтобы вычислить средний размер модели для расчёта места; писатель каталога один (`genome_weights`), других расчётов места по этой таблице нет. |
+| 2026-11-02 | `pgs_reference.rejected` × `pgs_rejected` (pgs_discovery) | **ложняк** | Читатель и писатель одной таблицы: пишет только `pgs_discovery._prune_model`, читает `pgs_reference.rejected` (для known_ids и пересмотра отказов). Второго писателя нет. |
+| 2026-11-02 | `pgs_reference.writer_alarm` × `discovery_runs` (pgs_discovery) | **ложняк** | Датчик читает квитанции, которые пишет только писатель докачки (`pgs_discovery`, ветка `blocked is None`). Второго писателя нет. |
+
+- 2026-11-05 · health · `agent_mail.send` / `bug_outbox.send` · **ложняк** по имени,
+  выявлен discovery до кода, подтверждён дубль-гейтом · первый публикует заявку
+  моста и пишет `agent_mail`; второй отправляет bug-report HTTP и ведёт JSONL-очередь.
+  Общих данных и реализации нет. Имя `send` задано интерфейсом задачи владельца.
+  В `dup_allowlist` добавлено `send`. Граница механизма: исключение действует
+  на имя во всём проекте, не на пару модулей; более узкого формата у гейта нет
+  (проверено 2026-11-05). Новый универсальный транспорт ради двух разных протоколов
+  не вводится. Договор почты — `docs/reference/agent_mail_bridge.md`.

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/lab_pipeline.md sha256:8edb68d9d2ea -->
+<!-- translation-of: docs/how-to/lab_pipeline.md sha256:10b2700946b3 -->
 **English** · [Русский](lab_pipeline.md)
 
 # How-to: lab recognition pipeline
@@ -10,6 +10,25 @@ Key: `~/.health_secrets/anthropic_key`.
 Pipeline: `lab_recognizer` (Opus+Sonnet, page by page) → `lab_oracles` (verification)
 → `lab_backfill` (writes to `lab_results_staging`) → `lab_review_sheet`/`lab_staging_summary`
 → `lab_promote` (atomic replacement of the canonical data). Canonical `lab_results` is NOT touched until promotion.
+
+During automatic intake, `lab_intake_watcher._settle_outcomes` decides the outcome
+after both readers finish. Zero rows alone is not a fault: a doctor's letter may
+legitimately enter the medical record without lab values. The narrow discrepancy
+is a `.norows` marker together with `doc_outcome(status="imported", kind="lab_result")`.
+Only this creates the new `notify.fault` and a `type=question` task asking for values
+as text or a closer photo. The date comes from `doc["date"]`; an unknown date is
+explicitly identified. The outcome says that values are missing and a separate
+question will follow; the existing bot queue delivers it subject to its limit.
+`imported/encounter` does not trigger this escalation; `failed` together with
+`.norows` retains the existing fault without a new question.
+Oracle: `test_zero_rows_queues_question_and_fault_once_without_db`.
+
+Repeated passes and restarts use the existing `outcome_told`; there is no extra
+fingerprint list. Explicit resubmission clears that receipt under the existing
+contract. The receipt is saved before external actions: a crash after saving can
+leave the outcome or question undelivered. This is an existing mechanism limitation,
+not an exactly-once delivery guarantee. Already recorded outcomes are not reprocessed
+automatically.
 
 ## 1. Rerun recognition on the corpus
 

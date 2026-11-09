@@ -2,7 +2,7 @@
 
 # ARCH_SNAPSHOT — Larry Health OS
 
-**Версия:** 15.433 | **Дата:** 2026-11-01
+**Версия:** 15.452 | **Дата:** 2026-11-09
 
 <!-- AUTO-READABLE ARCHITECTURE INDEX. Строку выше пишет doc_agent на post-commit
      (переехала из BLUEPRINT.md 2026-08-03, файл удалён) — руками не править. -->
@@ -166,6 +166,7 @@ intelligence layer между сырыми биометрическими дан
 
 | Label | Расписание | Модуль |
 |---|---|---|
+| `com.larry.health.agent-mail-bridge` | каждые 1мин | `agent_mail_bridge.py` |
 | `com.larry.health.assessment-scheduler.partner` | 03:30 | `assessment_scheduler.py` |
 | `com.larry.health.assessment-scheduler` | 03:30 | `assessment_scheduler.py` |
 | `com.larry.health.backup` | 03:00 | `backup_studio.sh` |
@@ -202,7 +203,6 @@ intelligence layer между сырыми биометрическими дан
 | `com.larry.health.oura-import` | 08:00; 11:00; 14:00; 17:00; 20:00 | `bash` |
 | `com.larry.health.owner-nag` | 08:00; 11:00; 14:00; 17:00; 20:00 | `owner_nag.py` |
 | `com.larry.health.owner-weekly` | Пн 09:10 | `owner_weekly.py` |
-| `com.larry.health.pgs-discovery.partner` | 5-го 03:00 | `pgs_discovery.py` |
 | `com.larry.health.pgs-discovery` | 5-го 03:00 | `pgs_discovery.py` |
 | `com.larry.health.pilot-shadow` | каждые 1ч | `pilot_shadow.py` |
 | `com.larry.health.pipaudit` | Пн 03:30 | `pip_audit_check.py` |
@@ -344,7 +344,7 @@ checkins_fts       -- виртуальная FTS5 таблица для полн
 <!-- GEN:MODULE_REGISTRY:START -->
 
 ## МОДУЛЬНЫЙ РЕЕСТР
-<!-- Авто-генерировано gen_blueprint.py 2026-10-31 -->
+<!-- Авто-генерировано gen_blueprint.py 2026-11-09 -->
 
 ### СЛОЙ ДАННЫХ
 ```
@@ -354,6 +354,7 @@ health_db.py  # SQLite-слой для health системы.
   assert_not_canonical(purpose) — FAIL-CLOSED гард для операций, которым НЕЛЬЗЯ трогать боевое сост
   attach_reference(conn) — Подключить общий справочник к соединению как схему `ref`.
   get_conn(read_only) — Возвращает SQLite-коннект.
+  get_metric_percentile(metric, pct, days, min_n) — Nearest-rank personal percentile over [reference_date-days, refer
   init_db() — Создаёт схему если не существует.
   canon_provenance_ddl() — DDL защиты «строка канона несёт класс источника» — один дом текст
   canon_provenance_trigger_names()
@@ -397,7 +398,7 @@ config_db.py  # config_db.py — доменный модуль config. Выне�
   get_doc_patterns() — Возвращает все паттерны классификации документов из БД.
   mark_imported(source_file, doc_type) — Помечает файл как импортированный. INSERT OR IGNORE — безопасен п
   get_imported_sources() — Возвращает множество полных относительных путей уже импортированн
-  upsert_config(key, value_text, value_num, value_json) — Записывает или обновляет параметр конфигурации системы.
+  upsert_config(key, value_text, value_num, value_json) — Write config. A supplied connection keeps transaction ownership w
   ocr_languages(conn) — Языки OCR тенанта для `tesseract -l` (system_config `ocr.language
   doc_type_markers(conn) — Маркеры типа документа тенанта (system_config `docs.type_markers`
   marker_doc_type(markers, where, haystack) — Первый doc_type, чья подстрока (без учёта регистра) есть в haysta
@@ -458,6 +459,7 @@ genome_db.py  # genome_db.py — доменный модуль genome. Выне�
   get_carrier_variants(limit) — Верифицированные НОСИТЕЛИ: effect_allele_status='resolved' и effe
   carrier_status_null_allele_violations(conn) — Строки, нарушающие сцепление: carrier-статус ⟹ effect_allele запо
   get_variants_by_genes(genes, limit) — Возвращает варианты из genetic_variants по списку генов.
+  genome_present() — Загружен ли геном у этой установки (есть хоть одна строка raw_snp
   genome_summary_counts() — Сводные счётчики для genome_context (Ф5). 'patho' = Pathogenic/Li
   get_snps_batch(rsids) — Возвращает {rsid: genotype} для списка rsID.
   upsert_genetic_variant(rsid, data) — Сохраняет или обновляет аннотированный вариант.
@@ -525,6 +527,10 @@ labs_db.py  # labs_db.py — доменный модуль labs. Вынесен 
   get_all_canonical_names() — Все уникальные canonical-имена в lib (для fuzzy-matching).
   get_all_lab_dates() — Все даты, по которым есть анализы.
   effective_freshness(active_conds) — Расписание свежести для тенанта: BASE + условные тесты его активн
+  schedule_origin(source) — Classify interval provenance, not clinical validity; no I/O.
+  latest_result_by_specimen() — {канон: {класс материала | None: последняя дата}} по lab_results 
+  tenant_lab_schedule() — Срок анализа для ВСЕХ читателей: {test: {interval_days, priority,
+  lab_due(names, day) — {канон: {due, last, interval_days, priority, source, note}} для а
 
 memory_db.py  # memory_db.py — доменный модуль memory. Вынесен из health_db.py (Поток C, strangl
   get_memory(category, n, active_only)
@@ -591,6 +597,7 @@ rules_db.py  # rules_db.py — доменный модуль rules. Вынесе
 tasks_db.py  # tasks_db.py — доменный модуль tasks. Вынесен из health_db.py (Поток C, strangler
   save_task(source, type_, content, priority) — Сохраняет задачу в базу.
   resolve_task(task_id, resolved_text, status) — Закрывает ОТКРЫТУЮ (или отложенную) задачу. True — закрыта; False
+  lab_task_pairs(tasks) — Find shared analytes in open/snoozed lab tasks from ONE tenant sn
   get_open_tasks(limit) — Возвращает незакрытые задачи, отсортированные по приоритету.
   get_overdue_tasks(days_old) — Задачи которые открыты дольше N дней без ответа.
   get_unsent_tasks(type_) — Outbox задач одного типа: открытые, с sent_at IS NULL, старшие пе
@@ -602,6 +609,9 @@ tasks_db.py  # tasks_db.py — доменный модуль tasks. Вынесе
   get_unsent_assessment_tasks() — Outbox опросников: открытые задачи type='assessment' с sent_at IS
   wake_snoozed_assessment_tasks(today) — Отложенный опросник, чей срок настал, снова ложится в outbox: sta
   mark_task_sent(task_id, tg_message_id) — Помечает что задача отправлена в Telegram.
+  get_unanswered_bot_tasks(sent_before) — Открытые анкеты и вопросы, отправленные в бот раньше sent_before 
+  mark_followup_sent(task_ids) — Одна follow-up доставка: просьба ассистенту для вопросов/анкет,
+  get_task(task_id) — Одна задача по id (07.11: закрытие дела по письму ассистента).
 
 treatment_db.py  # treatment_db.py — доменный модуль treatment. Вынесен из health_db.py (Поток C, s
   get_medications(confirmation, include_proposed) — Список режимов лечения. По умолчанию только канонические (гейт пр
@@ -688,6 +698,7 @@ hai_chat.py  # hai_chat — chat(), run_arbiter(), CLI.
   assembled_context_text(user_message, include_data) — Плоская строка ВСЕГО контекста, что видит модель (system + все хо
   chat(user_message, include_data) — Claude сам запрашивает нужные данные через tool use.
   chat_with_image(caption, image_bytes, mime_type) — Анализирует изображение в контексте здоровья пользователя.
+  extract_artifacts(user_message, assistant_reply) — Shared dialogue extractor, without writes; reported input is unco
   run_arbiter(user_message, assistant_reply, unverified) — Анализирует пару user↔assistant и сохраняет артефакты.
   judge_service_trouble(user_message, assistant_reply) — Судья гипотезы «человеку плохо от системы» (§17: НЕ тот вызов, чт
 
@@ -738,6 +749,7 @@ gp_context.py  # gp_context.py — сборка текстового конте�
   judge_absence_claims(text, window_days) — Судья отсутствия для ЛЮБОГО тракта: (хиты, готовая поправка одной
   recommendations_without_evidence(text, last_dates, schedule) — Рекомендации сдать аналит, у которого строка СВЕЖЕЕ окна монитори
   documents_answering_absence(text, docs) — Документы медкарты, которые отвечают на утверждение «нет / не заф
+  strip_lab_recency(text) — Текст задачи без хвоста annotate_lab_recency. Хвост — справка о п
   annotate_lab_recency(text) — Дописывает к тексту задачи дату последней сдачи аналитов, которые
 
 wellally_consult.py
@@ -776,6 +788,9 @@ safety_net.py  # safety_net.py — детерминированный safety net
 ```
 
 task_agent.py
+  deadline_from_schedule(t) — Срок задачи на анализ ставит расписание, а не модель (план додело
+  lab_task_closable_by_result(task) — Закроется ли задача сама, когда придёт результат: lab_test, вся п
+  close_lab_tasks_by_results() — Задача «сдать анализ» закрывается ПРИХОДОМ РЕЗУЛЬТАТА (план додел
   extract_tasks_from_report(report_text, source, source_date, report_date) — Парсит GP отчёт, извлекает задачи, сохраняет в DB.
   dismissed_recall_days() — Окно памяти о снятых задачах в днях: из system_config; нет ключа 
   judge_task_duplicates(new_items, known) — {id_новой: {verdict, ids, reason}} для каждой новой задачи, котор
@@ -792,6 +807,7 @@ task_agent.py
   promote_memory_questions(limit) — Поднимает вопросы из памяти в задачи, которые реально задаются че
   should_ask_again(fingerprint) — Задавать ли вопрос заново, если на него уже отвечали.
   complete_macos_reminder(task_id) — Помечает ремайндер в macOS как выполненный по task_id в теле заме
+  words(value)
   esc(s)
 
 checkin_agent.py
@@ -822,6 +838,7 @@ import_oura.py  # Импорт данных Oura Ring через API v2.
   oura_get(endpoint, start, end) — W5K-A2 (2026-05-14): follow next_token пагинацию до конца.
   parse_sleep(sessions, scores) — Возвращает dict[date_str → sleep_summary].
   parse_readiness(data)
+  day_shape(a) — Форма дня по пятиминуткам Oura — «сидит или ходит» для ассистента
   parse_activity(data)
   parse_spo2(data) — daily_spo2: spo2_percentage.average (число %), breathing_disturba
   parse_hrv(sessions) — HRV из ночных сессий — берём average_hrv из long_sleep.
@@ -920,6 +937,7 @@ integrity_tests.py  # integrity_tests.py — проверка целостнос
   check_problem_plain_summary() — Открытая проблема несёт описание простыми словами (27.09, волна 4
   check_protocols()
   check_tasks_pipeline()
+  check_lab_task_pairs() — Conflicting or duplicate open lab requests need reconciliation, n
   check_recent_task_activity()
   check_question_answer_integrity() — Вопрос, закрытый без ответа; недоставленный вопрос; ответ без сле
   check_question_queue_drains() — Очередь вопросов обязана СЛИВАТЬСЯ за время, которое сама себе на
@@ -982,6 +1000,8 @@ integrity_tests.py  # integrity_tests.py — проверка целостнос
   check_watchdog_liveness() — WARN: §14 terminus — сам uncommitted_watchdog мог тихо умереть (l
   check_macbook_uncommitted() — НЕЗАКОММИЧЕННАЯ РАБОТА НА MacBook — судится отсюда, по снимку, а 
   check_macbook_head_deployed() — КОД С MacBook НЕ ДОЕХАЛ ДО STUDIO — и об этом никто не сказал (27
+  macbook_jobs_in_snapshot(message) — Чистая/тестируемая: поле `health_jobs=` из сообщения снимка MacBo
+  check_macbook_health_jobs() — ДЖОБ ДАННЫХ НА MacBook — падает «громко», но в журнал, который ни
   threads_in_snapshot(threads_field) — Разбор поля `threads=` снимка MacBook — ОДИН дом формата для двух
   thread_copies_missing(threads_field, have, now_ts, grace_h) — Чистая/тестируемая: какие ветки нитей старше grace_h НЕ доехали с
   check_thread_work_has_a_second_copy() — РАБОТА НИТИ В ОДНОМ ЭКЗЕМПЛЯРЕ — вопрос ПОСТРАДАВШЕГО, не строите
@@ -995,8 +1015,8 @@ integrity_tests.py  # integrity_tests.py — проверка целостнос
   check_memory_facts_growth() — WARN (Ф4.3 tripwire, план «ПЕРЕСБОРКА ФАЗЫ 4»): активные ЭПИЗОДИЧ
   check_memory_facts_invariants() — FAIL: инварианты memory_facts (E, долг из аудита 5 июля).
   check_temporal_class_coverage() — WARN: active state с temporal_class IS NULL — путь записи обошёл 
-  check_clinical_kb_populated() — FAIL: clinical_kb ПУСТ → medical_frame вырождается в standard-рам
-  check_clinical_kb_replica_fresh(conn) — FAIL: clinical_kb в БД тенанта РАЗОШЁЛСЯ с git-источником (yaml с
+  check_clinical_kb_populated(conn) — WARN only for an explicitly uninstalled, intact public pack; defe
+  check_clinical_kb_replica_fresh(conn) — Use the same readiness verdict; public absence is not a successfu
   check_frozen_relative_not_current() — WARN: active state с «сегодня/вчера» в ТЕКСТЕ, но НЕ классифициро
   check_db_row_regression() — Таблица упала >50% против пика последних бэкапов → тихое стирание
   check_visual_orphans() — Целостность visual-intake: фото без кейса / кейс без фото / hande
@@ -1063,7 +1083,8 @@ integrity_tests.py  # integrity_tests.py — проверка целостнос
   check_doc_structure() — Проверяет что ключевые doc-файлы существуют после Diataxis-рестру
   check_oura_column_completeness() — W5K-#169 (2026-05-14): свежесть Oura-колонок в daily_metrics.
   check_translations_fresh() — Английский перевод отстал от русского оригинала (28.09.2026, реше
-  check_assessments_freshness() — Каждый инструмент — последнее заполнение не старше cadence_days +
+  check_assessment_producer_liveness() — Fail when production is due but neither a task nor an answer is r
+  check_assessments_freshness() — Каждый инструмент — последнее заполнение в пределах schedule_poli
   check_pro_score_unit_single(db_path) — PRO-балл под одним именем хранится в ОДНОЙ размерности (§16 клауз
   check_literature_freshness() — Последний literature_search покрывает последний плановый запуск п
   check_literature_freshness_partner() — Поиск литературы партнёра покрывает свой последний плановый запус
@@ -1082,7 +1103,12 @@ integrity_tests.py  # integrity_tests.py — проверка целостнос
   scan_backup_staleness(db_paths, now) — Чистая/тестируемая: свежесть ежедневного бэкапа по тенантам.
   check_backup_freshness() — Свежайший ежедневный бэкап КАЖДОГО тенанта покрывает последний пл
   check_db_size()
+  check_disk_room_for_reference() — Хватит ли диска Studio на следующую докачку справочника PGS (сним
+  check_reference_has_writer() — Докачка справочника PGS жива: последний прогон, оставивший кандид
   check_logs_all_listed() — Слепое пятно ротации: лог РАСТЁТ, а в конфиге ротации его нет.
+  check_agent_mail_bridge_alive() — Bridge heartbeat must be readable and no older than ten minutes.
+  check_agent_mail_unacked() — A letter may not wait for its owner/ack for more than thirty minu
+  check_agent_signals_ran() — Enabled assistant channel must complete a daily pass within its c
   check_bug_outbox_drains() — Очередь отчётов /bug разбирается (нить bug-report, 19.10).
   check_fault_journal() — Решение владельца 2026-09-28: сбои идут в ночной цикл, не в Teleg
   check_logrotate_liveness() — Ротатор жив И отработал чисто (§14, находка producer_registry 01.
@@ -1161,25 +1187,28 @@ telegram_bot.py  # telegram_bot.py — thin entry-point для launchd plist com
 ## ГРАФ ЗАВИСИМОСТЕЙ
 
 ```
-integrity_tests              → _time_inject, agent_reports_db, assessment_importer, assessment_scheduler, belief_contract, bug_outbox, cbcr_lookup, clinical_kb, config_db, correlation_gate, cpic_reference_db, daemon_liveness, db_regression, diagnosis_guard, doc_translation, ecg_db, finding_identity, generate_constitutions, genome_db, git_facts, google_calendar_fetcher, gp_context, hae_checker, hai_core, health_db, heldout_readiness, i18n, import_medical_events, infra_config, intent_registry, lab_canon, lab_intake_watcher, lab_oracles, lab_promote, labs_db, llm_client, log_rotate, loinc_match, memory_facts_db, metrics_db, morning_test_summary, norm_documents, owner_weekly, parked_decisions, pgs_reference, pii_census, plist_env_liveness, producer_registry, profile_reconciler, proposals_db, pubmed_client, quarantine_db, region_pack, safety_net, secrets_paths, security_sensors, signal_family, stderr_watch, time_contract_sensor, treatment_db, triage_agent, visual_db, weekly_digest
+integrity_tests              → _time_inject, agent_mail, agent_reports_db, agent_signals, assessment_importer, assessment_scheduler, belief_contract, bug_outbox, cbcr_lookup, clinical_kb, config_db, correlation_gate, cpic_reference_db, daemon_liveness, db_regression, diagnosis_guard, doc_translation, ecg_db, finding_identity, generate_constitutions, genome_db, git_facts, google_calendar_fetcher, gp_context, hae_checker, hai_core, health_db, heldout_readiness, i18n, import_medical_events, infra_config, intent_registry, lab_canon, lab_intake_watcher, lab_oracles, lab_promote, labs_db, llm_client, log_rotate, loinc_match, memory_facts_db, metrics_db, morning_test_summary, norm_documents, owner_weekly, parked_decisions, pgs_discovery, pgs_reference, pii_census, plist_env_liveness, producer_registry, profile_reconciler, proposals_db, pubmed_client, quarantine_db, region_pack, safety_net, secrets_paths, security_sensors, signal_family, stderr_watch, time_contract_sensor, treatment_db, triage_agent, visual_db, weekly_digest
 health_db                    → _time_inject, agent_reports_db, alerts_db, assessments_db, checkins_db, clinical_kb, config_db, constitutions_db, consult_sessions_db, consultations_db, cpic_reference_db, doc_reviews_db, events_db, experiments_db, field_reviews_db, food_floor, generated_food_rules, genome_db, hae_db, hai_context, hypotheses_db, i18n, import_status_db, infra_config, lab_canon, labs_db, memory_db, metrics_db, norm_documents, periods_db, problems_db, profile_db, proposals_db, protocols_db, quarantine_db, rules_db, secrets_paths, tasks_db, treatment_db, workouts_db
 gp_agent                     → _fmt_helpers, _time_inject, beliefs, brief_pipeline, brief_state, brief_validator, config_db, env_context, food_rule_review, genome_context, gp_context, hai_core, hai_hypotheses, health_ai, health_db, i18n, labs_db, lifestyle_agents, llm_client, location_signal, notify, patient_context, promethease_context, safety_net, wellally_consult
 monthly_consilium            → _time_inject, cbcr_hypothesis, consilium_roster, food_rule_generator, generated_food_rules, genome_context, gp_agent, gp_context, hai_analysis, hai_core, hai_hypotheses, health_db, hypothesis_semantic_check, i18n, llm_client, notify, patient_context, pharmaco_context, prs_context, traits_context, wellness_context
-lab_intake_watcher           → _time_inject, daemon_liveness, doc_triage, genome_intake, hai_core, health_db, i18n, import_all, import_medical_events, infra_config, lab_backfill, lab_recognizer, link_fetch, llm_client, notify, plist_env_liveness, secrets_paths
-task_agent                   → _fmt_helpers, _time_inject, config_db, hai_core, health_db, i18n, lab_canon, labs_db, llm_client, location_signal, memory_facts_db, notify, reminders_backend, reminders_sync, secrets_paths
+task_agent                   → _fmt_helpers, _time_inject, assessment_importer, assessment_scheduler, config_db, gp_context, hai_core, health_db, i18n, lab_canon, labs_db, llm_client, location_signal, memory_facts_db, notify, reminders_backend, reminders_sync, secrets_paths, task_guard, task_route, tasks_db
+lab_intake_watcher           → _time_inject, daemon_liveness, doc_triage, genome_intake, hai_core, health_db, i18n, import_all, import_medical_events, infra_config, lab_backfill, lab_recognizer, link_fetch, llm_client, notify, plist_env_liveness, secrets_paths, tasks_db
 generate_constitutions       → _time_inject, belief_contract, config_db, correlation_gate, doc_translation, food_profile, hai_core, health_db, i18n, infra_config, labs_db, llm_client, profile_reconciler, secrets_paths
-gp_context                   → _fmt_helpers, _time_inject, belief_contract, clinical_kb, correlation_gate, ecg_db, genome_context, health_db, i18n, lab_canon, labs_db, lifestyle_agents, notify, patient_context
+night_cycle                  → _fmt_helpers, _time_inject, agent_reports_db, bug_inbox, bug_report, finding_identity, i18n, morning_test_summary, night_investigator, notify, owner_gate, owner_nag, parked_decisions, weekly_digest
 assessment_dialog            → _fmt_helpers, _time_inject, assessment_importer, assessment_scheduler, config_db, genome_intake, health_db, i18n, notify, problems_db, profile_db, secrets_paths, treatment_db
 brief_pipeline               → _time_inject, brief_cards, brief_gate, calendar_client, env_context, food_profile, genome_context, health_ai, health_db, location_signal, safety_net, trails, trend_alerts
 consult_prep                 → _time_inject, config_db, genome_context, hai_core, hai_hypotheses, health_db, i18n, infra_config, labs_db, llm_client, notify, patient_context, treatment_summary
-night_cycle                  → _fmt_helpers, _time_inject, agent_reports_db, bug_inbox, finding_identity, i18n, morning_test_summary, night_investigator, notify, owner_gate, owner_nag, parked_decisions, weekly_digest
+gp_context                   → _fmt_helpers, _time_inject, belief_contract, correlation_gate, ecg_db, genome_context, health_db, i18n, lab_canon, labs_db, lifestyle_agents, notify, patient_context
+agent_reply                  → _time_inject, agent_mail, config_db, gp_context, hai_chat, hai_core, i18n, llm_client, mcp_tools, notify, patient_context, tasks_db
 getting_started              → _time_inject, brief_gate, food_quarterly, generate_constitutions, google_calendar_fetcher, health_db, i18n, labs_db, metrics_db, release_notice, secrets_paths, signal_family
 longitudinal_analysis        → _time_inject, belief_contract, correlation_gate, git_facts, health_db, i18n, lab_canon, metrics_db, notify, quarantine_db, secrets_paths, signal_family
 doc_agent                    → _time_inject, doc_translation, git_facts, hai_core, i18n, intent_registry, llm_client, notify, pii_census, secret_guard, secrets_paths
 hai_context                  → _fmt_helpers, _time_inject, calendar_client, genome_context, gp_context, health_db, lab_canon, labs_db, lifestyle_agents, metrics_db, patient_context
 hypothesis_consilium_eval    → _time_inject, consilium_roster, hai_core, health_db, i18n, lab_canon, labs_db, lifestyle_agents, llm_client, patient_context, wellally_consult
 import_medical_events        → config_db, events_db, hai_core, health_db, infra_config, lab_intake_watcher, lab_schedule_extractor, llm_client, problems_db, treatment_db, treatment_extractor
+mcp_tools                    → _time_inject, food_profile, generated_food_rules, i18n, lab_canon, labs_db, memory_facts_db, metrics_db, patient_context, pii_census, problems_db
 wellally_consult             → _fmt_helpers, _time_inject, consilium_roster, genome_context, hai_core, health_db, labs_db, lifestyle_agents, llm_client, patient_context, treatment_summary
+agent_signals                → _time_inject, agent_mail, config_db, health_db, i18n, lab_canon, labs_db, profile_db, safety_net, treatment_db
 hai_chat                     → _time_inject, config_db, gp_context, hai_context, hai_core, hai_reports, health_db, llm_client, memory_facts_db, treatment_db
 hai_reports                  → _fmt_helpers, _time_inject, clinical_kb, gp_context, hai_core, health_db, infra_config, llm_client, pubmed_client, wellally_consult
 survivorship_curator         → _time_inject, cbcr_hypothesis, gp_context, hai_core, hai_hypotheses, health_db, hypothesis_semantic_check, i18n, llm_client, notify
@@ -1189,25 +1218,28 @@ hai_hypotheses               → _time_inject, cbcr_hypothesis, gp_context, hai_
 lab_backfill                 → _time_inject, hai_core, health_db, infra_config, lab_oracles, lab_recognizer, lab_specimen, labs_db, llm_client
 literature_curator           → _time_inject, cbcr_hypothesis, hai_core, hai_hypotheses, health_db, hypothesis_semantic_check, i18n, llm_client, notify
 llm_admission                → doc_translation, hai_core, health_db, i18n, lab_canon, lab_recognizer, llm_client, notify, treatment_extractor
-mcp_tools                    → _time_inject, food_profile, generated_food_rules, labs_db, memory_facts_db, metrics_db, patient_context, pii_census, problems_db
 patient_context              → _time_inject, beliefs, health_db, labs_db, memory_config, memory_facts_db, memory_salience, problems_db, treatment_summary
 safety_net                   → _time_inject, config_db, health_db, i18n, lab_canon, labs_db, norm_documents, notify, rules_db
 weekly_digest                → _time_inject, config_db, diagnosis_guard, hai_core, i18n, llm_client, notify, pii_census, secrets_paths
 genome_intake                → _fmt_helpers, config_db, genome_pipeline, health_db, i18n, infra_config, link_fetch, notify
 genome_pipeline              → backfill_effect_alleles, fix_palindromic_het, generate_constitutions, genome_annotator, genome_parser, health_db, profile_reconciler, prs_pipeline
 lifestyle_agents             → consilium_roster, genome_context, gp_context, hai_core, health_db, llm_client, patient_context, promethease_context
+task_guard                   → _time_inject, config_db, health_db, llm_client, mcp_tools, notify, secrets_paths, tasks_db
+vcf_import_pipeline          → _time_inject, genome_intake, health_db, pharmaco_pipeline, prs_pipeline, secrets_paths, traits_pipeline, wellness_pipeline
+assessment_scheduler         → _fmt_helpers, _time_inject, assessment_importer, clinical_kb, health_db, i18n, secrets_paths
 checkin_agent                → _time_inject, gp_context, hai_core, health_db, llm_client, patient_context, region_pack
 hai_core                     → _time_inject, calendar_client, health_db, i18n, llm_client, patient_context, region_pack
 import_all                   → _time_inject, config_db, health_db, hypothesis_lab_linker, import_coordinator, infra_config, lab_intake_watcher
 notify                       → _time_inject, i18n, owner_nag, plist_env_liveness, release_notice, screen_trace, secrets_paths
 owner_nag                    → _fmt_helpers, _time_inject, i18n, notify, parked_decisions, plist_env_liveness, region_pack
 owner_weekly                 → _time_inject, i18n, night_cycle, notify, owner_nag, parked_decisions, triage_agent
+pgs_discovery                → _time_inject, genome_weights, health_db, pgs_reference, prs_context, prs_pipeline, secrets_paths
 proposals_db                 → _fmt_helpers, _time_inject, gp_context, health_db, i18n, problems_db, profile_reconciler
 test_failure_handler         → _time_inject, doc_translation, hai_core, i18n, infra_config, llm_client, notify
 triage_agent                 → _fmt_helpers, _time_inject, finding_identity, health_db, i18n, notify, task_agent
-vcf_import_pipeline          → _time_inject, genome_intake, health_db, pharmaco_pipeline, prs_pipeline, traits_pipeline, wellness_pipeline
+agent_mail                   → _time_inject, config_db, health_db, mcp_tools, notify, secret_guard
 assessment_bot_handlers      → _fmt_helpers, _time_inject, assessment_dialog, health_db, i18n, notify
-assessment_scheduler         → _fmt_helpers, _time_inject, assessment_importer, health_db, i18n, secrets_paths
+bug_report                   → _time_inject, genome_db, health_db, notify, screen_trace, secrets_paths
 food_quarterly               → _time_inject, clinical_kb, food_profile, health_db, i18n, secrets_paths
 genome_update_agent          → _fmt_helpers, _time_inject, hai_core, health_db, i18n, llm_client
 health_ai                    → hai_analysis, hai_chat, hai_context, hai_core, hai_hypotheses, hai_reports
@@ -1215,7 +1247,7 @@ hypothesis_resolution        → _time_inject, hai_hypotheses, health_db, hypoth
 lab_promote                  → _time_inject, config_db, health_db, lab_canon, lab_oracles, labs_db
 labs_db                      → _time_inject, clinical_kb, health_db, i18n, lab_canon, safety_net
 memory_consolidation         → beliefs, hai_core, health_db, i18n, llm_client, memory_facts_db
-bug_report                   → _time_inject, health_db, notify, screen_trace, secrets_paths
+task_route                   → _time_inject, agent_mail, agent_reply, config_db, health_db, task_agent
 cbcr_hypothesis              → _time_inject, cbcr_lookup, gp_agent, hai_core, llm_client
 dashboard                    → daemon_liveness, dashboard_db, dashboard_state, health_db, infra_config
 env_context                  → brief_cards, config_db, env_sources, location_signal, region_pack
@@ -1226,6 +1258,7 @@ model_health_check           → hai_core, health_db, i18n, llm_client, notify
 morning_test_summary         → _time_inject, health_db, infra_config, plist_env_liveness, test_failure_handler
 problems_db                  → _time_inject, clinical_kb, hai_core, health_db, llm_client
 publication_reader           → _time_inject, hai_core, health_db, llm_client, patient_context
+reminders_sync               → health_db, notify, reminders_backend, secrets_paths, task_route
 assessment_importer          → _time_inject, assessment_scheduler, health_db, i18n
 food_genome                  → clinical_kb, i18n, region_pack, seasonal_produce
 import_oura                  → health_db, infra_config, oura_oauth, secrets_paths
@@ -1233,16 +1266,16 @@ import_withings              → health_db, notify, region_pack, withings_api
 lab_extractor                → _time_inject, hai_core, infra_config, llm_client
 lab_reconcile                → _time_inject, health_db, import_all, lab_backfill
 lab_specialized              → health_db, lab_canon, lab_promote, labs_db
+llm_client                   → api_spend_log, i18n, llm_translate, secret_guard
 location_signal              → _time_inject, config_db, health_db, memory_facts_db
 monthly_api_report           → _time_inject, i18n, model_health_check, notify
 night_investigator           → hai_core, i18n, llm_client, owner_gate
 night_repair                 → finding_identity, infra_config, notify, secrets_paths
 oura_freshness_check         → health_db, i18n, notify, secrets_paths
-pgs_discovery                → genome_weights, health_db, pgs_reference, prs_pipeline
 pubmed_client                → _time_inject, clinical_kb, pii_census, rules_db
 pubmed_searcher              → _time_inject, clinical_kb, health_db, pubmed_client
-reminders_sync               → health_db, notify, reminders_backend, secrets_paths
 symptom_intake               → hai_core, hai_hypotheses, i18n, visual_db
+tasks_db                     → gp_context, health_db, lab_canon, notify
 backfill_effect_alleles      → effect_allele, genome_annotator, health_db
 backfill_hae_coverage        → _time_inject, hae_checker, health_db
 belief_contract              → _time_inject, health_db, secrets_paths
@@ -1269,7 +1302,6 @@ lab_schedule_extractor       → hai_core, health_db, llm_client
 lab_staging_summary          → health_db, lab_canon, labs_db
 lab_triage                   → health_db, lab_canon, lab_oracles
 link_fetch                   → genome_intake, i18n, notify
-llm_client                   → api_spend_log, llm_translate, secret_guard
 memory_facts_db              → beliefs, health_db, memory_salience
 profile_db                   → _time_inject, health_db, treatment_summary
 profile_reconciler           → _time_inject, health_db, import_all
@@ -1284,7 +1316,6 @@ brief_cards                  → hai_analysis, metrics_db
 brief_state                  → brief_gate, config_db
 bug_inbox                    → _time_inject, bug_report
 calendar_client              → _time_inject, secrets_paths
-calendar_sync                → _time_inject, health_db
 correlation_gate             → lab_canon, signal_family
 cpic_reference_db            → health_db, i18n
 daemon_liveness              → infra_config, plist_env_liveness
@@ -1319,7 +1350,6 @@ quarantine_db                → health_db, signal_family
 repertoire                   → i18n, taste
 security_sensors             → infra_config, plist_env_liveness
 service_trouble              → config_db, health_db
-tasks_db                     → gp_context, health_db
 treatment_summary            → health_db, i18n
 trend_alerts                 → clinical_kb, health_db
 wellness_pipeline            → i18n, traits_pipeline
@@ -1364,6 +1394,7 @@ loinc_loader                 → health_db
 memory_config                → config_db
 memory_db                    → health_db
 memory_salience              → memory_config
+pgs_reference                → _time_inject
 pharmaco_pipeline            → _time_inject
 pii_census                   → git_facts
 pilot_shadow                 → notify
@@ -1408,7 +1439,7 @@ workouts_db                  → health_db
 ~/health/reports/                                           -- Markdown GP отчёты YYYY-MM-DD.md
 ~/health/genome/                                            -- raw 23andMe TSV (импортируется в raw_snps)
 ~/health/biochemical/                                       -- PDF лабораторных анализов
-~/health/backups/                                           -- Ежедневные sqlite3 .backup (ротация 30д, com.larry.health.backup)
+~/health/backups/                                           -- Ежедневные sqlite3 .backup (ротация 30д, com.larry.health.backup) ⚠️ отсутствует
 ~/health/logs/                                              -- api.log, bot logs, per-machine
 ~/health/.claude/specialists/                               -- Промпты MDT-специалистов (oncology.md и др.) ⚠️ отсутствует
 ~/health_scripts/                                           -- Production-код, git canonical после миграции 2026-05-09
@@ -1627,6 +1658,22 @@ XFAIL — известные баги, документированы как `pa
 ## ЛОГ АРХИТЕКТУРНЫХ ИЗМЕНЕНИЙ
 
 <!-- GEN:ARCH_LOG:START -->
+- `2026-11-08` — `llm_client` + зависимость: i18n
+- `2026-11-08` — `bug_report` + зависимость: genome_db; `night_cycle` + зависимость: bug_report
+- `2026-11-07` — `agent_reply` + зависимость: gp_context, hai_chat, i18n, tasks_db; `agent_signals` + зависимость: i18n; `assessment_scheduler` + зависимость: clinical_kb; `lab_intake_watcher` + зависимость: tasks_db (+5 изменений)
+- `2026-11-07` — `gp_context` − зависимость: clinical_kb
+- `2026-11-07` — `reminders_sync` + зависимость: task_route
+- `2026-11-07` — `agent_reply` + зависимость: _time_inject; `task_agent` + зависимость: task_route; новый модуль `task_route` (зависит от: _time_inject, agent_mail, agent_reply, config_db, health_db)
+- `2026-11-07` — `agent_reply` + зависимость: _time_inject; `task_agent` + зависимость: task_route; новый модуль `task_route` (зависит от: _time_inject, agent_mail, agent_reply, config_db, health_db)
+- `2026-11-07` — `agent_reply` + зависимость: _time_inject; `task_agent` + зависимость: task_route; новый модуль `task_route` (зависит от: _time_inject, agent_mail, agent_reply, config_db, health_db)
+- `2026-11-07` — `agent_reply` + зависимость: _time_inject
+- `2026-11-07` — `agent_reply` + зависимость: _time_inject
+- `2026-11-06` — удалён модуль `calendar_sync`
+- `2026-11-06` — `agent_reply` + зависимость: notify
+- `2026-11-06` — `agent_reply` + зависимость: notify
+- `2026-11-06` — новый модуль `agent_mail` (зависит от: _time_inject, config_db, health_db, mcp_tools, notify, secret_guard); новый модуль `agent_reply` (зависит от: agent_mail, config_db, hai_core, llm_client, mcp_tools, patient_context); новый модуль `agent_signals` (зависит от: _time_inject, agent_mail, config_db, health_db, lab_canon, labs_db, profile_db, safety_net, treatment_db); `integrity_tests` + зависимость: agent_mail, agent_signals
+- `2026-11-02` — `pgs_discovery` + зависимость: _time_inject, prs_context, secrets_paths; новый модуль `pgs_reference` (зависит от: _time_inject); `vcf_import_pipeline` + зависимость: secrets_paths
+- `2026-11-02` — `integrity_tests` + зависимость: pgs_discovery
 - `2026-10-31` — `bug_inbox` + зависимость: _time_inject; `bug_outbox` + зависимость: _time_inject; `bug_report` + зависимость: _time_inject; `screen_trace` + зависимость: _time_inject
 - `2026-10-23` — `gp_agent` + зависимость: notify; `problems_db` − зависимость: api_spend_log
 - `2026-10-20` — `gp_context` + зависимость: notify

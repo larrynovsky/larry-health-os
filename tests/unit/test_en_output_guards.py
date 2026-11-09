@@ -55,7 +55,7 @@ def _context():
         _RECO_RE _SENTENCE_SPLIT_RE recommendations_without_evidence annotate_lab_recency
         """, _ldb=SimpleNamespace(
             get_recent_labs=lambda days: [{"test_name": "HGB", "date": LAST}],
-            get_effective_lab_schedule=lambda: {"HGB": {"interval_days": 30}}))
+            tenant_lab_schedule=lambda: {"HGB": {"interval_days": 30}}))
 
 
 def test_absence_english_claims_and_russian_control():

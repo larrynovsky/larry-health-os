@@ -281,6 +281,17 @@ and as references in code comments; the numbers are stable identifiers, not an o
   no test. Mock the files a function reads, not the layer under them. A new
   integrity sensor (`check_*`) comes with an executed negative control: show it
   turning red on the defect it is meant to catch.
+- **Housekeeping (Studio footprint).** Any Studio-side artifact a task creates —
+  launchd job (`com.larry.*`), Docker container/image/volume, listening port, or
+  directory that grows (logs, backups, caches, tmp) — must be declared in
+  `housekeeping.yaml` at the repository root in the same commit, under the matching
+  `subsystem_intent.yaml` id (`owns.services / containers / images / ports / dirs`,
+  plus `never_touch`, `schedule_windows`, `restart_safe`). New entries start at
+  `status: declared`; only the owner promotes them. Never delete, move, or clean a
+  Studio object not listed there; never touch `never_touch` paths; never create
+  files inside a Studio working tree (e.g. `~/health_scripts`) outside its `logs/`
+  directory — a dirty tree silently breaks `git push studio`. An unclaimed object
+  is an orphan: report it, do not clean it.
 
 ## Public-clone development and checks
 

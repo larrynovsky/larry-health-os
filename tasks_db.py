@@ -6,17 +6,26 @@ import logging
 
 log = logging.getLogger(__name__)
 
+ASSISTANT_FACT_SOURCE = "assistant_fact:"
+
 
 def save_task(source: str, type_: str, content: str,
               priority: str = "medium", deadline: str = None,
               source_date: str = None, reason: str = None,
               fingerprint: str = None,
               resolution_type: str = "self_managed",
-              judge_verdict: str = None, judge_reason: str = None) -> int | None:
+              judge_verdict: str = None, judge_reason: str = None,
+              origin: str = None,
+              max_per_source: int | None = None,
+              guard_verdicts: list[dict] | None = None) -> int | None:
     """
     Сохраняет задачу в базу.
     Если fingerprint задан и открытая задача с таким fingerprint уже есть — пропускает.
-    Возвращает id новой задачи или None если пропущена как дубликат.
+    Для source=assistant_fact:* дедупликация включает закрытые вопросы.
+    max_per_source ограничивает число задач этого source во всех статусах; проверка
+    и INSERT сериализованы SQLite BEGIN IMMEDIATE. Аннотация давности лабораторий
+    пропускается для assistant_fact: текст чужого утверждения нельзя дополнять.
+    Возвращает id новой задачи или None если пропущена как дубликат/по лимиту.
 
     ДВА СЛОЯ, И ИХ НЕЛЬЗЯ ПУТАТЬ (15.09, BL-JUDGE-VERDICT-UNRECORDED-1):
       `reason`        — ПУБЛИКАЦИЯ: рендерится человеку в Telegram курсивом
@@ -26,16 +35,28 @@ def save_task(source: str, type_: str, content: str,
     Замер, ради которого разведено: у всех 23 вопросов из памяти в `reason` лежала
     одна константа, а собственная причина судьи — была в руках и терялась.
 
+    guard_verdicts — отдельные теневые оценки пар, не адресация вопроса.
+    Записываются в task_guard_journal в транзакции задачи; сбой журнала не теряет задачу.
+
     Совет сдать анализ получает дату последней сдачи (gp_context.annotate_lab_recency, 27.09):
     человек читает задачу, а не отчёт, и дата нужна ему здесь.
     """
     import gp_context as _gc  # лениво: gp_context импортирует health_db, а тот — этот модуль
-    content = _gc.annotate_lab_recency(content)
+    if not source.startswith(ASSISTANT_FACT_SOURCE):
+        content = _gc.annotate_lab_recency(content)
     with _hdb.get_conn() as conn:
+        if max_per_source is not None:
+            if isinstance(max_per_source, bool) or not isinstance(max_per_source, int) or max_per_source < 0:
+                raise ValueError("invalid max_per_source")
+            # Serialize count + insert, including answered/dismissed questions.
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT COUNT(*) FROM tasks WHERE source=?", (source,)).fetchone()[0] >= max_per_source:
+                return None
         # Дедупликация по fingerprint
         if fingerprint:
             existing = conn.execute(
-                "SELECT id FROM tasks WHERE fingerprint=? AND status='open'",
+                "SELECT id FROM tasks WHERE fingerprint=?" +
+                ("" if source.startswith(ASSISTANT_FACT_SOURCE) else " AND status='open'"),
                 (fingerprint,)
             ).fetchone()
             if existing:
@@ -51,15 +72,44 @@ def save_task(source: str, type_: str, content: str,
                 "reason", "fingerprint", "deadline", "resolution_type"]
         значения = [source, source_date, type_, priority, content,
                     reason, fingerprint, deadline, resolution_type]
+        # Происхождение: всё, что пишет save_task, — автоматические производители, то есть
+        # «система», если вызывающий не доказал иное (ревью 07.11, находка 9). Колонки может не
+        # быть у старой схемы (тестовые фикстуры) — тогда поле не пишется.
+        if origin is None and "origin" in {c[1] for c in conn.execute("PRAGMA table_info(tasks)")}:
+            origin = "system"
         for имя, значение in (("judge_verdict", judge_verdict),
-                              ("judge_reason", judge_reason)):
+                              ("judge_reason", judge_reason),
+                              ("origin", origin)):
             if значение is not None:
                 поля.append(имя)
                 значения.append(значение)
         cur = conn.execute(
             f"INSERT INTO tasks ({', '.join(поля)}) "
             f"VALUES ({', '.join('?' * len(поля))})", значения)
-        return cur.lastrowid
+        task_id = cur.lastrowid
+        # Optional shadow audit must not prevent the task INSERT. A savepoint
+        # keeps successful audit rows atomic with the task and rolls back partial audits.
+        if guard_verdicts:
+            import sqlite3
+            conn.execute("SAVEPOINT task_guard_audit")
+            try:
+                conn.executemany(
+                    "INSERT INTO task_guard_journal "
+                    "(new_task_id, open_task_id, evaluated_at, verdict, confidence, judge, reason) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [(task_id, v["open_task_id"], v["evaluated_at"], v["verdict"],
+                      v["confidence"], v["judge"], v["reason"]) for v in guard_verdicts])
+            except sqlite3.Error:
+                conn.execute("ROLLBACK TO task_guard_audit")
+                log.warning("task_guard: audit storage failed; task retained")
+                try:
+                    import notify
+                    notify.fault("task_guard: audit storage failed; task retained", person_key=None)
+                except Exception:  # optional reporting cannot lose the task
+                    log.warning("task_guard: audit fault reporting unavailable")
+            finally:
+                conn.execute("RELEASE task_guard_audit")
+        return task_id
 
 
 def resolve_task(task_id: int, resolved_text: str = None,
@@ -76,6 +126,37 @@ def resolve_task(task_id: int, resolved_text: str = None,
             WHERE id=? AND status IN ('open', 'snoozed')
         """, (status, resolved_text, task_id))
     return cur.rowcount > 0
+
+
+def lab_task_pairs(tasks: list[dict]) -> list[dict]:
+    """Find shared analytes in open/snoozed lab tasks from ONE tenant snapshot.
+
+    Required fields: id (unique integer), type, status, content; deadline is an
+    ISO date or absent (None/empty). No IO, writes or clinical judgment. Return
+    one {task_ids: [int, int], analyte: str, kind: duplicate|contradiction} per
+    pair/analyte, ordered by ids then analyte. One missing deadline differs
+    from a specified deadline. Callers validate the task snapshot at entry.
+    Recency annotations are presentation history, not requests (gp_context.strip_lab_recency).
+    """
+    from itertools import combinations
+    from lab_canon import analytes_mentioned
+    from gp_context import strip_lab_recency   # один дом формата хвоста (ключ i18n gp.task.lab_recency)
+
+    indexed = []
+    for task in sorted(tasks, key=lambda task: task["id"]):
+        if task["type"] != "lab_test" or task["status"] not in {"open", "snoozed"}:
+            continue
+        content = strip_lab_recency(task["content"])
+        indexed.append((task, analytes_mentioned(content)))
+    findings = []
+    for (left, left_names), (right, right_names) in combinations(indexed, 2):
+        for analyte in sorted(left_names & right_names):
+            findings.append({
+                "task_ids": [left["id"], right["id"]], "analyte": analyte,
+                "kind": "duplicate" if (left.get("deadline") or None) ==
+                (right.get("deadline") or None) else "contradiction",
+            })
+    return findings
 
 
 def get_open_tasks(limit: int = 20) -> list:
@@ -266,6 +347,32 @@ def mark_task_sent(task_id: int, tg_message_id: int | None = None):
                 "UPDATE tasks SET sent_at=datetime('now'), tg_message_id=? WHERE id=?",
                 (tg_message_id, task_id)
             )
+
+
+def get_unanswered_bot_tasks(sent_before: str) -> list:
+    """Открытые анкеты и вопросы, отправленные в бот раньше sent_before (UTC, формат SQLite),
+    о которых ассистента ещё не просили напомнить (followup_sent_at IS NULL). 07.11.2026."""
+    with _hdb.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tasks WHERE status='open' AND type IN ('assessment','question') "
+            "AND sent_at IS NOT NULL AND sent_at < ? AND followup_sent_at IS NULL "
+            "ORDER BY sent_at, id", (sent_before,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_followup_sent(task_ids: list[int]) -> None:
+    """Одна follow-up доставка: просьба ассистенту для вопросов/анкет,
+    квитанция запасной Telegram-сводки для дел (task_route, 07.11.2026)."""
+    with _hdb.get_conn() as conn:
+        conn.executemany("UPDATE tasks SET followup_sent_at=datetime('now') WHERE id=?",
+                         [(int(i),) for i in task_ids])
+
+
+def get_task(task_id: int) -> dict | None:
+    """Одна задача по id (07.11: закрытие дела по письму ассистента)."""
+    with _hdb.get_conn() as conn:
+        row = conn.execute("SELECT * FROM tasks WHERE id=?", (int(task_id),)).fetchone()
+    return dict(row) if row else None
 
 
 # health_db — В КОНЦЕ модуля (BL-TEST-COLLECT-ALONE-1, 2026-09-24): он ре-экспортирует функции

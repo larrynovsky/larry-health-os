@@ -42,6 +42,7 @@
     "get_last_consultation",
     "get_medications",
     "get_memory",
+    "get_metric_percentile",
     "get_metric_percentiles",
     "get_open_tasks",
     "get_overdue_tasks",
@@ -98,5 +99,22 @@
   ],
   "depends_on": [],
   "disposability": null,
-  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился."
+  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился.",
+  "agent_signals_extension": {
+    "date": "2026-11-05",
+    "get_metric_percentile": "Read-only nearest-rank estimator shared with personal floors, explicit exclusive reference date; missing history -> None, storage failure raises. stress_high_min includes zero. Existing personalizer callers retain their default window.",
+    "oracle": "tests/unit/test_agent_signals.py",
+    "get_recent_labs": "Existing facade delegates to labs_db. Optional n_days=None removes the lower date bound; reference_date caps history. Default exclusion of PRO also filters score units before latest-row grouping.",
+    "upsert_config": "Existing facade delegates to config_db. Optional conn preserves caller transaction ownership and rollback; omitted conn retains autonomous write behavior."
+  },
+  "sleep_read_contract": {
+    "date": "2026-11-08",
+    "owner": "metrics_db (health_db compatibility facade)",
+    "read": "get_day reconstructs sleep from daily_metrics sleep columns only when raw.sleep is absent/empty. Hours stay hours; missing stages are None. source is AppleHealth when the Apple witness matches total, otherwise flat. Existing raw.sleep is unchanged.",
+    "write": "AppleHealth sleep updates replace prior Apple flat values, never a present raw.sleep block. Non-null fields only. Repeated identical imports are idempotent.",
+    "late_data": "get_day reads current SQLite data on every call. Replacing partial Apple sleep makes the next consumer see fresh data without a dirty flag, report rewrite, or automatic resend.",
+    "archive": "Daily JSON format is unchanged. migrate_all_json passes the complete payload once: Oura if source=Oura, sleep has contributors or source=Oura, or an Oura-only key is present (readiness_score, resilience, stress, hrv_balance, body_temperature, recovery_index, breathing_disturbance); otherwise AppleHealth. It does not repair previously mislabelled database rows.",
+    "failures": "Database writes roll back together. Importer logs SQLite failures and retains the source archive for replay. JSON archive and SQLite are not a cross-store atomic transaction.",
+    "oracle": "tests/integration/test_uc_a_03_hae_merge.py::test_apple_sleep_read_late_update_and_oura_shape"
+  }
 }

@@ -32,7 +32,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import health_db as db
-import anthropic
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -474,13 +473,14 @@ async def _call_round_a(client, name: str, role: str, input_pkg: str, sem) -> di
             ))
             text = llm_client.answer_text(resp).strip()
         except Exception as e:
-            return {"name": name, "ok": False, "patterns": [], "raw": str(e)}
+            return {"name": name, "ok": False, "patterns": [], "raw": str(e), "exc_type": type(e).__name__}
 
         try:
             from cbcr_hypothesis import _extract_json
             parsed = _extract_json(text)
-        except Exception:
-            parsed = None
+        except Exception as e:
+            return {"name": name, "ok": False, "patterns": [], "raw": text[:500],
+                    "exc_type": type(e).__name__}
         if not parsed:
             return {"name": name, "ok": False, "patterns": [], "raw": text[:500]}
 
@@ -560,13 +560,14 @@ async def _call_round_b(client, name: str, role: str, input_pkg: str,
             ))
             text = llm_client.answer_text(resp).strip()
         except Exception as e:
-            return {"name": name, "ok": False, "final_patterns": [], "raw": str(e)}
+            return {"name": name, "ok": False, "final_patterns": [], "raw": str(e), "exc_type": type(e).__name__}
 
         try:
             from cbcr_hypothesis import _extract_json
             parsed = _extract_json(text)
-        except Exception:
-            parsed = None
+        except Exception as e:
+            return {"name": name, "ok": False, "final_patterns": [], "raw": text[:500],
+                    "exc_type": type(e).__name__}
         if not parsed:
             return {"name": name, "ok": False, "final_patterns": [], "raw": text[:500]}
 
@@ -826,7 +827,8 @@ def _incomplete(e) -> list[int]:
     """Месячный консилиум идёт из launchd/cron: исключение осталось бы в лог-файле. Неполного
     итога нет (решение владельца 04.10) — сбой в инженерную очередь, гипотез месяца нет."""
     import notify
-    notify.fault(f"monthly_consilium: {e.label}: {', '.join(e.missing)} / {e.total}", person_key=None)
+    notify.fault(f"monthly_consilium: {e.label}: {', '.join(e.missing)} / {e.total}", person_key=None,
+                 detail=[f"{name}:{e.reasons.get(name, 'unanswered')}" for name in e.missing])
     return []
 
 

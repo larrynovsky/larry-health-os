@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:6a76fafbf951 -->
+<!-- translation-of: docs/how-to/README.md sha256:839554eca8d3 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -80,6 +80,8 @@ from the image need them.
 - Channels: [email](email_channel.md) · [weekly digest](weekly_digest.md) ·
   [log rotation](rotate_logs.md)
 - [Connect a Withings blood-pressure monitor](connect_withings.md) — a second blood-pressure source
+- [Agent mail: health letters to the personal assistant](agent_mail.md) — bridge to the post office, settings, rollback
+- [Studio is running out of disk](free_studio_disk.md) — where to look and what holds deleted files
 - [Add a second person](add_person.md) ·
   [migrating from a native install to a container](pilot_switch.md)
 

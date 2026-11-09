@@ -75,7 +75,7 @@ def test_report_summary_names_last_lab_date(db, anthropic_mock, clock, monkeypat
             {"test_name": "TSH", "date": str(today - timedelta(days=142))},
             {"test_name": "Vitamin_B12", "date": str(b12)}]
     monkeypatch.setattr(gc._ldb, "get_recent_labs", lambda n: labs)
-    monkeypatch.setattr(gc._ldb, "get_effective_lab_schedule", lambda: sched)
+    monkeypatch.setattr(gc._ldb, "tenant_lab_schedule", lambda: sched)
     _seed_analyzer_output(db)
     anthropic_mock.script(
         match=lambda p: "Четыре варианта" in p,

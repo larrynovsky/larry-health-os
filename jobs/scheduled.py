@@ -22,15 +22,14 @@ import asyncio
 import json as _j
 import logging
 from datetime import date, datetime as _dt, time, timedelta
-from _time_inject import get_today  # seam
+from _time_inject import get_now, get_today  # seam
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import TelegramError
+from telegram.error import BadRequest, NetworkError, RetryAfter, TelegramError
 from telegram.ext import ContextTypes
 
-import checkin_agent as ck
 import gp_agent as gp
 import health_ai as hai
 import health_db as db
@@ -222,11 +221,16 @@ def _apply_morning_schedule(app) -> str:
         j.schedule_removal()
     bt = _brief_time()
     app.job_queue.run_daily(
-        send_morning_report,
+        morning_report_job,
         time=time(hour=bt.hour, minute=bt.minute, tzinfo=tz),
         name="morning_report",
         job_kwargs={"misfire_grace_time": 1800},
     )
+    try:
+        _apply_agent_signals_schedule(app, bt, tz)
+    except Exception as exc:
+        # Optional mail configuration must not block the required brief or other jobs.
+        log.error("agent_signals schedule failed (%s)", type(exc).__name__)
     log.info("morning_report @ %02d:%02d %s (gps_ok=%s)", bt.hour, bt.minute, tz_name, ok)
     return tz_name
 
@@ -271,6 +275,23 @@ async def _reschedule_local(context: ContextTypes.DEFAULT_TYPE):
                 text=i18n.t("jobs.timezone_changed", previous=cur or '?', current=tz_name))
         except Exception as e:  # noqa: BLE001
             log.warning("reschedule notify failed: %r", e)
+
+
+def _transient_net(e: BaseException) -> bool:
+    """Сбой связи с Telegram, который лечится повтором. В PTB 22.7 BadRequest — ПОДКЛАСС
+    NetworkError (замер 28.10 в контейнере бота), поэтому `except NetworkError` поймал бы и
+    ошибку разметки/чата, а её повтор не лечит. RetryAfter (флуд-контроль) — транзиентный."""
+    return isinstance(e, RetryAfter) or (isinstance(e, NetworkError) and not isinstance(e, BadRequest))
+
+
+async def _typing(bot, chat_id) -> None:
+    """«Печатает…» перед долгим отчётом — косметика: её сетевой сбой не смеет отменять отчёт.
+    28.10: ConnectTimeout на этом вызове в 08:30 стоил брифа на весь день — исключение
+    вылетало из задачи раньше генерации. Ошибки доставки самого отчёта не подавляются."""
+    try:
+        await bot.send_chat_action(chat_id=chat_id, action="typing")
+    except TelegramError as e:
+        log.warning("send_chat_action: %r — продолжаю без индикатора", e)
 
 
 # ── Утренний отчёт ─────────────────────────────────────────────────────────
@@ -350,12 +371,7 @@ async def send_morning_report(context: ContextTypes.DEFAULT_TYPE):
         # всё чисто», а это разные вещи (§14: «датчик мёртв» ≠ «данные целы»).
         log.warning("BRIEF_NOT_GATED %s", _why)
 
-    try:
-        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    except TelegramError as e:
-        # Индикатор «печатает» — косметика. 28.10 он упал по таймауту Telegram и оборвал
-        # бриф целиком: дня нет ни в reports/, ни в context_cards, повтора не было.
-        log.warning("morning_report: индикатор «печатает» не ушёл (%s) — бриф продолжаю", e)
+    await _typing(context.bot, chat_id)
     await asyncio.to_thread(refresh_data)
 
     # Oura пишет сон на дату пробуждения = сегодня
@@ -487,6 +503,71 @@ async def send_morning_report(context: ContextTypes.DEFAULT_TYPE):
     # (BL-EXP-1, 2026-07-10). Жизненный цикл гипотез — только через consilium.
 
 
+
+# ── Повтор брифа при сетевом сбое Telegram (нить brief-net-retry, 28.10) ────────
+# Инцидент 28.10: одна ConnectTimeout в 08:30 — и бриф не пришёл вовсе: задача упала,
+# повтора в тот же день не было (досылка срабатывает только на рестарте бота), сбой в
+# журнал не попал. Теперь: сетевой сбой ДО квитанции .sent → повтор с нарастающим шагом;
+# исчерпаны → notify.fault (ночной ремонт). Квитанция доставки — та же reports/<день>.sent
+# (C-130), второго маркера нет: проверка .sent перед каждой попыткой не даёт задвоить бриф
+# с досылкой после рестарта. Повтор после сбоя на середине send_long шлёт весь бриф заново —
+# дубль первого куска дешевле потери брифа (принято зряче).
+# Доказательство «работает в жизни» (решение владельца 28.10, вариант Б): исход повтора
+# пишется в system_config тенанта; первое «доставлено после повтора» — машинный признак,
+# по которому ночная проверка просит поднять инвариант
+# morning_brief::transient_net_does_not_lose_brief (integrity_tests.check_brief_net_retry).
+BRIEF_RETRY_DELAYS_S = (120, 300, 900)   # §9 кл.2: механика повтора, не клиника
+BRIEF_NET_RETRY_KEY = "brief.net_retry"
+
+
+def _record_net_retry(day, attempt: int, outcome: str) -> None:
+    """Исход повтора → system_config тенанта. Сбой записи — в лог, бриф не роняет."""
+    try:
+        from config_db import get_config, upsert_config
+        v = get_config(BRIEF_NET_RETRY_KEY, {}) or {}
+        v["last"] = {"date": str(day), "attempt": attempt, "outcome": outcome}
+        if outcome == "delivered":
+            v.setdefault("first_delivered", str(day))
+        upsert_config(BRIEF_NET_RETRY_KEY, value_json=v, category="brief", source="morning_brief")
+    except Exception as e:  # noqa: BLE001 — запись доказательства не важнее доставки
+        log.warning("brief.net_retry не записан (%s, %s): %r", day, outcome, e)
+
+
+async def morning_report_job(context: ContextTypes.DEFAULT_TYPE):
+    """Задача брифа для job_queue: send_morning_report + повтор при сетевом сбое Telegram.
+
+    Транзиентным считается только сбой связи (`_transient_net`): ошибка токена, чата или
+    разметки — не сеть, повтор её не лечит и спрятал бы постоянную поломку.
+    """
+    job = getattr(context, "job", None)
+    attempt = int(((getattr(job, "data", None) or {}).get("attempt")) or 0)
+    day = get_today()
+    if _sent_marker(day).exists():
+        return  # бриф за день уже доставлен (досылка или другой повтор успел раньше)
+    try:
+        await send_morning_report(context)
+    except TelegramError as e:
+        if not _transient_net(e):
+            raise
+        if _sent_marker(day).exists():
+            return  # сеть упала уже после доставки (хвостовые сообщения) — брифа не касается
+        if attempt < len(BRIEF_RETRY_DELAYS_S):
+            delay = BRIEF_RETRY_DELAYS_S[attempt]
+            log.warning("BRIEF_NET_RETRY attempt=%d через %dс: %r", attempt + 1, delay, e)
+            await asyncio.to_thread(_record_net_retry, day, attempt + 1, "retrying")
+            context.job_queue.run_once(morning_report_job, when=delay,
+                                       name="morning_report_retry", data={"attempt": attempt + 1})
+            return
+        log.error("BRIEF_NET_RETRY исчерпан (%d попыток): %r", attempt + 1, e)
+        await asyncio.to_thread(_record_net_retry, day, attempt, "exhausted")
+        await notify.afault(i18n.t("jobs.brief.net_exhausted_fault", day=day,
+                                   attempts=attempt + 1, error=type(e).__name__),
+                            person_key=None, exc=e)
+        return
+    if attempt > 0 and _sent_marker(day).exists():
+        log.info("BRIEF_NET_RETRY доставлен с попытки %d", attempt + 1)
+        await asyncio.to_thread(_record_net_retry, day, attempt, "delivered")
+
 # ── Вечерний чекин: СНЯТ 2026-08-17 (решение владельца) ────────────────────
 # Автозапуск в 20:00 местного рассылал вопрос обоим тенантам без их действия.
 # Функция send_evening_checkin и регистрация job'ы "evening_checkin" удалены
@@ -529,21 +610,11 @@ async def send_weekly_report(context: ContextTypes.DEFAULT_TYPE):
       сб 23:00 → specialists_run (MDT синтез)
       вс 07:00 → send_weekly_report (этот job, читает MDT)
     """
-    chat_id = get_chat_id()
-    if not chat_id:
+    result = await _send_periodic_report(context, "weekly", gp.generate_weekly_report)
+    if result is None:
         return
-    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    await asyncio.to_thread(refresh_data)
-    target = get_today() - timedelta(days=1)
-    report = None
-    try:
-        # GP читает MDT из agent_reports (специалисты уже отработали в сб 23:00)
-        report = await asyncio.to_thread(gp.generate_weekly_report, target, False)
-        header = i18n.t("jobs.weekly.heading") + report
-    except Exception as e:
-        log.error(f"Ошибка GP weekly report: {e}")
-        header = await notify.afault(f"scheduled.send_weekly_report: {type(e).__name__}: {e}", person_key="jobs.weekly.failed")
-    await send_long(context.bot, chat_id, header)
+    chat_id = get_chat_id()
+    target, report = result
     # Извлекаем задачи из scheduled отчёта
     if report:
         asyncio.create_task(_send_tasks_from_report(
@@ -598,19 +669,7 @@ async def send_weekly_report(context: ContextTypes.DEFAULT_TYPE):
 
 async def send_monthly_check(context: ContextTypes.DEFAULT_TYPE):
     """Scheduled 1-го числа — GP ежемесячный отчёт."""
-    chat_id = get_chat_id()
-    if not chat_id:
-        return
-    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    await asyncio.to_thread(refresh_data)
-    target = get_today() - timedelta(days=1)
-    try:
-        report = await asyncio.to_thread(gp.generate_monthly_report, target)
-        header = i18n.t("jobs.monthly.heading") + report
-    except Exception as e:
-        log.error(f"Ошибка GP monthly report: {e}")
-        header = await notify.afault(f"scheduled.send_monthly_report: {type(e).__name__}: {e}", person_key="jobs.monthly.failed")
-    await send_long(context.bot, chat_id, header)
+    await _send_periodic_report(context, "monthly", gp.generate_monthly_report)
 
 
 # ── Рекомендации по доменам (каждые 2ч, 9:00-21:00) ────────────────────────
@@ -876,6 +935,16 @@ async def check_pending_treatments(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ── Регистрация всех jobs ──────────────────────────────────────────────────
 
+def _no_genome(job: str) -> bool:
+    """Генетической задаче без генома делать нечего: тихо выходим, а не сбоим
+    (карточка report:44f643 — скан PGS сбоил у установки без генома)."""
+    import genome_db
+    if genome_db.genome_present():
+        return False
+    log.info("%s: генома нет — пропуск", job)
+    return True
+
+
 async def send_genome_update_monthly(context: ContextTypes.DEFAULT_TYPE):
     """Ежемесячный синк ClinVar + авто-уведомление (audit 2026-06-17).
 
@@ -887,6 +956,8 @@ async def send_genome_update_monthly(context: ContextTypes.DEFAULT_TYPE):
     - Block C: создаётся задача на пересмотр гипотез (health_db.save_task)
     - Block B: запускается перегенерация конституций (generate_constitutions.py subprocess)
     """
+    if _no_genome("send_genome_update_monthly"):
+        return
     chat_id = get_chat_id()
     try:
         import genome_update_agent as gua
@@ -955,6 +1026,8 @@ async def check_prs_updates_monthly(context: ContextTypes.DEFAULT_TYPE):
 
     Запускается после send_genome_update_monthly (05:00) — в 06:00 1-го числа.
     """
+    if _no_genome("check_prs_updates_monthly"):
+        return
     chat_id = get_chat_id()
 
     try:
@@ -1074,11 +1147,25 @@ async def discover_pgs_monthly(context: ContextTypes.DEFAULT_TYPE):
     Фильтр качества: GRCh38 harmonized + num_variants >= 50.
     Phase H coverage — финальный фильтр релевантности.
     """
+    if _no_genome("discover_pgs_monthly"):
+        return
     chat_id = get_chat_id()
     log.info("discover_pgs_monthly: start")
 
     try:
-        result = await asyncio.to_thread(pgsd.discover_and_import_new_scores)
+        # Срок следующего прогона — из своего расписания: следующий запуск + запас на
+        # догоняющий запуск (misfire_grace_time регистрации). Его судит датчик писателя.
+        due = None
+        try:
+            from datetime import timezone
+            ap = getattr(context.job, "job", None)
+            nxt = context.job.next_t
+            grace = getattr(ap, "misfire_grace_time", None) or 0
+            if nxt is not None:
+                due = (nxt + timedelta(seconds=grace)).astimezone(timezone.utc).isoformat(timespec="seconds")
+        except Exception as exc:  # silent-ok: без срока датчик молчит, а не врёт
+            log.warning("discover_pgs_monthly: срок следующего прогона не вычислен: %s", exc)
+        result = await asyncio.to_thread(pgsd.discover_and_import_new_scores, None, due)
     except Exception as exc:
         log.error("discover_pgs_monthly: failed: %s", exc, exc_info=True)
         await notify.afault(f"scheduled.discover_pgs_monthly: {type(exc).__name__}: {exc}", person_key=None)
@@ -1093,7 +1180,11 @@ async def discover_pgs_monthly(context: ContextTypes.DEFAULT_TYPE):
         await notify.afault(f"scheduled.discover_pgs_monthly: pre-op snapshot failed: {snapshot_error}", person_key=None)
         log.error("discover_pgs_monthly: snapshot failed: %s", snapshot_error)
     if errors:
-        await notify.afault(f"scheduled.discover_pgs_monthly: import errors={len(errors)}", person_key=None)
+        # R2-стопы (место, целость справочника) — с текстом: по одной цифре владелец не
+        # отличит «нет места» от «справочник испорчен».
+        r2 = [e["error"] for e in errors if str(e.get("pgs_id", "")).startswith("R2_")]
+        tail = f": {r2[0]}" if r2 else ""
+        await notify.afault(f"scheduled.discover_pgs_monthly: import errors={len(errors)}{tail}", person_key=None)
 
     if not imported:
         log.info(
@@ -1136,29 +1227,92 @@ def _reports_dir() -> Path:
     return Path(os.environ.get("HEALTH_DATA_DIR") or infra_config.cloud_dir()) / "data" / "reports"
 
 
-def _sent_marker(day) -> Path:
-    """reports/<день>.sent — бриф за день ушёл в Telegram (пишется ПОСЛЕ send_long)."""
-    return _reports_dir() / f"{day}.sent"
+def _sent_marker(period, kind="morning") -> Path:
+    """Delivery receipt; preserve the existing daily reports/<date>.sent format."""
+    key = str(period) if kind == "morning" else f"{kind}-{period}"
+    return _reports_dir() / f"{key}.sent"
+
+
+def _report_slot(kind):
+    """Latest due weekly/monthly slot, or today's morning slot, in tenant time."""
+    if kind == "morning":
+        tz, _, _ = _resolve_brief_tz()
+        at = _brief_time()
+    else:
+        tz = _tenant_tz(TZ)
+        at = WEEKLY_REPORT_TIME if kind == "weekly" else MONTHLY_REPORT_TIME
+    now = get_now(tz)
+    day = now.date()
+    if kind == "weekly":
+        day += timedelta(days=(WEEKLY_REPORT_DAYS[0] - 1) % 7 - day.weekday())
+        if _dt.combine(day, at, tzinfo=tz) > now:
+            day -= timedelta(days=7)
+        year, week, _ = day.isocalendar()
+        period = f"{year}-W{week:02d}"
+    elif kind == "monthly":
+        day = day.replace(day=MONTHLY_REPORT_DAY)
+        if _dt.combine(day, at, tzinfo=tz) > now:
+            day = (day.replace(day=1) - timedelta(days=1)).replace(day=MONTHLY_REPORT_DAY)
+        period = day.strftime("%Y-%m")
+    else:
+        period = str(get_today())
+    return now, _dt.combine(day, at, tzinfo=tz), _sent_marker(period, kind)
+
+
+async def _send_periodic_report(context, kind, generate):
+    """Serialize cron/catch-up in this bot; mark only a successfully delivered report.
+
+    Telegram acknowledgement and the file write are not atomic: a process crash
+    between them can repeat a report. Generation/delivery failures remain retryable.
+    """
+    lock = context.bot_data.setdefault(f"report_lock:{kind}", asyncio.Lock())
+    async with lock:
+        now, slot, sent = _report_slot(kind)
+        chat_id = get_chat_id()
+        if not chat_id or now < slot or sent.exists():
+            return None
+        await _typing(context.bot, chat_id)
+        await asyncio.to_thread(refresh_data)
+        target = slot.date() - timedelta(days=1)
+        try:
+            args = (target, False) if kind == "weekly" else (target,)
+            report = await asyncio.to_thread(generate, *args)
+        except Exception as e:
+            log.error("Ошибка GP %s report: %s", kind, e)
+            header = await notify.afault(
+                f"scheduled.send_{kind}_report: {type(e).__name__}: {e}",
+                person_key=f"jobs.{kind}.failed")
+            await send_long(context.bot, chat_id, header)
+            return target, None
+        await send_long(context.bot, chat_id, i18n.t(f"jobs.{kind}.heading") + report)
+        sent.parent.mkdir(parents=True, exist_ok=True)
+        sent.touch()
+        return target, report
+
+
+def _schedule_report_catchup(app, kind, callback, name):
+    """On first weekly/monthly receipt use, suppress the latest slot without sending.
+
+    A report genuinely missed at upgrade is not caught up once: this is preferred
+    over duplicating previously delivered reports on every upgraded installation.
+    Morning receipts and catch-up are unaffected.
+    """
+    now, slot, sent = _report_slot(kind)
+    if kind in ("weekly", "monthly") and not any(
+        path.is_file() for path in sent.parent.glob(f"{kind}-*.sent")
+    ):
+        sent.parent.mkdir(parents=True, exist_ok=True)
+        sent.touch()
+        log.info("%s catch-up: first receipt %s initialized without sending", name, sent.name)
+        return
+    if now <= slot or sent.exists():
+        return
+    log.info("%s catch-up: нет %s — досылаю через 60с", name, sent.name)
+    app.job_queue.run_once(callback, when=60, name=f"{name}_catchup")
 
 
 def _schedule_morning_catchup(app):
-    """Если бот стартует ПОСЛЕ времени брифа, а бриф за сегодня не ДОСТАВЛЕН —
-    одноразовая досылка через 60с. Маркер — квитанция reports/<today>.sent, которую
-    send_morning_report пишет после отправки; повторный рестарт дубля не шлёт.
-    До 01.10 маркером был reports/<today>.md, а он пишется ДО отправки (M3).
-    Граница: в день перехода на квитанцию рестарт после брифа пошлёт его второй раз."""
-    tz, _tzn, _ok = _resolve_brief_tz()
-    bt = _brief_time()
-    now = _dt.now(tz)
-    slot = now.replace(hour=bt.hour, minute=bt.minute, second=0, microsecond=0)
-    if now <= slot:
-        return  # обычное расписание сработает сегодня — досылка не нужна
-    sent = _sent_marker(get_today())
-    if sent.exists():
-        return  # бриф за сегодня уже доставлен
-    log.info("morning_report catch-up: рестарт после брифа, нет %s — досылаю через 60с",
-             sent.name)
-    app.job_queue.run_once(send_morning_report, when=60, name="morning_report_catchup")
+    _schedule_report_catchup(app, "morning", morning_report_job, "morning_report")
 
 
 # ── Непрерывная консолидация памяти (A): nightly + человек-гейт SUPERSEDE ─────
@@ -1326,6 +1480,8 @@ def register(app):
     # Catch-up нужен и после рестарта процесса: заново созданный run_daily
     # планирует следующий слот, а пропущенный сегодня требует досылки.
     _schedule_morning_catchup(app)
+    _schedule_report_catchup(app, "weekly", send_weekly_report, "weekly_report")
+    _schedule_report_catchup(app, "monthly", send_monthly_check, "monthly_check")
 
     # Пересчёт местного tz (поездка) — раз в 12ч (выбор владельца). run_daily биндит tz на
     # регистрации, поэтому без этого смена пояса не подхватится до рестарта процесса.
@@ -1510,6 +1666,46 @@ def register(app):
         interval=_pdb.DELIVERY_EVERY_S,
         first=150,
         name="deliver_pending_proposals",
+    )
+
+    app.job_queue.run_repeating(
+        task_nudge_job,
+        interval=3600,
+        first=420,
+        name="task_nudge",
+        job_kwargs={"max_instances": 1},
+    )
+
+    app.job_queue.run_repeating(
+        lab_task_evidence_job,
+        interval=3600,
+        first=480,
+        name="lab_task_evidence",
+        job_kwargs={"max_instances": 1},
+    )
+
+    app.job_queue.run_repeating(
+        assessment_scheduler_job,
+        interval=6 * 3600,
+        first=300,
+        name="assessment_scheduler",
+        job_kwargs={"max_instances": 1},
+    )
+
+    app.job_queue.run_repeating(
+        oura_refresh_job,
+        interval=1800,
+        first=240,
+        name="oura_refresh",
+        job_kwargs={"max_instances": 1},
+    )
+
+    app.job_queue.run_repeating(
+        deliver_agent_mail_job,
+        interval=300,
+        first=180,
+        name="deliver_agent_mail",
+        job_kwargs={"max_instances": 1},
     )
 
     # Outbox вопросов — каждые 5 мин (2026-09-12, нить question-answer-channel):
@@ -1721,6 +1917,134 @@ async def deliver_pending_proposals_job(context: ContextTypes.DEFAULT_TYPE) -> N
     if not chat_id:
         return
     await _send_problem_proposals(context.application.bot, chat_id)
+
+
+async def task_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Nudge unanswered questions; independently surface overdue assistant deeds in the bot."""
+    import fcntl
+    import sqlite3
+    import task_route
+    from handlers.tasks import task_keyboard
+    try:
+        await asyncio.to_thread(task_route.nudge)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        notify.fault(f"task_nudge: {type(exc).__name__}: {exc}", person_key=None)
+    chat_id = get_chat_id()
+    if not chat_id:
+        return
+    try:
+        # Serialize overlapping processes without depending on the mail bridge mount.
+        with (Path(db.DB_PATH).parent / "task_overdue.lock").open("a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return
+            # Сперва закрыть анализы, по которым пришёл результат, и перечитать статус: иначе бот
+            # отправит как незавершённое дело, закрытое секунду назад (повторное ревью 07.11, нах. 4).
+            try:   # сбой автозакрытия не отменяет запасной путь для остальных дел (ревью №3)
+                await asyncio.to_thread(ta.close_lab_tasks_by_results)
+            except (OSError, ValueError, sqlite3.Error) as exc:
+                notify.fault(f"task_overdue: lab close failed ({type(exc).__name__})", person_key=None)
+            rows = await asyncio.to_thread(task_route.overdue_assistant_tasks)
+            rows = [r for r in rows if (db.get_task(r["id"]) or {}).get("status") == "open"]
+            groups = (("tasks.open.assistant_overdue", [r for r in rows if r.get("deadline")]),
+                      ("tasks.open.assistant_waiting", [r for r in rows if not r.get("deadline")]))
+            for heading, group in groups:
+                for start in range(0, len(group), 20):
+                    part = group[start:start + 20]  # formatter and keyboard both show at most 20
+                    text = i18n.t(heading) + "\n\n" + ta.format_open_tasks_message(part)
+                    receipts = await send_long(context.bot, chat_id, text, reply_markup=task_keyboard(part))
+                    if not receipts or any(not r for r in receipts):
+                        raise ValueError("task_overdue: missing Telegram receipt")
+                    ids = [r["id"] for r in part]
+                    await asyncio.to_thread(db.mark_followup_sent, ids)
+                    log.info("task_overdue: delivered %d tasks", len(ids))
+    except (OSError, ValueError, sqlite3.Error, TelegramError) as exc:
+        notify.fault(f"task_overdue: {type(exc).__name__}: {exc}", person_key=None)
+
+
+async def lab_task_evidence_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Задача «сдать анализ» закрывается приходом результата (п.4, 07.11). Сбой — в журнал."""
+    import sqlite3
+    import task_agent
+    try:
+        await asyncio.to_thread(task_agent.close_lab_tasks_by_results)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        notify.fault(f"lab_task_evidence: {type(exc).__name__}: {exc}", person_key=None)
+
+
+async def assessment_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Пора ли заполнить опросник (07.11). У владельца планировщик жил только в launchd вне
+    контейнера и после переезда не запускался: с 31.08 ни одной задачи-опросника. Повтор
+    безопасен — открытая задача с тем же fingerprint вторую не даёт. Сбой — в журнал сбоев."""
+    import subprocess
+    import sys
+    script = Path(__file__).resolve().parent.parent / "assessment_scheduler.py"
+    try:
+        done = await asyncio.to_thread(subprocess.run, [sys.executable, str(script)],
+                                       capture_output=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        notify.fault("assessment_scheduler: timed out", person_key=None)
+        return
+    if done.returncode:
+        notify.fault(f"assessment_scheduler: failed (exit {done.returncode})", person_key=None)
+
+
+async def oura_refresh_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Oura за вчера и сегодня раз в 30 минут (07.11). До этого у владельца кольцо тянулось
+    только перед отчётами — день был виден с опозданием до суток. Сбой — в журнал сбоев."""
+    import subprocess
+    import sys
+    script = Path(__file__).resolve().parent.parent / "import_oura.py"
+    try:
+        done = await asyncio.to_thread(subprocess.run, [sys.executable, str(script), "1"],
+                                       capture_output=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        notify.fault("oura_refresh: import timed out", person_key=None)
+        return
+    if done.returncode:
+        notify.fault(f"oura_refresh: import failed (exit {done.returncode})", person_key=None)
+
+
+async def deliver_agent_mail_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Bridge inbox → taken (persisted) → ack → reply to the owner's assistant.
+    No Telegram echo: owner decision 06.11 «я вижу все и так» — the post office is his view."""
+    import agent_mail
+    import sqlite3
+    try:
+        with agent_mail.delivery_slot() as acquired:
+            if not acquired:
+                return
+            # A broken receipt must not starve the independent inbox direction.
+            try:
+                agent_mail.poll_sent()
+            except (OSError, ValueError, sqlite3.Error) as exc:
+                notify.fault(f"agent_mail: poll_sent failed ({type(exc).__name__})", person_key=None)
+            letters = agent_mail.pull_inbox()
+            for letter in letters[:agent_mail.budget_left()]:
+                try:
+                    import agent_reply
+                    await asyncio.to_thread(agent_reply.queue_fact_questions, letter)
+                except Exception as exc:   # silent-ok: громко в notify.fault
+                    # Письмо идёт дальше: повтор без ack гонял бы модель каждые 5 минут вечно и
+                    # держал ответ ассистенту. Потеря кандидатов-фактов видна в журнале сбоев.
+                    notify.fault(f"agent_reply: fact questions failed ({type(exc).__name__})", person_key=None)
+                agent_mail.record_taken(letter["key"])
+                agent_mail.mark_shown(letter["key"])
+                # Ответ ассистенту своего хозяина (этап 2, решение владельца 05.11 «пусть отвечает»).
+                # Сбой ответа не отменяет приём: письмо видно на почтамте, причина — в журнал сбоев.
+                try:   # «задача #N: сделано» от ассистента закрывает дело (маршрут задач, 07.11)
+                    import task_route
+                    await asyncio.to_thread(task_route.close_from_letter, letter)
+                except Exception as exc:   # silent-ok: громко в notify.fault, ответ всё равно пишем
+                    notify.fault(f"task_route: close_from_letter failed ({type(exc).__name__})", person_key=None)
+                try:
+                    import agent_reply
+                    await asyncio.to_thread(agent_reply.reply_to_letter, letter)
+                except Exception as exc:   # silent-ok: громко в notify.fault, канал показа не роняем
+                    notify.fault(f"agent_reply: reply not composed ({type(exc).__name__})", person_key=None)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        notify.fault(f"agent_mail: delivery failed ({type(exc).__name__})", person_key=None)
 
 
 # ── Outbox вопросов (нить question-answer-channel, 2026-09-12) ───────────────
@@ -1943,7 +2267,7 @@ async def check_hypothesis_evaluations(context: ContextTypes.DEFAULT_TYPE):
             chat_id=chat_id,
             text=i18n.t("jobs.hypotheses.checking_one", memory_id=memory_id, observation=obs),
         )
-        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        await _typing(context.bot, chat_id)
 
         try:
             verdict_dict = await evaluate_hypothesis_via_consilium(memory_id)
@@ -1968,3 +2292,44 @@ async def check_hypothesis_evaluations(context: ContextTypes.DEFAULT_TYPE):
             log.error(f"check_hypothesis_evaluations #{memory_id}: {e}", exc_info=True)
             await notify.afault(f"scheduled.check_hypothesis_evaluations memory_id={memory_id}: {type(e).__name__}: {e}",
                 person_key=None)
+
+
+async def agent_signals_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Optional assistant channel, using the observation day in the scheduled timezone."""
+    import agent_signals
+    from _time_inject import get_now
+    cfg = context.job.data
+    day = get_now(ZoneInfo(cfg["timezone"])).date()
+    try:
+        await asyncio.to_thread(agent_signals.run, day, phase=cfg["phase"])
+    except Exception as exc:
+        # Scheduler boundary: preserve failed heartbeat and journal without medical payload.
+        notify.fault(f"agent_signals: {cfg['phase']} failed ({type(exc).__name__})", person_key=None)
+
+
+def _apply_agent_signals_schedule(app, brief_time, brief_tz):
+    """Called by register -> _apply_morning_schedule and its timezone rescheduler.
+
+    Morning shares the tenant brief clock. Afternoon follows the installation's
+    Oura cron clock (HEALTH_TZ/region), which does not move with the user's GPS.
+    """
+    import agent_signals
+    import config_db
+    for phase in ("morning", "afternoon"):
+        for job in app.job_queue.get_jobs_by_name("agent_signals_" + phase):
+            job.schedule_removal()
+    if not config_db.get_config("agent_mail.assistant", ""):
+        return
+    cfg = agent_signals.policy()
+    for phase, hour, minute, offset, tz in (
+        ("morning", brief_time.hour, brief_time.minute, cfg["morning_offset_minutes"], brief_tz),
+        ("afternoon", cfg["stress_import_hour"], 0, cfg["stress_offset_minutes"], _tenant_tz(TZ)),
+    ):
+        total_minutes = (hour * 60 + minute + offset) % (24 * 60)
+        app.job_queue.run_daily(
+            agent_signals_job,
+            time=time(hour=total_minutes // 60, minute=total_minutes % 60, tzinfo=tz),
+            name="agent_signals_" + phase,
+            data={"phase": phase, "timezone": str(tz)},
+            job_kwargs={"misfire_grace_time": 1800},
+        )

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/llm_egress.md sha256:0b8e4de477bf -->
+<!-- translation-of: docs/explanation/llm_egress.md sha256:b499816dc0d8 -->
 **English** · [Русский](llm_egress.md)
 
 # Outbound access to an external LLM API: why one home
@@ -47,3 +47,31 @@ In Tanenbaum's terms (§7.2.1): the guard's conit is narrower than the client's 
 Two sensors run nightly. `check_llm_direct_constructors` is a ratchet: no more than 27 constructors bypassing the factory; the baseline is lowered manually along with migration. `check_llm_guard_blocks_reported` counts blocks over the past day: without it, a block would disappear into the caller's log, and neither a false positive nor a real finding would be visible to a person.
 
 The remaining modules migrate **when touched**, rather than as a separate project: when you touch a module for another reason, switch it to the factory and lower the baseline.
+
+
+## Shadow task-pair classifier
+
+`task_guard.judge_pair` (2026-11-07; oracle: `tests/unit/test_task_guard.py`) calls
+TypeSafe's discriminative `/v1/systemone` API with `jev-latest`. It uses stdlib HTTP
+rather than a generative model role, but applies `mcp_tools.redact` and
+`llm_client.guard_outgoing`. Only task type, text, deadline and origin leave the
+machine. Redaction removes known identifiers, not all medical meaning. The tenant's
+`secrets_dir()/typesafe_key.txt` is used only as bearer authentication.
+
+`tasks.guard_mode=off` disables this egress. The default is `shadow`; `enforce` is
+also shadow with a warning. `tasks.guard_timeout_seconds` bounds each network
+operation (seed 2 seconds, accepted range 0 < t ≤ 10); there are no retries or
+redirects. `tasks.guard_budget_seconds` limits model-call admission across the entire creation
+batch; its 20-second seed/fallback is defined once in config_db. Each call's timeout
+is capped by the remaining budget. The first transport error opens a circuit
+breaker until the end of that batch. Deterministic checks always continue.
+Skipped pairs remain unjudged journal rows with reason budget or breaker_open;
+GROUP BY reason over the batch's saved task IDs gives missing-coverage counts.
+The budget does not bound the old judge, storage or deterministic work. The network
+timeout is a socket timeout, not a hard deadline for OS DNS/the entire HTTP exchange. Provider
+responses and error messages are never stored: only validated labels, confidence
+and fixed reason codes reach the journal. A missing key file means `unjudged/not_configured`, with no HTTP or fault:
+the model is not configured, while deterministic checks continue. This is logged
+once per process for each tenant; key availability is rechecked next batch. An
+empty file means `empty_key` and a fault. Transport failures and invalid responses
+also mean `unjudged`, never `new`.

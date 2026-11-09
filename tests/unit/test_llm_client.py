@@ -97,7 +97,7 @@ def test_guarded_client_builds_via_public_entry(monkeypatch):
     """guarded_client() — публичный вход; клиент не конструируется по-настоящему."""
     import anthropic
     monkeypatch.setattr(anthropic, "Anthropic", lambda **kw: _Inner(), raising=False)
-    monkeypatch.setattr(lc, "api_key", lambda: "fake")
+    monkeypatch.setattr(lc, "api_key", lambda prov=None: "fake")
     monkeypatch.setattr(lc.secret_guard, "find_secret_values", lambda *a, **k: [])
     c = lc.guarded_client()
     assert c.messages.create(messages=[{"role": "user", "content": "q"}]) == "sent"

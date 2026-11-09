@@ -138,7 +138,7 @@ def test_long_pdf_is_refused_before_classifier_and_vision(wat, monkeypatch):
     monkeypatch.setattr(import_medical_events, "process_incoming", lambda *a, **k: 0)
     classifiers, vision, told = [], [], []
     monkeypatch.setattr(import_all, "classify", lambda *a: classifiers.append(a) or "other")
-    monkeypatch.setattr(wat.lab_backfill, "run_backfill", lambda *a: vision.append(a) or {})
+    monkeypatch.setattr(wat.lab_backfill, "run_backfill", lambda *a, **k: vision.append(a) or {})
     monkeypatch.setattr(wat.notify, "notify", lambda msg, **k: told.append(msg) or "telegram")
     wat.process_once(); wat.process_once()
     assert len(told) == 1 and "Разделите PDF" in told[0]

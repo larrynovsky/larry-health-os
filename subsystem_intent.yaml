@@ -436,6 +436,12 @@
       check:
         file: health_db.py
         present: ["journal_mode=WAL"]
+    - id: writer_machine_runs_no_data_jobs
+      claim: "На машине, где пишется код (MacBook), по расписанию крутится только гигиена репозитория — снимки, ротация журналов, конфликты iCloud; джоб, исполняющий код проекта против данных, там ошибка по построению: он либо падает на запрете записи, либо пишет мимо канона. Что загружено в launchd, везёт снимок backup.sh --wip, судит Studio по списку разрешённого (git_facts.MACBOOK_ALLOWED_JOBS); «launchctl не ответил» — «не судимо», а не «чисто». Громкий отказ засчитывается, только если его кто-то слышит. Решение владельца 2026-11-06."
+      status: holds
+      check:
+        file: integrity_tests.py
+        present: ["def check_macbook_health_jobs", "MACBOOK_ALLOWED_JOBS"]
   sentinel: tests/consistency/test_intent_validation_gate.py
   last_reconciled: "2026-07-10"
 
@@ -844,6 +850,8 @@
     # физически (миграция), но якорь на инфра-модуль раздувает подсистему до
     # полурепозитория — preflight сразу сказал «инфра-seed, подсистема широкая».
     # Сам гейт стережётся маркером в invariants[answer_or_nothing].check.
+    - agent_reply.py::queue_fact_questions
+    - hai_chat.py::extract_artifacts
     - task_agent.py::record_answer
     - task_agent.py::should_ask_again
     - task_agent.py::promote_memory_questions
@@ -983,6 +991,12 @@
       check:
         file: task_agent.py
         present: ["ASKING_VERDICTS", "unsure"]
+    - id: assessment_catalog_and_producer_durable
+      claim: "Повторяемые опросники поставляются в methodology/instruments/recurring; tenant-файл с тем же именем главнее, остальные берутся из образа. Автоназначение и оба ночных датчика используют load_instruments(applicable_only=True): applies_when требует все перечисленные condition_id из clinical_kb.active_conditions; пустой список разрешает всем, overlay — явное назначение без фильтра. В bundle ISI/MFSI-SF требуют oncology; узкоспециальные опросники — только в каталоге тенанта. Неприменимый каталог даёт ноль задач без FAIL; отсутствующий или испорченный каталог — отказ, а не ноль опросников. Планировщик, импортёр, диалог, анализатор и ночной монитор читают один каталог. Интервал из cadence_days, запас и дефолт интервала — methodology/assessment_schedule.json. check_assessment_producer_liveness даёт FAIL, если нет открытой/отложенной задачи и последний ответ/создание задачи старше интервала с запасом; отсутствие всей истории тоже FAIL. Открытую задачу судит существующая проверка доставки/свежести. Оракулы: tests/unit/test_assessment_scheduler.py, мутации исполнены 07.11.2026; это не доказательство доставки в production."
+      status: holds
+      check:
+        file: integrity_tests.py
+        present: ["check_assessment_producer_liveness", "schedule_policy(ins)"]
     - id: assessment_zero_score_is_failure
       claim: "Опросник (путь assessment_dialog → assessment_importer) с ответами, из которых не посчиталось ни одной субшкалы, — ОТКАЗ, а не «заполнено»: импорт возвращает False, сессия получает статус import_failed, задача остаётся открытой, человеку честный ответ, ночной check_assessments_freshness предупреждает. До 27.09 такой импорт закрывал сессию и задачу как успешные — баллов не было, и никто этого не видел (майский дрейф ключей ответов). Записано по слову владельца 27.09 (BL-BOTDEC-1, путь опросников был вне реестра)."
       status: holds
@@ -1026,6 +1040,18 @@
     - integrity_tests.py::check_db_integrity
     - triage_agent.py::run_triage
   invariants:
+    - id: task_pair_guard_is_shadow
+      claim: "При создании в task_agent (отчёт и вопросы памяти) сторож сравнивает кандидата со всеми открытыми задачами тенанта: lab_task_pairs прежде Jev. off отключает сверку; shadow и заглушка enforce ничего не блокируют. Отдельный task_guard_journal хранит ID пары, время, verdict/confidence/judge и безопасный код причины; поля адресации вопроса сохранены. Ошибка Jev даёт unjudged и суточный fault без сообщения пациенту; первая транспортная ошибка размыкает всю пачку (breaker_open), общий бюджет даёт budget. Нет файла ключа — not_configured без fault, пустой файл — сбой. Det остаётся активен; пропущенные пары сохраняются и считаются по reason. Оракул: tests/unit/test_task_guard.py. Снимок не включает более поздние конкурентные записи; старый блокирующий судья работает прежде этого сторожа."
+      status: holds
+      check:
+        file: task_guard.py
+        present: ["def audit_new_task", "tasks.guard_mode", "lab_task_pairs", "report_failure"]
+    - id: open_lab_tasks_are_consistent
+      claim: "Открытые и отложенные lab_test-задачи одного тенанта проверяются попарно через tasks_db.lab_task_pairs: общий аналит при одинаковом deadline (включая два отсутствующих) — дубль, при разных — противоречие. Исторический хвост annotate_lab_recency исключён. FAIL требует сверки человеком, не выбирает срок и не закрывает задачи; в сигнале только номера и аналит. Оракул: tests/unit/test_task_dedup.py. Не судит клиническую оправданность повторов и закрытие без результата."
+      status: holds
+      check:
+        file: integrity_tests.py
+        present: ["check_lab_task_pairs", "db.lab_task_pairs"]
     - id: daily_integrity_check
       claim: "Ежедневная проверка целостности (07:50): integrity базы, свежесть данных, полнота ядра метрик; критическое падение поднимает флаг, не тонет в логе."
       status: holds
@@ -1623,6 +1649,12 @@
       check:
         file: food_profile.py
         present: ["_SUPPRESSED_WHEN_GAIN", "food.frame.dominance"]   # 29.09: текст «вес/калории важнее генетики» переехал в словари (K9)
+    - id: food_kb_not_assessed
+      claim: "Решение владельца 08.11.2026: clinical_kb.readiness — единый владелец статуса источника и реплики. not_installed требует clinical_pack: not_installed в индексе, отсутствие conditions/floor и совпадение непустого shared-каталога с БД; потеря таблиц, повреждение, устаревшая реплика и неработающий пол дают failed. Оба датчика integrity дают WARN «clinical_kb: свод не установлен» только для not_installed (standing), дефекты — FAIL. Без ready floor возвращает floor_unavailable; критик пишет rejected, применитель пропускает правило с причиной в логе. Профиль, MCP, бриф и конституция питания сообщают not_assessed на ru/en; генерация персонального питания отключена. Оракул: test_clinical_kb_phase2.py, синтетический пакет и отрицательные контроли."
+      status: holds
+      check:
+        file: tests/unit/test_clinical_kb_phase2.py
+        present: ["test_public_pack_warn_and_failed_seed_fail", "test_public_pack_refuses_generated_rules", "test_owner_like_seeded_pack_parity_and_corruption"]
     - id: food_deterministic_decision_llm_renders
       claim: "Пищевой профиль: решение принимает КОД (medical_frame по курируемым правилам), LLM только рендерит (render_food_document детерминирован). N12: детерминированное решение, LLM-рендер."
       status: holds
@@ -1635,6 +1667,18 @@
       check:
         file: food_quarterly.py
         present: ["should_deliver", "_quarter("]
+    - id: transient_net_does_not_lose_brief
+      claim: "Сбой связи с Telegram (обрыв, таймаут, флуд-контроль) до квитанции доставки reports/<день>.sent не отменяет бриф: задача брифа повторяет попытку с нарастающим шагом, пока не доставит, а исчерпав повторы — пишет сбой в журнал, который читает ночной ремонт. Ошибка разметки, чата или токена — не сеть и не повторяется: повтор её не лечит и спрятал бы постоянную поломку. Косметический индикатор «печатает…» отчёт не отменяет. Каждый исход повтора бот пишет в system_config тенанта (brief.net_retry)."
+      status: open
+      closes_when: "в system_config хотя бы одного тенанта есть brief.net_retry.first_delivered — бриф, доставленный после НАСТОЯЩЕГО сетевого сбоя в жизни, а не в тесте. Признак ставит сам бот; пока статус не holds, ночная проверка живости брифа (check_morning_brief_gate_liveness) при появлении признака просит поднять его."
+      closes_when_by: owner
+      # Критерий утверждён владельцем 2026-10-28 («согласен», вариант Б: тесты — сразу, «работает в
+      # жизни» — по первому реальному случаю, машинным признаком; нить brief-net-retry). Тесты
+      # (tests/unit/test_brief_catchup_receipt.py) доказывают модель сбоя, не сбой: обычное утро
+      # повтор не включает, поэтому живое утро без сбоя доказательством не считается.
+      check:
+        file: jobs/scheduled.py
+        present: ["def morning_report_job(", "def _transient_net(", "BRIEF_NET_RETRY_KEY"]
 
 - id: project_context
   title: 'Анти-дубль и онбординг: discovery по данным + гейты'
@@ -2292,11 +2336,12 @@
   explanation: docs/explanation/report_absence_claims.md
   code_anchors:
     - gp_context.py::absent_claims_contradicted
+    - agent_reply.py::reply_to_letter
     - gp_agent.py::_guard_absent_claims
     - labs_db.py::canon_window_note
   invariants:
     - id: claim_judged_against_canon
-      claim: "Текст отчёта судится против lab_results, а не против показанного модели среза: судья читает канон за 10 лет, и фильтр между базой и промптом не становится определением реальности."
+      claim: "Текст отчёта судится против lab_results, а не против показанного модели среза: судья читает канон за 10 лет, и фильтр между базой и промптом не становится определением реальности. Ответ ассистенту (agent_reply.reply_to_letter) использует общего gp_context.judge_absence_claims с политикой чата: поправка приписывается до agent_mail.send и проходит его redact/visible_names; хиты отражаются числом в log и notify.fault без персональных данных. Отказ судьи не блокирует письмо. Оракул подключения и редактирования — tests/unit/test_agent_reply.py."
       status: holds
       check:
         file: gp_agent.py
@@ -2442,11 +2487,13 @@
         file: night_cycle.py
         present: ["owner_card", "ДИАГНОЗ НЕ ГОТОВ ДЛЯ ВЛАДЕЛЬЦА"]
     - id: bell_names_each_decision_daily
+      limits:
+        - "Без отметки наличия ремонтной сессии (notify.repair_provisioned) колокол молчит, включая потерю памяти стола; карточки сохраняются. Возраст отметки и живость ремонта не глушат колокол владельца. На 08.11.2026 ни один KINDS не имеет пути решения в боте. Оракул: test_repair_provisioning_controls_bell в tests/unit/test_owner_nag.py."
       claim: "Колокол звонит владельцу не чаще раза в день и называет КАЖДОЕ ждущее решение одной строкой простыми словами (нить — её человеческим названием из INDEX), плюс ближайший срок умолчания и одну фразу для Claude, открывающую полные карточки. Решение владельца 28.09: «на столе N» без предметов не давало понять, про что решения, а пять звонков в день глушили канал; содержание технических находок триаж владельцу больше не шлёт — они идут в ночной цикл."
       status: holds
       check:
         file: owner_nag.py
-        present: ["Ждут твоего решения", "разбери решения", "Если промолчишь", "_rang_today"]
+        present: ["owner.nag.heading", "owner.nag.action", "owner.nag.default", "_rang_today", "notify.repair_provisioned()"]
     - id: desk_holds_only_live_questions
       claim: "На столе лежит только то, чей повод жив. Карточка из проверки (`warn:*`, `integrity:*`) снимается, когда её находки нет в СЕГОДНЯШНЕЙ проверке или её класс стал `standing`; карточка «нить стоит» — когда нить закрыта в INDEX. Колокол в минуту ночного цикла ждёт его и звонит после, числом уже после снятий. Повод — 23.09: звонок сказал «14», из них три карточки были о закрытых нитях, а у семи повода в проверке уже не было."
       status: holds
@@ -2676,6 +2723,11 @@
     - scripts/git-hooks/post-commit-macbook
     - integrity_tests.py::check_thread_work_has_a_second_copy
     - integrity_tests.py::check_backup_freshness
+    - integrity_tests.py::check_disk_room_for_reference
+    - pgs_discovery.py::discover_and_import_new_scores
+    - pgs_reference.py::import_room
+    - pgs_reference.py::writer_alarm
+    - integrity_tests.py::check_reference_has_writer
   invariants:
     - id: db_backed_up_where_canonical
       claim: "База бэкапится на машине, где она канонична (Studio, backup_studio.sh), и свежесть КАЖДОГО тенанта судится SLA-датчиком. Прежняя форма — бэкап с MacBook по iCloud-пути — падала на TCC 35 ночей из 36 и бэкапила не ту БД после перехода single-primary → Studio; оба дефекта лечатся одним: база бэкапится там, где она канонична."
@@ -2686,6 +2738,25 @@
       limits:
         - "Датчик судит СВЕЖЕСТЬ файла бэкапа, а не восстановимость из него: `PRAGMA integrity_check` перед использованием — ручной шаг R3 политики, машиной он не исполняется."
         - "Оффсайта нет — решение владельца 13.08, риск принят явно. Канон и все суточные копии лежат на одном диске одной машины."
+    - id: reference_snapshot_one_writer_zero_at_rest
+      claim: "Общий справочник PGS (~/.health_reference/pgs.db, 16,5 ГБ на 02.11) импортирует и копирует перед импортом только процесс, которому он доступен на запись (pgs_reference.writable); снимок лежит в pgs_reference.snapshot_dir() и удаляется после PRAGMA quick_check, не прошедший проверку — остаётся и кричит R2_ref_check; импорт не начинается без места на снимок + рост (pgs_reference.import_room), тот же расчёт судит ночной датчик места. До 02.11 три запуска снимали по 16 ГБ в свои backups/ и держали по 5 — ~33 ГБ за одно утро при 72 ГБ свободного (решения владельца 02.11: «0 в покое»). Тесты test_read_only_reference_neither_imports_nor_snapshots, test_snapshot_removed_when_reference_intact, test_no_room_stops_before_snapshot — мутации «писатель любой», «снимок не удаляется», «место не судится», «снимок в backups/» красные."
+      status: holds
+      check:
+        file: pgs_discovery.py
+        present: ["if not pgs_reference.writable():", "room = pgs_reference.import_room(MAX_IMPORT_PER_RUN)", "snap_dir = pgs_reference.snapshot_dir()"]
+        absent: ["DB_SIZE_LIMIT_MB   =", "SNAP_RETENTION     ="]
+      limits:
+        - "Писатель выбирается по факту доступа на запись: если справочник когда-нибудь смонтируют в контейнер на запись, писателей снова станет несколько — ограничитель тогда только R1 и проверка места."
+        - "Датчик места судит только потребность докачки справочника — самого крупного потребителя диска; общего порога свободного места нет."
+    - id: reference_keeps_only_usable_scores
+      claim: "Справочник держит веса только тех шкал, что пригодны (покрытие ≥ prs_context.COVERAGE_USABLE_PCT) хоть одному видимому тенанту; бесполезные для всех удаляются по одной на транзакцию с чекпойнтом и запоминаются в pgs_rejected, новые крупнее доказанной границы не качаются, а геном крупнее прежних снимает границу и пересматривает отказы. Писатель оставляет квитанцию discovery_runs со сроком следующего прогона из расписания бота; датчик check_reference_has_writer краснеет, если прогон, оставивший кандидатов, не сменился до срока. Замер 02.11: на чип-геномах 706 из 772 шкал <40% и ~все 16,5 ГБ; из 439 шкал >1 тыс. вариантов ни одна не дошла до 40%. Мутации plans/mutate_pgs_coverage_2026-11-02.sh — 7 из 7 красные."
+      status: holds
+      check:
+        file: pgs_discovery.py
+        present: ["to_prune = _judge(evidence, catalog)", "if bound is not None and nv > bound:", "INSERT INTO discovery_runs VALUES"]
+      limits:
+        - "Тенант в контейнере не голосует: его канон в томе VM, писателю на хосте не виден. На 02.11 его покрытие совпадало с партнёром по всем 772 шкалам (оба генома ~643 тыс. позиций)."
+        - "Установка, где писателя не было никогда, молчит: таблицы квитанций нет — судить нечего."
     - id: code_snapshot_never_enters_main
       claim: "Снимок кода не коммитит в main и не пушит main: дерево уезжает как commit-tree в refs/backups/* и деплоя не вызывает. До 24.07 форма была другой — `git commit --no-verify` в main + push, — и ночью деплоился непроверенный WIP, обходя ВСЕ гейты (dupgate, L2, доки, ponytail), а история зарастала авто-коммитами."
       status: holds
@@ -2931,6 +3002,12 @@
     лимит 10 $ в месяц на допуск, собственные бланки владельца в автоматическом допуске уходят
     только в Anthropic. Чужой поставщик установки (HEALTH_LLM_PROVIDER) получает только роли,
     чьи модели прошли допуск на синтетике; остальное отказывает громко.
+    Непустой HEALTH_LLM_PROVIDER всегда старше файлов ключей. На переходном выпуске
+    отсутствие переменной при наличии anthropic_key сохраняет Anthropic с предупреждением:
+    нативные службы владельца и партнёра разделяют ключ, дополнительные ключи не меняют выбор.
+    Без anthropic_key выбирается единственный файл профиля; ноль или несколько ключей
+    блокируют вызовы с объяснением в логе и боте. Строгий режим — после миграции загруженных
+    launchd-окружений; рендер даёт всем службам явную переменную.
   explanation: docs/explanation/model_choice.md
   code_anchors:
     - llm_client.py::guarded_client
@@ -3076,13 +3153,19 @@
       check:
         file: lab_intake_watcher.py
         present: ["\"person.file.nothing\"", "\"person.lab.failed\"", "\"person.lab.key_problem\""]
+    - id: zero_rows_question
+      claim: "Только .norows + doc_outcome(status=imported, kind=lab_result) в _settle_outcomes создаёт notify.fault без персональных данных и tasks(type=question) с датой из doc.date. Неизвестная дата названа явно. Итог сообщает отсутствие значений и предстоящий вопрос. imported/encounter не даёт сбоя или вопроса; незавершённый разбор ждёт; failed + .norows сохраняет прежнее поведение. Повторные проходы и рестарт дедуплицированы существующим outcome_told; явный повтор снимает его по прежнему контракту. Очередь jobs.scheduled.deliver_unsent_question_tasks доставляет вопрос с обратным адресом и своим лимитом. Оракул: test_zero_rows_queues_question_and_fault_once_without_db. Граница: сохранение outcome_told до внешних действий не обеспечивает повтор доставки после аварии между этими шагами."
+      status: holds
+      check:
+        file: lab_intake_watcher.py
+        present: ["person.lab.zero_rows_question", "person.lab.zero_rows_outcome"]
     - id: one_outcome_after_both_readers
-      claim: "Если разбор анализов ничего не дал (гейт «не бланк» или 0 строк), человек слышит итог только когда закончит разбор документов (квитанция .events.done или .events.failed): «принят в медкарту» с числом предложений или «уже в медкарте»; «ничего не добавлено» и запись в журнал сбоев — только когда пусто у обоих. Пока разбор документов не закончен — молчание. Если анализы нашлись, а документ принят не как результат анализа (письмо врача с маркерами в прозе — замер 06.10), часть про документ идёт в том же сообщении или следом. Подсказка «пришлите как анализы» — только при расхождении разборщиков (гейт: не бланк; документы: результат анализа) или когда документ не прочитан. Тест: tests/unit/test_lab_intake_watcher.py::test_conclusion_is_told_as_document_after_both_readers (красный на коде до 06.10)."
+      claim: "Если разбор анализов ничего не дал (гейт «не бланк» или 0 строк), человек слышит итог только когда закончит разбор документов (квитанция .events.done или .events.failed): «принят в медкарту» с числом предложений или «уже в медкарте»; «ничего не добавлено» — только когда пусто у обоих; failed + .norows сохраняет прежний сбой. Отдельное расхождение imported/lab_result + .norows получает сбой и вопрос (zero_rows_question). Пока разбор документов не закончен — молчание. Если анализы нашлись, а документ принят не как результат анализа (письмо врача с маркерами в прозе — замер 06.10), часть про документ идёт в том же сообщении или следом. Подсказка «пришлите как анализы» — только при расхождении разборщиков (гейт: не бланк; документы: результат анализа) или когда документ не прочитан. Тест: tests/unit/test_lab_intake_watcher.py::test_conclusion_is_told_as_document_after_both_readers (красный на коде до 06.10)."
       status: holds
       check:
         file: lab_intake_watcher.py
         present: ["_settle_outcomes(state)", "import_medical_events.doc_outcome(f)"]
-  last_reconciled: "2026-10-06"
+  last_reconciled: "2026-11-07"
 - id: mcp_gateway
   title: "Облачные помощники: одна память, вход через бот, наружу только MCP"
   intent: >
@@ -3179,3 +3262,48 @@
         file: security_sensors.py
         present: ["def _mcp_public_surface(", "_MCP_EXPECT_404 = (\"/\", \"/labs\""]
   last_reconciled: "2026-10-07"
+
+- id: agent_signals
+  title: Действия для персонального ассистента по сигналам здоровья
+  intent: >
+    По решению владельца 2026-11-05 ассистент получает только поводы пересмотреть
+    нагрузку, напоминания о добавках или срок анализа. Нормальное состояние молчит.
+    Пропуск optional-письма допустим, повторный шум ограничивается стойким учётом попыток.
+  explanation: docs/explanation/agent_signals.md
+  code_anchors:
+    - agent_signals.py::state_signals
+    - agent_signals.py::run
+    - jobs/scheduled.py::_apply_agent_signals_schedule
+    - integrity_tests.py::check_agent_signals_ran
+  invariants:
+    - id: existing_evaluators_only
+      claim: "Личные пороги, перцентили, признаки болезни и интервалы анализов имеют штатных владельцев; числовая политика читается из system_config."
+      status: holds
+      check:
+        file: tests/unit/test_agent_signals.py
+        present: ["def test_threshold_is_data", "def test_safety_result_and_rule_are_reused"]
+    - id: no_normal_or_duplicate_mail
+      claim: "При норме нет письма состояния; повтор дня не повторяет попытку, днём допустим только новый стресс."
+      status: holds
+      check:
+        file: tests/unit/test_agent_signals.py
+        present: ["def test_normal_sends_nothing", "def test_dedup_restart_and_new_afternoon_signal", "def test_concurrent_runs_do_not_duplicate"]
+    - id: lab_interval_provenance_and_noise
+      claim: "Письмо lab_due показывает происхождение интервала (encounter:* — врач, manual* — вручную, остальное — система). Только системная просрочка больше собственного интервала получает «при ближайшем заборе»; аббревиатуры сохраняются, name:due не повторяется на следующий день."
+      status: holds
+      check:
+        file: tests/unit/test_agent_signals.py
+        present: ["def test_schedule_origin", "def test_lab_letter_origin_urgency_and_acronym", "def test_lab_overdue_fingerprint_survives_next_day"]
+    - id: process_tenant_and_disabled_silence
+      claim: "Адресат, данные и ledger принадлежат базе процесса; пустой адресат выключает весь путь."
+      status: holds
+      check:
+        file: tests/unit/test_agent_signals.py
+        present: ["def test_empty_recipient_is_off", "def test_seed_fresh_upgrade_owner_partner_and_off_preserved"]
+    - id: completed_daily_pass_sensor
+      claim: "Датчик замечает отсутствующий или просроченный полный утренний проход при включённом адресате."
+      status: holds
+      check:
+        file: tests/unit/test_agent_signals.py
+        present: ["def test_sensor_negative_control"]
+  last_reconciled: "2026-11-06"

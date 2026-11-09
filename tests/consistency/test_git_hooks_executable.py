@@ -17,6 +17,7 @@ Git перестал запускать хук, сообщив об этом о�
 ГРАНИЦА, названная вслух: диск MacBook не стережёт никто — там нет всегда-живого
 монитора, а хук стеречь сам себя не может.
 """
+import pytest
 import subprocess
 from pathlib import Path
 
@@ -54,6 +55,7 @@ def _modes() -> dict[str, str]:
     return modes
 
 
+@pytest.mark.host_only
 def test_hook_files_are_executable_in_git():
     modes = _modes()
     broken = {p: modes.get(p, "ОТСУТСТВУЕТ") for p in MUST_BE_EXEC
@@ -64,6 +66,7 @@ def test_hook_files_are_executable_in_git():
         "Fix: git update-index --chmod=+x <путь> && chmod 755 <путь>")
 
 
+@pytest.mark.host_only
 def test_baseline_files_all_present():
     """Ратчет в обратную сторону: файл исчез — решение человека, не тишина."""
     modes = _modes()

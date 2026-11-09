@@ -24,6 +24,7 @@ address_kinds: [runtime, registry_rule, ritual, data, methodology_page]
 # С 29.09 подаются и наблюдения: 47 из 83 уроков были observation и до исполнителя на
 # старте не доезжали вовсе (решение 29.09, нить lessons-adopted-on; так же в соседнем проекте).
 # Цена — длина подачи: у крупных предметов до ~20 строк.
+shared_subjects: ~/Projects/infra/failure_classes.yaml
 deliver_statuses: [observation, in_work, adopted, failed]
 # У каждого внедрённого урока — дата внедрения. Урок той же группы (адрес + предмет),
 # записанный позже неё, красит проверку формы: правило не сработало → failed.
@@ -425,7 +426,6 @@ lessons:
   thread: project-context-spine
   modules:
   - calendar_client
-  - calendar_sync
   - integrity_tests
   event: датчик на 1 тенанта принят за покрытие всех (tenant-слепота)
   cost: в источнике не записана
@@ -635,14 +635,13 @@ lessons:
   thread: blueprint-close
   modules:
   - calendar_client
-  - calendar_sync
   event: 'словари классификатора пересеклись: «Check in to Hotel» уезжает в перелёты; проверь CHECKIN_KEYWORDS
     ∩ FLIGHT_KEYWORDS до правки правил'
   cost: в источнике не записана
   cause: словари классов классификатора пересекаются, и пересечение ничем не проверяется
   address:
     kind: runtime
-    ref: calendar_sync.py
+    ref: calendar_client.py
   subject:
   - classifier_rules
   outcome:
@@ -2952,7 +2951,7 @@ lessons:
   cost: '~1 ч ошибок записи базы владельца, 2 упавших деплоя, 1 сорванный разбор документа (сайдкар снят руками)'
   cause: 'у накопителя «образ на каждое событие» не было ни уборщика, ни датчика места; диск общий с базой, поэтому заполнение било по данным, а не только по сборке'
   address: {kind: runtime, ref: scripts/deploy_container.sh}
-  subject: [sensor_perimeter, filesystem_icloud]
+  subject: [sensor_perimeter, filesystem_icloud, steady_state]
   outcome: {kind: check, text: 'после сверки нового образа остаётся только образ этого коммита (+:local); при ≥85% занятого — notify.fault; форма стережётся test_deploy_container_ocr::test_old_images_are_removed_and_disk_is_watched; живьём после деплоя 14:42 осталось 2 тега. Граница: место меряется только на деплое'}
   status: adopted
   change: 'git:11ec69e'
@@ -3278,7 +3277,7 @@ lessons:
   cost: 'консилиум молча терял половину специалистов при включении думания'
   cause: 'срок вызова — литерал, подобранный под ответ без думания; то же, что лимит токенов в коде, только в секундах — число-копия свойства модели и задачи'
   address: {kind: runtime, ref: llm_client.call_timeout}
-  subject: [llm_output, measurement_path]
+  subject: [llm_output, measurement_path, timeouts]
   outcome: {kind: rule, text: 'срок вызова модели выводится из замера модели (задержка + токены × сек/токен + отклонение) на полный лимит с повтором; литерал срока у вызова — красный ратчет'}
   status: observation
   evidence: ['tests/unit/test_llm_task_modes.py']
@@ -3468,7 +3467,7 @@ lessons:
   cost: 'шесть суток все правки разбора документов не доходили до процесса партнёра (класс 01.08 — 16 суток, 19278 сообщений); найдено только сверкой времени старта процесса после деплоя'
   cause: 'имя службы живёт в двух домах (плист и ручной список хука), переименование прошло по одному; «launchctl kickstart … || true» превращает «нет такой службы» в успех, и строка лога «triggered» врёт; датчик расхождения — warn без адресата, его никто не читал'
   address: {kind: runtime, ref: scripts/git-hooks/post-commit-macbook}
-  subject: [sensor_perimeter, state_lifetime]
+  subject: [sensor_perimeter, state_lifetime, let_it_crash]
   outcome: {kind: rule, text: 'после деплоя сверять ВРЕМЯ СТАРТА процесса каждой долгоживущей службы, а не строку «restart triggered»; имя исправлено (git:69e6140); кандидат в устройство — хук берёт список имён из плистов (один дом) и отказ kickstart не глотает; решать владельцу'}
   status: observation
   evidence: ['git:69e6140', 'docs/handoff/lab-intake-retry/2026-10-06-c21064e.md']
@@ -3637,7 +3636,7 @@ lessons:
   cost: 'два перезапуска по ~25 минут; первый раз висел с 08:06 до ручного снятия'
   cause: 'ssh к стенду идёт без keepalive и без общего таймаута — разрыв канала не превращается в отказ, а превращается в вечное ожидание'
   address: {kind: runtime, ref: scripts/test_on_studio.sh}
-  subject: [test_stand, shell_scripts]
+  subject: [test_stand, shell_scripts, timeouts, integration_points]
   outcome: {kind: check, text: 'ssh/rsync/scp стенда идут с ServerAliveInterval=15/CountMax=4; rc=255 называется «связь потеряна, это не красные тесты». tests/unit/test_stand_ssh_keepalive.py; plans/mutate_stand_keepalive_2026-10-18.sh — 3 мутации красные. Замер на Studio: без опций клиент жив на 206 с, с опциями вышел на 74 с, rc=255'}
   status: adopted
   adopted_on: '2026-10-18'
@@ -3771,4 +3770,184 @@ lessons:
   change: git:3818181
   evidence:
   - docs/handoff/reminders-tenant-account/2026-10-31-c0e4737.md
+  owner: владелец
+- id: C-185
+  date: '2026-10-28'
+  thread: brief-net-retry
+  event: 'Утренний бриф 28.10 не пришёл вовсе: в 08:30:05 косметический `send_chat_action("typing")` получил ConnectTimeout от Telegram, исключение вылетело из задачи до генерации отчёта; повтора в тот же день не было (досылка срабатывала только на рестарте бота), в журнал сбоев не попало ничего. Первым заметил владелец; датчик живости брифа заметил бы только через сутки и не ему.'
+  cost: бриф владельца за 28.10 потерян насовсем (решение владельца — вечером не досылать)
+  cause: 'однократный сетевой сбой стоил всего дня: у задачи брифа не было повтора по классу «сеть», а необязательный вызов стоял на пути обязательного без перехвата; досылка по квитанции .sent была привязана к событию «рестарт», а не к событию «попытка не удалась»'
+  address:
+    kind: runtime
+    ref: jobs/scheduled.py::morning_report_job
+  subject:
+  - message_delivery
+  - vendor_data
+  - integration_points
+  - backoff
+  outcome:
+    kind: rule
+    text: 'задача доставки владельцу повторяет попытку по классу «сеть» до квитанции доставки, исчерпав — notify.fault; «сеть» в PTB 22.7 — NetworkError БЕЗ BadRequest (BadRequest — его подкласс, замер в контейнере 28.10) плюс RetryAfter; косметика (индикатор «печатает…») не стоит на пути отчёта без перехвата; живое доказательство повтора — машинный признак brief.net_retry.first_delivered, а не утро без сбоя. Оракулы tests/unit/test_brief_catchup_receipt.py (повтор) и tests/unit/test_first_miss_rule.py (признак), 8 мутаций красные'
+  status: adopted
+  adopted_on: '2026-10-28'
+  change: git:b8e211e
+  evidence:
+  - tests/unit/test_brief_catchup_receipt.py
+  owner: владелец
+- id: C-186
+  date: '2026-11-02'
+  thread: pgs-coverage
+  event: 'Свободное место на Studio упало до 72 ГБ: за одно утро 02.11 три запуска ежемесячной докачки PGS сняли по копии справочника (16,5 ГБ) в папки бэкапов своих тенантов и держали бы по пять. Плюс локальные снимки Time Machine поймали временные копии, а VM colima держала 16,6 ГБ удалённых файлов до перезапуска. Заметил владелец по скриншоту, ни один датчик места не краснел.'
+  cost: ~33 ГБ за одно утро при 72 ГБ свободного; справочник 16,5 ГБ, из которых ~все — шкалы, бесполезные на чип-геномах (706 из 772 с покрытием <40%)
+  cause: 'копия перед импортом хранилась по счёту (SNAP_RETENTION=5), а не на время риска; её делал каждый запуск, а не единственный писатель; места под прогон никто не считал; что докачивать, решал объём каталога, а не пригодность шкалы людям установки'
+  address:
+    kind: runtime
+    ref: pgs_discovery.py::discover_and_import_new_scores
+  subject:
+  - filesystem_icloud
+  - writers_readers
+  - steady_state
+  outcome:
+    kind: rule
+    text: 'копия общего ресурса перед записью живёт только на время риска: снимает один писатель (pgs_reference.writable), удаляется после PRAGMA quick_check, не прошедшая — остаётся и кричит; импорт не начинается без места (pgs_reference.import_room), тот же расчёт судит ночной датчик check_disk_room_for_reference; храним только шкалы, пригодные хоть одному тенанту. Оракулы tests/unit/test_pgs_discovery.py, мутации plans/mutate_disk_room_2026-11-02.sh и plans/mutate_pgs_coverage_2026-11-02.sh — 7 из 7 красные'
+  status: adopted
+  adopted_on: '2026-11-02'
+  change: git:154bf01
+  evidence:
+  - docs/handoff/pgs-reference-hygiene/2026-11-03-1963358.md
+  owner: владелец
+- id: C-187
+  date: '2026-11-03'
+  thread: pgs-hollow
+  event: 'После прополки в каталоге справочника нашлись 26 шкал без единого веса (например PGS000296: 6,6 млн вариантов по метаданным, 0 строк весов, баллов не было никогда). Отбор по покрытию их не судил: 0/0 читалось как «не посчитано». Когда загрузка перестала молчать, 8 новых шкал в формате весов по дозе генотипа стали бы ошибкой каждый месяц.'
+  cost: 26 пустых шкал висели в каталоге с неизвестного момента; 8 ошибок в месяц в канал сбоев, если бы формат не стал отказом
+  cause: 'genome_weights.download_and_import записывал шкалу в каталог ДО весов, и «шкала в каталоге» для читателей значило «шкала годна»: обрыв загрузки или неподдерживаемый формат оставляли пустую шкалу, неотличимую от рабочей'
+  address:
+    kind: runtime
+    ref: genome_weights.py::download_and_import
+  subject:
+  - pipeline_order
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: 'запись в каталог — последний шаг после весов; 0 весов → empty_weights; веса по дозе генотипа без effect_weight → unsupported_format и отказ с reason=format в pgs_rejected, который не пересматривается по размеру генома; докачка снимает шкалы без весов и веса без шкалы. Оракулы tests/unit/test_genome_weights_catalog_after_weights.py и tests/unit/test_pgs_discovery.py. Живьём 03.11: снято 26 пустых, в каталоге пустых 0'
+  status: adopted
+  adopted_on: '2026-11-03'
+  change: git:a6e84fe
+  evidence:
+  - docs/handoff/pgs-reference-hygiene/2026-11-03-1963358.md
+  owner: владелец
+- id: C-188
+  date: '2026-11-03'
+  thread: lab-margin
+  event: 'Ночной ремонт 03.11 снова поднял «lab-путь готов к возврату» (0d6782ea) — развилку владельца, по которой ничего не изменилось с 31.08: последний анализ крови 29.08, HGB 21, MCV/RDW/WBC/PLT по 18 при минимуме 18. Отсрочка была привязана к дате, и по её истечении вопрос возвращался ежедневно без новых данных.'
+  cost: ежедневный вопрос владельцу без нового материала; одна починка ночного ремонта отклонена вручную
+  cause: 'условие отсрочки описывало календарь, а решение зависит от данных: «вернуться к вопросу» должно наступать, когда появился материал, меняющий ответ (запас замеров над минимумом), а не когда прошёл срок'
+  address:
+    kind: data
+    ref: methodology/validation_gate/data_manifest.yaml::labs.deferred
+  subject:
+  - intent_registry
+  - time_dates
+  outcome:
+    kind: rule
+    text: 'отсрочка решения владельца задаётся условием на данных (deferred.until_margin: 2 — все аналиты ≥ минимум+2), а не датой; пока запас не набран — недельная строка с именами аналитов и счётом, а не ежедневный вопрос. Оракул tests/unit/test_lab_family_names.py::test_lab_scope_deferred_by_margin_not_by_date'
+  status: adopted
+  adopted_on: '2026-11-03'
+  change: git:732d6e6
+  evidence:
+  - docs/handoff/pgs-reference-hygiene/2026-11-03-1963358.md
+  owner: владелец
+- id: C-189
+  date: '2026-11-06'
+  thread: macbook-kayak-oura
+  modules:
+  - backup
+  - integrity_tests
+  event: 'На MacBook месяцами жили два джоба эпохи «MacBook пишет данные»: поездки KAYAK (каждый час, падение на R1/R2 в /tmp/calendar_sync_err.log, последняя поездка в базе — 01.05) и импорт Oura (5 раз в день ходил в облако с ключом владельца, запись падала с 27.06 — 3924 строки «readonly database»). Код падал «громко», как велит замысел data_ingestion.no_silent_stale_replica, но в журналы, которых никто не читает. Нашёл Devops по сводке, не датчик. Джоб Oura был жив при битом XML плиста на диске; метка джоба поездок — без «health».'
+  cost: 'четыре месяца (Oura) и полгода (поездки) мёртвых джобов; поездки после 01.05 в periods не попали; лишняя копия ключа Oura на ноутбуке'
+  cause: 'машину-писатель кода не судил ни один датчик: громкость падения мерилась по коду, а не по наличию слушателя'
+  address:
+    kind: runtime
+    ref: backup.sh
+  subject:
+  - sensor_perimeter
+  - dead_code
+  outcome:
+    kind: rule
+    text: 'падение без слушателя = тишина. Снимок backup.sh --wip везёт health_jobs= — загруженные в launchd (launchctl print, не файлы плистов) джобы com.larry.*, исполняющие health_scripts; check_macbook_health_jobs на Studio сверяет с git_facts.MACBOOK_ALLOWED_JOBS; «неизвестно»/нет поля — «не судимо» вслух. Оракулы tests/unit/test_backup_wip_snapshot.py, tests/unit/test_macbook_uncommitted.py, мутации plans/mutate_macbook_jobs_2026-11-06.sh — 3 из 3 красные'
+  status: adopted
+  adopted_on: '2026-11-06'
+  change: git:3e50ce3
+  evidence:
+  - docs/handoff/macbook-kayak-oura/LATEST.md
+  owner: владелец
+- id: C-190
+  date: '2026-11-07'
+  thread: agent-post
+  modules:
+  - agent_reply
+  - mcp_tools
+  event: 'Первый живой ответ health ассистенту владельца 06.11 на «как владелец спал»: «данных за ночь нет», при записанных 5.3 ч сна. Окно данных звало day_metrics с {"days": 7}, а схема инструмента требует date; инструмент падал, ошибка шла в контекст модели как текст, флаг ошибки отбрасывался. Все 7 юнитов были зелёными.'
+  cost: 'один неверный ответ ассистенту хозяина; около часа на разбор; повторный вопрос пришлось просить у владельца'
+  cause: 'заглушка mcp_tools.call в тесте принимала любые аргументы, а ошибка инструмента превращалась в строку «данных нет», и падение было неотличимо от пустоты'
+  address:
+    kind: runtime
+    ref: agent_reply.py
+  subject:
+  - test_harness
+  - measurement_path
+  outcome:
+    kind: check
+    text: 'заглушка окна данных держит настоящую схему mcp_tools.TOOLS (лишний или недостающий аргумент — красный), ошибка инструмента — notify.fault. Оракул tests/unit/test_agent_reply.py::test_context_calls_match_tool_schemas — на старом коде 6 из 8 красные'
+  status: adopted
+  adopted_on: '2026-11-06'
+  change: git:9395fc8
+  evidence:
+  - git:9395fc8
+  owner: владелец
+- id: C-191
+  date: '2026-11-07'
+  thread: agent-post
+  modules:
+  - assessment_scheduler
+  - jobs/scheduled
+  event: 'После переезда health владельца в контейнер планировщик опросников жил только в launchd вне контейнера (housekeeping.yaml: state not_loaded, «dead config?»), а каталог опросников остался в старой папке на Studio. С 31.08 по 07.11 — ни одной задачи-опросника; отчёт терапевта заметил устаревшую анкету и написал текстовую задачу, ушедшую в Напоминания iPhone, где заполнить нечего. Импорт Oura у владельца по той же причине шёл только перед отчётами.'
+  cost: 'около 68 дней без анкет (дисфагия, сон, усталость); дневная активность видна с опозданием до суток; владелец получил задачу, которую нельзя выполнить'
+  cause: 'перепись джобов отмечала not_loaded как «мёртвый конфиг?», но никто не спрашивал, кто его заменил; у производителя задач-опросников нет датчика «давно ничего не производил», поэтому тишина выглядела как «пока не пора»'
+  address:
+    kind: data
+    ref: housekeeping.yaml
+  subject:
+  - sensor_perimeter
+  - dead_code
+  outcome:
+    kind: check
+    text: 'сделано: планировщик опросников и импорт Oura — джобы самого бота (git:4e2e47d, git:106f334), каталог опросников — в данных контейнера. Не сделано: датчик «у каждой not_loaded записи housekeeping есть замена, либо она снята» и живость производителя опросников'
+  status: in_work
+  evidence:
+  - git:4e2e47d
+  owner: следующая сессия нити agent-post
+- id: C-192
+  date: '2026-11-07'
+  thread: agent-post
+  modules:
+  - import_oura
+  event: 'Замер 07.11 в 09:00: Oura уже отдаёт утро до 08:45, а health не видел сегодняшних шагов до следующего дня. daily_activity запрашивался с end_date=сегодня, а у этого эндпоинта конец не включается (daily_stress и daily_readiness с тем же окном сегодняшний день отдают). Заодно при разборе выбрасывались пятиминутки активности и время сидения.'
+  cost: 'сегодняшняя активность невидима до суток с начала импорта Oura; ассистенту нечего было сказать о «сидит или ходит»'
+  cause: 'смысл end_date приняли одинаковым для всех эндпоинтов Oura без замера; проверочный запрос «сегодня» никто не делал'
+  address:
+    kind: runtime
+    ref: import_oura.py
+  subject:
+  - vendor_data
+  - time_dates
+  outcome:
+    kind: check
+    text: 'daily_activity — до завтрашней даты; форма дня из пятиминуток в raw.activity. Оракулы tests/unit/test_oura_parse_and_pagination.py::test_activity_requested_through_tomorrow и ::test_day_shape_still_and_last_active — красные на старом коде'
+  status: adopted
+  adopted_on: '2026-11-07'
+  change: git:106f334
+  evidence:
+  - git:106f334
   owner: владелец

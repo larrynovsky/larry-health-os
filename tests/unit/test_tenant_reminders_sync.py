@@ -28,6 +28,9 @@ def sync(monkeypatch, tmp_path, request):
     db.get_open_tasks = Mock(return_value=[])
     db.resolve_task = Mock(return_value=True)
     monkeypatch.setitem(sys.modules, "health_db", db)
+    # Маршрут задач тенанта — не предмет этих тестов; без подмены судил бы снимок БД (§20):
+    # на снимке владельца tasks.route=assistant, и синхронизация честно ничего не делала.
+    monkeypatch.setitem(sys.modules, "task_route", SimpleNamespace(route=lambda: "reminders"))
 
     # Intercept every external boundary before importing the service.
     run = Mock(side_effect=AssertionError("Real AppleScript must never run"))
@@ -196,3 +199,12 @@ def test_ошибка_внутри_applescript_это_сбой_а_не_пуст�
     assert len(faults) == 1 and "-1728" in faults[0] and "Health (partner)" in faults[0]
     script = sync.run.call_args[0][0][2]
     assert "on error" in script and sync.module._ERR in script     # метку ставит сам скрипт
+
+
+def test_assistant_route_never_closes_from_reminders(sync, monkeypatch):
+    import task_route
+    monkeypatch.setattr(task_route, "route", lambda: "assistant")
+    sync.db.get_open_tasks.return_value = [{"id": 41, "type": "lab_test"}]
+    sync.run.side_effect = lambda args, **kw: subprocess.CompletedProcess(args, 0, stdout="[task_id:41]", stderr="")
+    sync.module.sync_completed_reminders()
+    sync.db.resolve_task.assert_not_called()

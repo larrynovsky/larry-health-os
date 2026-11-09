@@ -27,6 +27,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("HEALTH_SECRETS_DIR", str(tmp_path / "secrets"))
     set_test_clock("2026-08-02")
     import notify  # ленивый: env секретов уже задан выше
+    monkeypatch.setattr(notify, "repair_provisioned", lambda: True)
     calls = []
     monkeypatch.setattr(notify, "notify_operator",
                         lambda msg, fallback=True: calls.append(msg) or "telegram")
@@ -231,7 +232,6 @@ def test_bell_line_keeps_the_question_and_never_cuts_a_word():
     """Холодное чтение 28.09: строка звонка резалась по символу («слишком близко к гр…»),
     и главное сообщение дня не говорило, о чём решение. Длинный абзац → первая фраза и
     вопрос карточки; слово не режется."""
-    import owner_nag
     long = ("Выдуманная находка " + "очень " * 30 + "длинная. Вторая фраза. Что делать?"
             "\n\n• Вариант — цена")
     line = on._headline(long)
@@ -303,9 +303,61 @@ def test_desk_memory_only_grows_and_ignores_foreign_store(env, monkeypatch):
     monkeypatch.setattr(pd, "_remembered", lambda: 1)
     import config_db
     monkeypatch.setattr(config_db, "upsert_config", lambda k, **kw: written.append((k, kw["value_num"])))
-    pd.park("a", "dev_fix", "x"); pd.park("b", "dev_fix", "y")
+    pd.park("a", "dev_fix", "x")
+    pd.park("b", "dev_fix", "y")
     pd.remember_size()
     assert written == [(pd.MEMORY_KEY, 2)]
     monkeypatch.setattr(pd, "_remembered", lambda: 5)
     pd.remember_size()
     assert written == [(pd.MEMORY_KEY, 2)], "вниз не пишем"
+
+
+@pytest.mark.parametrize("mark_age_days", [10, 0], ids=["stale", "fresh"])
+def test_repair_provisioning_controls_bell(tmp_path, monkeypatch, mark_age_days):
+    """Synthetic desk: no mark is silent; stale and fresh marks keep the original bell."""
+    import notify
+    import plist_env_liveness as pl
+
+    monkeypatch.setenv("HEALTH_PARKED_DB", str(tmp_path / "parked.json"))
+    monkeypatch.setenv("HEALTH_NAG_RECEIPT", str(tmp_path / "nag.json"))
+    monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(tmp_path / "faults.jsonl"))
+    monkeypatch.setenv("HEALTH_NIGHT_CYCLE_RECEIPT", str(tmp_path / "cycle.json"))
+    monkeypatch.setattr(pl, "last_scheduled_fire", lambda *a: None)
+    monkeypatch.setattr(pl, "artifact_covers_last_fire", lambda *a: True)
+    calls = []
+    monkeypatch.setattr(notify, "notify_operator", lambda text: calls.append(text) or "telegram")
+    for kind in pd.KINDS:
+        pd.park(kind, kind, "Synthetic system fault")
+    before = (tmp_path / "parked.json").read_bytes()
+    assert not notify.repair_provisioned()
+    assert on.run(now=_at(11))["rang"] is False
+    assert calls == []
+    with monkeypatch.context() as m:
+        m.setattr(pd, "memory_lost", lambda: (0, 4))
+        assert on.run(now=_at(11))["rang"] is False
+        assert calls == []
+    assert (tmp_path / "parked.json").read_bytes() == before
+
+    from _time_inject import get_now
+    (tmp_path / notify.REPAIR_SEEN).write_text(
+        str(int(get_now().timestamp()) - mark_age_days * 86400))
+    (tmp_path / "cycle.json").write_text(json.dumps({"ran_at": get_now().isoformat()}))
+    assert notify.repair_provisioned()
+    assert notify.repairer_alive() is (mark_age_days == 0)
+    assert on.run(now=_at(11))["rang"] is True
+    assert calls == [
+        "🔔 Ждут твоего решения: 3\n"
+        "1. Synthetic system fault\n2. Synthetic system fault\n3. Synthetic system fault\n\n"
+        "Чтобы решить, напиши Claude в проекте health: «разбери решения». "
+        "Он покажет каждое с вариантами."
+    ]
+    assert (tmp_path / "parked.json").read_bytes() == before
+
+    # Memory loss must also reach the owner even when the repair path is down.
+    (tmp_path / "nag.json").unlink()
+    (tmp_path / "cycle.json").unlink()
+    monkeypatch.setattr(pd, "memory_lost", lambda: (0, 4))
+    assert not notify.repairer_alive()
+    assert on.run(now=_at(11))["desk_memory_lost"] == [0, 4]
+    assert len(calls) == 2 and "Стол решений потерял память" in calls[-1]
+    assert (tmp_path / "parked.json").read_bytes() == before

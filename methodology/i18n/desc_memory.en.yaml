@@ -25,6 +25,9 @@
 0341a1f45e90:
   ru: Задавать ли вопрос заново, если на него уже отвечали.
   en: Whether to ask a question again if it has already been answered.
+03a655e2ac15:
+  ru: 'Чистая/тестируемая: поле `health_jobs=` из сообщения снимка MacBook.'
+  en: 'Clean/testable: field `health_jobs=` from the MacBook snapshot message.'
 045285b94b6a:
   ru: Сырые имена, которым РАЗНЫЕ форматы дали разные канонические имена.
   en: Raw names to which DIFFERENT formats assigned different canonical names.
@@ -118,6 +121,9 @@
 0f1b60d034cf:
   ru: захват чужого файла в коммит (по ленте снимков)
   en: capturing another's file into a commit (from snapshot feed)
+0f3e1bbbc02e:
+  ru: 'Закроется ли задача сама, когда придёт результат: lab_test, вся просьба распознана и'
+  en: 'Whether the task will close itself when the result arrives: lab_test, the entire request is recognized and'
 0f87f7fc6a6c:
   ru: доставленные тексты судятся против канона
   en: delivered texts are judged against the canon
@@ -127,6 +133,9 @@
 108ceda8ca18:
   ru: Блок «сдано один раз и не пересдавалось» для контекстов LLM.
   en: Block «submitted once and never retaken» for LLM contexts.
+10a409177dc0:
+  ru: 'Одна follow-up доставка: просьба ассистенту для вопросов/анкет,'
+  en: 'One follow-up delivery: a request to the assistant for questions/questionnaires,'
 1102d24242a5:
   ru: документы нормы свежи (sha256 / updated_at по next_check)
   en: norm documents are fresh (sha256 / updated_at by next_check)
@@ -151,9 +160,6 @@
 1442d70b0dcd:
   ru: воспалит. прокси
   en: inflammatory proxy
-149a1a8fa42b:
-  ru: Каждый инструмент — последнее заполнение не старше cadence_days + 14.
-  en: Each tool — last fill is no older than cadence_days + 14.
 14b093da96d2:
   ru: 'Отложенный опросник, чей срок настал, снова ложится в outbox: status=''open'', sent_at=NULL.'
   en: 'A deferred assessment whose due date has arrived is placed back in outbox: status=''open'', sent_at=NULL.'
@@ -259,6 +265,9 @@
 1fa6629fc639:
   ru: 'Инвариант threshold_derived_from_document (реестр norm_from_documents): набранных'
   en: 'Invariant threshold_derived_from_document (registry norm_from_documents): typed'
+1fdf3c6fc040:
+  ru: Загружен ли геном у этой установки (есть хоть одна строка raw_snps).
+  en: Whether the genome is loaded for this installation (at least one raw_snps row exists).
 202ed844158d:
   ru: 'F-09: словарь распознавателя собирается из `_VOCAB` ∪ общего `lab_vocab`, а `lab_name_aliases` (единственный дом с подтверждением человека) в него не входит. Зелёным станет в Области 2.'
   en: 'F-09: the recognizer dictionary is built from `_VOCAB` ∪ shared `lab_vocab`, but `lab_name_aliases` (the sole human-confirmed home) is not included. Will go green in Area 2.'
@@ -382,6 +391,9 @@
 2d4313015c98:
   ru: 'Импортирует клинические данные из прочитанных PDF в health.db:'
   en: 'Imports clinical data from read PDFs into health.db:'
+2d933f7eabbe:
+  ru: Хватит ли диска Studio на следующую докачку справочника PGS (снимок + рост).
+  en: Check whether Studio disk space is sufficient for the next PGS reference incremental download (snapshot + growth).
 2d93cdf40316:
   ru: карта проекта пересобрана после закрытия нити
   en: Project map rebuilt after thread closure.
@@ -424,6 +436,9 @@
 318d0a01489e:
   ru: Краткий текст для инжекта в контекст GP.
   en: Short text for injection into GP context.
+31961e75d4d0:
+  ru: Место на диске под докачку справочника PGS
+  en: Disk space for PGS reference incremental download.
 31982289584d:
   ru: Сохраняет протокол в таблицу protocols.
   en: Saves a protocol to the protocols table.
@@ -466,6 +481,9 @@
 3641c20b86e9:
   ru: Строка канона несёт класс источника — документ, опросник, предложение или ручная
   en: A canon row carries a source class — document, questionnaire, proposal, or manual.
+36894dc4b77e:
+  ru: У справочника PGS есть живой писатель
+  en: The PGS reference has a live writer.
 368c0ac73deb:
   ru: Возвращает последний результат для каждого теста за последние n_days дней.
   en: Returns the latest result for each test over the last n_days days.
@@ -574,6 +592,9 @@
 429c297f60a1:
   ru: 'РАТЧЕТ: ни одна строка staging не лежит в статусе, который никто не стережёт.'
   en: 'RATCHET: no staging row sits in a status that nobody watches.'
+42e1e8330ac1:
+  ru: Мост почты агентов жив
+  en: Agent mail bridge is alive
 4386f1248446:
   ru: Отмечает что доставка началась (защита от двойной отправки при краше).
   en: Marks that delivery has started (protection against double-send on crash).
@@ -586,6 +607,9 @@
 43e4507ef745:
   ru: 'F-03: per-file ошибка посчитана и напечатана, но не доехала до кода возврата. Зелёным станет в Фазе C.'
   en: 'F-03: per-file error is counted and printed but did not reach the return code. Will go green in Phase C.'
+4441d5253fc7:
+  ru: '{канон: {due, last, interval_days, priority, source, note}} для аналитов из names,'
+  en: '{canon: {due, last, interval_days, priority, source, note}} for analytes from names,'
 45315f77db7d:
   ru: 'Возвращает {raw_name: canonical} для confirmed aliases формата.'
   en: 'Returns {raw_name: canonical} for confirmed aliases of the format.'
@@ -604,6 +628,9 @@
 473f1dc9e05c:
   ru: недельная статистика не пуста
   en: weekly statistics are not empty
+4769d5948380:
+  ru: 'Одна задача по id (07.11: закрытие дела по письму ассистента).'
+  en: 'A single task by id (07.11: closing the case on the assistant''s letter).'
 48396eb2a033:
   ru: Материал БЕЗ своей ступени неотличим от назначенного — а именно эта
   en: A material WITHOUT its own stage is indistinguishable from an assigned one — and it is exactly this
@@ -691,6 +718,9 @@
 4ee402158335:
   ru: REM-сон ночью
   en: REM sleep at night
+4f5529032d12:
+  ru: Задача «сдать анализ» закрывается ПРИХОДОМ РЕЗУЛЬТАТА (план доделок п.4, 07.11.2026).
+  en: The "submit a lab test" task closes ON RESULT ARRIVAL (improvement plan item 4, 07.11.2026).
 4f59506563aa:
   ru: health_ai — публичный интерфейс intelligence layer.
   en: health_ai — public interface of the intelligence layer.
@@ -1270,6 +1300,9 @@
 88b12506199f:
   ru: 'WARN: §14 terminus — сам uncommitted_watchdog мог тихо умереть (launchd'
   en: 'WARN: §14 terminus — uncommitted_watchdog itself may have silently died (launchd'
+88f22c6d904a:
+  ru: ДЖОБ ДАННЫХ НА MacBook — падает «громко», но в журнал, который никто не читает.
+  en: DATA JOB ON MacBook — fails 'loudly', but into a log nobody reads.
 8967ff2293cd:
   ru: В свежем longitudinal-саммари статистический гейт обязан быть применён.
   en: A fresh longitudinal summary must have the statistical gate applied.
@@ -1372,9 +1405,15 @@
 95000f2af607:
   ru: Создаёт ремайндеры для списка задач. Возвращает количество созданных.
   en: Creates reminders for a list of tasks. Returns the number created.
+9506068411dc:
+  ru: Открытые анкеты и вопросы, отправленные в бот раньше sent_before (UTC, формат SQLite),
+  en: Open forms and questions sent to the bot before sent_before (UTC, SQLite format),
 9506e0c9550e:
   ru: 'Чистая часть: [(источник, имя, материал, дата)] → ключи с более чем одной датой.'
   en: 'Pure part: [(source, name, material, date)] → keys with more than one date.'
+950d20166b17:
+  ru: 'Докачка справочника PGS жива: последний прогон, оставивший кандидатов, сменился'
+  en: 'PGS reference incremental download is alive: the last run that left candidates has changed.'
 951a56f8237e:
   ru: 'классификатор документов: per-tenant сид засеян (A3 liveness)'
   en: 'document classifier: per-tenant seed is seeded (A3 liveness)'
@@ -1393,6 +1432,9 @@
 9720f8652887:
   ru: Создаёт задачу в macOS Reminders (список Health).
   en: Creates a task in macOS Reminders (Health list).
+9724f1871e6a:
+  ru: Каждый инструмент — последнее заполнение в пределах schedule_policy.
+  en: Each instrument — the latest completion within schedule_policy.
 9746a5ae2f3b:
   ru: 'метрики прибора: у каждой есть хозяин (HAE)'
   en: 'device metrics: each one has an owner (HAE)'
@@ -1444,6 +1486,12 @@
 9af18d843386:
   ru: шаги из flat daily_metrics видны через get_day()
   en: steps from flat daily_metrics are accessible via get_day()
+9b7ae4d11d2d:
+  ru: Письма агентов подтверждены
+  en: Agent letters are confirmed
+9c666ad73f63:
+  ru: Сигналы ассистенту выполняются
+  en: Assistant signals are executed
 9cc07ca28c2c:
   ru: граница двух домов лабораторных данных цела
   en: boundary between the two lab-data houses is intact
@@ -1561,6 +1609,9 @@ a8a436beb34a:
 a8bd89355f6f:
   ru: проблемы под наблюдением доезжают до недельного разбора
   en: monitored issues reach the weekly review
+a8d80aa6703c:
+  ru: 'Срок анализа для ВСЕХ читателей: {test: {interval_days, priority, source, note}}.'
+  en: 'Analysis deadline for ALL readers: {test: {interval_days, priority, source, note}}.'
 a8e34dec6fc5:
   ru: Запрашивает аннотации для батча rsID через myvariant.info POST.
   en: Requests annotations for a batch of rsIDs via myvariant.info POST.
@@ -1729,6 +1780,9 @@ b6e165eee416:
 b709fa150072:
   ru: Дефолтный специалист для /visit — per-tenant из system_config, иначе нейтральный 'general'.
   en: Default specialist for /visit — per-tenant from system_config, otherwise neutral 'general'.
+b7139f45d4e8:
+  ru: Форма дня по пятиминуткам Oura — «сидит или ходит» для ассистента (07.11).
+  en: Day form by Oura five-minute slots — 'sitting or walking' for the assistant (07.11).
 b783623f01de:
   ru: нет зашитого диагноза в промпт-билдерах (нить diagnosis-hardcode)
   en: no hardcoded diagnosis in prompt-builders (thread diagnosis-hardcode)
@@ -1855,9 +1909,6 @@ c2c0c3977b18:
 c2e2b4a5f081:
   ru: Не ослеп ли сам датчик stderr. ОБЯЗАН стоять ДО check_stderr_errors.
   en: Whether the stderr sensor itself is blind. MUST be placed BEFORE check_stderr_errors.
-c3605f5aaca4:
-  ru: 'FAIL: clinical_kb в БД тенанта РАЗОШЁЛСЯ с git-источником (yaml сменился, init_db не'
-  en: 'FAIL: clinical_kb in the tenant DB HAS DIVERGED from the git source (yaml changed, init_db not'
 c406ed2b9c72:
   ru: имена семьи валид-гейта разрешаются в живые данные
   en: validation gate family names resolve to live data
@@ -2077,9 +2128,6 @@ d7745a8a6888:
 d782f85c74e4:
   ru: Возвращает перцентильный ранг вчерашних ключевых метрик
   en: Returns the percentile rank of yesterday's key metrics
-d8258f7688c5:
-  ru: 'FAIL: clinical_kb ПУСТ → medical_frame вырождается в standard-рамку И assert_floor молчит →'
-  en: 'FAIL: clinical_kb IS EMPTY → medical_frame degenerates into a standard frame AND assert_floor is silent →'
 d86773048969:
   ru: 'содержание GP-отчёта: есть ключевые разделы'
   en: 'GP report content: key sections are present'
@@ -2089,6 +2137,9 @@ d8ab7a4fbba6:
 d8c61c30d0bf:
   ru: Закрывает задачу по порядковому номеру в списке.
   en: Closes a task by its index number in the list.
+d9c292de9ff4:
+  ru: Текст задачи без хвоста annotate_lab_recency. Хвост — справка о прошлой сдаче, а не
+  en: Task text without the annotate_lab_recency tail. The tail is a note about a previous test submission, not
 dab50bc74593:
   ru: Одна специальность под разными словами сводится к общему ключу.
   en: One specialty under different wordings is reduced to a common key.
@@ -2119,6 +2170,9 @@ dd35f6214c51:
 dd6f7f9657fc:
   ru: единственный канонический health.db (R1/R2 split-brain)
   en: single canonical health.db (R1/R2 split-brain)
+dda6029fd150:
+  ru: на MacBook только разрешённые джобы (по снимку)
+  en: on MacBook only allowed jobs (per snapshot)
 ddb802a6c5d9:
   ru: ночной прогон тестов состоялся (§14)
   en: nightly test run completed (§14)
@@ -2329,9 +2383,6 @@ f5deef73e290:
 f61ecdb82cf8:
   ru: 'этап2: добавляет запись динамики серии в гипотезу (поле dynamics[]) — врач видит'
   en: 'Stage 2: appends a series-dynamics record to the hypothesis (dynamics[] field) — visible to the doctor.'
-f645df071651:
-  ru: Записывает или обновляет параметр конфигурации системы.
-  en: Writes or updates a system configuration parameter.
 f6ceeee19349:
   ru: Возвращает активные абсолютные пороги. Опциональный фильтр по direction.
   en: Returns active absolute thresholds. Optional filter by direction.
@@ -2347,6 +2398,9 @@ f7308d9e1ec8:
 f79c820ff423:
   ru: DDL гейта «вопрос не закрывается пустотой» — ОДИН дом текста триггеров.
   en: DDL for the 'question not closed by void' gate — the single home of trigger text.
+f8211b973fbd:
+  ru: Срок задачи на анализ ставит расписание, а не модель (план доделок п.1, 07.11.2026).
+  en: The analysis task deadline is set by the schedule, not the model (fix plan item 1, 07.11.2026).
 f83733101323:
   ru: Проблемы и протоколы с просроченным review_date.
   en: Issues and protocols with an expired review_date.

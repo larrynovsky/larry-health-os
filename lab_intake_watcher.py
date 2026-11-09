@@ -345,15 +345,14 @@ def process_once() -> int:
                 log.info(f"[{tenant}] не лабораторная таблица ({lab}), пропуск: {f.name}")
                 continue
             log.info(f"[{tenant}] recognize {f.name} run={run_id}")
-            summary = lab_backfill.run_backfill(run_id, None, None, str(f), None)
+            summary = lab_backfill.run_backfill(run_id, None, None, str(f), None, reraise=True)
             rows = summary.get("rows", 0)
             wk.unlink(missing_ok=True)
             rt.unlink(missing_ok=True)
-            if rows == 0 and summary.get("errors"):
-                # Распознаватель упал, а не «прочитал и не нашёл»: run_backfill проглатывает сбой
-                # документа в счётчик errors. Это сбой у нас — ветка сбоя ниже, не «0 строк».
-                raise RuntimeError(f"lab_backfill: {summary['errors']} ошибок, 0 строк; "
-                                   f"первая — {summary.get('first_error', 'не записана')}")
+            # Сбой распознавателя сюда не доходит: reraise=True пробрасывает его как есть в ветку
+            # сбоя ниже (прежде он оседал в счётчике errors, и вотчер поднимал СВОЙ RuntimeError —
+            # журнал терял тип и кадры настоящей причины, карточка report:ecaba4, 04.11).
+            # Оракул test_recognition_failure_journal_keeps_real_cause краснеет, если reraise снять.
             if rows == 0:
                 # Ноль строк — итог РАЗБОРА АНАЛИЗОВ, не файла. Гейт при сомнении говорит «бланк»,
                 # и заключение врача с таблицей на первой странице законно попадает сюда; его
@@ -467,8 +466,9 @@ def _settle_outcomes(state: dict) -> None:
     обязана стоить лишнего вызова модели, а не ложного ответа человеку.
 
     Здесь — файлы, по которым анализы не дали ничего. Пока разбор документов не закончен
-    (не брался, ждёт ключа), молчим. «Ничего» звучит, только когда пусто у обоих; только тогда
-    это и сбой для журнала."""
+    (не брался, ждёт ключа), молчим. «Ничего» звучит, только когда пусто у обоих — это сбой.
+    Отдельное расхождение: документ принят именно как lab_result, но есть .norows;
+    тогда нужен сбой и вопрос о значениях. Принятое заключение — не это расхождение."""
     import import_medical_events
     told = set(state.get("outcome_told", []))
     notlab = set(state.get("notlab", []))
@@ -488,6 +488,22 @@ def _settle_outcomes(state: dict) -> None:
         if lab_part_told:     # анализы уже сказаны; досказать документ, если он есть
             if _is_document_part(doc):
                 _tell_person_text(_document_text(f, doc, also=True))
+            continue
+        if (f.with_suffix(f.suffix + ".norows").exists()
+                and doc.get("status") == "imported" and doc.get("kind") == "lab_result"):
+            # Оба читателя закончили: событие анализа принято, но значений нет.
+            # outcome_told выше закрывает повторные проходы вместе с итогом файла.
+            import tasks_db
+            date = doc.get("date")
+            if not date or date == "unknown":
+                date = i18n.t("person.lab.date_unknown")
+            notify.fault("lab_intake_watcher: lab result imported but no rows recognized",
+                         person_key=None)
+            tasks_db.save_task(
+                source="lab_intake_watcher", type_="question",
+                content=i18n.t("person.lab.zero_rows_question", date=date, file=_shown(f)),
+            )
+            _tell_person_text(i18n.t("person.lab.zero_rows_outcome", file=_shown(f)))
             continue
         _tell_person_text(_outcome_text(f, doc, gate_said_not_lab=f.name in notlab))
         if doc.get("status") == "failed" and f.with_suffix(f.suffix + ".norows").exists():

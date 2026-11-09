@@ -1,0 +1,70 @@
+{
+  "module": "task_route",
+  "public": [
+    "route",
+    "hand_over",
+    "nudge",
+    "close_from_letter",
+    "overdue_assistant_tasks"
+  ],
+  "depends_on": [
+    {
+      "module": "agent_mail",
+      "uses": [
+        "send",
+        "task_handover_times"
+      ],
+      "why": "единственный путь письма наружу: заявка в мост, redact и гард секретов там"
+    },
+    {
+      "module": "agent_reply",
+      "uses": [
+        "allowed_peers"
+      ],
+      "why": "один дом адресата: ассистент хозяина из agent_mail.assistant (тот же, кому health отвечает)"
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "get_unanswered_bot_tasks",
+        "mark_followup_sent",
+        "get_task",
+        "resolve_task"
+      ],
+      "why": "таблица tasks — фасад tasks_db; свой SQL по tasks был бы вторым писателем"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config"
+      ],
+      "why": "маршрут и срок напоминания — данные тенанта (§9)",
+      "legacy": "config_db до гейта одноразовости; контракт не заводился"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен — куда идёт задача health при маршруте тенанта и просьба напомнить ассистенту. Создание задач — task_agent, доставка в бот — jobs/scheduled, транспорт — agent_mail.",
+      "D2": "route() — маршрут; hand_over(tasks) — дела письмом; nudge() — одна просьба по неотвеченным анкетам/вопросам; close_from_letter(letter) — «задача #N: сделано» от ассистента закрывает дело. Остальное приватное. overdue_assistant_tasks() — read model запасного пути.",
+      "D3": "только публичные agent_mail.send, agent_reply.allowed_peers, health_db (фасад tasks_db), config_db.get_config. agent_mail.task_handover_times читает время первой передачи.",
+      "D4": "Один модуль, без нового планировщика или схемы БД.",
+      "D5": "tests/unit/test_task_route.py: открытая просроченная переданная задача доставляется один раз, закрытая/свежая/непереданная не доставляется; отдельно срок ожидания без deadline, маршрут, конфиг, ошибки доставки, партии и блокировка. Ack не влияет.",
+      "D6": "общий с task_agent инвариант: анкеты и вопросы идут в бот при любом маршруте (REMINDER_TYPES_EXCLUDED ↔ BOT_TYPES); с agent_mail — письмо наружу только через send."
+    },
+    "rationale": "Переписывается за час по контракту: прочитать tasks.route; дела (не question/assessment) пачками по 8 — send(kind=task) ассистенту; неотвеченные в бот дольше tasks.nudge_after_days — пометить followup_sent_at и один send(kind=nudge).",
+    "date": "2026-11-07",
+    "oracle": "tests/unit/test_task_route.py: без хука в task_agent красный test_assistant_route_hands_over_deeds_not_questionnaires (прогон 07.11)."
+  },
+  "contract": {
+    "overdue": "overdue_assistant_tasks reads tasks.assistant_overdue_grace_days (single fallback 2, whole days >=0) and tasks.assistant_no_deadline_days (single fallback 14, whole days >=1). Only assistant route, open handed-over deeds, followup_sent_at NULL. ISO deadline date is evaluated after end of UTC day plus grace; without deadline, elapsed time since first hand_over request must exceed waiting days. Ack and replies do not affect eligibility; any task closure excludes it.",
+    "delivery": "Existing task_nudge_job groups dated/undated deeds with separate i18n captions; task_agent.format_open_tasks_message + task_keyboard + send_long, batches <=20. Tenant-local task_overdue.lock. Mark followup only after all receipt IDs; log count, no fault for overdue deeds. Actual config/storage/transport errors still journal faults. Nudge failure does not block fallback.",
+    "limits": "Legacy requests lack task_ids, so explicit backfill is required. No exactly-once guarantee across Telegram/SQLite crash or ambiguous acknowledgement. No new bridge protocol or schema."
+  },
+  "followup_policy": {
+    "decision": "deed",
+    "measured": "2026-11-07",
+    "reason": "hypothesis_resolution._create_task_if_needed and dashboard confirm copy payload.test into followup. handlers.tasks completion and tasks_db.resolve_task do not require a conversational answer for this type. GP followup is an overloaded label, not sufficient evidence of a return-address contract.",
+    "oracle": "tests/unit/test_task_route.py::test_followup_is_a_deed_with_completion_not_a_bot_answer"
+  }
+}

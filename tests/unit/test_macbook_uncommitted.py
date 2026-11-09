@@ -238,3 +238,62 @@ def test_без_деревьев_нитей_датчик_молчит_как_п�
     r = I.check_macbook_uncommitted()
     assert r["worktrees_uncovered"] == 0, r
     assert cap == [], f"датчик заговорил без повода: {cap}"
+
+
+# ── ДЖОБЫ MacBook ПО СНИМКУ (06.11, нить macbook-kayak-oura) ─────────────────
+# Замер 06.11: два джоба данных месяцами падали на MacBook в журналы без читателя.
+# Ниже — живое сообщение снимка с ними (метки как были) и без них.
+
+_ЗАКОННЫЕ = ("com.larry.health.backup,com.larry.health.backup-wip,"
+             "com.larry.health.conflict-check,com.larry.health.logrotate")
+
+
+def _снимок_джобов(monkeypatch, cap, сообщение):
+    import integrity_tests as I
+    import git_facts as gf
+    monkeypatch.setattr(I, "warn", lambda n, d="": cap.append((n, d)))
+
+    def fake(args):
+        assert args[:2] == ["log", "-1"] and args[-1] == "refs/backups/wip", args
+        return сообщение
+    monkeypatch.setattr(gf, "_git", fake)
+    return I
+
+
+def test_мёртвые_джобы_06_11_названы_по_именам(monkeypatch):
+    """⭐ Состояние MacBook утром 06.11: поездки и Oura загружены. Метка поездок без
+    «health» — фильтр по метке её бы пропустил; судится то, что launchd исполняет."""
+    cap = []
+    msg = (f"snapshot: wip backup 2026-11-06 worktrees_uncovered=1 threads=нет "
+           f"health_jobs=com.larry.calendar-sync,{_ЗАКОННЫЕ},com.larry.health.oura-import")
+    I = _снимок_джобов(monkeypatch, cap, "2026-11-06\n" + msg)
+    r = I.check_macbook_health_jobs()
+    assert r["unexpected"] == ["com.larry.calendar-sync", "com.larry.health.oura-import"]
+    assert len(cap) == 1 and "com.larry.calendar-sync" in cap[0][0] \
+        and "com.larry.health.oura-import" in cap[0][0], cap
+
+
+def test_после_снятия_молчит(monkeypatch):
+    """Те же четыре законных джоба, что на MacBook после снятия 06.11 — тишина."""
+    cap = []
+    I = _снимок_джобов(monkeypatch, cap, f"2026-11-06\nsnapshot: x health_jobs={_ЗАКОННЫЕ}")
+    r = I.check_macbook_health_jobs()
+    assert r["unexpected"] == [] and cap == []
+
+
+@pytest.mark.parametrize("сообщение", [
+    "snapshot: wip backup 2026-11-05 worktrees_uncovered=0 threads=нет",   # старый backup.sh
+    "snapshot: x health_jobs=неизвестно",                                  # launchctl не ответил
+])
+def test_не_знаю_не_равно_чисто(monkeypatch, сообщение):
+    """Нет поля и «неизвестно» — «не судимо» вслух, а не молчание «всё хорошо»."""
+    cap = []
+    I = _снимок_джобов(monkeypatch, cap, "2026-11-06\n" + сообщение)
+    assert I.check_macbook_health_jobs() is None
+    assert [n for n, _ in cap] == ["джобы MacBook не судимы"], cap
+
+
+def test_пустой_список_назван_явно():
+    import integrity_tests as I
+    assert I.macbook_jobs_in_snapshot("snapshot: x health_jobs=нет") == []
+    assert I.macbook_jobs_in_snapshot("snapshot: x threads=нет") is None

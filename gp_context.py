@@ -24,7 +24,6 @@ from pathlib import Path
 
 import health_db  # noqa: F401 — ядро раньше labs_db (порядок фасадного цикла)
 import labs_db as _ldb
-from labs_db import effective_freshness  # diagnosis-hardcode B6: per-tenant расписание из класса состояния
 from _fmt_helpers import fmt_min, fmt_or
 
 log = logging.getLogger(__name__)
@@ -64,47 +63,13 @@ def _check_lab_freshness(recent_labs: list, reference_date: date) -> tuple[str, 
     overdue = []
     missing_critical = []
 
-    # Эффективное расписание: DB (encounter/manual) > DATA_FRESHNESS defaults
-    try:
-        db_sched = db.get_effective_lab_schedule()
-    except Exception:
-        db_sched = {}
-
-    # diagnosis-hardcode B6: набор тестов per-tenant — BASE + условные для АКТИВНЫХ классов
-    # состояния СМОТРЯЩЕГО тенанта (clinical_kb.active_conditions по его данным). Тенант без
-    # онко-класса не проверяется на онкомаркеры, даже если стая code_seed-строка осталась в БД.
-    try:
-        import clinical_kb as _ckb
-        _active = _ckb.active_conditions()
-    except Exception:
-        _active = set()
-    tenant_freshness = effective_freshness(_active)
-
-    effective_schedule = {}
-    for test, cfg in tenant_freshness.items():
-        dbrow = db_sched.get(test)
-        # Реальная клин-правка (encounter/manual) главнее дефолта. НО code_seed — это СТАРЫЙ
-        # дефолт, он НЕ должен перекрывать effective_freshness: иначе условный boost (напр.
-        # ALT medium→high при онко) молча не сработал бы, а стая онко-маркеров вернулась бы.
-        if dbrow and dbrow.get("source") != "code_seed":
-            effective_schedule[test] = {
-                "days":         dbrow["interval_days"],
-                "priority":     dbrow["priority"],
-                "missing_note": cfg.get("missing_note", ""),
-                "source":       dbrow["source"],
-            }
-        else:
-            effective_schedule[test] = {**cfg, "source": "default"}
-    # db_sched-only тесты добавляем ТОЛЬКО если это реальная клин. правка (encounter/manual),
-    # НЕ стая code_seed: иначе онкомаркеры тенанта без онко-класса из старого сида просочились бы обратно.
-    for test, cfg in db_sched.items():
-        if test not in effective_schedule and cfg.get("source") != "code_seed":
-            effective_schedule[test] = {
-                "days":         cfg["interval_days"],
-                "priority":     cfg["priority"],
-                "missing_note": cfg.get("note", ""),
-                "source":       cfg["source"],
-            }
+    # Расписание — единый дом labs_db.tenant_lab_schedule (план доделок п.1, 07.11): то же
+    # правило слияния, что у писем ассистенту и у сроков задач на анализ.
+    effective_schedule = {
+        test: {"days": c["interval_days"], "priority": c["priority"],
+               "missing_note": c["note"], "source": c["source"]}
+        for test, c in _ldb.tenant_lab_schedule().items()
+    }
 
     for test, cfg in effective_schedule.items():
         window = cfg["days"]
@@ -443,7 +408,7 @@ def recommendations_without_evidence(text: str, last_dates: dict, schedule: dict
     в третий случай. Само наличие строки ещё не делает повтор необоснованным:
     бинарный предикат «есть строка → ложь» давал бы ложные тревоги.
 
-    Окно берётся из `labs_db.get_effective_lab_schedule` (дом в БД), не из литерала (§9).
+    Окно берётся из `labs_db.tenant_lab_schedule` (единый дом срока), не из литерала (§9).
     Аналит без расписания судить нечем — он возвращается отдельным классом `no_schedule`,
     а не молча пропускается: «судить нечем» и «чисто» — разные утверждения (§18).
     """
@@ -507,6 +472,18 @@ def documents_answering_absence(text: str, docs: list) -> list:
     return hits
 
 
+def strip_lab_recency(text: str) -> str:
+    """Текст задачи без хвоста annotate_lab_recency. Хвост — справка о прошлой сдаче, а не
+    просьба сдать: ферритин в «(последний раз сдано: Ferritin — …)» задачу о нём не делает.
+    Формат хвоста — один дом, ключ i18n gp.task.lab_recency; его префикс берём оттуда же."""
+    import i18n
+    # Все языки: задача могла получить хвост при другой локали тенанта, чем читается сейчас.
+    heads = tuple(i18n.t("gp.task.lab_recency", lang=lang, parts="\x00").split("\x00")[0]
+                  for lang in i18n.LANGS)
+    body, sep, last = (text or "").rpartition("\n")
+    return body if sep and last.startswith(heads) else (text or "")
+
+
 def annotate_lab_recency(text: str) -> str:
     """Дописывает к тексту задачи дату последней сдачи аналитов, которые он советует сдать.
 
@@ -524,7 +501,7 @@ def annotate_lab_recency(text: str) -> str:
         return text
     try:
         last = {r["test_name"]: r["date"] for r in _ldb.get_recent_labs(730 * 5)}
-        hits = recommendations_without_evidence(text, last, _ldb.get_effective_lab_schedule())
+        hits = recommendations_without_evidence(text, last, _ldb.tenant_lab_schedule())
     except Exception as e:  # noqa: BLE001 — задача важнее пометки; пропуск ловит ночной датчик
         log.warning("annotate_lab_recency: анализы не прочитаны (%s) — задача без даты", e)
         return text
@@ -533,6 +510,28 @@ def annotate_lab_recency(text: str) -> str:
     parts = [f"{h['test']} — {date.fromisoformat(h['last_date']).strftime('%d.%m.%Y')}" for h in hits]
     import i18n
     return text + "\n" + i18n.t("gp.task.lab_recency", parts="; ".join(parts))
+
+
+_HISTORY_EMPTY_MARK = "clinical_history_empty_noticed"   # отметка «оператору сказано» — рядом с журналом сводки
+
+
+def _note_history_empty() -> None:
+    """Оператору ОДИН раз строкой недельной сводки; отметка — только по квитанции записи
+    (ревью ночного ремонта 01.11). Никогда не бросает: подсказка не важнее отчёта.
+    Принятая потеря (ревью 07.11): у установки без ремонта пустота «потому что сломалось»
+    (история была и обнулилась) неотличима от новизны — fault и повторной строки не будет.
+    У владельца при временно мёртвом ремонте строка скажет «нормально» о настоящей пустоте;
+    fault вернётся, когда ремонт оживёт."""
+    try:
+        import i18n
+        import notify
+        mark = notify.weekly_path().parent / _HISTORY_EMPTY_MARK
+        if mark.exists() or not notify.weekly(i18n.t("owner.weekly.clinical_history_empty")):
+            return
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.write_text("1", encoding="utf-8")
+    except Exception as e:  # noqa: BLE001 — подсказка best-effort; лог остаётся
+        log.warning("_note_history_empty: %s: %s", type(e).__name__, e)
 
 
 def _build_clinical_history() -> str:
@@ -549,9 +548,15 @@ def _build_clinical_history() -> str:
         # у постороннего отчёт не собирался ни разу, а добавить период ему было нечем
         # (отчёт друга 20.10). Пустота видна дважды: строкой в контексте отчёта и сбоем в
         # журнале — его прочтёт ночная проверка, если пустота окажется поломкой, а не новизной.
+        # Карточка report:421a91 (07.11, v0.2.5): у чужой установки ремонта нет, а журнал уезжает
+        # в /bug — пустая история новой установки приходила разработчику дефектом каждым отчётом.
+        # Без ремонта это новизна: оператору одна строка недельной сводки (класс CTCAE, 01.11).
         import notify
-        notify.fault("gp_context._build_clinical_history: periods empty — clinical history "
-                     "not filled in, report built without it", person_key=None)
+        if notify.repairer_alive():
+            notify.fault("gp_context._build_clinical_history: periods empty — clinical history "
+                         "not filled in, report built without it", person_key=None)
+        else:
+            _note_history_empty()
         return "ИСТОРИЯ БОЛЕЗНИ: не заполнена — периодов болезней и лечения в базе нет."
     with db.get_conn() as conn:
         problems = conn.execute(

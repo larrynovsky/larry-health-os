@@ -1,4 +1,8 @@
-"""periods_db.py — доменный модуль periods. Вынесен из health_db.py (Поток C, strangler-фасад)."""
+"""periods_db.py — доменный модуль periods. Вынесен из health_db.py (Поток C, strangler-фасад).
+
+Почему у периода нет флага «текущий», а есть даты и deleted_at, и почему поездки здесь не
+хранятся с 06.11.2026 (их знает только бриф, из Google Calendar): docs/explanation/periods_model.md.
+"""
 from __future__ import annotations
 
 import json

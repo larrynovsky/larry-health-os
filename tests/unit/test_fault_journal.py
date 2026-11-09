@@ -75,7 +75,7 @@ class FaultRoutingTests(unittest.TestCase):
             self.assertEqual(person, i18n.t("common.error.our_side", "ru"))
             self.assertNotIn("FAKE_529", person)
             record = self.records()[-1]
-            self.assertEqual(set(record), {"ts", "code", "tenant", "where", "text", "frames"})
+            self.assertEqual(set(record), {"ts", "code", "release", "tenant", "where", "text", "frames"})
             # сбой без исключения несёт место позвавшего (нить bug-report-depth, 19.10)
             self.assertEqual(record["frames"],
                              ["tests/unit/test_fault_journal.py:test_fault_appends_one_record_and_preserves_person_return"])
@@ -226,14 +226,18 @@ class FaultRoutingTests(unittest.TestCase):
                 operator = Mock(return_value="telegram")
                 send = AsyncMock()
                 scheduled = _load(
-                    "jobs/scheduled.py", {"send_weekly_report"},
+                    # _typing — обёртка «печатает…» (нить brief-net-retry, 28.10): её сетевой сбой
+                    # не отменяет отчёт; грузится вместе с функцией, которая её зовёт
+                    "jobs/scheduled.py", {"send_weekly_report", "_typing", "_transient_net", "_send_periodic_report"},
                     asyncio=asyncio, i18n=i18n, notify=_notify(operator), log=LOG,
                     get_chat_id=lambda: 123, get_today=lambda: date(2000, 1, 4),
                     refresh_data=Mock(), timedelta=timedelta, send_long=send,
+                    _report_slot=lambda kind: (datetime(2000, 1, 4), datetime(2000, 1, 2),
+                                               SimpleNamespace(exists=lambda: False)),
                     gp=SimpleNamespace(generate_weekly_report=Mock(
                         side_effect=RuntimeError("FAKE_529 overloaded"))),
                     hai=SimpleNamespace(get_active_protocols=lambda: []))
-                context = SimpleNamespace(bot=SimpleNamespace(send_chat_action=AsyncMock()))
+                context = SimpleNamespace(bot=SimpleNamespace(send_chat_action=AsyncMock()), bot_data={})
                 asyncio.run(scheduled.send_weekly_report(context))
                 operator.assert_not_called()
                 self.assertIn("RuntimeError: FAKE_529 overloaded", self.records()[-1]["text"])

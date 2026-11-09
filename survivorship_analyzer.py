@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import health_db as db
-from assessment_scheduler import tenant_data_path
+from assessment_scheduler import tenant_data_path, load_instruments
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -31,15 +31,7 @@ CONFIG = tenant_data_path("survivorship_config.yaml")
 
 
 def _load_instruments():
-    out = []
-    if not INSTRUMENTS_DIR.exists():
-        return out
-    for f in sorted(INSTRUMENTS_DIR.glob("*.json")):
-        try:
-            out.append(json.loads(f.read_text()))
-        except Exception as e:  # silent-ok: broken JSON в каталоге — пропуск инструмента
-            log.warning(f"failed to parse {f.name}: {e}")
-    return out
+    return load_instruments(INSTRUMENTS_DIR, applicable_only=True)
 
 
 def _latest_pro_per_subscale(instrument_id, window_days=180):

@@ -1,7 +1,7 @@
 """Дом извлечённых уроков (project_context/lessons.py, нить lessons-home 28.09.2026).
 
 Четыре обещания, каждое со своим способом покраснеть:
-1. страж формы краснеет на внесённых поломках (selftest движка — 21 поломка);
+1. страж формы краснеет на внесённых поломках (selftest движка — 34 поломки);
 2. уроки health_scripts проходят форму (lessons.yaml в корне);
 3. у уроков ОДИН дом: при lessons.yaml манифест не держит corpus — иначе два источника
    ложных путей разойдутся молча;
@@ -55,6 +55,7 @@ def test_form_check_survives_copy_without_git(tmp_path):
     assert lessons.lesson_problems(tmp_path) == []
 
 
+@pytest.mark.host_only
 def test_evidence_commit_must_be_in_history_not_just_in_store(tmp_path):
     """31.10 (карточка 2026-10-31-4a31191b): хеш нити до ребейза лежит в хранилище (reflog,
     backup-ref) на одной машине и вычищен gc на другой — «объект есть» давал зелёный от машины

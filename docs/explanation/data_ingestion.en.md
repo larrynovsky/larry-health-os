@@ -1,40 +1,52 @@
-<!-- translation-of: docs/explanation/data_ingestion.md sha256:63200c30621a -->
+<!-- translation-of: docs/explanation/data_ingestion.md sha256:d7febd65fffa -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](data_ingestion.md)
 
-# Data Ingestion: Single Canonical Database (single-primary): How the System Decides What to Trust
+# Data Ingestion: Single Canonical Database (single-primary): Where the One Source of Truth About the Body Comes From
+
+## What Changed
+
+- **A new invariant added** `writer_machine_runs_no_data_jobs` (status: holding): it is now recorded that the machine on which code is written (MacBook) does not run jobs that work with medical data. Permitted jobs on the MacBook are listed explicitly; everything else is considered a violation by construction.
+- **Why**: on 06.11 two jobs were found on the MacBook that had been failing into unread logs for months — KAYAK trips and Oura import. The rule is checked automatically: a MacBook snapshot taken every 3 hours carries the list of loaded jobs, and Studio compares it against the allowed list.
+
+**Updated:** 2026-11-06
+
 
 ## Why It Exists
 
-Imagine keeping a health journal in several notebooks at once — on a computer, a tablet, a phone. Sooner or later they will contain different numbers for the same date. Which one do you trust? It's not clear. And if the system automatically picks the "average" or silently shows yesterday's value instead of today's — that is no longer a journal, it is an illusion of order.
+Imagine keeping a health diary in several notebooks at once — one on your desk, one on your phone, one somewhere in the cloud. Sooner or later they start to diverge: one has yesterday's blood pressure, another has the day before's, and it is unclear which one to trust. When there is a lot of data and several devices, this is not a hypothetical inconvenience but an almost inevitable outcome.
 
-Body data arrives from everywhere: from watches, from sensors, from photographs of lab report forms. Without a strict rule about who is allowed to write, it is very easy to end up with several "truths" at once. This subsystem addresses exactly that problem — versions of a single reality that have multiplied out of control.
+Body data arrives from everywhere: wearable devices, photos of lab results, different computers. Without a specific order, each source starts living its own life, producing copies and versions. The single canonical database subsystem exists precisely so that this disorder does not arise: so that there is one point in the system that can be trusted, and so that no other point can quietly pretend to be that one point.
 
-## What It Does, in Plain Terms
+## What It Does, in Plain Words
 
-The subsystem is built around one simple principle: **only one machine — Studio, and no other — may write to the database**.
+The entire subsystem is built around one principle: **only one machine can write to the database** — the always-on Studio. Other devices can view the data but not change it. This is not a request or an agreement — it is a technical constraint: a connection from any other machine opens in read-only mode.
 
-Every other device that has access to the database sees it as read-only. They can view, analyse, and plot charts — but they cannot write anything to it. This is not a technical accident; it is a deliberate choice: one hand writes, the rest only read.
+If someone still wants to bypass this rule, they need to explicitly and deliberately enable a special flag (`ALLOW_WRITE_NONPRIMARY`). This cannot happen accidentally.
 
-The second important decision concerns the situation when Studio is not nearby. Suppose you open the application on another device and find an old copy of the database there, synced through the cloud a few hours ago. What will the system do? It will **refuse loudly** — report an error — rather than quietly presenting stale data as current. This feels inconvenient, but it is honest: it is better to see "cannot display" than to see yesterday's blood-sugar reading and assume it is today's.
+The second important thing is the treatment of stale copies. iCloud can store a copy of the database on other devices, and that copy may lag behind the real one by a day or two. The system does not allow it to quietly substitute itself for current data. If a machine that is not supposed to write has no explicit pointer to where the real database is (`HEALTH_DATA_DIR`), the system does not stay silent or guess — it fails loudly with an error. An explicit failure that cannot be missed is better than yesterday's data presenting itself as today's.
 
-The third point: the database operates in a mode designed for exactly one writer. This is a conscious architectural decision — the system does not pretend that multiple sources can write simultaneously and everything will be fine. It is honestly structured around a single write stream, and therefore does not require the complex maintenance that a separate server would demand.
+There is a third aspect: the machine on which the project code is written (MacBook) is not supposed to run jobs that work with medical data at all. Only repository maintenance jobs run on a schedule there — backups, log rotation, iCloud conflict resolution. If some process on the MacBook tries to work with data in violation of the rules, it will either hit the write prohibition or miss the canonical database entirely. What is permitted on the MacBook is recorded as an explicit list; everything not on that list is considered a violation by construction, not by mistake.
 
-Importing data from wearable devices and recognising lab results are also part of this same subsystem, but they have their own rules and separate descriptions.
+At the same time, the system is honest about one important thing: a loud failure only counts when someone hears it. If an error occurred but nobody saw it — it does not count as protection.
 
 ## What to Honestly Say About Its Limits
 
-All three key promises of this subsystem are being met today — there are no known violations and no open questions.
+All described invariants are holding as of today. But "holding" and "verified under all conditions" are different claims.
 
-This does not mean the system is all-powerful. It solves a specific problem — preventing silent confusion between versions of data. It does not solve the problem of backup, does not guarantee that data will not be physically lost together with Studio, and is not responsible for what happens before data reaches the database. These questions lie outside this subsystem.
+Limit of the MacBook check: a snapshot is taken every 3 hours and only while the laptop is on — a new job is visible with a delay of up to 3 hours. A job that runs project code from outside the project folder is not visible at all.
 
-The only way to permit writing from a machine other than Studio is an explicit manual override. This means that in an emergency you have a way out, but it requires a deliberate action rather than triggering by accident on its own.
+Limit on failure visibility: protection against a silent stale copy works through a loud failure. But the loudness of a failure only matters if someone is present to notice it. For this reason, failures on the MacBook are no longer left to the logs: their list is sent to Studio, where the daily check reads it.
+
+Limit on import: wearable devices and lab result recognition are also part of this subsystem, but their own invariants are described separately and are not verified here.
+
+None of the above means the system is unreliable. It means that reliability is not magic, but specific verified agreements with specific limits.
 
 ## Where This Lives in the System
 
-The logic that enforces all three promises lives in **`health_db.py`** — this is the file that, when connecting to the database, checks which machine it is running on and either raises an error or grants write permission.
+The technical structure of the database is described in `health_db.py` — that is where the connection logic, WAL mode, separation of reading and writing nodes, and the `HEALTH_DATA_DIR` environment variable check live.
 
-The overall architectural rationale — why this single-writer-node scheme was chosen at all — is set out in **`CLAUDE.md`**. That document captures the intent of the entire system, and this subsystem appears there as one of the foundational decisions.
+The intent of the subsystem as a whole — why it is designed this way and which invariants it holds — is recorded in `subsystem_intent.yaml`. This is a document of intent: it says not how the code is structured, but why it is structured that way.
 
-The formal description of invariants — exactly what the system promises and their current status — is recorded in **`subsystem_intent.yaml`**. This is the machine-readable "signature" of the subsystem: if anything changes or comes into question, an honest note will appear there first.
+Together these two files form a pair: one answers the question "what is happening", the other answers "what for".

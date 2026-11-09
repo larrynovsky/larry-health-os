@@ -24,6 +24,7 @@ COVERED = {
     "problems_db.py", "task_agent.py", "literature_curator.py", "survivorship_curator.py",
     "memory_consolidation.py", "import_medical_events.py", "food_rule_generator.py",
     "generate_constitutions.py",   # тело конституции; ревью алертов — оператору, по-русски
+    "agent_reply.py",   # ответ health ассистенту хозяина (agent-post, 06.11): answer_language в конце system
 }
 VIA_SHARED = {"hai_chat.py", "hai_reports.py"}
 NOT_YET: set[str] = set()   # храповик пуст с 28.09; новый генератор без языка — сюда, с причиной

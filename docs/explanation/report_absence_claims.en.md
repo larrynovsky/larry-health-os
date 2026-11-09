@@ -1,59 +1,51 @@
-<!-- translation-of: docs/explanation/report_absence_claims.md sha256:a0d0e8724f3b -->
+<!-- translation-of: docs/explanation/report_absence_claims.md sha256:bc85e05b5d1f -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](report_absence_claims.md)
 
-# The report does not claim the absence of a test that has a row: why the system stays silent instead of lying
+# The report does not assert the absence of a test that has a row: why the system watches for words about "absence"
 
 ## What changed
 
-- **The status of `context_declares_its_boundary` changed from open to holds.** The promise that a data slice declares its own boundaries is now considered met — but only within the limits named below.
+- **The wording of `claim_judged_against_canon` has been clarified.** The description of what the judge checks absence claims against has changed — the direction of the change cannot be determined automatically, so it is described neutrally: the wording has been adjusted, but it has not been verified whether it became broader, narrower, or simply shifted emphasis.
 
-- **The run was confirmed on staging (2026-10-05).** Staging is a snapshot of the canon: real code and real data, but not the production database. "Holds" means "holds where it was tested", not "verified on a live system".
-
-**Updated:** 2026-10-05
+**Updated:** 2026-11-07
 
 
 ## Why it exists
 
-Imagine: a doctor reads your report and sees the phrase "this test was never taken". They make a decision — they order it for the first time instead of comparing it against results that already exist. Or you read it yourself and think: a clean history, then; we start from scratch.
+When a doctor reads "this test was never ordered" in a report, it sounds like a fact. Not a guess, not a caveat — something that was checked and established. And the decision changes: ordering the test for the first time versus pulling old results are different actions with different consequences.
 
-The problem is that the phrase may be a lie — quiet, confident, and completely invisible from the outside.
+The problem is that the model composing the report does not see the patient's full history — only a fragment, the slice that was passed to it. If the relevant test did not make it into that slice (for example, it was performed before the chosen time window, or for some reason was not included in the list), the model honestly reports: "this is not in what I was shown" — but in the report text this becomes "this never happened at all." From the outside no error is visible: the report looks coherent, confident, well written. The lie in it is targeted and precise — about exactly this test, for exactly this person.
 
-The model that writes the report does not see your full history. It is shown a slice: for example, tests from the past six months, or only those that made it into a particular list. If the test in question is not in that slice, the model draws what seems to it a reasonable conclusion: "it was never taken." It does not know it was looking through a window rather than at the whole room. The report remains coherent, confident, and well-written. The failure is invisible — and that is precisely what makes it dangerous.
-
-This mechanism exists so that such a lie does not get through.
+This subsystem exists so that such a lie does not reach the reader unnoticed.
 
 ## What it does, in plain terms
 
-Two simple principles work here, and they hold together.
+The work is organized in two layers.
 
-**First:** when a data slice is passed to the system, the slice must describe itself. The block containing the tests reports: "I am showing data for this period; beyond its boundary there are this many rows." The model knows it is looking through a window, not at the full archive. If that declaration cannot be assembled, the block does not stay silent and does not crash: it says "treat me as incomplete." There is no silence.
+**The first layer — an honest description of the boundary.** When the system builds a block of laboratory data to pass to the model, that block declares what it is: what period the data covers, whether there are records outside that period. The model therefore receives not just data, but data together with an explanation of its own limits. This does not guarantee that the model will use that explanation correctly — but at least the information is there.
 
-**Second:** the finished report text is checked not against what was shown to the model, but against the full archive. The judge that checks the report reads the entire history — ten years of it — not the slice that went into the prompt. If the report says "this test was never taken" and the archive contains a row with a result, that is a lie, and it is rejected. The filter between the database and the prompt cannot become the definition of reality, because reality is verified separately.
+If for some reason that boundary declaration cannot be assembled, the block is still marked — as incomplete. The system does not stay silent and does not crash: it reports its own uncertainty rather than pretending everything is fine.
 
-There is one subtle point about phrasing. The phrase "this test did not appear in the past six months" is honest if there is genuinely no row within that six-month period. The phrase "this test was never taken" is a lie if a row exists somewhere in the archive. The system distinguishes these two cases: a time-bounded claim of absence is verified only within its own window and is not refuted by something old that lies outside it. When a report is honest about its boundaries, that is not a reason to reject it.
+**The second layer — checking text that has already been written.** Before the report is sent, a dedicated judge checks its "absence" claims not against the slice the model saw, but against the patient's full laboratory archive. If a row exists in the archive — the test was performed, and writing "was never performed" is not permitted. The correction is made before sending.
 
-When something is rejected, the system does not simply discard the text. It records exactly what failed and why — so that the next review does not proceed blind.
+The judge distinguishes between two different claims. "This test has never been done at all" is one thing, and it is false if even one row exists in the archive. "This test has not been done in the past year" is another thing, and it is false only if a row exists within that specific period. A row that is older than the stated window does not disprove an honest claim that includes a boundary. The system does not penalize the model for having honestly stated the limits of its data.
+
+When the judge rejects something, it records exactly what and why — both to the log and to a notification. Without that record, any subsequent review of the situation would proceed blind.
 
 ## What is honest to say about its limits
 
-These principles hold — but "holds" and "verified everywhere" are different things. Here is where the boundaries are.
+The system holds — but "holds" and "verified everywhere" are different claims. Here is where the boundary of what has been proved lies.
 
-**Report composers are not themselves checked.** The modules that assemble a final report — a monthly summary or a case-conference report, for example — call the data collectors, and it is the collectors that carry responsibility for declaring boundaries. But if a composer drops a data block along the way, that will not reach the verification step. The judge will see the text, not the fact that the composer dropped a piece of context.
+The boundary declaration is not verified at every point in the system. Of approximately twenty-one places that pass laboratory data to the model, nine declare the boundary directly, twelve are accepted with a stated rationale — for example, because they are judges, or because they have no text output, or because the logic works differently there. This is a judgment, not an automatic measurement. The machine can recount which functions have no live calls to data at all — but it cannot automatically verify each individual rationale.
 
-**The "accepted with reason" list is a judgment, not an automatic measurement.** Some modules do not declare data boundaries — and that is considered acceptable for recorded reasons: they make no claims of absence, or their output goes directly to a human, or their context is structured differently. But that list was assembled by people, not recalculated by a machine on every change. The only thing recalculated automatically is whether the relevant functions have any live call sites at all.
+There is also a more specific vulnerability: the components that assemble the final reports — the monthly report and the consilium report — are not themselves judged. The individual data collectors they call are judged. If a block is lost somewhere between a collector and the final report, that loss will remain invisible to the verification mechanism.
 
-**The laboratory section does not always appear in chat.** When you ask something in chat, the router decides whether the test block is needed. If the question did not activate the laboratory domain, the section simply will not appear. This is a router boundary, not a declaration boundary: the system will not lie about absence, but it will also not warn you that it never looked in that direction at all.
+The laboratory section in the chat is tested with a question that deliberately includes the required route. A question that the router directs differently will not receive a laboratory data section at all — and that is a limit of the router, not of the declaration.
 
-In short: the mechanism is verifiable, and it holds where it was tested. Where it was not tested, that is stated plainly, not buried in fine print.
+Finally, it is important to understand that the system guards the mechanism, not the execution. It verifies that every tract capable of making an absence claim either has a judge or openly declares the reason it does not. Whether the model lied in a specific case is a separate question, and it remains outside what the system can guarantee automatically.
 
 ## Where this lives in the system
 
-The logic lives in several places that work together.
-
-`gp_context.py` — this is where context is assembled for the general practitioner and for case conferences. This is where the laboratory block receives its declaration of window boundaries: what is shown, how many rows remain beyond the edge, whether there are exceptions.
-
-`subsystem_intent.yaml` — the file where the intent of this subsystem is recorded explicitly: what it promises, which invariants hold, where the boundary of what has been verified lies. This is not after-the-fact documentation — it is what the system checks itself against.
-
-The judge that checks the finished text operates independently of all of this — it reads the full archive and has no knowledge of what the model saw. That independence is what makes the verification real.
+The judge logic lives in `gp_context.py` — that is where `judge_absence_claims` resides, which checks the report text against the full data archive. The boundary declaration is assembled by `labs_db` via `declared_boundary` and `canon_window_note`. The subsystem's intentions and invariants are described in `subsystem_intent.yaml`. The tests that verify that corrections are made before sending and that the judge is actually connected live in `tests/unit/test_agent_reply.py`.

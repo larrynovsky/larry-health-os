@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 import os
 import logging
 from datetime import date, timedelta
@@ -9,6 +10,9 @@ from pathlib import Path
 
 
 log = logging.getLogger(__name__)
+
+# Engineering latency budget; shared by schema seed and runtime fallback.
+TASK_GUARD_BUDGET_SECONDS = 20.0
 
 
 def default_visit_specialist() -> str:
@@ -102,12 +106,12 @@ def get_imported_sources() -> set:
 
 
 def upsert_config(key: str, value_text=None, value_num=None, value_json=None,
-                  category: str = None, source: str = "manual") -> None:
-    """Записывает или обновляет параметр конфигурации системы."""
+                  category: str = None, source: str = "manual", conn=None) -> None:
+    """Write config. A supplied connection keeps transaction ownership with caller."""
     import json as _json
     if isinstance(value_json, (dict, list)):
         value_json = _json.dumps(value_json, ensure_ascii=False)
-    with _hdb.get_conn() as conn:
+    with (nullcontext(conn) if conn is not None else _hdb.get_conn()) as conn:
         conn.execute(
             """INSERT INTO system_config (key, value_text, value_num, value_json, category, updated_at, source)
                VALUES (?, ?, ?, ?, ?, datetime('now'), ?)

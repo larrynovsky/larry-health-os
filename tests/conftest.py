@@ -298,6 +298,24 @@ def screen_trace_file(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_agent_mail(tmp_path, monkeypatch):
+    """C-111/C-122: every mail access must stay inside this test's tmp_path.
+
+    Check before the resolver touches disk; resolve symlinks to catch escapes.
+    Do not silently redirect a production path into a fake empty inbox.
+    """
+    import agent_mail
+    original = agent_mail.mail_dir
+
+    def guarded():
+        root = agent_mail.default_root()
+        assert root.is_relative_to(tmp_path.resolve()), "agent_mail outside tmp_path"
+        return original()
+
+    monkeypatch.setattr(agent_mail, "mail_dir", guarded)
+
+
+@pytest.fixture(autouse=True)
 def _no_real_bug_receiver(monkeypatch, tmp_path_factory):
     """Тест не шлёт отчёт о сбое в настоящий приёмник разработчика (урок C-122): адрес по
     умолчанию — закрытый порт localhost; тест с приёмником поднимает свой и подменяет адрес."""

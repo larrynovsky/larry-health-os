@@ -75,6 +75,7 @@ def test_flip_by_own_criterion_in_thread_is_flagged(repo):
     assert v and "s1::i1" in v[0] and "claude" in v[0]
 
 
+@pytest.mark.host_only
 def test_merge_result_unlike_branch_tip_is_not_judged_by_commits(repo):
     main, tree = repo
     _commit(tree, _reg("open", "owner"), "критерий владельца")

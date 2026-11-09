@@ -29,6 +29,7 @@ def _chains_from_code_defaults(monkeypatch):
     основные модели на claude-opus-5/claude-sonnet-5-5, и снимок его базы на стенде сделал
     test_one_retired_detected зелёным переключением вместо отказа (C-75: тест зависел от данных)."""
     import hai_core
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
     real = hai_core.db.get_config
     monkeypatch.setattr(hai_core.db, "get_config",
                         lambda k, d=None, **kw: d if str(k).startswith("model.") else real(k, d, **kw))
@@ -124,3 +125,13 @@ if __name__ == "__main__":
     test_all_ok()
     test_one_retired_detected()
     print("TEST PASS")
+
+
+def test_missing_provider_is_failed_check_without_persistence(monkeypatch, tmp_path):
+    import llm_client
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    monkeypatch.setattr(llm_client, "_KEY_FILE", tmp_path / "anthropic_key")
+    monkeypatch.setattr(mh, "_persist_and_announce", lambda *a: pytest.fail("invalid snapshot"))
+    result = mh.run_check(persist=True)
+    assert result["configuration"]["ok"] is False
+    assert "HEALTH_LLM_PROVIDER" in result["configuration"]["detail"]

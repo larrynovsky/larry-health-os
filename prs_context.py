@@ -63,10 +63,17 @@ def _check_staleness(conn: sqlite3.Connection) -> bool:
     return bool(scored_ids) and latest not in scored_ids
 
 
+# Уровни покрытия — единственный дом (02.11.2026): их читают консилиум (здесь), дашборд
+# (dashboard_routers/views.py) и отбор шкал докачки (pgs_discovery). До этого 70/40 жили
+# литералами в двух местах. Ниже USABLE шкала «недостаточна для интерпретации».
+COVERAGE_OK_PCT = 70
+COVERAGE_USABLE_PCT = 40
+
+
 def _coverage_note(coverage: float) -> str:
-    if coverage >= 70:
+    if coverage >= COVERAGE_OK_PCT:
         return f"покрытие {coverage:.0f}%"
-    if coverage >= 40:
+    if coverage >= COVERAGE_USABLE_PCT:
         return f"покрытие {coverage:.0f}% ⚠️ (ограниченная точность)"
     return f"покрытие {coverage:.0f}% ⛔ (недостаточно для интерпретации)"
 
@@ -116,8 +123,14 @@ def _build(conn: sqlite3.Connection) -> str:
     lines.append(_ANCESTRY_WARNING)
     lines.append("")
 
+    # Консилиум получает только шкалы, пригодные к интерпретации (решение владельца 02.11):
+    # до этого блок нёс все 772 — 104 тыс. символов, из них 706 строк «⛔ недостаточно».
+    hidden = 0
     for pgs_id, trait_label, raw_score, matched, total, computed_at in scores:
         coverage = matched / total * 100 if total > 0 else 0.0
+        if coverage < COVERAGE_USABLE_PCT:
+            hidden += 1
+            continue
         label = trait_label or pgs_id
         cov_note = _coverage_note(coverage)
         lines.append(f"**{label}** ({pgs_id})")
@@ -128,6 +141,9 @@ def _build(conn: sqlite3.Connection) -> str:
         )
         lines.append("")
 
+    if hidden:
+        lines.append(f"_Не показано {hidden} шкал с покрытием ниже {COVERAGE_USABLE_PCT}% — "
+                     f"на этом геноме они не информативны._")
     ts = scores[0][5] if scores else "?"
     lines.append(f"_Вычислено: {ts[:10]}_")
     return "\n".join(lines)

@@ -64,6 +64,7 @@ def class_of_warning(label: str, detail: str = "") -> str:
 # Каждая подстрока обязана встречаться в исходнике датчиков — стережёт
 # tests/unit/test_triage_delivery.py::test_warn_classes_match_live_labels.
 CLASS_BY_SUBSTRING = {
+    "clinical_kb: свод не установлен": "standing",
     # Вопросы владельца по природе: сработало условие пересмотра ЕГО решения. Умолчание
     # теперь fix, поэтому такие метки обязаны стоять здесь явно (30.09).
     "условие возврата наступило":       "decide",    # его решение вернулось к нему

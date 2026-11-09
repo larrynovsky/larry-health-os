@@ -1315,3 +1315,13 @@ CREATE TABLE bp_readings (
                 source      TEXT NOT NULL DEFAULT 'withings',
                 imported_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+CREATE TABLE IF NOT EXISTS task_guard_journal (new_task_id INTEGER NOT NULL REFERENCES tasks(id),
+                open_task_id INTEGER NOT NULL REFERENCES tasks(id),
+                evaluated_at TEXT NOT NULL,
+                verdict TEXT NOT NULL CHECK (verdict IN ('duplicate','contradicts','new','unjudged')),
+                confidence REAL CHECK (confidence BETWEEN 0 AND 1),
+                judge TEXT NOT NULL CHECK (judge IN ('det','jev')),
+                reason TEXT NOT NULL,
+                PRIMARY KEY (new_task_id, open_task_id)
+            );

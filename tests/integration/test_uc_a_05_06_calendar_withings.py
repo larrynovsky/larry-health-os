@@ -2,7 +2,8 @@
 UC-A-05 (Withings BP) + UC-A-06 (Calendar/KAYAK trips) — smoke tests.
 
 Источник: USE_CASES.md §3.A.
-Status: A-05 `intended`, A-06 `partial`.
+Status: A-05 `intended`, A-06 снят 06.11.2026 (нить macbook-kayak-oura): модуль calendar_sync удалён,
+остаётся проверка словарей calendar_client — их читает бриф.
 """
 from __future__ import annotations
 
@@ -12,11 +13,6 @@ pytestmark = pytest.mark.integration
 
 
 # ── UC-A-06: Calendar sync ──────────────────────────────────────────────────
-
-
-def test_calendar_sync_module_imports():
-    import calendar_sync
-    assert calendar_sync is not None
 
 
 def test_calendar_client_keywords_distinct():

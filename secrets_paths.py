@@ -317,6 +317,7 @@ GUARDED_SUFFIXES = (".py", ".sh")
 #   state  — НЕ секрет: состояние/кэш, оказавшееся в каталоге секретов (долг, Ф4)
 SECRET_SCOPE: dict[str, str] = {
     # per-tenant: у владельца и партнёра разные значения
+    "typesafe_key.txt": "tenant",   # ключ судьи Jev сторожа задач (07.11); у партнёра нет — сторож «не настроен»
     "telegram_token": "tenant",
     "telegram_chat_id": "tenant",
     "oura_token": "tenant",

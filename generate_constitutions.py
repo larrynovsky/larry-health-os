@@ -554,6 +554,8 @@ def _frame_text() -> str:
     import food_profile
     f = food_profile.medical_frame()
     lang = i18n.DEFAULT
+    if f.get("assessment") == "not_assessed":
+        return f["reasons"][0]
     lines = [f"  энергия: {f['energy']}; белок: {f['protein']}",
              "  коды ограничений: " + (", ".join(sorted(f["constraints"])) or "нет"),
              "  микроэлементы в фокусе: " + (", ".join(sorted(f["micro"])) or "нет")]
@@ -728,6 +730,11 @@ def _metrics_or_sparse_note(metrics: str) -> str:
 
 
 def _generate_one(domain_key: str, dry_run: bool = False) -> str:
+    if domain_key == "nutrition":
+        import food_profile
+        frame = food_profile.medical_frame()
+        if frame.get("assessment") == "not_assessed":
+            return "" if dry_run else frame["reasons"][0]
     cfg = DOMAINS[domain_key]
     print(f"\n→ Генерирую конституцию: {cfg['title']}...", flush=True)
 

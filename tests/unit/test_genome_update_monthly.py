@@ -29,6 +29,14 @@ import infra_config as _ic
 _PRIMARY = _ic.PRIMARY_HOST  # основная машина установки, не литерал владельца
 
 
+@pytest.fixture(autouse=True)
+def _genome_loaded(monkeypatch):
+    """Эти задачи судятся на установке С геномом; без генома они тихо выходят
+    (tests/unit/test_genome_jobs_without_genome.py)."""
+    import genome_db
+    monkeypatch.setattr(genome_db, "genome_present", lambda: True)
+
+
 def _run(coro):
     return asyncio.run(coro)
 

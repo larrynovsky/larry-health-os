@@ -29,10 +29,8 @@ import health_db as db
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-from assessment_scheduler import tenant_data_path
-INSTRUMENTS_DIR = tenant_data_path("instruments")  # каталог опросников ЭТОГО человека (28.09, этап Б)
-# Каталог опросников — данные установки; доступность проверяется для текущего тенанта.
-# Отсутствующий каталог не означает отсутствие заполненных опросников.
+from assessment_scheduler import tenant_data_path, load_instrument
+INSTRUMENTS_DIR = tenant_data_path("instruments")  # tenant overrides; shared bundle resolved by assessment_scheduler
 
 
 def assessments_dir() -> Path:
@@ -51,10 +49,7 @@ def instrument_source_id(canonical_id: str) -> str:
 
 
 def _load_instrument(instrument_id):
-    p = INSTRUMENTS_DIR / f"{instrument_id}.json"
-    if not p.exists():
-        raise FileNotFoundError(f"instrument {instrument_id} not found in {INSTRUMENTS_DIR}")
-    return json.loads(p.read_text())
+    return load_instrument(instrument_id, INSTRUMENTS_DIR)
 
 
 _RECALL_RU = {"past_week": "за неделю", "past_2_weeks": "за 2 недели", "past_month": "за месяц"}

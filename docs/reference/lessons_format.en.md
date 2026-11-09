@@ -15,7 +15,8 @@ rituals call one command from the root of any of them.
 |---|---|
 | `python3 -m project_context lessons` | shape check; exit code 1 and a list of discrepancies, 2 — no home file |
 | `… lessons --subject <key>` | what to deliver at the start of work on a subject (statuses from `deliver_statuses`) |
-| `… lessons --subjects` | dictionary of the project's subject keys |
+| `… lessons --subject <key> --everywhere` | the same from every root of the shared dictionary; an unreadable root prints «не знаю: <root>» |
+| `… lessons --subjects` | dictionary of the project's subject keys and the shared ones (marked «общий») |
 | `… lessons --modules a,b` | lessons touching the given modules, any status (this is how preflight prints them) |
 | `… lessons --groups` | summary by (address, subject); a group of 3 witnesses is ripe |
 | `… lessons --selftest` | injected breakages must turn red |
@@ -31,6 +32,7 @@ directory or `--root <path>`.
 | `address_kinds` | closed list of address kinds ("what exactly to change") |
 | `subjects` | dictionary of subject keys; key — lowercase Latin characters; grows only here |
 | `homes` | optional: address kind → `{file, section}`; a lesson's `ref` is looked up BY KEY in this home; `file` — a flat `*.yaml` filename in the root |
+| `shared_subjects` | optional: path to the shared failure-class dictionary (`~/Projects/infra/failure_classes.yaml`, or relative to the project root — for a vendored copy in a repo checked on another machine); its keys are valid in `subject`; a key is not repeated in `subjects`; an unreadable dictionary is red |
 | `deliver_statuses` | optional: which statuses `--subject` delivers; default `[adopted, failed]` |
 | `adoption_dates` | optional: `required` — every adopted entry must have `adopted_on` |
 
@@ -48,7 +50,7 @@ Required fields: `id`, `date`, `thread`, `event` (what happened), `cost` (what i
 - `evidence`: a path in the repository or `git:<sha>` — the commit carrying the trace.
 - `modules`: optional; list of modules for which preflight prints the lesson.
 
-The guard turns red on a missing field, an address outside the list, a key outside the dictionary,
+The guard turns red on a missing field, an extra key in `address` or `outcome` (text cut by YAML at an unquoted comma), a `deliver_statuses` value outside the five legal ones, an address outside the list, a key outside the dictionary,
 an outcome outside the three, a cause reduced to the person, adopted without `change`, a
 non-existent piece of evidence, a duplicate id, a home that cannot be read, an adopted home record
 not reviewed after the lesson, adopted without `adopted_on` (when `adoption_dates: required`), and

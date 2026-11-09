@@ -17,18 +17,24 @@ log = logging.getLogger(__name__)
 WAITING_REVIEW_SQL = "COALESCE(review_status,'pending') NOT IN ('rejected','promoted','specialized')"
 
 
-def get_recent_labs(n_days: int = 365, key_tests: list = None, exclude_pro: bool = True) -> list[dict]:
+def get_recent_labs(n_days: int | None = 365, key_tests: list = None, exclude_pro: bool = True,
+                    *, reference_date: date | None = None) -> list[dict]:
     """
     Возвращает последний результат для каждого теста за последние n_days дней.
-    Если key_tests задан — только эти тесты.
+    Если key_tests задан — только эти тесты. n_days=None removes the lower bound.
+    reference_date caps history inclusively for deterministic historical callers.
 
     exclude_pro=True (default): исключает записи с source LIKE 'instrument:%'
-    (это PRO-подшкалы опросников — survivorship-extension).
+    (это PRO-подшкалы опросников — survivorship-extension) и unit LIKE 'score%'.
     Передать exclude_pro=False, чтобы получить ВСЕ записи включая PRO.
     """
     _hdb._ensure_lab_table()
-    cutoff = str(get_today() - timedelta(days=n_days))
-    pro_filter = " AND (source IS NULL OR source NOT LIKE 'instrument:%')" if exclude_pro else ""
+    cutoff = str((reference_date or get_today()) - timedelta(days=n_days)) if n_days is not None else "0001-01-01"
+    pro_filter = (" AND (source IS NULL OR source NOT LIKE 'instrument:%')"
+                  " AND (unit IS NULL OR unit NOT LIKE 'score%')") if exclude_pro else ""
+    if reference_date is not None:
+        pro_filter += " AND date <= ?"
+    date_args = [cutoff] + ([str(reference_date)] if reference_date is not None else [])
     with _hdb.get_conn() as conn:
         if key_tests:
             placeholders = ",".join("?" * len(key_tests))
@@ -36,10 +42,10 @@ def get_recent_labs(n_days: int = 365, key_tests: list = None, exclude_pro: bool
                 SELECT test_name, value, value_text, unit, status, date,
                        ref_low, ref_high, source, MAX(date) as last_date
                 FROM lab_results
-                WHERE date >= ? AND test_name IN ({placeholders}){pro_filter}
+                WHERE date >= ?{pro_filter} AND test_name IN ({placeholders})
                 GROUP BY test_name
                 ORDER BY test_name
-            """, [cutoff] + key_tests).fetchall()
+            """, date_args + key_tests).fetchall()
         else:
             rows = conn.execute(f"""
                 SELECT test_name, value, value_text, unit, status, date,
@@ -48,7 +54,7 @@ def get_recent_labs(n_days: int = 365, key_tests: list = None, exclude_pro: bool
                 WHERE date >= ?{pro_filter}
                 GROUP BY test_name
                 ORDER BY test_name
-            """, (cutoff,)).fetchall()
+            """, date_args).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -728,7 +734,7 @@ def build_lab_history_context(min_points: int = 3, max_hist: int = 8,
 
     Для консилиума/конституций: видят И тренды (многолетние), И различают
     ТЕКУЩЕЕ (в пределах срока аналита) vs УСТАРЕЛО (нет актуальных данных).
-    Срок берётся из get_effective_lab_schedule (doctor ?? stable).
+    Срок берётся из tenant_lab_schedule (тот же дом, что у отчёта и задач).
 
     min_points гейтит ТОЛЬКО тренд-историю: аналит со свежим (в пределах срока)
     значением показывается всегда, даже при 1–2 точках. Иначе потребитель
@@ -743,7 +749,7 @@ def build_lab_history_context(min_points: int = 3, max_hist: int = 8,
     import lab_canon
 
     today = get_today()
-    sched = get_effective_lab_schedule()
+    sched = tenant_lab_schedule()
     sched_norm = {lab_canon.normalize(k): v for k, v in sched.items()}
 
     with _hdb.get_conn() as conn:
@@ -1434,6 +1440,103 @@ def effective_freshness(active_conds) -> dict:
         for test, cfg in {**CONDITION_LABS.get(cond, {}), **_kb_labs().get(cond, {})}.items():
             sched[test] = cfg
     return sched
+
+
+def schedule_origin(source: str | None) -> str:
+    """Classify interval provenance, not clinical validity; no I/O.
+
+    encounter:* -> doctor, manual* -> manual, everything else -> system.
+    Human labels belong to i18n; callers share these stable category values.
+    """
+    source = source or ""
+    if source.startswith("encounter:"):
+        return "doctor"
+    if source.startswith("manual"):
+        return "manual"
+    return "system"
+
+
+def latest_result_by_specimen() -> dict:
+    """{канон: {класс материала | None: последняя дата}} по lab_results (без опросников).
+
+    Для решений «пришёл ли результат именно этого измерения» (§16: аналит = имя + материал +
+    размерность): одноимённая глюкоза мочи не результат глюкозы крови. Колонки specimen может
+    не быть у старой схемы — тогда материал неизвестен (None) для всех строк."""
+    import lab_canon
+    with _hdb.get_conn() as conn:
+        cols = {c[1] for c in conn.execute("PRAGMA table_info(lab_results)")}
+        spec = "specimen" if "specimen" in cols else "NULL"
+        rows = conn.execute(
+            f"SELECT test_name, date, {spec} AS specimen, unit FROM lab_results "
+            "WHERE value IS NOT NULL AND (source IS NULL OR source NOT LIKE 'instrument:%')").fetchall()
+    out: dict = {}
+    for r in rows:
+        if "score" in (r["unit"] or "").lower() or not r["date"]:
+            continue
+        k = lab_canon.normalize(r["test_name"])
+        cls = lab_canon.specimen_class(r["specimen"]) if r["specimen"] else None
+        slot = out.setdefault(k, {})
+        slot[cls] = max(slot.get(cls, ""), r["date"][:10])
+    return out
+
+
+def tenant_lab_schedule() -> dict:
+    """Срок анализа для ВСЕХ читателей: {test: {interval_days, priority, source, note}}.
+
+    Один дом правила слияния (план доделок п.1, 07.11.2026): реальная клиническая правка
+    в БД (encounter/manual/stable) главнее дефолта тенанта; code_seed — старый дефолт и
+    НЕ перекрывает effective_freshness (иначе условный буст молча не сработал бы, а
+    онкомаркеры тенанта без онко-класса вернулись бы из старого сида). Тесты только из БД
+    берутся, если это не code_seed. До 07.11 правило жило копией в gp_context, а письма
+    ассистенту читали get_effective_lab_schedule напрямую — и расходились (амилаза 90/180).
+    """
+    try:
+        db_sched = get_effective_lab_schedule()
+    except Exception as e:  # noqa: BLE001 — без БД остаются дефолты тенанта, громко в лог
+        log.warning("tenant_lab_schedule: расписание из БД не прочитано: %s", e)
+        db_sched = {}
+    try:
+        import clinical_kb
+        active = clinical_kb.active_conditions()
+    except Exception as e:  # noqa: BLE001
+        log.warning("tenant_lab_schedule: классы состояния не прочитаны: %s", e)
+        active = set()
+    out = {}
+    for test, cfg in effective_freshness(active).items():
+        row = db_sched.get(test)
+        if row and row.get("source") != "code_seed":
+            out[test] = {"interval_days": row["interval_days"], "priority": row["priority"],
+                         "source": row["source"], "note": cfg.get("missing_note", "")}
+        else:
+            out[test] = {"interval_days": cfg["days"], "priority": cfg["priority"],
+                         "source": "default", "note": cfg.get("missing_note", "")}
+    for test, row in db_sched.items():
+        if test not in out and row.get("source") != "code_seed":
+            out[test] = {"interval_days": row["interval_days"], "priority": row["priority"],
+                         "source": row["source"], "note": row.get("note") or ""}
+    return out
+
+
+def lab_due(names, day: date) -> dict:
+    """{канон: {due, last, interval_days, priority, source, note}} для аналитов из names,
+    у которых есть срок в tenant_lab_schedule И последняя точка. Без точки срок повтора
+    не вычисляется — такой аналит в ответ не попадает."""
+    import lab_canon
+    sched = {lab_canon.normalize(k): v for k, v in tenant_lab_schedule().items()}
+    want = {lab_canon.normalize(n) for n in names} & set(sched)
+    if not want:
+        return {}
+    last = {}
+    for r in get_recent_labs(n_days=None, reference_date=day):
+        k = lab_canon.normalize(r["test_name"])
+        if k in want and r.get("date"):
+            last[k] = max(last.get(k, ""), r["date"][:10])
+    for k in want:
+        iv = sched[k]["interval_days"]
+        if isinstance(iv, bool) or not isinstance(iv, int) or iv <= 0:
+            raise ValueError(f"lab_due: interval {k!r} = {iv!r}, expected integer > 0")
+    return {k: {"due": date.fromisoformat(last[k]) + timedelta(days=sched[k]["interval_days"]),
+                "last": last[k], **sched[k]} for k in want if k in last}
 
 
 # DATA_FRESHNESS — ПОЛНЫЙ каталог (BASE + все условные) для обратной совместимости/инвентаря.

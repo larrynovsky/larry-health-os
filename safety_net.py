@@ -680,12 +680,17 @@ def _personal_floor(metric: str, pct: int = 5, min_n: int = 30):
         return None
 
 
-def check_lifestyle_alerts(target: date = None) -> list[dict]:
-    """Проверяет lifestyle-метрики против абсолютных и относительных порогов."""
+def check_lifestyle_alerts(target: date = None, *, initialize: bool = True) -> list[dict]:
+    """Проверяет lifestyle-метрики против абсолютных и относительных порогов.
+
+    initialize=False is for read-only evaluations after application startup migrations.
+    Existing callers retain initialization by default.
+    """
     if target is None:
         target = get_today()
 
-    db.init_db()
+    if initialize:
+        db.init_db()
     day    = db.get_day(str(target))
     stats30 = db.get_stats(30, target)
     _ABS = _load_lifestyle_abs()

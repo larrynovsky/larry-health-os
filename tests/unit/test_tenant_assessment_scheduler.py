@@ -42,6 +42,10 @@ def test_catalogue_path_and_reader(monkeypatch, tmp_path, data_name, owner):
         directory.mkdir(parents=True)
         (directory / "example.json").write_text(json.dumps({"id": identifier}))
 
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "example.json").write_text(json.dumps({"id": "synthetic_bundle"}))
+    monkeypatch.setattr(scheduler, "BUNDLED_INSTRUMENTS_DIR", bundle)
     expected = legacy if owner else tenant
     assert scheduler.INSTRUMENTS_DIR == expected
     assert scheduler.tenant_data_path("instruments") == expected
@@ -50,7 +54,10 @@ def test_catalogue_path_and_reader(monkeypatch, tmp_path, data_name, owner):
     assert scheduler._load_instruments() == [
         {"id": "synthetic_owner" if owner else "synthetic_tenant"}]
 
-    # A missing tenant catalogue must not silently fall back to the owner.
+    # A missing tenant catalogue uses only the bundle, never the owner's files.
     (expected / "example.json").unlink()
     expected.rmdir()
-    assert scheduler._load_instruments() == []
+    assert scheduler._load_instruments() == [{"id": "synthetic_bundle"}]
+    (bundle / "example.json").unlink()
+    with pytest.raises(FileNotFoundError):
+        scheduler._load_instruments()

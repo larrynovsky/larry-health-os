@@ -33,6 +33,39 @@ MAX_BYTES = 8192
 MAX_FAULT_GROUPS = 10
 MAX_TRACE = 20
 FAULT_WINDOW_DAYS = 7
+MAX_DETAIL = 4
+MAX_DETAIL_LENGTH = 120
+# Place travels inside each token so the receiver can apply the SAME allowlist without
+# changing legacy at/fp (at may contain traceback frames, not the journal's where).
+_IDENT = r"[a-z_][a-z_]*"
+_DETAIL_RULES = (
+    (re.compile(r"run_checks\.[a-z_]+"),
+     # Цифры в имени теста — код, не данные (test_uc_a_03_…); параметры [..] не пропускаются.
+     re.compile(r"tests/(?:[a-z0-9_]+/)*test_[a-z0-9_]+\.py(?:::(?:Test[A-Za-z0-9_]+|test_[a-z0-9_]+)){1,2}")),
+    (re.compile(r"monthly_consilium|consilium_roster"),
+     re.compile(r"[a-z_]+:(?:[A-Z][A-Za-z_]*|unanswered)")),
+    (re.compile(r"llm_admission"),
+     re.compile(_IDENT + r":(?:o[134](?:-[a-z0-9]+)*|(?:claude|gpt|gemini|deepseek|qwen|llama|mistral)(?:[.-][a-z0-9]+)+):"
+                r"(?:all_failed|next_not_admitted|removed|call_error)")),
+)
+
+
+def _detail_token_ok(token: object) -> bool:
+    if not isinstance(token, str) or len(token) > MAX_DETAIL_LENGTH:
+        return False
+    place, sep, value = token.partition(":")
+    return bool(sep and any(p.fullmatch(place) and v.fullmatch(value) for p, v in _DETAIL_RULES))
+
+
+def _detail(record: dict) -> list[str]:
+    place, values = record.get("where"), record.get("detail")
+    if not isinstance(place, str) or not any(p.fullmatch(place) for p, _ in _DETAIL_RULES):
+        return []
+    if not isinstance(values, list):
+        return []
+    return list(dict.fromkeys(f"{place}:{v}" for v in values
+                             if isinstance(v, str) and _detail_token_ok(f"{place}:{v}")))[:MAX_DETAIL]
+
 
 # Шаблоны узкие нарочно: чем шире строка, тем больше в неё помещается фраза для читающего агента.
 _SHAPES = {"report_id": re.compile(r"[0-9a-f]{16}:\d{1,6}"),
@@ -101,7 +134,22 @@ def faults_from_journal(path: Path, now: datetime | None = None) -> list[dict]:
         fp = fingerprint(exc, at)
         g = groups.setdefault(fp, {"type": exc, "at": at, "n": 0, "fp": fp})
         g["n"] += 1
+        detail = _detail(rec)
+        if detail:
+            g["detail"] = list(dict.fromkeys([*g.get("detail", []), *detail]))[:MAX_DETAIL]
+        rel = rec.get("release")
+        if isinstance(rel, str) and _REL.fullmatch(rel) and \
+                release_key(rel) > release_key(g.get("rel", "v0.0.0")):
+            g["rel"] = rel          # самая новая версия, на которой сбой ещё случался
     return sorted(groups.values(), key=lambda g: -g["n"])[:MAX_FAULT_GROUPS]
+
+
+_REL = re.compile(r"v\d{1,3}\.\d{1,3}\.\d{1,3}")
+
+
+def release_key(rel: str) -> tuple:
+    """«v0.2.7» → (0, 2, 7); не версия («local», пусто) — (), меньше любой версии."""
+    return tuple(int(x) for x in rel[1:].split(".")) if _REL.fullmatch(rel or "") else ()
 
 
 def build(category: str, *, report_id: str, release: str, platform: str,
@@ -110,16 +158,23 @@ def build(category: str, *, report_id: str, release: str, platform: str,
     отбрасывается — сборщик не бросает: отчёт нужен именно тогда, когда что-то сломано."""
     def tok(k: str, v: str, fallback: str) -> str:
         return v if isinstance(v, str) and _SHAPES[k].fullmatch(v) else fallback
-    return {
+    report = {
         "schema": SCHEMA,
         "report_id": report_id,                      # рождает установка; не прошёл — schema_problems отобьёт
         "release": tok("release", release, "local"),
         "platform": tok("platform", platform, "other/other"),
         "category": category if category in CATEGORIES else "other",
         "connected": {k: bool(connected.get(k)) for k in _INTEGRATIONS},
-        "faults": faults[:MAX_FAULT_GROUPS],
+        "faults": [dict(g) for g in faults[:MAX_FAULT_GROUPS]],
         "screen": [s for s in screen if isinstance(s, str) and _TRACE.fullmatch(s)][-MAX_TRACE:],
     }
+
+    # Optional diagnostics must not make a formerly deliverable report too large.
+    for g in reversed(report["faults"]):
+        if len(json.dumps(report, ensure_ascii=False).encode()) <= MAX_BYTES:
+            break
+        g.pop("detail", None)
+    return report
 
 
 def schema_problems(report: object) -> list[str]:
@@ -155,7 +210,12 @@ def schema_problems(report: object) -> list[str]:
 
 
 def _fault_ok(g: object) -> bool:
-    if not (isinstance(g, dict) and set(g) == {"type", "at", "n", "fp"}):
+    if not (isinstance(g, dict) and set(g) - {"rel", "detail"} == {"type", "at", "n", "fp"}):
+        return False
+    if "rel" in g and not (isinstance(g["rel"], str) and _REL.fullmatch(g["rel"])):
+        return False
+    if "detail" in g and not (isinstance(g["detail"], list) and 1 <= len(g["detail"]) <= MAX_DETAIL
+                              and all(_detail_token_ok(t) for t in g["detail"])):
         return False
     at_ok = (isinstance(g["at"], list) and 1 <= len(g["at"]) <= 6
              and all(isinstance(a, str) and (_CODE_AT.fullmatch(a) or _WHERE.fullmatch(a) or a == "other")
@@ -176,11 +236,8 @@ def _connected() -> dict[str, bool]:
     import health_db
     dirs = [Path(secrets_dir()), Path(owner_secrets_dir()), Path(health_db.DB_PATH).parent]
     out = {k: any((d / n).exists() for d in dirs for n in names) for k, names in _MARKERS.items()}
-    try:
-        with health_db.get_conn() as conn:
-            out["genome"] = conn.execute("SELECT 1 FROM raw_snps LIMIT 1").fetchone() is not None
-    except Exception:  # silent-ok: нет таблицы или базы — генома нет, отчёт всё равно нужен
-        out["genome"] = False
+    import genome_db
+    out["genome"] = genome_db.genome_present()
     return out
 
 

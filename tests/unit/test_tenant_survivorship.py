@@ -53,6 +53,8 @@ def test_analyzer_inputs(monkeypatch, tmp_path, data_name, owner, analyzer_dry_r
         (directory / "survivorship_config.yaml").write_text(
             f"pilot_flags:\n  analyzer_dry_run: {str(flag).lower()}\n")
 
+    monkeypatch.setattr(modules["assessment_scheduler"], "BUNDLED_INSTRUMENTS_DIR",
+                        expected / "instruments")
     assert analyzer.INSTRUMENTS_DIR == expected / "instruments"
     assert analyzer.CONFIG == expected / "survivorship_config.yaml"
     assert analyzer.INSTRUMENTS_DIR == modules["assessment_scheduler"].INSTRUMENTS_DIR
@@ -68,14 +70,14 @@ def test_analyzer_inputs(monkeypatch, tmp_path, data_name, owner, analyzer_dry_r
     assert analyzer.run() == {"per_instrument": {identifier: []}, "global": []}
     assert db.save_agent_report.call_count == (0 if analyzer_dry_run else 1)
 
-    # Missing inputs keep the existing empty/default behavior within this tenant.
+    # Missing all catalogues must fail rather than silently produce no findings.
     (expected / "instruments/example.json").unlink()
     (expected / "instruments").rmdir()
     analyzer.CONFIG.unlink()
     db.save_agent_report.reset_mock()
-    assert analyzer._load_instruments() == []
-    assert analyzer.run() == {"per_instrument": {}, "global": []}
-    db.save_agent_report.assert_called_once()
+    with pytest.raises(FileNotFoundError):
+        analyzer.run()
+    db.save_agent_report.assert_not_called()
 
 
 def test_pipeline_selects_its_checkout_before_starting_jobs(tmp_path):

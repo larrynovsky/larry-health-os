@@ -120,6 +120,24 @@ _UNCOVERED=$(( $(git worktree list 2>/dev/null | wc -l) - 1 ))
 _THREADS=$(git for-each-ref --format='%(refname:short):%(objectname:short=12):%(committerdate:unix)' \
     refs/heads/thread/ 2>/dev/null | sed 's|^thread/||' | paste -sd, - )
 [ -z "$_THREADS" ] && _THREADS="нет"
+# ── ДЖОБЫ MacBook, ИСПОЛНЯЮЩИЕ health_scripts (06.11, нить macbook-kayak-oura) ──
+# Замер 06.11: на MacBook месяцами жили два джоба эпохи «MacBook пишет данные» —
+# поездки KAYAK (каждый час, падали на R1/R2) и импорт Oura (5 раз в день, ходил в
+# облако с ключом владельца, запись в базу падала с 27.06). Код падал «громко», но
+# в журналы, которых никто не читает: падение без слушателя — та же тишина.
+# Студийный датчик (integrity_tests.check_macbook_health_jobs) ноутбук перечислить
+# не может — факт едет в сообщении снимка, как threads=. Судится то, что launchd
+# держит ЗАГРУЖЕННЫМ (`launchctl print`), а не файлы плистов: джоб Oura был жив при
+# битом XML на диске, и по файлу его не было бы видно. Метка не фильтр: джоб
+# поездок назывался com.larry.calendar-sync, без «health».
+# `неизвестно` ≠ `нет`: launchctl не ответил — датчик обязан сказать «не судимо».
+_HJOBS="неизвестно"
+if _LCL=$(launchctl list 2>/dev/null); then
+    _HJOBS=$(printf '%s\n' "$_LCL" | awk '$3 ~ /^com\.larry\./ {print $3}' | while read -r _lbl; do
+        if launchctl print "gui/$(id -u)/$_lbl" 2>/dev/null | grep -q "health_scripts"; then echo "$_lbl"; fi
+    done | sort | paste -sd, - ) || _HJOBS="неизвестно"
+    [ -z "$_HJOBS" ] && _HJOBS="нет"
+fi
 if git rev-parse --git-dir > /dev/null 2>&1; then
     # ── РЕШЕНИЕ «СНИМАТЬ ЛИ»: начало блока (14.09.2026) ─────────────────────
     # ПОЧЕМУ `--wip` СНИМАЕТ ВСЕГДА, даже на чистом дереве. До 14.09 условие
@@ -143,7 +161,7 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
         cp .git/index "$TMP_INDEX"
         if GIT_INDEX_FILE="$TMP_INDEX" git add -A >> "$LOG" 2>&1 \
            && TREE=$(GIT_INDEX_FILE="$TMP_INDEX" git write-tree) \
-           && SNAP=$(git commit-tree "$TREE" -p HEAD -m "snapshot: $KIND backup $DATE (вне main, см. backup.sh) worktrees_uncovered=$_UNCOVERED threads=$_THREADS") \
+           && SNAP=$(git commit-tree "$TREE" -p HEAD -m "snapshot: $KIND backup $DATE (вне main, см. backup.sh) worktrees_uncovered=$_UNCOVERED threads=$_THREADS health_jobs=$_HJOBS") \
            && git update-ref "$SNAP_REF" "$SNAP"; then
             log "git snapshot: $SNAP_REF = $SNAP (main не тронут)"
             if git push -f studio "$SNAP_REF" >> "$LOG" 2>&1; then

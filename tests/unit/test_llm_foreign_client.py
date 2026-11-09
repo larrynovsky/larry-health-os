@@ -18,7 +18,9 @@ FIX = ROOT / "tests" / "fixtures" / "llm_translate"
 _PLANTED = "sk-fake-0a1b2c3d4e5f6a7b8c9d"
 
 
-def test_provider_default_and_unknown(monkeypatch):
+def test_provider_default_and_unknown(monkeypatch, tmp_path):
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / "anthropic_key").touch()
     monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
     assert lc.provider() == "anthropic"
     monkeypatch.setenv("HEALTH_LLM_PROVIDER", "nosuch")
@@ -96,7 +98,9 @@ def test_foreign_role_works_only_when_admitted(monkeypatch, tmp_path):
         hai_core.get_model("opus")
 
 
-def test_anthropic_path_unchanged(monkeypatch):
+def test_anthropic_path_unchanged(monkeypatch, tmp_path):
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / "anthropic_key").touch()
     monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
     monkeypatch.setattr(hai_core.db, "get_config", lambda k, d=None, **kw: d)
     assert hai_core.get_model("opus") == hai_core.MODEL_DEFAULTS["opus"]
@@ -341,3 +345,101 @@ def test_foreign_http_guard_before_translation(monkeypatch, tmp_path, prov, asyn
     finally:
         sync_http.close()
         asyncio.run(async_http.aclose())
+
+
+@pytest.mark.parametrize("name", ["anthropic", "openai", "gemini", "deepseek"])
+@pytest.mark.parametrize("env", [None, "", "  "])
+def test_provider_from_only_key(monkeypatch, tmp_path, name, env):
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    if env is not None:
+        monkeypatch.setenv("HEALTH_LLM_PROVIDER", env)
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / lc.profiles()[name]["key_file"]).touch()
+    assert lc.provider() == name
+
+
+@pytest.mark.parametrize("keys", [[], ["openai_key", "gemini_key"]])
+def test_provider_ambiguous_blocks_client(monkeypatch, tmp_path, caplog, keys):
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    for key in keys:
+        (tmp_path / key).touch()
+    with pytest.raises(lc.ProviderConfigurationError, match="HEALTH_LLM_PROVIDER"):
+        lc.guarded_client()
+    assert "HEALTH_LLM_PROVIDER" in caplog.text
+
+
+def test_explicit_provider_wins_over_key_files(monkeypatch, tmp_path):
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / "openai_key").touch()
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    assert lc.provider() == "anthropic"
+    (tmp_path / "anthropic_key").touch()
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", " OpenAI ")
+    assert lc.provider() == "openai"
+
+
+def test_early_imports_without_provider(monkeypatch, tmp_path):
+    import os
+    import subprocess
+    import site
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    env = {**os.environ, "HOME": str(tmp_path), "PYTHONPATH": site.getusersitepackages()}
+    result = subprocess.run([sys.executable, "-c",
+                             "import bot.main, model_health_check, llm_admission"],
+                            env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_explicit_admission_client_uses_its_own_key(monkeypatch, tmp_path):
+    import anthropic
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "openai")
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / "anthropic_key").write_text("synthetic-anthropic")
+    (tmp_path / "openai_key").write_text("synthetic-openai")
+    received = []
+    monkeypatch.setattr(anthropic, "Anthropic",
+                        lambda **kw: received.append(kw) or type("SDK", (), {"messages": None})())
+    lc.guarded_client(prov="anthropic")
+    assert received == [{"api_key": "synthetic-anthropic"}]
+
+
+def test_migration_keeps_owner_with_two_keys_but_warns(monkeypatch, tmp_path, caplog):
+    monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
+    monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
+    (tmp_path / "anthropic_key").write_text("synthetic-owner")
+    (tmp_path / "deepseek_key").touch()
+    assert lc.provider() == "anthropic"
+    assert lc.api_key() == "synthetic-owner"
+    assert "keeping legacy Anthropic" in caplog.text
+    assert "HEALTH_LLM_PROVIDER=anthropic" in caplog.text
+    assert "synthetic-owner" not in caplog.text
+    caplog.clear()
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "deepseek")
+    assert lc.provider() == "deepseek"
+    assert not caplog.records
+
+
+def test_partner_provider_and_api_key_share_home_not_tenant_secrets(monkeypatch, tmp_path):
+    import os
+    import site
+    import subprocess
+    home = tmp_path / "home"
+    shared = home / ".health_secrets"
+    shared.mkdir(parents=True)
+    partner = home / ".health_secrets_partner"
+    partner.mkdir()
+    (shared / "anthropic_key").write_text("synthetic-shared")
+    (shared / "deepseek_key").touch()
+    env = {**os.environ, "HOME": str(home), "PYTHONPATH": site.getusersitepackages(),
+           "HEALTH_DATA_DIR": str(home / "health_partner"), "HEALTH_SECRETS_DIR": str(partner)}
+    env.pop("HEALTH_LLM_PROVIDER", None)
+    result = subprocess.run([sys.executable, "-c", """
+from pathlib import Path
+import llm_client as lc
+assert lc._KEY_FILE == Path.home() / '.health_secrets' / 'anthropic_key'
+assert lc.provider() == 'anthropic'
+assert lc.api_key() == 'synthetic-shared'
+"""], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert "keeping legacy Anthropic" in result.stderr

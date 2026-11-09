@@ -12,7 +12,7 @@ import logging
 import health_db as _hdb_status
 import urllib.request
 import urllib.error
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # ── Пути ──────────────────────────────────────────────────────────────────
@@ -168,6 +168,45 @@ def parse_readiness(data: list) -> dict:
     return result
 
 
+_ACTIVE_CLASSES = "345"   # class_5_min Oura: 0 кольцо снято, 1 покой, 2 сидя, 3–5 движение
+_STILL_CLASSES = "12"
+
+
+def _minutes(sec):
+    return round(sec / 60) if isinstance(sec, (int, float)) else None
+
+
+def day_shape(a: dict) -> dict:
+    """Форма дня по пятиминуткам Oura — «сидит или ходит» для ассистента (07.11).
+    До этого из активности брались только шаги и оценка, пятиминутки выбрасывались."""
+    cls = a.get("class_5_min") or ""
+    out = {
+        "sedentary_min": _minutes(a.get("sedentary_time")),
+        "resting_min": _minutes(a.get("resting_time")),
+        "low_min": _minutes(a.get("low_activity_time")),
+        "medium_min": _minutes(a.get("medium_activity_time")),
+        "high_min": _minutes(a.get("high_activity_time")),
+        "inactivity_alerts": a.get("inactivity_alerts"),
+        "class_5_min": cls or None,
+    }
+    try:
+        start = datetime.fromisoformat(a["timestamp"])
+    except (KeyError, TypeError, ValueError):
+        return out
+    if not cls:
+        return out
+    slot = timedelta(minutes=5)
+    out["data_until"] = (start + slot * len(cls)).isoformat(timespec="minutes")
+    tail = len(cls) - len(cls.rstrip("0"))
+    worn = cls[:len(cls) - tail]
+    still = len(worn) - len(worn.rstrip(_STILL_CLASSES))
+    out["ring_off_tail_min"] = tail * 5
+    out["still_min"] = still * 5
+    last = max(worn.rfind(c) for c in _ACTIVE_CLASSES)
+    out["last_active_at"] = (start + slot * (last + 1)).isoformat(timespec="minutes") if last >= 0 else None
+    return out
+
+
 def parse_activity(data: list) -> dict:
     result = {}
     for a in data:
@@ -177,6 +216,7 @@ def parse_activity(data: list) -> dict:
             "total_kcal": a.get("total_calories"),
             "distance_km": round(a.get("equivalent_walking_distance", 0) / 1000, 2) if a.get("equivalent_walking_distance") else None,
             "activity_score": a.get("score"),
+            "activity": day_shape(a),
         }
     return result
 
@@ -304,7 +344,9 @@ def import_oura(start: date, end: date):
     sleep_sessions  = oura_get("sleep", start_s, end_s)
     sleep_scores    = oura_get("daily_sleep", start_s, end_s)
     readiness_data  = oura_get("daily_readiness", start_s, end_s)
-    activity_data   = oura_get("daily_activity", start_s, end_s)
+    # День активности Oura идёт с 04:00 до 04:00, и end_date для него не включает end:
+    # замер 07.11 — end=сегодня отдаёт только вчера, поэтому сегодняшних шагов не было до завтра.
+    activity_data   = oura_get("daily_activity", start_s, (end + timedelta(days=1)).isoformat())
     spo2_data       = oura_get("daily_spo2", start_s, end_s)
     stress_data     = oura_get("daily_stress", start_s, end_s)
     resilience_data = oura_get("daily_resilience", start_s, end_s)

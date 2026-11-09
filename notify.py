@@ -197,6 +197,17 @@ def faults_journal() -> Path:
     return _faults_journal()
 
 
+def repair_provisioned() -> bool:
+    """Whether this installation has a repair session, regardless of current liveness.
+
+    The repair-seen mark's existence is enough: an old mark means repair is late
+    or dead, precisely when the owner must still hear the bell. Freshness belongs
+    to repairer_alive(), which guards promises of active repair, not invitations
+    to the repair session. A stranger's install has no mark.
+    """
+    return (_faults_journal().parent / REPAIR_SEEN).exists()
+
+
 def repairer_alive() -> bool:
     """Есть ли у ЭТОЙ установки тот, кто чинит сбои: свежая отметка ночного ремонта.
 
@@ -305,8 +316,35 @@ async def afault(tech: str, person_key: "str | None" = "common.error.our_side", 
     return await asyncio.to_thread(fault, tech, person_key, exc=exc, _place=place, **kw)
 
 
+def claim_repeat(signature: str, state: Path, now: float, repeat_s: float) -> bool:
+    """Claim a repeat window; shared pilot throttle, serialized across processes.
+
+    State is caller-owned and tenant-scoped. Changed signature is immediately due.
+    Filesystem failure propagates: caller decides whether to defer notification.
+    """
+    import fcntl
+    import json
+
+    state.parent.mkdir(parents=True, exist_ok=True)
+    with state.open("a+", encoding="utf-8") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        stream.seek(0)
+        try:
+            last = json.load(stream)
+        except ValueError:
+            last = {}
+        if (isinstance(last, dict) and last.get("sig") == signature
+                and now - last.get("at", 0) < repeat_s):
+            return False
+        stream.seek(0)
+        stream.truncate()
+        json.dump({"sig": signature, "at": now}, stream)
+    return True
+
+
 def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
-          exc: "BaseException | None" = None, _place: "str | None" = None, **kw) -> "str | None":
+          exc: "BaseException | None" = None, _place: "str | None" = None,
+          detail: "list[str] | None" = None, **kw) -> "str | None":
     """Технический сбой — в журнал, человеку — одна человеческая строка.
 
     Решение владельца 28.09 (холодное чтение сообщений): «Error code: 529», «проверь
@@ -316,6 +354,9 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
 
     Решение владельца 2026-09-28 (batch 4b): владелец не почтальон. Журнал читает
     integrity, его артефакт — ночной цикл. Мед-данных и секретов в tech не класть.
+
+    detail — необязательные структурные токены писателя, отдельно от tech. В /bug
+    допускаются только после проверки места и грамматики в bug_report.
 
     Текст по умолчанию обещает починку — только если чинящий жив (`repairer_alive`). Нет
     его — оператору установки (посторонний на своей машине) уходит код сбоя и куда с ним
@@ -340,9 +381,13 @@ def fault(tech: str, person_key: "str | None" = "common.error.our_side", *,
         where = parts[0]
         if len(parts) > 1 and ("/" in where or where.endswith((".py", ".sh"))):
             where += ":" + parts[1]
-        record = {"ts": ts, "code": code,
+        # release — версия, на которой случился сбой (08.11): отчёт /bug иначе не отличал сбой
+        # до обновления от рецидива после него (окно журнала — неделя).
+        record = {"ts": ts, "code": code, "release": os.environ.get("HEALTH_RELEASE", ""),
                   "tenant": Path(secrets_dir()).name, "where": where, "text": tech[:500],
                   **_exc_shape(exc, _place)}
+        if detail is not None:
+            record["detail"] = detail  # structural writer input; bug_report validates at egress
         path = _faults_journal()
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a+", encoding="utf-8") as journal:

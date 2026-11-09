@@ -405,6 +405,7 @@ def save_daily_summaries(daily, mode="merge"):
     for ds, summary in sorted(daily.items()):
         if not summary:
             continue
+        incoming_summary = dict(summary)
         out_path = HEALTH_DATA / f"{ds}.json"
         if mode == "merge" and out_path.exists():
             with open(out_path) as f:
@@ -421,7 +422,12 @@ def save_daily_summaries(daily, mode="merge"):
             }
             for k in _OURA_OWNED:
                 if k in existing and existing[k] is not None:
-                    filtered.pop(k, None)
+                    block = existing[k]
+                    apple_sleep = (k == "sleep" and isinstance(block, dict)
+                                   and block.get("source") != "Oura"
+                                   and "contributors" not in block)
+                    if not apple_sleep:
+                        filtered.pop(k, None)
             existing.update(filtered)
             summary = existing
         # Атомарная запись: temp в той же директории (same filesystem)
@@ -437,7 +443,7 @@ def save_daily_summaries(daily, mode="merge"):
         # W5K-B3: также пишем в SQLite с source='AppleHealth' — без ожидания migrate_all_json
         try:
             from health_db import upsert_metrics_from_json as _upsert
-            _upsert(ds, summary, source="AppleHealth")
+            _upsert(ds, incoming_summary, source="AppleHealth")
         except Exception as e:
             log.warning(f"  sqlite upsert {ds}: {e}")
 

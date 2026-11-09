@@ -10,7 +10,23 @@
     "pick_from_chain",
     "save_message"
   ],
-  "depends_on": [],
+  "depends_on": [
+    {
+      "module": "llm_client",
+      "uses": [
+        "provider",
+        "profiles",
+        "guarded_client"
+      ],
+      "why": "Provider selection and role defaults have one owner; base_chain derives the accepted ID prefix from default_model(role)."
+    }
+  ],
   "disposability": null,
-  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился."
+  "_note": "Мигрировано из словаря CONTRACTS (check_contracts.py) 2026-07-26, Э2. depends_on при миграции легаси НЕ заполнялся — заполняется при касании модуля. disposability=null: легаси вне периметра гейта dispgate, вердикт не выносился.",
+  "base_chain_contract": {
+    "reads": "system_config.model.<role>; provider defaults via default_model(role)",
+    "writes": [],
+    "behavior": "Preserve order of stored IDs with the current default model prefix (before the first hyphen); warn once per call with role and dropped IDs; fall back to default_model(role) if none remain. Admission remains in get_model.",
+    "oracle": "tests/unit/test_model_chain.py::test_base_chain_filters_current_provider"
+  }
 }

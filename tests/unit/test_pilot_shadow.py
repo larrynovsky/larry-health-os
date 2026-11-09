@@ -1,7 +1,6 @@
 """Теневой сторож пилота (docker-install, этап 10). Краснеет, если расхождение вердиктов молчит,
 если одно и то же расхождение шлётся каждый час, если сбой сравнения проглатывается."""
-import sys
-import types
+import notify
 
 import pytest
 
@@ -13,7 +12,7 @@ pytestmark = pytest.mark.unit
 @pytest.fixture
 def sent(monkeypatch, tmp_path):
     box = []
-    monkeypatch.setitem(sys.modules, "notify", types.SimpleNamespace(notify_operator=box.append))
+    monkeypatch.setattr(notify, "notify_operator", box.append)
     monkeypatch.setattr(ps, "SHADOW", tmp_path / "health")
     monkeypatch.setenv("HEALTH_SHADOW_CONTAINER", "c")
     monkeypatch.setattr(ps, "frozen_findings", lambda: [])        # копия судится своими тестами ниже

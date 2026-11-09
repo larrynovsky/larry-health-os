@@ -164,6 +164,31 @@ def test_other_recognition_failure_stays_a_fault(env, monkeypatch):
     assert (inbox / "other.pdf.failed").exists() and faults and not told
 
 
+def test_recognition_failure_journal_keeps_real_cause(env, monkeypatch):
+    """Карточка report:ecaba4 (03.11): отчёты /bug с чужой установки несли одно
+    «RuntimeError в process_once» — run_backfill глотал сбой документа в счётчик, вотчер
+    поднимал свой RuntimeError, и журнал сбоев терял тип и кадры настоящей причины.
+    Настоящий путь: распознаватель падает → журнал (тот, что читает bug_report)."""
+    import json
+    hdb, w, tmp = env
+    journal = tmp / "faults.jsonl"
+    monkeypatch.setenv("HEALTH_FAULTS_JOURNAL", str(journal))
+    inbox = w._incoming(); inbox.mkdir(parents=True, exist_ok=True)
+    f = inbox / "lab9.pdf"; f.write_text("b"); _age(f, 999)
+
+    def broken(*a, **k):
+        raise KeyError("page")          # не временный, не ключ — обычный сбой разбора
+    monkeypatch.setattr(w.lab_backfill.lab_recognizer, "recognize", broken)
+    monkeypatch.setattr(w.notify, "notify_operator", lambda msg, **k: "telegram")
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: "telegram")
+    w.process_once()
+    assert (inbox / "lab9.pdf.failed").exists()
+    recs = [json.loads(x) for x in journal.read_text().splitlines()]
+    rec = next(r for r in recs if r["where"].startswith("lab_intake_watcher"))
+    assert rec["exc_type"] == "KeyError", rec
+    assert "lab_backfill.py:run_backfill" in rec["frames"], rec
+
+
 # ── 2026-07-28: сигнал расхождения «принят как таблица, распознано 0 строк» ────
 
 def test_zero_rows_is_discrepancy_not_success(env, monkeypatch):
@@ -558,7 +583,7 @@ def test_letter_with_marker_prose_tells_both_parts(env, monkeypatch, doc_ready):
     staged = set()                                   # как staging: разобранный не берётся снова
     monkeypatch.setattr(w, "_processed", lambda: set(staged))
     monkeypatch.setattr(w.lab_backfill, "run_backfill",
-                        lambda run, a1, a2, path, *r: staged.add(Path(path).name) or {"rows": 2, "pending": 2})
+                        lambda run, a1, a2, path, *r, **k: staged.add(Path(path).name) or {"rows": 2, "pending": 2})
     done = {"status": "imported", "kind": "encounter", "date": "2026-05-10",
             "diagnoses": 0, "medications": 2}
     _doc(monkeypatch, [done] if doc_ready else [None, done])
@@ -581,7 +606,7 @@ def test_lab_blank_is_not_retold_as_document(env, monkeypatch):
     staged = set()                                   # как staging: разобранный не берётся снова
     monkeypatch.setattr(w, "_processed", lambda: set(staged))
     monkeypatch.setattr(w.lab_backfill, "run_backfill",
-                        lambda run, a1, a2, path, *r: staged.add(Path(path).name) or {"rows": 20, "pending": 0})
+                        lambda run, a1, a2, path, *r, **k: staged.add(Path(path).name) or {"rows": 20, "pending": 0})
     _doc(monkeypatch, [None, {"status": "imported", "kind": "lab_result", "date": "2026-04-03"}])
     w.process_once(); w.process_once(); w.process_once()
     assert len(told) == 1 and "медкарту" not in told[0]
@@ -668,7 +693,7 @@ def test_transient_failure_then_recovery_needs_no_resend(env, monkeypatch):
     staged = set()
     monkeypatch.setattr(w, "_processed", lambda: set(staged))
     monkeypatch.setattr(w.lab_backfill, "run_backfill",
-                        lambda run, a1, a2, path, *r: staged.add(Path(path).name) or {"rows": 5})
+                        lambda run, a1, a2, path, *r, **k: staged.add(Path(path).name) or {"rows": 5})
     _age(inbox / "cbc.pdf.waitretry", 10 * 60)
     w.process_once()
     assert len(told) == 1 and "распознано значений — 5" in told[0]
@@ -715,3 +740,79 @@ def test_invoice_is_told_as_not_medical_not_as_unreadable(env, monkeypatch):
     w.process_once()
     assert len(told) == 1 and "не медицинский документ" in told[0]
     assert "не смог прочитать" not in told[0] and "ещё раз" not in told[0]
+
+
+@pytest.mark.parametrize("status,kind,norows,date", [
+    ("imported", "lab_result", True, "2025-02-03"),
+    ("imported", "lab_result", True, "unknown"),
+    ("imported", "encounter", True, "2025-02-03"),
+    ("failed", None, True, None),
+    ("imported", "lab_result", False, "2025-02-03"),
+])
+def test_zero_rows_queues_question_and_fault_once_without_db(
+        tmp_path, monkeypatch, status, kind, norows, date):
+    """Both readers must finish before escalation; an encounter is NOT an empty lab.
+    Uses real watcher state/sidecars, mocked DB and delivery boundaries only.
+    """
+    import lab_intake_watcher as w
+    import tasks_db
+    import import_medical_events
+    import link_fetch
+    import daemon_liveness
+
+    inbox = tmp_path / "incoming"
+    inbox.mkdir()
+    state_path = tmp_path / "state.json"
+    state_path.write_text('{"watermark": 0, "outcome_told": []}')
+    f = inbox / "sample.pdf"
+    f.write_bytes(b"synthetic document")
+    monkeypatch.setattr(w, "_state_path", lambda: state_path)
+    monkeypatch.setattr(w, "_incoming", lambda: inbox)
+    monkeypatch.setattr(w, "_watched", lambda: [inbox])
+    monkeypatch.setattr(w, "_tenant", lambda: "synthetic")
+    monkeypatch.setattr(w, "_processed", lambda: set())
+    monkeypatch.setattr(w, "_stable", lambda p: True)
+    monkeypatch.setattr(w, "_is_lab", lambda p: norows)
+    monkeypatch.setattr(w.i18n, "lang_of", lambda: "ru")
+    monkeypatch.setattr(link_fetch, "process_requests", lambda p: None)
+    monkeypatch.setattr(daemon_liveness, "beat", lambda: None)
+    outcome = None
+    monkeypatch.setattr(import_medical_events, "doc_outcome", lambda p: outcome)
+    def forbidden_db(*args, **kwargs):
+        raise AssertionError("test must not open a database")
+    monkeypatch.setattr(w.health_db, "get_conn", forbidden_db)
+    faults, questions, messages = [], [], []
+    monkeypatch.setattr(w.notify, "fault", lambda *a, **k: faults.append((a, k)))
+    monkeypatch.setattr(w.notify, "notify", lambda msg, **k: messages.append(msg) or "telegram")
+    monkeypatch.setattr(w.notify, "notify_operator", lambda *a, **k: "telegram")
+    monkeypatch.setattr(tasks_db, "save_task", lambda **k: questions.append(k) or len(questions))
+    monkeypatch.setattr(w.lab_backfill, "run_backfill", lambda *a, **k: {"rows": 0})
+
+    w.process_once()
+    assert f.with_suffix(".pdf.norows").exists() == norows
+    assert not faults and not questions and not messages, "wait for the document reader"
+    outcome = {"status": status, "kind": kind, "date": date}
+    w.process_once()
+    discrepancy = norows and status == "imported" and kind == "lab_result"
+    assert len(questions) == int(discrepancy)
+    assert len(faults) == int(discrepancy or status == "failed")
+    assert len(messages) == 1
+    if discrepancy:
+        q = questions[0]
+        assert q["type_"] == "question" and q["source"] == "lab_intake_watcher"
+        expected_date = date if date != "unknown" else "дата не определена"
+        assert q["content"] == (f'Документ от {expected_date} («sample.pdf») распознан как анализ, '
+                                'но значений не найдено — пришли значения текстом или фото крупнее.')
+        assert faults[0] == (("lab_intake_watcher: lab result imported but no rows recognized",),
+                             {"person_key": None})
+        assert "значений из него не найдено" in messages[0]
+        assert "придёт отдельный вопрос" in messages[0]
+    elif status == "failed":
+        assert "ничего не добавлено" in messages[0]
+        assert faults[0][0] == ("lab_intake_watcher: no rows recognized and document reader found nothing",)
+    else:
+        assert "медкарту" in messages[0] and "придёт отдельный вопрос" not in messages[0]
+    before = (list(faults), list(questions), list(messages))
+    w.process_once(); w.process_once()  # state reloaded from disk, not just the same dict
+    assert (faults, questions, messages) == before
+    assert str(f) in w._load_state()["outcome_told"]

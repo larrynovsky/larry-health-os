@@ -110,7 +110,9 @@ def model_chain(role: str) -> list[str]:
 
 def base_chain(role: str) -> list[str]:
     """Цепочка роли из базы этой установки (или модель по умолчанию) — без запасных таблицы
-    выпуска. Писать в базу допуск обязан её, а не model_chain, иначе таблица вросла бы в базу."""
+    выпуска. Чужие префиксы отбрасываются в памяти; префикс провайдера берётся из
+    default_model(role). Пустой остаток → дефолт; один warning на вызов перечисляет
+    отброшенные ID. system_config не меняется: записью цепочки владеет допуск."""
     try:
         stored = db.get_config(f"model.{role}")
     except Exception as e:
@@ -119,11 +121,17 @@ def base_chain(role: str) -> list[str]:
             role, e,
         )
         stored = None
-    if isinstance(stored, list) and stored:
-        return [str(m) for m in stored]
+    default = default_model(role)
     if stored:
-        return [str(stored)]
-    return [default_model(role)]
+        chain = [str(m) for m in stored] if isinstance(stored, list) else [str(stored)]
+        prefix = default.split("-", 1)[0] + "-"
+        kept = [m for m in chain if m.startswith(prefix)]
+        dropped = [m for m in chain if not m.startswith(prefix)]
+        if dropped:
+            log.warning("base_chain(%r): dropped models outside current provider: %s", role, dropped)
+        if kept:
+            return kept
+    return [default]
 
 
 def default_model(role: str) -> str:

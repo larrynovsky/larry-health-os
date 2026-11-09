@@ -22,7 +22,7 @@ import i18n
 import import_all as doc_import
 
 from bot.filters import owner_chat_id
-from bot.utils import send_md
+from bot.utils import safe_answer, send_md
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ async def callback_doc_review(update: Update, context: ContextTypes.DEFAULT_TYPE
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return
     query = update.callback_query
-    await query.answer()
+    await safe_answer(query)
 
     parts = query.data.split("_", 2)  # docrev_{id}_{type}
     if len(parts) != 3 or parts[0] != "docrev":
@@ -118,7 +118,7 @@ async def callback_field_review(update: Update, context: ContextTypes.DEFAULT_TY
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return
     query = update.callback_query
-    await query.answer()
+    await safe_answer(query)
 
     data = query.data  # fieldrev_{id}_ok_{canonical} OR fieldrev_{id}_skip
     parts = data.split("_", 3)   # ['fieldrev', id, 'ok'/'skip', canonical?]
@@ -158,7 +158,7 @@ async def callback_treatment_review(update: Update, context: ContextTypes.DEFAUL
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return
     query = update.callback_query
-    await query.answer()
+    await safe_answer(query)
 
     parts = query.data.split("_", 2)  # ['medrev', id, 'ok'/'skip']
     if len(parts) < 3 or parts[0] != "medrev":
@@ -189,7 +189,7 @@ async def callback_mem_consolidation(update: Update, context: ContextTypes.DEFAU
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return
     query = update.callback_query
-    await query.answer()
+    await safe_answer(query)
     parts = query.data.split("_", 2)  # ['memcons', id, 'ok'/'skip']
     if len(parts) < 3 or parts[0] != "memcons":
         return
@@ -220,7 +220,7 @@ async def callback_visual_followup(update: Update, context: ContextTypes.DEFAULT
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return
     query = update.callback_query
-    await query.answer()
+    await safe_answer(query)
     parts = query.data.split("_", 2)  # ['visfu', id, 'continue'/'close']
     if len(parts) < 3 or parts[0] != "visfu":
         return

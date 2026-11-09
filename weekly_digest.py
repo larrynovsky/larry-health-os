@@ -328,6 +328,11 @@ def gate_text(text: str, lex: frozenset[str], raw: str = "") -> GateVerdict:
     low = text.lower()
     hits = sorted({t for t in lex if t in low})
     classes = [f"lexicon:{t[:3]}…" for t in hits]
+    # Doctor names may be bounded patterns rather than substring literals.
+    import pii_census
+    doctors = pii_census.pattern(["doctor"])
+    if doctors is not None and doctors.search(text):
+        classes.append("lexicon:doctor")
     if _VALUE_UNIT.search(text):
         classes.append("value_with_unit")
     if _MEAS_DATE.search(text):

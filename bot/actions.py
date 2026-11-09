@@ -119,7 +119,8 @@ async def handle_callback(update, context) -> int | None:
     if update.effective_chat is None or update.effective_chat.id != owner_chat_id():
         return                                   # UC-I-02 fail-closed, как у соседей
     query = update.callback_query
-    await query.answer()
+    from bot.utils import safe_answer
+    await safe_answer(query)                     # отбитый answer() не теряет нажатие (report:cdbe78)
     parsed = _parse(query.data)
     fn = _ACTIONS.get(parsed[0]) if parsed else None
     if fn is None:

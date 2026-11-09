@@ -1,6 +1,8 @@
 """Рендер расписания для контейнера (scripts/install.py --docker, нить docker-install, этап 1).
 Краснеет, если служба молча пропадает из контейнера (нет места в placement.yaml), если в
 контейнер протекают пути Мака, если часы теряют пояс или расписание меняет частоту."""
+from pathlib import Path
+
 import pytest
 
 from scripts import install
@@ -31,8 +33,13 @@ def test_пустой_образ_или_пробел_отказ_рендера_�
 def test_cli_передаёт_образ_и_печатает_общий_итог(tmp_path, monkeypatch, capsys):
     import yaml
     (tmp_path / "publication_zones.yaml").write_text((install.ROOT / "publication_zones.yaml").read_text())
+    (tmp_path / "methodology").mkdir()
+    (tmp_path / "methodology/llm_providers.json").write_text(
+        (install.ROOT / "methodology/llm_providers.json").read_text())
     monkeypatch.setattr(install, "ROOT", tmp_path)
-    assert install.main(["--docker", "--tz", "UTC", "--image", "ghcr.io/example/health:v1"]) == 0
+    assert install.main(["--docker", "--tz", "UTC", "--image", "ghcr.io/example/health:v1",
+                         "--provider", "openai"]) == 0
+    assert "HEALTH_LLM_PROVIDER=openai\n" in (tmp_path / "build/docker/.env").read_text()
     compose = yaml.safe_load((tmp_path / "build/docker/compose.yaml").read_text())
     assert all(s["image"] == "ghcr.io/example/health:v1" for s in compose["services"].values())
     line = next(l for l in capsys.readouterr().out.splitlines() if l.startswith("собрано в "))
@@ -238,7 +245,12 @@ def test_override_владельца_имя_машины_слой_только_�
         digest = f"{repo}/outputs/weekly_digest:{install.DIGEST_DIR}"
         assert backups in vols                                        # бэкапы — вне ВМ Colima (30.09)
         assert digest in vols                                         # дайджест с хоста (digest-container 05.10)
-        assert all(v.endswith(":ro") for v in vols if v not in (backups, digest))  # остальное — только чтение
+        mail = f"/Users/o/{install.AGENT_MAIL_REL}:{install.DOCKER_VALUES['DATA']}/agent_mail"
+        assert mail in vols                                           # каталог моста почты агентов (agent-post 05.11)
+        assert not any("agent_post" in v for v in vols)               # корень почтамта контейнеру не дают
+        infra = f"/Users/o/{install.INFRA_REL}:{install.DOCKER_VALUES['HOME']}/{install.INFRA_REL}:ro"
+        assert infra in vols                                          # словарь классов поломок — один дом в infra (06.11)
+        assert all(v.endswith(":ro") for v in vols if v not in (backups, digest, mail))  # остальное — только чтение
         assert f"{repo}/private/region.yaml:/app/private/region.yaml:ro" in vols
         assert not any(v.startswith(f"{repo}/private/infra.yaml") for v in vols)   # адреса машин не едут
         assert f"{repo}/build/docker/host/infra.yaml:/app/private/infra.yaml:ro" in vols
@@ -249,7 +261,8 @@ def test_override_владельца_имя_машины_слой_только_�
         assert "ports" not in s                                        # порты — только из базового рендера
         assert f"{repo}/logs:{install.HOST_LOGS}:ro" in vols            # журнал сбоев хоста (partner-faults)
     assert svc["cron"]["environment"] == {"HEALTH_FAULTS_EXTRA": f"{install.HOST_LOGS}/faults.jsonl",
-                                          "HEALTH_HOST_LOGS": install.HOST_LOGS}
+                                          "HEALTH_HOST_LOGS": install.HOST_LOGS,
+                                          "HEALTH_LLM_PROVIDER": "${HEALTH_LLM_PROVIDER:-anthropic}"}
     assert svc["caldav"]["ports"] == ["127.0.0.1:5232:5232"]           # наружу — только tailscale serve
     assert f"radicale[bcrypt]=={install.RADICALE_VERSION}" in svc["caldav"]["command"][-1]  # пароль — хешем
 
@@ -277,8 +290,9 @@ def test_сторож_переезда_контейнер_видит_всё_чт
     svc = yaml.safe_load(out["compose.override.yaml"])["services"]
     for label, paths in shares.items():
         for rel in paths:
+            src = f"/Users/o/{rel[2:]}" if rel.startswith("~/") else f"{repo}/{rel}"   # «~/» — от дома хоста
             for name in ("bot", "cron"):
-                assert any(v.startswith(f"{repo}/{rel}:") for v in svc[name]["volumes"]), \
+                assert any(v.startswith(f"{src}:") for v in svc[name]["volumes"]), \
                     f"{label} пишет {rel}, контейнер ({name}) его читает, тома нет"
 
 
@@ -366,3 +380,112 @@ def test_override_приёмник_отчётов_без_данных_и_тол�
     for name in ("bot", "cron"):
         assert svc[name]["environment"]["HEALTH_BUG_RECEIVER"] == handlers["/report"]["Proxy"]
     assert doc["volumes"][install.REPORTS_TS_VOLUME] == {"external": True}
+
+
+def test_том_infra_покрывает_словарь_из_lessons_yaml():
+    """lessons.yaml::shared_subjects и том infra в контейнере — один путь от дома (ночные починки 06.11):
+    разъедутся — ночной прогон в контейнере снова не прочтёт общий словарь классов поломок."""
+    import re
+    text = (Path(install.__file__).resolve().parents[1] / "lessons.yaml").read_text(encoding="utf-8")
+    m = re.search(r"^shared_subjects:\s*(\S+)", text, re.M)
+    assert m and m.group(1).startswith(f"~/{install.INFRA_REL}/"), m and m.group(1)
+
+
+def test_provider_template_is_unset_and_all_services_receive_env():
+    import yaml
+    files = install.render_docker("UTC")
+    env = dict(line.split("=", 1) for line in files[".env"].splitlines()
+               if line and not line.startswith("#"))
+    assert env["HEALTH_LLM_PROVIDER"] == ""
+    services = yaml.safe_load(files["compose.yaml"])["services"]
+    for service in services.values():
+        assert ".env" in service["env_file"]
+        assert service["environment"]["HEALTH_LLM_PROVIDER"] == "${HEALTH_LLM_PROVIDER:-}"
+
+
+@pytest.mark.parametrize("provider", [None, "openai"])
+def test_all_rendered_services_have_explicit_provider(tmp_path, provider):
+    import plistlib
+    import yaml
+    selected = provider or "anthropic"
+    values = {**_V, **({"LLM_PROVIDER": provider} if provider else {})}
+    owner = install.render_launchd(values)
+    tenant = install.render_tenant(values, "t2", 8002)
+    assert {n.removesuffix(".plist") for n in owner} == set(install.placement())
+    assert len(tenant) == sum(st == "ready" for st in install.tenant_services().values())
+    # Плисты несут переменную только при явном выборе: живые плисты владельца её пока не
+    # несут (миграция — BL-LLM-PROVIDER-STRICT-1), до неё держит переходный режим provider().
+    for name, body in {**owner, **tenant}.items():
+        pl = plistlib.loads(body.encode() if isinstance(body, str) else body)
+        assert pl.get("EnvironmentVariables", {}).get("HEALTH_LLM_PROVIDER") == provider, name
+    assert plistlib.loads(install.render_shadow_agent("/Users/test", provider).encode())[
+        "EnvironmentVariables"].get("HEALTH_LLM_PROVIDER") == provider
+    assert "EnvironmentVariables" not in plistlib.loads(
+        install.render_colima_agent("/Users/test", provider).encode()), "Colima не запускает Python"
+    files = install.render_docker("UTC", provider=selected)
+    assert f"HEALTH_LLM_PROVIDER={selected}\n" in files[".env"]
+    base = yaml.safe_load(files["compose.yaml"])["services"]
+    override = yaml.safe_load(install.render_owner_override(
+        "/Users/test", tmp_path, "test-host", "UTC", "https://mcp.example.test", True,
+        provider=provider)["compose.override.yaml"])["services"]
+    assert {"bot", "cron", "lab-intake", "ingest", "dashboard"} <= set(base)
+    assert {"mcp", "bug-inbox", "mcp-funnel", "reports-funnel", "caldav"} <= set(override)
+    for name, service in base.items():
+        assert service["environment"]["HEALTH_LLM_PROVIDER"] == "${HEALTH_LLM_PROVIDER:-}", name
+    for name, service in override.items():
+        assert service["environment"]["HEALTH_LLM_PROVIDER"] == "${HEALTH_LLM_PROVIDER:-" + selected + "}", name
+    for name, body in files.items():
+        if name.startswith("plists/"):
+            assert plistlib.loads(body.encode()).get("EnvironmentVariables", {}).get(
+                "HEALTH_LLM_PROVIDER") in (None, selected), name
+
+
+def test_container_command_does_not_override_selected_provider(tmp_path):
+    import os
+    import subprocess
+    import sys
+    # Real command generator, a native Anthropic plist and a foreign container environment.
+    command = install._cron_shell("synthetic-job", {
+        "EnvironmentVariables": {"HEALTH_LLM_PROVIDER": "anthropic"},
+        "ProgramArguments": [sys.executable, "-c",
+                             "import os; print(os.environ['HEALTH_LLM_PROVIDER'])"]})
+    result = subprocess.run(["sh", "-c", command], env={**os.environ, "HEALTH_LLM_PROVIDER": "openai"},
+                            capture_output=True, text=True, check=True)
+    assert result.stdout.strip() == "openai"
+
+
+def test_provider_render_guard_is_red_when_common_environment_is_lost(monkeypatch, tmp_path):
+    monkeypatch.setattr(install, "_native_environment", lambda provider=None: {})
+    with pytest.raises((AssertionError, KeyError)):
+        test_all_rendered_services_have_explicit_provider(tmp_path, None)
+
+
+@pytest.mark.parametrize("owner,provider,expected", [
+    (True, "", "anthropic"), (True, "openai", "openai"), (False, "gemini", "gemini")])
+def test_compose_resolves_provider_in_every_service(tmp_path, owner, provider, expected):
+    import json
+    import os
+    import shutil
+    import subprocess
+    standalone, docker = shutil.which("docker-compose"), shutil.which("docker")
+    if not standalone and not docker:
+        pytest.skip("Docker Compose CLI is required; no daemon is used")
+    compose = [standalone] if standalone else [docker, "compose"]
+    files = install.render_docker("UTC", provider=provider)
+    for name in ("compose.yaml", ".env"):
+        (tmp_path / name).write_text(files[name])
+    if owner:
+        override = install.render_owner_override(
+            "/Users/test", tmp_path, "test-host", "UTC", "https://mcp.example.test", True)
+        (tmp_path / "compose.override.yaml").write_text(override["compose.override.yaml"])
+    env = {**os.environ, "DOCKER_CONFIG": str(tmp_path / "docker-config")}
+    env.pop("HEALTH_LLM_PROVIDER", None)
+    if subprocess.run([*compose, "version"], env=env, capture_output=True).returncode:
+        pytest.skip("Docker Compose CLI is unavailable; rendering guards still run")
+    result = subprocess.run([*compose, "config", "--format", "json"], cwd=tmp_path,
+                            env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    services = json.loads(result.stdout)["services"]
+    assert services
+    for name, service in services.items():
+        assert service["environment"]["HEALTH_LLM_PROVIDER"] == expected, name

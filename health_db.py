@@ -3004,73 +3004,6 @@ def import_biochemical_json(filepath: str) -> int:
         "(source=doc:). Старый biochemical-JSON путь выведен из эксплуатации — терял "
         "точность и воскрешал мусор. Ре-импорт лаб-данных — только через lab_backfill."
     )
-    date_str = data.get("date", "unknown")
-    source   = Path(filepath).name
-    results  = data.get("results") or {}
-
-    count = 0
-    with get_conn() as conn:
-        # Удаляем старые записи из этого файла чтобы не дублировать
-        conn.execute("DELETE FROM lab_results WHERE source=?", (source,))
-        for test_name, item in results.items():
-            val = item.get("value")
-            if val is None:
-                continue
-            try:
-                val_float = float(val)
-            except (TypeError, ValueError):
-                val_float = None
-            conn.execute("""
-                INSERT INTO lab_results
-                    (date, source, test_name, value, value_text, unit, ref_low, ref_high, status)
-                VALUES (?,?,?,?,?,?,?,?,?)
-            """, (
-                date_str, source, test_name,
-                val_float,
-                str(val) if val_float is None else None,
-                item.get("unit"),
-                item.get("ref_low"),
-                item.get("ref_high"),
-                "flagged" if item.get("flagged") else "normal",
-            ))
-            count += 1
-    return count
-
-
-def import_all_biochemical():
-    """Импортирует все файлы из папки biochemical/."""
-    bio_dir = _HEALTH_DIR / "data" / "biochemical"
-    if not bio_dir.exists():
-        log.debug(f"biochemical dir not found, skipping: {bio_dir}")
-        return 0
-    _ensure_lab_table()
-    total = 0
-    errors = 0
-    for month_dir in sorted(bio_dir.iterdir()):
-        if not month_dir.is_dir():
-            continue
-        for f in sorted(month_dir.glob("*.json")):
-            try:
-                n = import_biochemical_json(str(f))
-                total += n
-            except Exception as e:
-                log.warning(f"lab import {f.name}: {e}")
-                errors += 1
-    log.info(f"Лабораторные данные: {total} записей импортировано, {errors} ошибок")
-    return total
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ── Memory / артефакты из разговоров ──────────────────────────────────────
@@ -4835,7 +4768,7 @@ from proposals_db import (  # noqa: E402
 
 # ── Поток C (2026-06-27): домен doc_reviews → doc_reviews_db.py ──
 from doc_reviews_db import (  # noqa: E402
-    save_pending_doc_review, get_pending_doc_reviews, mark_doc_review_sent, confirm_doc_review, reject_doc_review, auto_confirm_stale_reviews, import_from_pending,
+    save_pending_doc_review, get_pending_doc_reviews, mark_doc_review_sent, confirm_doc_review, reject_doc_review, auto_confirm_stale_reviews,
 )
 
 

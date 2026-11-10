@@ -58,7 +58,7 @@ import infra_config as _infra  # основная машина — private/infra
 
 # ── Облако установки — не настоящее (28.09.2026, нить icloud-test-guard, §20) ─────────
 # private/infra.yaml у владельца ведёт cloud_dir() в настоящий iCloud Drive, и модули
-# считают от него константы при импорте (lab_extractor.HEALTH_DIR, import_all.HEALTH, …).
+# считают от него константы при импорте (import_all.HEALTH, …).
 # На копии канона в базе лежат ОТНОСИТЕЛЬНЫЕ пути документов («CR/<файл>.pdf» в шести
 # таблицах) — тест, склеивший их с облаком, открывает настоящий документ человека. Замер
 # 28.09: полный прогон повис на 49% — pytest читал (fread из C-библиотеки PDF) файл в CR/,
@@ -232,14 +232,12 @@ pytest_plugins: list[str] = [
     "tests.fixtures.oura",            # T-0.7 — Oura API mock
     "tests.fixtures.hae",             # T-0.7 — HAE JSON mock
     "tests.fixtures.pubmed",          # T-0.7 — PubMed E-utilities mock
-    "tests.fixtures.pending_labs",    # T-0.8 — tentative-write pending_labs/
     "tests.fixtures.dashboard",       # Wave 9 — TestClient(dashboard.app)
     # "tests.fixtures.anthropic",     # T-0.6
     # "tests.fixtures.clinvar",       # T-0.7
     # "tests.fixtures.oura",          # T-0.7
     # "tests.fixtures.hae",           # T-0.7
     # "tests.fixtures.pubmed",        # T-0.7
-    # "tests.fixtures.pending_labs",  # T-0.8
 ]
 
 

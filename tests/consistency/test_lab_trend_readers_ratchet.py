@@ -38,9 +38,7 @@ KNOWN_NAME_READERS = {
     "assessment_scheduler.py",
     "constitution_analysis.py",
     "dashboard_routers/views.py",
-    "doc_reviews_db.py",
     "health_db.py",
-    "import_coordinator.py",
     "import_medical_docs.py",
     "integrity_tests.py",
     "lab_drytest.py",
@@ -86,6 +84,8 @@ KNOWN_NAME_READERS = {
     # может быть неполным». Без запасного пути немаппированный анализ выглядел бы для модели как
     # «нет данных», а это ложь хуже неполноты.
     "mcp_tools.py",
+    # doc_reviews_db.py, import_coordinator.py — вычеркнуты 2026-11-09: их единственные чтения по имени
+    # (import_from_pending и тело ретайрнутого _write_known_to_db) удалены как мёртвый код.
     # wellally_consult.py — вычеркнут 2026-09-02 (нить lab_refs): читает референс строки/моду бланка, не lab_refs по имени
 }
 

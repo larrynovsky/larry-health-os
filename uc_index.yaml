@@ -84,7 +84,6 @@ ucs:
     oracle: [B, E, C, D]
     modules:
       - import_all.py
-      - lab_extractor.py
       - health_db.py
       - telegram_bot.py
     tests: [tests/integration/test_uc_a_01_lab_pipeline.py]

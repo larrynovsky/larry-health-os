@@ -43,7 +43,6 @@ def refresh_data():
             log.warning(f"refresh {script}: {e}")
     db.init_db()
     db.migrate_all_json()
-    db.import_all_biochemical()
 
 
 async def _send_problem_proposals(bot, chat_id: int):

@@ -148,7 +148,7 @@ def validate() -> tuple[int, list[str]]:
                 errors.append(f"{uc_id}: test file missing: {t}")
 
         # modules — должны существовать. Для partial/intended допускаем
-        # будущие модули (lab_extractor.py, propose_uc.py до реализации).
+        # будущие модули (объявлены в индексе до реализации).
         for m in rec.get("modules", []):
             mp = SCRIPT_DIR / m
             if not mp.exists():

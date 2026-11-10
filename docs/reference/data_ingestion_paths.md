@@ -75,9 +75,10 @@ sleep `contributors` или одного из ключей `readiness_score`, `r
 | числовой диапазон | `\d+\.\d+\s*[-–]\s*\d+\.\d+` |
 | источник | имя клиники из `doc_patterns` тенанта |
 
-При совпадении `classify()` возвращает `"lab"` → `lab_extractor.extract_labs()` →
-`data/pending_labs/` → карточка в Telegram → после ✅ `health_db.import_from_pending()`
-вставляет в `lab_results` с `ON CONFLICT DO UPDATE`.
+При совпадении `classify()` возвращает `"lab"` → `lab_intake_watcher.force_lab()` →
+распознавание → `lab_results_staging` → ревью → `lab_promote`, единственный писатель
+`lab_results` (шаги — в [конвейере анализов](../how-to/lab_pipeline.md)). Прежний путь
+`lab_extractor` → `data/pending_labs/` → `import_from_pending()` удалён 2026-11-09.
 
 Ручной ввод (`LAB_DATA` в `import_medical_docs.py`) остаётся запасным путём
 для исторических данных без цифрового оригинала.

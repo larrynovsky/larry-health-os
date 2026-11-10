@@ -57,7 +57,7 @@ ALLOWLIST = {
     # английских справочников; пациента не знает и знать не должен — справочник публичный.
     "desc_translation",
     # извлечение / утилиты
-    "doc_agent", "doc_triage", "lab_extractor", "lab_recognizer", "lab_schedule_extractor",
+    "doc_agent", "doc_triage", "lab_recognizer", "lab_schedule_extractor",
     "treatment_extractor", "import_medical_events", "publication_reader",
     "genome_update_agent", "genome_context", "model_health_check",
     "hypothesis_semantic_check", "cbcr_lookup", "fill_description_ru", "api_spend_log",

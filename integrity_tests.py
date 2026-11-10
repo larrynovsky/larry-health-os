@@ -8059,7 +8059,7 @@ _LLM_TRACTS_KNOWN = {
     "cbcr_hypothesis", "checkin_agent", "consult_prep",
     "food_rule_generator", "generate_constitutions", "genome_context",
     "genome_update_agent", "gp_agent", "hai_core", "hypothesis_consilium_eval",
-    "import_medical_events", "lab_extractor", "lab_schedule_extractor",
+    "import_medical_events", "lab_schedule_extractor",
     "model_health_check", "monthly_consilium", "night_investigator", "task_agent",
     "treatment_extractor", "wellally_consult",
 }

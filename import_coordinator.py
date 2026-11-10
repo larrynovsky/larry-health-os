@@ -558,7 +558,7 @@ def _parse_imd_ref(ref_parts: list) -> "tuple[float | None, float | None]":
 def _parse_generic_regex(text: str, format_id: int | None) -> ParseResult:
     """
     Базовый regex-парсер для не-Synevo форматов.
-    Использует LAB_MARKERS из import_all.py как alias-источник.
+    Alias-источник — подтверждённые алиасы формата (`db.get_confirmed_aliases`).
     """
     result = ParseResult(format_id=format_id)
     alias_map: dict[str, str] = {}
@@ -679,61 +679,6 @@ def _write_known_to_db(result: ParseResult, path: Path, date_str: str | None = N
     return
 
 
-def _write_known_to_db_RETIRED_BODY(result: ParseResult, path: Path, date_str: str | None = None) -> None:
-    """Тело ретайрнутой функции. Не зовётся; оставлено читаемым один цикл,
-    чтобы при разборе инцидента было видно, ЧТО именно делал старый путь."""
-    import json as _json
-    if not date_str or date_str == "unknown":
-        date_str = _extract_date_from_path(path)
-    source   = path.name  # PDF filename — используется как source в lab_results
-
-    data = {
-        "date":        date_str,
-        "type":        "lab",
-        "source_file": str(path),
-        "source":      source,   # явно передаём чтобы import_biochemical_json использовал PDF-имя
-        "results": {
-            f.canonical: {
-                "value":    f.value,
-                "unit":     f.unit,
-                "ref_low":  f.ref_low,
-                "ref_high": f.ref_high,
-                "flagged":  f.flagged,
-            }
-            for f in result.known
-        }
-    }
-    # import_biochemical_json берёт source из Path(filepath).name (temp-имя).
-    # Обходим это прямой записью в DB, не через temp-файл.
-    db._ensure_lab_table()
-    with db.get_conn() as conn:
-        # Удаляем предыдущие записи от coordinator для этого же PDF
-        conn.execute("DELETE FROM lab_results WHERE source=?", (source,))
-        # Удаляем дубли из biochemical JSON для той же даты —
-        # coordinator является авторитетным источником для Synevo
-        if date_str and date_str != "unknown":
-            conn.execute(
-                "DELETE FROM lab_results WHERE date=? AND source LIKE '%.json' "
-                "AND source NOT LIKE 'instrument:%'",
-                (date_str,)
-            )
-        for test_name, item in data["results"].items():
-            val = item.get("value")
-            try:
-                val_float = float(val) if val is not None else None
-            except (TypeError, ValueError):
-                val_float = None
-            conn.execute(
-                "INSERT INTO lab_results"
-                "(date, source, test_name, value, unit, ref_low, ref_high, status)"
-                "VALUES (?,?,?,?,?,?,?,?)",
-                (date_str, source, test_name,
-                 val_float, item.get("unit"),
-                 item.get("ref_low"), item.get("ref_high"),
-                 "flagged" if item.get("flagged") else "normal"),
-            )
-
-
 def _queue_field_reviews(result: ParseResult, path: Path) -> int:
     """Ставит unknown-поля в очередь ревью. Возвращает кол-во новых записей."""
     unknown_list = [
@@ -770,23 +715,6 @@ def _extract_date_from_text(text: str) -> str:
     m = re.search(r'(\d{2})/(\d{2})/(\d{4})', text)
     if m:
         return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
-    return "unknown"
-
-
-def _extract_date_from_path(path: Path) -> str:
-    """Пробует извлечь YYYY-MM-DD из имени или пути файла."""
-    name = path.name
-    for pat, fmt in [
-        (r'(\d{2})[./\-](\d{2})[./\-](\d{4})', '{2}-{1}-{0}'),
-        (r'(\d{4})[./\-](\d{2})[./\-](\d{2})', '{0}-{1}-{2}'),
-    ]:
-        m = re.search(pat, name)
-        if m:
-            g = m.groups()
-            try:
-                return fmt.format(*g)
-            except Exception:
-                pass  # silent-ok: date format string мисматч — пробуем следующий паттерн
     return "unknown"
 
 

@@ -37,8 +37,8 @@ def test_retired_writer_does_not_touch_the_canon(monkeypatch, tmp_path):
 
 
 def test_retired_body_is_not_reachable_from_the_live_name():
-    """Тело оставлено читаемым один цикл под другим именем. Живое имя обязано
-    вести к фенсу, а не к телу — иначе «ретайр» это переименование, не фенс."""
+    """Живое имя обязано вести к фенсу, а не к прежнему телу — иначе «ретайр» это
+    переименование, не фенс. Тело, пролежавшее цикл под другим именем, удалено 2026-11-09."""
     import inspect
 
     import import_coordinator as ic

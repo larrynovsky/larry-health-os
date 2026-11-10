@@ -13,7 +13,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 MODULES = ["health_db", "lab_intake_watcher", "import_medical_events", "import_all", "lab_backfill",
-           "lab_extractor", "import_fitdays", "import_apple_health", "import_oura",
+           "import_fitdays", "import_apple_health", "import_oura",
            "consult_prep", "hae_checker", "vcf_import_pipeline"]
 
 

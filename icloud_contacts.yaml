@@ -67,11 +67,6 @@ contacts:
       .failed/.norows пишутся рядом с файлом, они несут сигнал человеку.
       CR/ читается только процессом владельца; у партнёра — лишь его incoming.
 
-  - file: lab_extractor.py
-    kind: staging
-    path: health/data/pending_labs/
-    note: tentative-зона лаб-пайплайна до Telegram-approve; канон — lab_results (БД).
-
   # ── Дополнено census-датчиком 2026-07-02 (первый прогон нашёл 20 незарегистрированных) ──
 
   - file: import_all.py

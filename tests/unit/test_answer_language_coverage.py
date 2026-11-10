@@ -37,7 +37,7 @@ OWN_LANGUAGE = {  # язык решён иначе, чем инструкцие�
 }
 INTERNAL = {
     "lifestyle_agents.py", "hypothesis_semantic_check.py", "publication_reader.py",
-    "lab_extractor.py", "lab_recognizer.py", "lab_schedule_extractor.py",
+    "lab_recognizer.py", "lab_schedule_extractor.py",
     "treatment_extractor.py", "doc_triage.py", "handlers/symptom.py", "model_health_check.py",
     "lab_drytest.py", "scripts/replay_beliefs.py", "scripts/replay_staleness.py",
     "doc_agent.py", "night_investigator.py", "test_failure_handler.py",

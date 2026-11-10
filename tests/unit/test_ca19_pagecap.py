@@ -14,9 +14,10 @@ def test_ca19_9_normalizes_to_canonical():
 
 
 def test_import_all_maps_ca19_to_canonical():
+    # Словарь LAB_MARKERS, где жил раскол, удалён 2026-11-09 вместе с его единственным
+    # читателем parse_lab_values (вызовов не было). Сторож остаётся от возврата старой цели.
     src = (Path(__file__).resolve().parents[2] / "import_all.py").read_text(encoding="utf-8")
-    assert '"Ca 19": "CA19-9"' in src        # источник раскола сведён к канону
-    assert '"Ca 19": "CA19_9"' not in src    # старое имя-цель убрано
+    assert '"Ca 19": "CA19_9"' not in src    # старое имя-цель не вернулось
 
 
 def test_render_pages_refuses_partial_pdf_at_max_pages(tmp_path):

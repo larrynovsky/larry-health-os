@@ -248,40 +248,6 @@ def parse_date(text: str, filename: str) -> str:
         return f"{mo.group(2)}-{mo.group(1)}-01"
     return "unknown"
 
-LAB_MARKERS = {
-    "WBC": "WBC", "RBC": "RBC", "HGB": "HGB", "HCT": "HCT",
-    "MCV": "MCV", "MCH": "MCH", "MCHC": "MCHC", "RDW": "RDW",
-    "PLT": "PLT", "CRP": "CRP",
-    "Glucose-B": "Glucose", "UREA-B": "Urea",
-    "Creatinine-B": "Creatinine", "Creatinme-B": "Creatinine",
-    "Sodium-B": "Sodium", "Potassium-B": "Potassium",
-    "Chloride-B": "Chloride", "Calcium-B": "Calcium",
-    "Albumin-B": "Albumin", "Protein, total-B": "Total_Protein",
-    "ALT(GPT)-B": "ALT", "AST(GOT)-B": "AST",
-    "LDH": "LDH", "Amylase-B": "Amylase",
-    "Ferritine": "Ferritin", "Iron-B": "Iron",
-    "Cholesterol, total-B": "Cholesterol",
-    "Triglycerides-B": "Triglycerides",
-    "LDL calculated-B": "LDL",
-    "CEA": "CEA", "Carcinoembryonic": "CEA",
-    "Ca9.9": "CA19-9", "Ca 19": "CA19-9", "Ca 19.9": "CA19-9", "Ca 19-9": "CA19-9",
-    "NEUTRO%": "Neutrophils_pct", "LYMPHO%": "Lymphocytes_pct",
-    "MONO%": "Monocytes_pct",
-}
-
-def parse_lab_values(text: str) -> dict:
-    results = {}
-    for line in text.split("\n"):
-        for key, label in LAB_MARKERS.items():
-            if key in line:
-                nums = re.findall(r"\b(\d+\.?\d*)\b", line)
-                if nums:
-                    results[label] = {
-                        "value": float(nums[0]),
-                        "flagged": bool(re.search(r"\bH\b|\bL\b", line))
-                    }
-                break
-    return results
 
 # ── Synevo (Georgian/multilingual digital PDF) ────────────────────────────────
 _GEORGIAN_RANGE = ('ა', 'ჿ')

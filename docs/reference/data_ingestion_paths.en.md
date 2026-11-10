@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/data_ingestion_paths.md sha256:162beec57a4f -->
+<!-- translation-of: docs/reference/data_ingestion_paths.md sha256:482b6755fcbf -->
 **English** · [Русский](data_ingestion_paths.md)
 
 # Data ingestion — paths, trigger conditions, schedules
@@ -75,9 +75,10 @@ Oracle: `tests/integration/test_uc_a_03_hae_merge.py::test_apple_sleep_read_late
 | numeric range | `\d+\.\d+\s*[-–]\s*\d+\.\d+` |
 | source | clinic name from the tenant's `doc_patterns` |
 
-On a match, `classify()` returns `"lab"` → `lab_extractor.extract_labs()` →
-`data/pending_labs/` → a card in Telegram → after ✅, `health_db.import_from_pending()`
-inserts into `lab_results` with `ON CONFLICT DO UPDATE`.
+On a match, `classify()` returns `"lab"` → `lab_intake_watcher.force_lab()` →
+recognition → `lab_results_staging` → review → `lab_promote`, the only writer of
+`lab_results` (steps are in the [lab pipeline](../how-to/lab_pipeline.md)). The former path
+`lab_extractor` → `data/pending_labs/` → `import_from_pending()` was removed on 2026-11-09.
 
 Manual entry (`LAB_DATA` in `import_medical_docs.py`) remains a backup path
 for historical data without a digital original.

@@ -545,8 +545,7 @@ def test_refresh_data_calls_subprocess_for_oura_only():
 
     with patch("bot.helpers.subprocess.run") as mock_run, \
          patch("bot.helpers.db.init_db"), \
-         patch("bot.helpers.db.migrate_all_json"), \
-         patch("bot.helpers.db.import_all_biochemical"):
+         patch("bot.helpers.db.migrate_all_json"):
         refresh_data()
 
     call_args_strs = [str(c.args[0]) for c in mock_run.call_args_list]
@@ -565,8 +564,7 @@ def test_refresh_data_subprocess_timeout_does_not_raise():
 
     with patch("bot.helpers.subprocess.run", side_effect=raise_timeout), \
          patch("bot.helpers.db.init_db"), \
-         patch("bot.helpers.db.migrate_all_json"), \
-         patch("bot.helpers.db.import_all_biochemical"):
+         patch("bot.helpers.db.migrate_all_json"):
         # Не должно бросить
         refresh_data()
 

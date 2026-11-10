@@ -1,8 +1,7 @@
-"""Smoke-тесты на T-0.7 fixtures (ClinVar, Oura, HAE, PubMed) и T-0.8 (pending_labs)."""
+"""Smoke-тесты на T-0.7 fixtures (ClinVar, Oura, HAE, PubMed)."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -114,32 +113,3 @@ def test_pubmed_search(pubmed_mock):
     pubmed_mock.add(2, title="Sleep architecture")
     pmids = pubmed_mock.search("HRV")
     assert pmids == ["1"]
-
-
-# ── pending_labs ─────────────────────────────────────────────────────────────
-
-def test_pending_labs_dir_empty(pending_labs_dir: Path):
-    assert pending_labs_dir.exists()
-    assert pending_labs_dir.is_dir()
-    assert list(pending_labs_dir.iterdir()) == []
-
-
-def test_make_pending_json_helper(make_pending_json):
-    payload = make_pending_json("2026-05-01_clinic")
-    assert payload["visit_key"] == "2026-05-01_clinic"
-    assert payload["items"][0]["name"] == "WBC"
-    assert payload["items"][0]["confidence"] == "high"
-
-
-def test_pending_labs_workflow(pending_labs_dir: Path, make_pending_json):
-    """Симулируем tentative-запись: создаём файл, читаем, удаляем."""
-    payload = make_pending_json("2026-05-01_clinic",
-                                  items=[{"name": "AST", "value": 80,
-                                          "ref_low": 10, "ref_high": 40,
-                                          "flagged": True, "confidence": "low"}])
-    path = pending_labs_dir / "2026-05-01_clinic.json"
-    path.write_text(json.dumps(payload, ensure_ascii=False))
-
-    assert path.exists()
-    loaded = json.loads(path.read_text())
-    assert loaded["items"][0]["confidence"] == "low"

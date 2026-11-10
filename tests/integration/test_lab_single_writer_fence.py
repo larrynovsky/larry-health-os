@@ -79,11 +79,16 @@ def test_old_path_cannot_resurrect_garbage(db, tmp_path):
         c.execute("INSERT INTO lab_results(date,source,test_name,value) "
                   "VALUES('2020-10-14','doc:lab 14.10.20.pdf','RDW',13.8)")
         c.commit()
-    # старый путь сканирует biochemical/ (полный дублей-мусора) и пытается импортнуть
-    _bio_file(tmp_path, "2020-10-14", {"RDW": {"value": 138.0}, "RBC": {"value": 0.0}})
-    _bio_file(tmp_path, "2020-08-12", {"MCH": {"value": 296.0}})
-    total = db.import_all_biochemical()
-    assert total == 0                   # фенс: ничего не импортировано
+    # старый путь шёл по biochemical/ (полный дублей-мусора) и импортировал каждый файл.
+    # Обход каталога (import_all_biochemical) удалён 2026-11-09: за фенсом он мог только
+    # писать по предупреждению на файл. Сценарий бьёт в единственную точку вставки.
+    garbage = [
+        _bio_file(tmp_path, "2020-10-14", {"RDW": {"value": 138.0}, "RBC": {"value": 0.0}}),
+        _bio_file(tmp_path, "2020-08-12", {"MCH": {"value": 296.0}}),
+    ]
+    for f in garbage:
+        with pytest.raises(RuntimeError, match="РЕТАЙРНУТ|lab_promote"):
+            db.import_biochemical_json(str(f))   # фенс: ничего не импортировано
     # канон нетронут: одна чистая doc:-строка, мусор не воскрес
     with db.get_conn() as c:
         rows = c.execute("SELECT source,value FROM lab_results").fetchall()

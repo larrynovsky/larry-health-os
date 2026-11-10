@@ -5,7 +5,6 @@ import json
 import os
 import logging
 from datetime import date, timedelta
-from pathlib import Path
 
 
 log = logging.getLogger(__name__)
@@ -77,51 +76,6 @@ def auto_confirm_stale_reviews(hours: int = 48) -> int:
             (f"-{hours}",),
         )
         return cur.rowcount
-
-
-def import_from_pending(pending_path: str) -> int:
-    """Импортирует pending_labs JSON в lab_results после Telegram-подтверждения.
-    Source = имя исходного PDF-файла (не имя pending-файла).
-    DELETE-before-INSERT: идемпотентен при повторном вызове."""
-    import json as _json
-    _hdb._ensure_lab_table()
-    data = _json.loads(Path(pending_path).read_text(encoding="utf-8"))
-    date_str = data.get("date", "unknown")
-    # Source = имя PDF (напр. "10000000002.PDF"), не имя pending-хеш-файла
-    # Источник — с классом «doc:» (C-173): строка канона без класса отбивается триггером.
-    # Повторный импорт того же файла снимает и строки прежних форм (голое имя до 07.10).
-    _name = Path(data.get("source_file", pending_path)).name
-    source = f"doc:{_name}"
-    count = 0
-    with _hdb.get_conn() as conn:
-        conn.execute("DELETE FROM lab_results WHERE source IN (?, ?, ?)",
-                     (source, _name, f"manual:legacy:{_name}"))
-        for t in data.get("tests", []):
-            val = t.get("value")
-            if val is None:
-                continue
-            try:
-                val_float = float(val)
-            except (TypeError, ValueError):
-                val_float = None
-            conn.execute(
-                """INSERT INTO lab_results
-                   (date, source, test_name, value, value_text, unit,
-                    ref_low, ref_high, status)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
-                (
-                    date_str, source, t.get("name"),
-                    val_float,
-                    str(val) if val_float is None else None,
-                    t.get("unit"),
-                    t.get("ref_low"),
-                    t.get("ref_high"),
-                    "flagged" if t.get("flagged") else "normal",
-                ),
-            )
-            count += 1
-    _hdb.log.info(f"import_from_pending: {source} → {count} записей в lab_results")
-    return count
 
 
 # health_db — В КОНЦЕ модуля (BL-TEST-COLLECT-ALONE-1, 2026-09-24): он ре-экспортирует функции

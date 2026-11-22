@@ -36,6 +36,7 @@ OWN_LANGUAGE = {  # язык решён иначе, чем инструкцие�
                                # название из ClinVar (handlers/genome.py, ветка lang != ru)
 }
 INTERNAL = {
+    "hypothesis_verdict.py",   # структуратор прогноза: JSON читает код, не человек (hypothesis-predictions 11.11)
     "lifestyle_agents.py", "hypothesis_semantic_check.py", "publication_reader.py",
     "lab_extractor.py", "lab_recognizer.py", "lab_schedule_extractor.py",
     "treatment_extractor.py", "doc_triage.py", "handlers/symptom.py", "model_health_check.py",

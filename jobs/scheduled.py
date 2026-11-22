@@ -1708,6 +1708,15 @@ def register(app):
         job_kwargs={"max_instances": 1},
     )
 
+    # Карточки новых протоколов, придержанные до ответа ассистента (protocol-fit, 11.11).
+    app.job_queue.run_repeating(
+        deliver_protocol_cards_job,
+        interval=300,
+        first=200,
+        name="deliver_protocol_cards",
+        job_kwargs={"max_instances": 1},
+    )
+
     # Outbox вопросов — каждые 5 мин (2026-09-12, нить question-answer-channel):
     # у вопроса ответ это текст, и до этой нити его некуда было написать —
     # ремайндер принимает только галочку. Дроссель questions.max_per_day внутри.
@@ -2003,7 +2012,11 @@ async def oura_refresh_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         notify.fault("oura_refresh: import timed out", person_key=None)
         return
     if done.returncode:
-        notify.fault(f"oura_refresh: import failed (exit {done.returncode})", person_key=None)
+        # Класс сбоя — отдельным токеном detail, не в тексте (17.11: журнал нёс только «exit 1», stderr
+        # выбрасывался, и сеть не отличалась от протухшей авторизации). Текст ошибки не пишем: URL.
+        import stderr_watch
+        cls = stderr_watch.exception_class((done.stderr or b"").decode(errors="replace"), done.returncode)
+        notify.fault(f"oura_refresh: import failed (exit {done.returncode})", person_key=None, detail=[cls])
 
 
 async def deliver_agent_mail_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2038,6 +2051,18 @@ async def deliver_agent_mail_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     await asyncio.to_thread(task_route.close_from_letter, letter)
                 except Exception as exc:   # silent-ok: громко в notify.fault, ответ всё равно пишем
                     notify.fault(f"task_route: close_from_letter failed ({type(exc).__name__})", person_key=None)
+                try:   # «протокол #P: N из M …» — пересказ выполнения (assistant-loop, 10.11)
+                    import protocol_outcomes
+                    await asyncio.to_thread(protocol_outcomes.record_from_letter, letter)
+                except Exception as exc:   # silent-ok: громко в notify.fault, ответ всё равно пишем
+                    notify.fault(f"protocol_outcomes: record_from_letter failed ({type(exc).__name__})",
+                                 person_key=None)
+                try:   # «проверка #P: впишется / не впишется — …» — улика для карточки (protocol-fit, 11.11)
+                    import protocol_fit
+                    await asyncio.to_thread(protocol_fit.record_fit_from_letter, letter)
+                except Exception as exc:   # silent-ok: громко в notify.fault; карточка уйдёт по сроку
+                    notify.fault(f"protocol_fit: record_fit_from_letter failed ({type(exc).__name__})",
+                                 person_key=None)
                 try:
                     import agent_reply
                     await asyncio.to_thread(agent_reply.reply_to_letter, letter)
@@ -2045,6 +2070,29 @@ async def deliver_agent_mail_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     notify.fault(f"agent_reply: reply not composed ({type(exc).__name__})", person_key=None)
     except (OSError, ValueError, sqlite3.Error) as exc:
         notify.fault(f"agent_mail: delivery failed ({type(exc).__name__})", person_key=None)
+
+
+async def deliver_protocol_cards_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Карточка нового протокола — одна: с ответом ассистента или по сроку без него (protocol-fit).
+    Это не эхо переписки (решение 06.11): ответ едет внутри карточки, отдельного сообщения нет.
+    Отметка после отправки: сбой Telegram оставляет карточку на следующий проход, а не теряет её."""
+    import protocol_fit
+    bot = context.application.bot
+    try:
+        cards = await asyncio.to_thread(protocol_fit.due_cards)
+    except Exception as exc:   # silent-ok: громко в notify.fault; датчик доставки краснеет по сроку
+        notify.fault(f"protocol_fit: due_cards failed ({type(exc).__name__})", person_key=None)
+        return
+    from handlers.hypotheses import protocol_keyboard
+    for card in cards:
+        try:
+            await bot.send_message(chat_id=owner_chat_id(), text=card["text"],
+                                   reply_markup=protocol_keyboard([{"id": card["protocol_id"]}]))
+        except Exception as exc:   # silent-ok: громко в notify.fault, повтор на следующем проходе
+            notify.fault(f"protocol_fit: card #{card['protocol_id']} not sent ({type(exc).__name__})",
+                         person_key=None)
+            continue
+        await asyncio.to_thread(protocol_fit.mark_delivered, card["id"])
 
 
 # ── Outbox вопросов (нить question-answer-channel, 2026-09-12) ───────────────
@@ -2236,7 +2284,20 @@ async def check_hypothesis_evaluations(context: ContextTypes.DEFAULT_TYPE):
     """
     Еженедельно (пн 10:00, см. register): сканирует гипотезы в status='testing' без вердикта.
     Запускает полный консилиум для каждой. Результат отправляет в Telegram.
+    Перед этим код оценивает прогнозы протоколов с закрывшимся окном (protocol_outcomes):
+    консилиум должен видеть уже поставленные оценки, а не ставить их сам.
     """
+    try:
+        import protocol_outcomes
+        await asyncio.to_thread(protocol_outcomes.score_due)
+    except Exception as exc:   # silent-ok: громко в notify.fault, консилиум идёт без свежих оценок
+        notify.fault(f"protocol_outcomes: score_due failed ({type(exc).__name__})", person_key=None)
+    try:   # прогнозы гипотез — тем же судом (hypothesis-predictions, 11.11)
+        import hypothesis_verdict
+        await asyncio.to_thread(hypothesis_verdict.structure_pending)
+        await asyncio.to_thread(hypothesis_verdict.score_hypothesis_predictions)
+    except Exception as exc:   # silent-ok: громко в notify.fault, консилиум идёт без свежих оценок
+        notify.fault(f"hypothesis_verdict: scoring failed ({type(exc).__name__})", person_key=None)
     chat_id = get_chat_id()
     if not chat_id:
         return

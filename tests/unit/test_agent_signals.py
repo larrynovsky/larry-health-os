@@ -224,6 +224,27 @@ def test_regimen_diff_and_return_to_previous_regimen(world):
     assert any('Убрано: Добавка А' in m['body'] for m in _letters(world, 'regimen'))
 
 
+def test_protocols_letter_on_change_only_with_adherence_format(world):
+    """assistant-loop 10.11: полный список протоколов при изменении; формат строки ответа — из
+    protocol_outcomes (один дом формата и разбора)."""
+    import protocol_outcomes
+    signals.run(DAY)
+    assert _letters(world, 'protocols') == []                      # протоколов не было — молчим
+    world.db.execute("INSERT INTO protocols(id,title,behavior,frequency,status,review_date) "
+                     "VALUES (5,'Сон','Отбой в 22:30','ежедневно','active','2026-05-20')")
+    signals.run(DAY)
+    signals.run(DAY)
+    letters = _letters(world, 'protocols')
+    assert len(letters) == 1
+    assert 'Протокол #5: Сон' in letters[0]['body'] and protocol_outcomes.ADHERENCE_HINT in letters[0]['body']
+    world.db.execute("UPDATE protocols SET status='retired' WHERE id=5")
+    signals.run(DAY)
+    # Имена файлов в out/ не упорядочены во времени (замер 11.11: [-1] на Studio дал первое письмо),
+    # поэтому ищем снятие среди двух писем, а не берём «последнее» по имени.
+    after = _letters(world, 'protocols')
+    assert len(after) == 2 and sum('Снят протокол #5' in l['body'] for l in after) == 1
+
+
 def test_lab_due_once_per_analyte_deadline_and_grouped(world):
     for test in ('HGB', 'WBC'):
         world.db.execute("INSERT INTO lab_monitoring_schedule(test_name,interval_days,source) VALUES (?,30,'manual')", (test,))

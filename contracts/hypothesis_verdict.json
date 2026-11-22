@@ -1,0 +1,80 @@
+{
+  "module": "hypothesis_verdict",
+  "public": [
+    "prediction_date",
+    "structure",
+    "structure_pending",
+    "score_hypothesis_predictions",
+    "code_verdict",
+    "verdict_lines"
+  ],
+  "depends_on": [
+    {
+      "module": "prediction_core",
+      "uses": [
+        "accept_prediction",
+        "refutes",
+        "metric_scales",
+        "observed",
+        "judge_prediction",
+        "cfg",
+        "PredictionRejected"
+      ],
+      "why": "тот же суд, что у протоколов"
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn"
+      ],
+      "why": "memory (гипотезы), lab_results (имена), hypothesis_predictions, hypothesis_prediction_runs"
+    },
+    {
+      "module": "hai_core",
+      "uses": [
+        "get_client",
+        "get_model"
+      ],
+      "why": "вызов структуратора",
+      "legacy": "контракта hai_core нет; get_client/get_model — общий вход ко всем моделям проекта"
+    },
+    {
+      "module": "llm_client",
+      "uses": [
+        "answer_text"
+      ],
+      "why": "единственный читатель текста ответа модели (C-148)",
+      "legacy": "контракта llm_client нет; answer_text — единственное используемое имя"
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "строки вердикта для пакета консилиума"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now",
+        "get_today"
+      ],
+      "why": "замораживаемое время",
+      "legacy": "шов времени без контракта"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен: числовой прогноз версии гипотезы и вердикт кода по нему; суд — prediction_core, показ — hypothesis_consilium_eval, расписание — jobs/scheduled",
+      "D2": "шесть публичных функций — дата версии, разбор одной и пачки, оценка, вердикт, строки для читателей; служебное — _prompt, _parse, _absolute_to_change, _lab_names, _run",
+      "D3": "только стабильные контракты: prediction_core, get_conn, get_client, answer_text, i18n.t",
+      "D4": "~240 строк",
+      "D5": "tests/unit/test_hypothesis_predictions.py — 19 тестов; plans/mutate_hypothesis_verdict_2026-11-11.sh — 16 мутаций, все красные",
+      "D6": "общие инварианты в схеме: CHECK low<=change<=high, один прогноз на (гипотеза, версия, показатель), разбор версии — одна строка журнала"
+    },
+    "rationale": "Правило вердикта — одна функция, промпт — одна функция, суд — в ядре; переписывается с нуля по тестам.",
+    "date": "2026-11-11",
+    "oracle": "tests/unit/test_hypothesis_predictions.py"
+  }
+}

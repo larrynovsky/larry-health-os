@@ -216,8 +216,13 @@ def resolve_hypothesis(memory_id: int, verdict_dict: dict, *,
         "prediction":  payload.get("prediction") or "",
         "test":        payload.get("test") or "",
         "reasoning":   reasoning[:200] if reasoning else "",
+        **({"forecast": payload["forecast"]} if "forecast" in payload else {}),
     })
     payload["history"] = history
+    # Прогноз в числах принадлежит версии текста: новой версии он не переходит — иначе код судил бы
+    # новый текст по старым числам. Новую версию разбирает переводчик прозы (hypothesis_verdict).
+    payload.pop("forecast", None)
+    payload.pop("no_forecast_reason", None)
 
     # ── confirmed / partial ──────────────────────────────────────────────────
     if verdict in ("confirmed", "partial"):
@@ -261,8 +266,10 @@ def resolve_hypothesis(memory_id: int, verdict_dict: dict, *,
                     protocol_id = save_protocol(protocol)
                     result["protocol_id"] = protocol_id
                     log.info(f"Гипотеза #{memory_id}: confirmed → протокол #{protocol_id}")
-                except Exception as e:
+                except Exception as e:   # silent-ok: громко в notify.fault, гипотеза остаётся открытой
                     log.warning(f"Протокол не создан: {e}")
+                    notify.fault(f"hypothesis_resolution: protocol not created for #{memory_id} "
+                                 f"({type(e).__name__})", person_key=None)
             else:
                 result["protocol_withheld"] = True
                 log.info(

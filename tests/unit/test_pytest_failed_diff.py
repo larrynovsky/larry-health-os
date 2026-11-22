@@ -8,7 +8,7 @@
 КОНТРАКТ СМЕНИЛСЯ 2026-09-02 (решение владельца). Замер: 42 красных утренних прогона
 против 28 зелёных — печатать «ХРОНИЧЕСКОЕ» каждый день значило слать фон. Теперь пустая
 строка = молчим, и говорим только об ИЗМЕНЕНИИ состояния: новый id; возраст ≥3 дней
-(первое напоминание); ≥7 дней (второе и последнее). Состояние получило третью колонку —
+(первое напоминание); ≥7 дней (второе); с 22.11 — дальше каждые 3 дня (решение владельца). Состояние получило третью колонку —
 сколько напоминаний уже отправлено.
 
 ДОМ ОДИН. Тесты, заведённые 02.09 в test_pytest_alert_narrowing.py, слиты сюда: два
@@ -58,12 +58,16 @@ def test_new_id_is_named_while_old_one_stays_silent(tmp_path):
     Изменился ИСХОД для старого — раньше он печатался «ХРОНИЧЕСКОЕ» каждый день,
     теперь молчит: повтор уже сообщённого не несёт нового факта.
     """
+    # 22.11: старое — вчерашнее, до срока напоминания. С 22.11 «молчать навсегда» больше нет:
+    # после 7-го дня напоминание каждые 3 дня (test_after_week_reminds_every_three_days).
+    import datetime as dt
+    first = (dt.date.today() - dt.timedelta(days=1)).isoformat()
     state = tmp_path / "state.tsv"
-    state.write_text("tests/a.py::t1\t2026-07-30\t2\n", encoding="utf-8")
+    state.write_text(f"tests/a.py::t1\t{first}\t0\n", encoding="utf-8")
     out, st = _run(state, ["tests/a.py::t1", "tests/b.py::t2"], tmp_path)
     assert "НОВОЕ: tests/b.py::t2" in out
-    assert "tests/a.py::t1" not in out, "уже сообщённое обязано молчать (решение 02.09)"
-    assert "tests/a.py::t1\t2026-07-30" in st, "дата первого провала потеряна"
+    assert "tests/a.py::t1" not in out, "уже сообщённое до срока обязано молчать (решение 02.09)"
+    assert f"tests/a.py::t1\t{first}" in st, "дата первого провала потеряна"
     assert "tests/b.py::t2\t" in st
 
 
@@ -113,7 +117,7 @@ def test_third_day_escalates_once(tmp_path):
     assert msg2 == "", "напоминание одноразовое, иначе оно станет новым фоном"
 
 
-def test_week_escalates_second_and_last_time(tmp_path):
+def test_week_escalates_second_time(tmp_path):
     ids = ["tests/unit/test_a.py::test_x"]
     import datetime as dt
     d = (dt.date.today() - dt.timedelta(days=8)).isoformat()
@@ -121,7 +125,34 @@ def test_week_escalates_second_and_last_time(tmp_path):
     assert "⏳" in msg and "8 дн" in msg
     assert state.strip().endswith("\t2")
     msg2, _ = _run2(tmp_path, ids)
-    assert msg2 == "", "после второго напоминания молчим навсегда по этому id"
+    assert msg2 == "", "до следующего срока (10 дн) молчим"
+
+
+def test_after_week_reminds_every_three_days(tmp_path):
+    """22.11 (решение владельца): после 7-го дня — каждые 3 дня, а не молчание навсегда.
+    Замер: тест фикстуры красный 05–22.11, после 12.11 — ни одного слова."""
+    ids = ["tests/unit/test_a.py::test_x"]
+    import datetime as dt
+    d = (dt.date.today() - dt.timedelta(days=10)).isoformat()
+    msg, state = _run2(tmp_path, ids, state_lines=[f"{ids[0]}\t{d}\t2\n"])
+    assert "⏳" in msg and "10 дн" in msg, "на 10-й день — третье напоминание"
+    assert state.strip().endswith("\t3")
+    d = (dt.date.today() - dt.timedelta(days=12)).isoformat()
+    msg, _ = _run2(tmp_path, ids, state_lines=[f"{ids[0]}\t{d}\t3\n"])
+    assert msg == "", "четвёртое — не раньше 13-го дня"
+    d = (dt.date.today() - dt.timedelta(days=13)).isoformat()
+    msg, _ = _run2(tmp_path, ids, state_lines=[f"{ids[0]}\t{d}\t3\n"])
+    assert "13 дн" in msg
+
+
+def test_deadman_ping_does_not_wait_for_green_pytest(tmp_path):
+    """22.11: пинг «жива» не гасится красным pytest; красное уходит телом пинга."""
+    src = (ROOT / "run_checks.sh").read_text(encoding="utf-8")
+    ping = src[src.index('_HC_URL="$('):src.index("СОСТОЯНИЕ В /tmp")]
+    assert 'curl' in ping and '--data-raw "$_HC_BODY"' in ping
+    assert 'if [[ "$PYTEST_OK" == "true" ]]; then _HC_BODY=' in ping
+    pre = src[:src.index('_HC_URL="$(')]
+    assert pre.rstrip().endswith("exit 2\n    fi") or "exit 2" in pre[-3000:], "CRITICAL по-прежнему выходит до пинга"
 
 
 def test_missed_run_does_not_eat_the_reminder(tmp_path):

@@ -216,6 +216,12 @@ ssh "$STUDIO" "
     echo '  ⚠ справочник $REFERENCE_DB не найден — тесты LOINC пойдут на пустом словаре'
   fi
   echo '  snapshot size: '\$(ls -lah '$STAGING/data/health.db' | awk '{print \$5}')
+  # Миграции ветки — на снимок, как их применит бот после выкатки (gp_agent/import_* зовут
+  # init_db). Без этого снимок несёт схему ДО ветки: новая колонка ветки краснела в тестах
+  # схемы как «подпись без колонки», хотя в проде её добавит первый же запуск (11.11,
+  # нить activity-temp). Заодно миграция проверяется на настоящих данных, а не на пустой базе.
+  cd '$STAGING' && HEALTH_DATA_DIR='$STAGING' HEALTH_SECRETS_DIR='$STAGING_SECRETS' $PY -c 'import health_db; health_db.init_db()' >/dev/null
+  echo '  миграции ветки применены к снимку'
 "
 
 # --- failfast_consistency: begin (C-174) ---

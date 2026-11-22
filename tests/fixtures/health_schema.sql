@@ -13,7 +13,7 @@ CREATE TABLE daily_metrics (
             weight      REAL,
             vo2max      REAL,
             raw         TEXT
-        , sleep_inbed REAL, sleep_awake REAL, sleep_core REAL, sleep_start TEXT, sleep_end TEXT, sleep_efficiency INTEGER, readiness_hrv_balance INTEGER, readiness_body_temp INTEGER, readiness_recovery_idx INTEGER, total_kcal REAL, distance_km REAL, activity_score INTEGER, breathing_disturbance REAL, stress_summary TEXT, stress_high_min INTEGER, recovery_high_min INTEGER, resilience_level TEXT, resilience_sleep_pct REAL, resilience_daytime_pct REAL, resilience_stress_pct REAL, bp_systolic REAL, bp_diastolic REAL, exercise_min REAL, cycling_km REAL, walking_speed_avg REAL, walking_step_length_avg REAL, walking_asymmetry_avg REAL, stand_min REAL, met_avg REAL, cardio_recovery_bpm REAL, six_min_walk_m REAL, stair_speed_up_ms REAL, stair_speed_down_ms REAL, bmi REAL, body_fat_pct REAL, skeletal_muscle_pct REAL, muscle_mass_kg REAL, visceral_fat REAL, body_water_pct REAL, bone_mass_kg REAL, protein_pct REAL, bmr_kcal REAL);
+        , sleep_inbed REAL, sleep_awake REAL, sleep_core REAL, sleep_start TEXT, sleep_end TEXT, sleep_efficiency INTEGER, readiness_hrv_balance INTEGER, readiness_body_temp INTEGER, readiness_recovery_idx INTEGER, temp_deviation REAL, temp_trend_deviation REAL, total_kcal REAL, distance_km REAL, activity_score INTEGER, breathing_disturbance REAL, stress_summary TEXT, stress_high_min INTEGER, recovery_high_min INTEGER, resilience_level TEXT, resilience_sleep_pct REAL, resilience_daytime_pct REAL, resilience_stress_pct REAL, bp_systolic REAL, bp_diastolic REAL, exercise_min REAL, cycling_km REAL, walking_speed_avg REAL, walking_step_length_avg REAL, walking_asymmetry_avg REAL, stand_min REAL, met_avg REAL, cardio_recovery_bpm REAL, six_min_walk_m REAL, stair_speed_up_ms REAL, stair_speed_down_ms REAL, bmi REAL, body_fat_pct REAL, skeletal_muscle_pct REAL, muscle_mass_kg REAL, visceral_fat REAL, body_water_pct REAL, bone_mass_kg REAL, protein_pct REAL, bmr_kcal REAL);
 CREATE TABLE experiments (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             name         TEXT NOT NULL,
@@ -1325,3 +1325,108 @@ CREATE TABLE IF NOT EXISTS task_guard_journal (new_task_id INTEGER NOT NULL REFE
                 reason TEXT NOT NULL,
                 PRIMARY KEY (new_task_id, open_task_id)
             );
+
+-- 2026-11-22 (нить fixture-schema): шесть таблиц миграций 05–11.11, которых не было в фикстуре.
+-- Список — из сообщения гарда test_fixture_schema_covers_prod_tables против живой базы в контейнере
+-- (health-cron-1, 22.11); DDL — дословно из живой sqlite_master. С 05.11 гард краснел каждую ночь
+-- и этим глушил dead-man heartbeat Health OS (пинг только при зелёном pytest).
+CREATE TABLE IF NOT EXISTS agent_mail (
+            id TEXT PRIMARY KEY,
+            direction TEXT NOT NULL CHECK(direction IN ('out','in')),
+            message_id TEXT,
+            peer TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            state TEXT NOT NULL,
+            detail TEXT NOT NULL DEFAULT '{}',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            UNIQUE(direction, message_id)
+        );
+CREATE INDEX IF NOT EXISTS idx_agent_mail_pending ON agent_mail(direction,state,created_at);
+
+CREATE TABLE IF NOT EXISTS hypothesis_prediction_runs (
+            memory_id   INTEGER NOT NULL,
+            version     INTEGER NOT NULL,
+            run_at      TEXT NOT NULL,
+            outcome     TEXT NOT NULL CHECK(outcome IN ('numeric','not_numeric','rejected','unparsed')),
+            note        TEXT,
+            PRIMARY KEY(memory_id, version));
+
+CREATE TABLE IF NOT EXISTS hypothesis_predictions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            memory_id     INTEGER NOT NULL,
+            version       INTEGER NOT NULL,
+            metric        TEXT NOT NULL,
+            kind          TEXT NOT NULL CHECK(kind IN ('daily','lab')),
+            baseline      REAL NOT NULL,
+            baseline_from TEXT,
+            baseline_to   TEXT,
+            unit          TEXT,
+            change        REAL NOT NULL,
+            low           REAL NOT NULL,
+            high          REAL NOT NULL,
+            horizon       TEXT NOT NULL,
+            created       TEXT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','scored','missed','void')),
+            observed      REAL,
+            n_points      INTEGER,
+            within        INTEGER,
+            beat_persistence  INTEGER,
+            direction_correct INTEGER,
+            scored_at     TEXT, form TEXT NOT NULL DEFAULT 'change' CHECK(form IN ('change','threshold')), bound TEXT CHECK(bound IN ('at_least','at_most')), threshold REAL,
+            CHECK(low <= change AND change <= high),
+            UNIQUE(memory_id, version, metric));
+
+CREATE TABLE IF NOT EXISTS protocol_adherence (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id INTEGER NOT NULL REFERENCES protocols(id),
+            period_from TEXT NOT NULL,
+            period_to   TEXT NOT NULL,
+            done        INTEGER NOT NULL CHECK(done >= 0),
+            planned     INTEGER NOT NULL CHECK(planned >= 1 AND done <= planned),
+            source      TEXT NOT NULL CHECK(source = 'assistant_report'),
+            letter_key  TEXT,
+            recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+            CHECK(period_from <= period_to),
+            UNIQUE(protocol_id, period_from, period_to));
+
+CREATE TABLE IF NOT EXISTS protocol_fit_checks (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id   INTEGER NOT NULL REFERENCES protocols(id),
+            peer          TEXT NOT NULL,
+            letter_key    TEXT,
+            card          TEXT NOT NULL,
+            asked_at      TEXT NOT NULL,
+            verdict       TEXT CHECK(verdict IN ('fits','conflict')),
+            reason        TEXT,
+            answered_at   TEXT,
+            answer_letter TEXT,
+            source        TEXT NOT NULL CHECK(source = 'assistant_report'),
+            delivered_at  TEXT);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_protocol_fit_open
+            ON protocol_fit_checks(protocol_id) WHERE delivered_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS protocol_predictions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id   INTEGER NOT NULL UNIQUE REFERENCES protocols(id),
+            metric        TEXT NOT NULL,
+            kind          TEXT NOT NULL CHECK(kind IN ('daily','lab')),
+            baseline      REAL NOT NULL,
+            baseline_from TEXT,
+            baseline_to   TEXT,
+            unit          TEXT,
+            change        REAL NOT NULL,
+            low           REAL NOT NULL,
+            high          REAL NOT NULL,
+            horizon       TEXT NOT NULL,
+            created       TEXT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','scored','missed','void')),
+            observed      REAL,
+            n_points      INTEGER,
+            within        INTEGER,
+            beat_persistence  INTEGER,
+            direction_correct INTEGER,
+            scored_at     TEXT,
+            CHECK(low <= change AND change <= high));
+

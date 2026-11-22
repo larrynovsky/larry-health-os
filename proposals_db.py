@@ -128,9 +128,10 @@ def format_proposal_card(prop: dict) -> str:
                                         pmid=ch.get("source_pmid") or "—"))
                 continue
             if action == "add":
-                nv = ch.get("new_value") if isinstance(ch.get("new_value"), dict) else {}
-                lines.append(i18n.t("proposals.new", title=ch.get('title') or nv.get('title', '')))
-                _plain = ch.get("plain_summary") or nv.get("plain_summary")
+                import problems_db as _pdb
+                nv = _pdb._add_fields(ch)
+                lines.append(i18n.t("proposals.new", title=nv.get('title') or _clip(nv.get('description'), 140) or ''))
+                _plain = nv.get("plain_summary")
                 if _plain:
                     lines.append(i18n.t("proposals.plain", summary=_clip(_plain, 300)))
             elif row is None:
@@ -182,9 +183,7 @@ def _plains_before_write(proposal_id: int) -> dict:
     for i, ch in enumerate(_j.loads(row["proposed"])):
         if ch.get("action") != "add":
             continue
-        src = dict(ch)
-        if isinstance(ch.get("new_value"), dict):
-            src.update(ch["new_value"])
+        src = _pdb._add_fields(ch)
         if not (src.get("plain_summary") or "").strip():
             out[i] = _pdb._plain_for_add(ch, row["source"])
     return out
@@ -241,10 +240,8 @@ def apply_proposal(proposal_id: int) -> int:
 
             elif action == "add":
                 # GP может положить поля либо напрямую в ch, либо в ch["new_value"]
-                _nv = ch.get("new_value")
-                _src = dict(ch)
-                if isinstance(_nv, dict):
-                    _src.update(_nv)  # new_value перекрывает top-level если есть
+                import problems_db as _pdb
+                _src = _pdb._add_fields(ch)   # new_value (словарь или строка) — единый дом слияния
                 # Дубль записи (2026-09-01): не только тот же problem_id (id придумывает модель —
                 # P007/<состояние>_<год>/new_<аналит>_gap за одну и ту же проблему), но и
                 # живая проблема с тем же условием clinical_kb / заголовком.

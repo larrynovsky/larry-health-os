@@ -33,7 +33,7 @@ def world(db, monkeypatch, tmp_path):
     answer = {'choice': 'duplicate', 'confidence': 0.8,
               'probabilities': {'duplicate': 0.8, 'contradicts': 0.1, 'new': 0.1}}
     w = SimpleNamespace(db=db, calls=calls, answer=answer, key=key, secrets=secret_dir,
-                        status=200, error=None, clock=0.0, elapsed=0.0)
+                        status=200, error=None, clock=0.0, elapsed=0.0, outcomes=[])
     monkeypatch.setattr(task_guard, '_monotonic', lambda: w.clock)
 
     class HTTP:
@@ -44,6 +44,10 @@ def world(db, monkeypatch, tmp_path):
         def request(self, method, url, body, headers):
             calls.append((json.loads(body), headers, self.timeout))
             assert (method, url) == ('POST', '/v1/systemone')
+            if w.outcomes:
+                outcome = w.outcomes.pop(0)
+                w.error = outcome if isinstance(outcome, Exception) else None
+                w.status = outcome if isinstance(outcome, int) else 200
             w.clock += min(w.elapsed, self.timeout)
             if w.error:
                 raise w.error
@@ -218,8 +222,10 @@ def test_config_seed_upgrade_keeps_operator_choice(world):
     config_db.upsert_config('tasks.guard_mode', value_text='off')
     config_db.upsert_config('tasks.guard_timeout_seconds', value_num=0.3)
     config_db.upsert_config('tasks.guard_budget_seconds', value_num=7)
+    config_db.upsert_config('tasks.guard_breaker_failures', value_num=4)
     health_db._migrate_patient_profile_and_config()
     assert config_db.get_config('tasks.guard_budget_seconds') == 7
+    assert config_db.get_config('tasks.guard_breaker_failures') == 4
     assert config_db.get_config('tasks.guard_mode') == 'off'
     assert config_db.get_config('tasks.guard_timeout_seconds') == 0.3
 
@@ -244,15 +250,15 @@ def test_breaker_spans_report_batch_but_det_continues_and_next_run_resets(world,
         w.status = 503
     saved = extract(w, {'type': 'action', 'content': 'first'},
                     {'type': 'lab_test', 'content': 'ALT'})
-    assert len(saved) == 2 and len(w.calls) == 1
+    assert len(saved) == 2 and len(w.calls) == 3
     counts = {r['reason']: r['n'] for r in w.db.fetchall(
         'SELECT reason, count(*) AS n FROM task_guard_journal GROUP BY reason')}
     cause = 'provider_unavailable' if failure == 'timeout' else 'http_error'
-    assert counts == {cause: 1, 'breaker_open': 5, 'shared_analyte_deadline': 1}
+    assert counts == {cause: 3, 'breaker_open': 3, 'shared_analyte_deadline': 1}
     assert len(journal(w)) == 7
     assert all(r['verdict'] == 'unjudged' for r in journal(w) if r['judge'] == 'jev')
     assert extract(w, {'type': 'action', 'content': 'next report'})
-    assert len(w.calls) == 2  # breaker belongs to a run, never the process
+    assert len(w.calls) == 6  # breaker belongs to a run, never the process
 
 
 def test_budget_spans_batch_caps_timeout_and_preserves_det(world):
@@ -312,6 +318,7 @@ def test_empty_key_is_configuration_fault(world):
 
 def test_memory_creation_shares_one_breaker(world):
     w = world
+    config_db.upsert_config('tasks.guard_breaker_failures', value_num=2)
     for key, value in (("questions.memory_window_days", 45), ("questions.promote_batch", 5),
                        ("questions.max_per_day", 20)):
         config_db.upsert_config(key, value_num=value)
@@ -323,8 +330,8 @@ def test_memory_creation_shares_one_breaker(world):
         str(r['id']): {'verdict': 'patient', 'reason': 'addressed', 'ru': r['value']} for r in rows})
     w.error = TimeoutError('synthetic timeout')
     saved = task_agent.promote_memory_questions()
-    assert len(saved) == 2 and len(w.calls) == 1
-    assert [r['reason'] for r in journal(w)].count('breaker_open') == 2
+    assert len(saved) == 2 and len(w.calls) == 2
+    assert [r['reason'] for r in journal(w)].count('breaker_open') == 1
 
 
 def test_budget_seed_and_fallback_share_one_default(world):
@@ -359,3 +366,117 @@ def test_key_can_be_configured_between_batches(world):
     path.write_text(world.key)
     assert extract(world, {'type': 'action', 'content': 'configured run'})
     assert len(world.calls) == 2
+
+
+@pytest.mark.parametrize('failure', [503, TimeoutError('synthetic timeout')])
+def test_one_transport_failure_then_successes_are_judged(world, failure):
+    world.outcomes = [failure, 200, 200]
+    for i in range(3):
+        world.db.add_task(f'old {i}', type='action')
+    assert extract(world, {'type': 'action', 'content': 'candidate'})
+    rows = journal(world)
+    assert len(world.calls) == 3
+    assert sum(r['verdict'] == 'unjudged' for r in rows) == 1
+    assert sum(r['reason'] == 'jev-latest' for r in rows) == 2
+
+
+def test_success_resets_transport_streak_across_tasks(world):
+    config_db.upsert_config('tasks.guard_breaker_failures', value_num=2)
+    world.db.add_task('old', type='action')
+    world.outcomes = [503, 200, 503, 503]
+    saved = extract(world, *[{'type': 'action', 'content': f'candidate {i}'} for i in range(3)])
+    assert len(saved) == 3 and len(world.calls) == 4
+    counts = {r['reason']: r['n'] for r in world.db.fetchall(
+        'SELECT reason, count(*) AS n FROM task_guard_journal GROUP BY reason')}
+    assert counts == {'http_error': 3, 'jev-latest': 1, 'breaker_open': 2}
+
+
+@pytest.mark.parametrize('value,expected', [(1, 1), (20, 20), (None, 3), (0, 3),
+    (-1, 3), (21, 3), (1.5, 3), ('invalid', 3), ('nan', 3), ('inf', 3)])
+def test_breaker_setting_controls_http_attempts(world, caplog, value, expected):
+    health_db._migrate_patient_profile_and_config()
+    assert config_db.get_config('tasks.guard_breaker_failures') == config_db.TASK_GUARD_BREAKER_FAILURES == 3
+    if value is None:
+        world.db.execute("DELETE FROM system_config WHERE key='tasks.guard_breaker_failures'")
+    else:
+        config_db.upsert_config('tasks.guard_breaker_failures', value_text=str(value))
+    for i in range(21):
+        world.db.add_task(f'old {i}', type='action')
+    world.status = 503
+    assert extract(world, {'type': 'action', 'content': 'candidate'})
+    assert len(world.calls) == expected
+    assert sum(r['reason'] == 'breaker_open' for r in journal(world)) == 21 - expected
+    if value not in (None, 1, 20):
+        assert 'invalid breaker failures' in caplog.text
+
+
+@pytest.mark.parametrize('failure', [False, True])
+def test_assistant_questions_audit_open_tasks_and_siblings(world, failure):
+    import agent_reply
+    import hai_chat
+    config_db.upsert_config('agent_mail.assistant', value_text='synthetic-peer')
+    world.mp.setattr(hai_chat, 'extract_artifacts', lambda *a, **kw: {
+        'observations': ['synthetic claim one', 'synthetic claim two']})
+    old = world.db.add_task('old', type='action')
+    world.db.add_task('closed', type='action', status='completed')
+    if failure:
+        config_db.upsert_config('tasks.guard_breaker_failures', value_num=2)
+        world.status = 503
+    letter = {'peer': 'synthetic-peer', 'message_id': 'synthetic-letter', 'wrapped': 'synthetic'}
+    ids = agent_reply.queue_fact_questions(letter)
+    assert len(ids) == 2
+    assert {(r['new_task_id'], r['open_task_id']) for r in journal(world)} == {
+        (ids[0], old), (ids[1], old), (ids[1], ids[0])}
+    assert all(tasks_db.get_task(tid)['source'].startswith('assistant_fact:') for tid in ids)
+    assert len(world.calls) == (2 if failure else 3)
+    assert sum(r['reason'] == 'breaker_open' for r in journal(world)) == int(failure)
+    assert agent_reply.queue_fact_questions(letter) == []
+    assert len(journal(world)) == 3  # deduplication retains original journal, no orphans
+
+
+def test_assistant_question_survives_audit_failure(world):
+    import agent_reply
+    import hai_chat
+    config_db.upsert_config('agent_mail.assistant', value_text='synthetic-peer')
+    world.mp.setattr(hai_chat, 'extract_artifacts', lambda *a, **kw: {'observations': ['synthetic claim']})
+    def unavailable(**kw):
+        raise RuntimeError('synthetic snapshot failure')
+    world.mp.setattr(tasks_db, 'get_open_tasks', unavailable)
+    faults = []
+    world.mp.setattr(notify, 'fault', lambda *a, **kw: faults.append(a))
+    ids = agent_reply.queue_fact_questions({'peer': 'synthetic-peer', 'message_id': 'synthetic-letter'})
+    assert len(ids) == 1 and tasks_db.get_task(ids[0])['status'] == 'open'
+    assert journal(world) == [] and len(faults) == 1
+
+
+@pytest.mark.parametrize('preexisting', [False, True])
+def test_fault_throttle_cannot_touch_inherited_database_directory(
+        monkeypatch, tmp_path, tmp_path_factory, preexisting):
+    # Synthetic production stand-in deliberately outside this test's tmp_path.
+    from datetime import datetime, timezone
+    import _time_inject
+    fake_live = tmp_path_factory.mktemp('synthetic_production')
+    state = fake_live / 'task_guard_fault.json'
+    original = '{"sig": "task_guard", "at": 1}'
+    if preexisting:
+        state.write_text(original)
+    monkeypatch.setattr(health_db, 'DB_PATH', fake_live / 'health.db')
+    monkeypatch.setenv('HEALTH_DATA_DIR', str(fake_live))
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(_time_inject, 'get_now', lambda: now)
+    faults = []
+    monkeypatch.setattr(notify, 'fault', lambda *a, **kw: faults.append(a))
+    task_guard.report_failure()
+    task_guard.report_failure()
+    assert state.read_text() == original if preexisting else not state.exists()
+    saved = list((tmp_path / 'repeat_state').rglob('task_guard_fault.json'))
+    assert len(saved) == 1
+    assert json.loads(saved[0].read_text()) == {'sig': 'task_guard', 'at': now.timestamp()}
+    assert len(faults) == 1  # the real repeat algorithm still runs, not a no-op stub
+
+
+def test_shared_db_fixture_keeps_fault_state_beside_temporary_database(world):
+    from pathlib import Path
+    assert Path(health_db.DB_PATH) == world.db.path
+    task_guard.report_failure()
+    assert (world.db.path.parent / 'task_guard_fault.json').is_file()

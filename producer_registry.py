@@ -88,6 +88,9 @@ MONITORED: dict[str, str] = {
     # ── 2026-09-01: агент ротации логов заведён вместе со своим датчиком ────────
     # Ратчет поймал его в тот же вечер, когда агент встал: задача была, датчика не
     # было. Артефакт у неё датируемый (stdout-квитанция), поэтому не EXEMPT.
+    # 13.11 (карточка warn:producer_registry 24.09): задача по StartInterval — _schedule_covers её
+    # не судит, поэтому строка руками; withings-import тем же датчиком покрыт вычисленно.
+    "com.larry.health.import-watchdog": "check_import_pulses_alive (пульс import_watchdog.ran_at старше StartInterval — пропущенный запуск)",
     "com.larry.health.logrotate": "check_logrotate_liveness (свежесть квитанции logs/logrotate.log + хвост `selftest ok`)",
     "com.larry.health.calendar-sync.partner": "check_calendar_freshness (per-tenant: scan_calendar_staleness по всем тенантам)",
     "com.larry.health.oura-import.partner": "check_tenant_biometrics_freshness (per-tenant HRV, 2026-08-07)",

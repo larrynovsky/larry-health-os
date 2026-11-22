@@ -119,10 +119,11 @@ def new_errors(save: bool = True) -> list[dict]:
                 chunk = f.read(size - prev)
         except OSError:
             continue
-        hits = [ln.strip() for ln in chunk.splitlines() if ERROR_SIGNS.search(ln)]
+        lines = chunk.splitlines()
+        hits = [i for i, ln in enumerate(lines) if ERROR_SIGNS.search(ln)]
         if hits:
             found.append({"label": label, "path": str(path),
-                          "hits": len(hits), "sample": hits[0][:160]})
+                          "hits": len(hits), "sample": _sample(lines, hits[0])[:160]})
     if save:
         try:
             state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,6 +133,70 @@ def new_errors(save: bool = True) -> list[dict]:
             # Не тихо: без сохранения позиций датчик слепнет на следующий прогон.
             print(f"stderr_watch: позиции не сохранены: {e!r}")
     return found
+
+
+_TB_HEAD = re.compile(r"Traceback \(most recent call last\)")
+_TB_CHAIN = ("During handling of the above exception", "The above exception was")
+# Итог исключения: имя (с модулем) на Error/Exception/Group/Exit/Interrupt/Timeout, затем «:» или
+# конец строки. Строка вне этой формы — уже не трассировка (ревью 18.11: иначе образцом становилась
+# чужая строка лога после незакрытой трассировки).
+_EXC_LINE = re.compile(r"^[A-Za-z_][\w.]*(Error|Exception|Group|Exit|Interrupt|Timeout)(:|$)")
+
+
+def _sample(lines: list[str], i: int) -> str:
+    """Строка-образец находки. Для трассировки — её ИТОГ («ValueError: ...»), а не заголовок:
+    карточка 18.11 по боту несла «Traceback (most recent call last):» — причину по ней не назвать.
+
+    Поиск ограничен блоком трассировки: строки с отступом — кадры; цепочка «During handling…»
+    продолжает поиск до последнего исключения; первая строка без отступа, не похожая на итог, —
+    конец блока. Итога нет (обрыв концом куска, обрыв внутри цепочки, чужая строка) — честный
+    откат на заголовок. Группа исключений (3.11+, «+ Exception Group Traceback», все строки
+    с отступом «| …») — итог берётся из её строки «| ExceptionGroup: …»."""
+    head = lines[i].strip()
+    if not _TB_HEAD.search(head):
+        return head
+    group = head.lstrip("+ ").startswith("Exception Group")
+    last = None
+    for ln in lines[i + 1:]:
+        if not ln.strip():
+            continue
+        if group:
+            s = ln.strip().lstrip("|").strip()
+            if _EXC_LINE.match(s):
+                return s
+            if not ln[:1].isspace():
+                break
+            continue
+        if ln[:1].isspace() or _TB_HEAD.search(ln):
+            continue
+        if ln.startswith(_TB_CHAIN):
+            last = None          # дальше — следующее исключение цепочки; без него итога нет
+            continue
+        if _EXC_LINE.match(ln.strip()):
+            last = ln.strip()    # итог; цепочка может продолжиться
+            continue
+        break                    # чужая строка — блок трассировки кончился
+    return last or head
+
+
+def exception_class(stderr_text: str, returncode: int) -> str:
+    """Класс сбоя подпроцесса по его stderr — токен для detail журнала сбоев, без текста ошибки
+    (в тексте бывают URL и ответы провайдера). Исходы различимы, а не сведены в одно «нет»
+    (ревью починки 2026-11-17-46973d29):
+      signal_N     — процесс убит сигналом (код < 0), трассировки нет по построению;
+      no_traceback — заголовка трассировки нет;
+      unparsed     — трассировка есть, итог не разобран (обрыв); заметка add_note после итога не мешает;
+      <Class>      — последний сегмент имени исключения (URLError, ExceptionGroup, …)."""
+    if returncode < 0:
+        return f"signal_{-returncode}"
+    lines = (stderr_text or "").splitlines()
+    heads = [i for i, ln in enumerate(lines) if _TB_HEAD.search(ln)]
+    if not heads:
+        return "no_traceback"
+    s = _sample(lines, heads[0])
+    if _TB_HEAD.search(s) or not _EXC_LINE.match(s):
+        return "unparsed"
+    return s.split(":", 1)[0].rsplit(".", 1)[-1]
 
 
 def blind_spots(max_age_hours: float = 26.0) -> list[str]:

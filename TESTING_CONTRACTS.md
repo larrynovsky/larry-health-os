@@ -114,7 +114,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 
 <!-- BEGIN AUTOGEN: integrity-sensors (gen_testing_contracts.py) -->
 
-### Реестр датчиков целостности (198 шт., генерируется)
+### Реестр датчиков целостности (204 шт., генерируется)
 
 > Источник: `integrity_tests.py`. Таблица построена из AST — не редактировать руками, менять код. launchd 07:50 → triage 08:00.
 
@@ -130,6 +130,9 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | <dynamic> | `check_problem_list` | — |
 | открытые проблемы описаны простыми словами | `check_problem_plain_summary` | Открытая проблема несёт описание простыми словами (27.09, волна 4). Медицинский текст — |
 | протоколы читаются | `check_protocols` | — |
+| протоколы исполнимы и пересматриваются | `check_protocols_actionable` | Действующий протокол обязан нести поведение и дату пересмотра (нить assistant-loop, 10.11): |
+| оценщик прогнозов протоколов жив | `check_protocol_scoring_alive` | Прогнозы протоколов оценивает код раз в неделю (check_hypothesis_evaluations). Если оценщик |
+| карточки новых протоколов доставлены | `check_protocol_fit_cards_delivered` | Карточка нового протокола придержана до ответа ассистента (protocol-fit). Если её не отправили |
 | задачи читаются (open + overdue) | `check_tasks_pipeline` | — |
 | <dynamic> | `check_lab_task_pairs` | Conflicting or duplicate open lab requests need reconciliation, not auto-close. |
 | активность задач за 14 дней | `check_recent_task_activity` | — |
@@ -243,6 +246,8 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | утренний разбор человека-тенанта жив | `check_tenant_triage_alive` | Утренний разбор ЧЕЛОВЕКА-ТЕНАНТА жив (28.09, решение владельца «партнёру — свой разбор»). |
 | расписание GP monthly | `check_gp_schedule` | GP monthly ≤35д. |
 | review_date проблем и протоколов | `check_review_dates` | Проблемы и протоколы с просроченным review_date. |
+| температура ночью приходит вместе со сном | `check_temperature_arrives` | Сон за ночь пришёл, а градусов температуры нет (решение владельца 12.11, нить temp-guards). |
+| автоматизация тренировок HAE жива | `check_hae_workouts_automation` | Автоматизация HAE «Workouts» жива (решение владельца 12.11, нить temp-guards): Oura записал |
 | актуальность клинических периодов | `check_periods_expiry` | Клинические периоды: фазы watchful_waiting с истёкшей датой без next phase. |
 | даты терапии: periods ↔ problem_list, medications, профиль | `check_treatment_dates_agree` | Даты терапий в `periods` (primary) против `problem_list` (копии в полях и заголовках), |
 | лечение извлечено из документов | `check_treatment_history_extracted` | Лечение — производное из документов (medications), не ручная строка. |
@@ -282,6 +287,7 @@ oura_freshness_check и лаб-конвейер 2026-06-30). Актуальны�
 | Очередь отчётов о сбоях разбирается | `check_bug_outbox_drains` | Очередь отчётов /bug разбирается (нить bug-report, 19.10). |
 | Сбои бота и служб за сутки | `check_fault_journal` | Решение владельца 2026-09-28: сбои идут в ночной цикл, не в Telegram. |
 | Ротация логов жива и чиста | `check_logrotate_liveness` | Ротатор жив И отработал чисто (§14, находка producer_registry 01.09). |
+| пульс плановых задач приёма (Withings, сторож Apple Health) | `check_import_pulses_alive` | §14 для двух плановых задач приёма (карточка warn:producer_registry 24.09, закрыта 14.11). |
 | Реестр классов секретов против каталогов | `check_secret_scope_matches_reality` | Объявленный класс секрета против того, что реально лежит в каталогах (02.09). |
 | LLM-тракты без secret_guard не множатся (§19) | `check_llm_tracts_guarded` | Число LLM-трактов БЕЗ secret_guard не растёт (§19, решение владельца 2026-08-03). |
 | Конструкторы Anthropic мимо llm_client не множатся | `check_llm_direct_constructors` | Клиент Anthropic конструируется ТОЛЬКО в llm_client — там гард секретов стоит по конструкции. |

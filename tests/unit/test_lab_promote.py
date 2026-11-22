@@ -30,11 +30,12 @@ def db(tmp_path, monkeypatch):
             ("2021-06-14", "instrument:isi", "Hemoglobin", 13.9),    # preserve
         ])
         # новый staging (run r1): кровь
-        cols = "run_id,extractor_version,source_file,date,panel,canonical_name,raw_name,value,value_agreement,review_status"
+        # Единица обязательна: число без шкалы промоут не пускает (карточка 2026-10-21).
+        cols = "run_id,extractor_version,source_file,date,panel,canonical_name,raw_name,value,value_agreement,review_status,unit"
         c.executemany(
-            f"INSERT INTO lab_results_staging({cols}) VALUES(?,?,?,?,?,?,?,?,?,?)", [
-            ("r1", "v", "lab_a.pdf", "2025-03-11", "cbc", "RDW", "RDW", 13.6, "agree", "auto"),
-            ("r1", "v", "lab_a.pdf", "2025-03-11", "chemistry", "Glucose", "Glucose", 94.0, "agree", "auto"),
+            f"INSERT INTO lab_results_staging({cols}) VALUES(?,?,?,?,?,?,?,?,?,?,?)", [
+            ("r1", "v", "lab_a.pdf", "2025-03-11", "cbc", "RDW", "RDW", 13.6, "agree", "auto", "%"),
+            ("r1", "v", "lab_a.pdf", "2025-03-11", "chemistry", "Glucose", "Glucose", 94.0, "agree", "auto", "mg/dL"),
         ])
         c.commit()
     return health_db
@@ -93,12 +94,12 @@ def test_execute_preserves_same_analyte_other_date(db):
 # Синтетические rejected-строки проверяют решение ревьюера как рабочий гейт.
 
 _STG_COLS = ("run_id,extractor_version,source_file,date,panel,canonical_name,"
-             "raw_name,value,value_agreement,review_status")
+             "raw_name,value,value_agreement,review_status,unit")
 
 
 def _add_staging(conn, rows):
     conn.executemany(
-        f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)", rows)
+        f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?,?)", rows)
     conn.commit()
 
 
@@ -126,9 +127,9 @@ def test_human_rejected_never_reaches_canon(db):
     with db.get_conn() as c:
         _add_staging(c, [
             ("r1", "v", "lab_a.pdf", "2025-07-07", "chemistry",
-             "Glucose", "Glucose", 99.1, "agree", "rejected"),
+             "Glucose", "Glucose", 99.1, "agree", "rejected", "mg/dL"),
             ("r1", "v", "lab_a.pdf", "2025-07-08", "chemistry",
-             "Glucose", "Glucose", 88.2, "agree", "pending"),
+             "Glucose", "Glucose", 88.2, "agree", "pending", "mg/dL"),
         ])
     lab_promote.plan("r1", None, execute=True)
     with db.get_conn() as c:
@@ -153,7 +154,7 @@ def test_null_review_status_promotes_like_pending(db):
     with db.get_conn() as c:
         _add_staging(c, [
             ("r1", "v", "lab_a.pdf", "2025-07-09", "chemistry",
-             "Glucose", "Glucose", 77.3, "agree", None),
+             "Glucose", "Glucose", 77.3, "agree", None, "mg/dL"),
         ])
     lab_promote.plan("r1", None, execute=True)
     with db.get_conn() as c:
@@ -171,10 +172,10 @@ def test_приток_считается_наравне_с_потерей(db):
     import lab_promote
     with db.get_conn() as c:
         cols = ("run_id,extractor_version,source_file,date,panel,canonical_name,"
-                "raw_name,value,value_agreement,review_status")
-        c.execute(f"INSERT INTO lab_results_staging({cols}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "raw_name,value,value_agreement,review_status,unit")
+        c.execute(f"INSERT INTO lab_results_staging({cols}) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                   ("r1", "v", "lab_a.pdf", "2025-03-11", "chemistry",
-                   "Ferritin", "Ferritin", 61.0, "agree", "auto"))
+                   "Ferritin", "Ferritin", 61.0, "agree", "auto", "ng/mL"))
         c.commit()
     r = lab_promote.plan("r1", None, execute=False)
     # Ferritin в фикстуре канона не было НИКОГДА — обязан быть виден как приток
@@ -195,10 +196,10 @@ def test_известное_имя_на_новой_дате_не_приток(db
     import lab_promote
     with db.get_conn() as c:
         cols = ("run_id,extractor_version,source_file,date,panel,canonical_name,"
-                "raw_name,value,value_agreement,review_status")
-        c.execute(f"INSERT INTO lab_results_staging({cols}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "raw_name,value,value_agreement,review_status,unit")
+        c.execute(f"INSERT INTO lab_results_staging({cols}) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                   ("r2", "v", "lab_b.pdf", "2025-10-02", "lipids",
-                   "Cholesterol", "Cholesterol", 176.0, "agree", "auto"))
+                   "Cholesterol", "Cholesterol", 176.0, "agree", "auto", "mg/dL"))
         c.commit()
     import lab_canon
     r = lab_promote.plan("r2", None, execute=False)
@@ -273,18 +274,18 @@ def test_повторное_добавление_не_крови_с_именем
     import lab_canon
     import lab_promote
     assert lab_canon.normalize("Индекс HOMA-IR") != "Индекс HOMA-IR"   # посылка теста
-    row = ("2025-03-11", "other", "Индекс HOMA-IR", "Индекс HOMA-IR", 3.2, "agree", "auto")
+    row = ("2025-03-11", "other", "Индекс HOMA-IR", "Индекс HOMA-IR", 3.2, "agree", "auto", None)
     with db.get_conn() as c:
-        c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                   ("r1", "v", "lab_a.pdf", *row))
         c.commit()
     lab_promote.plan("r1", None, execute=True)
     with db.get_conn() as c:
-        c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                   ("r2", "v", "lab_a.pdf", *row))
-        for name, val in (("RDW", 13.6), ("Glucose", 94.0)):
-            c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                      ("r2", "v", "lab_a.pdf", "2025-03-11", "cbc", name, name, val, "agree", "auto"))
+        for name, val, unit in (("RDW", 13.6, "%"), ("Glucose", 94.0, "mg/dL")):
+            c.execute(f"INSERT INTO lab_results_staging({_STG_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                      ("r2", "v", "lab_a.pdf", "2025-03-11", "cbc", name, name, val, "agree", "auto", unit))
         c.commit()
     r = lab_promote.plan("r2", None, execute=False)
     assert "Индекс HOMA-IR" not in r["fresh_names"], r       # не «новое имя» и не «старое непокрытое»
@@ -293,3 +294,23 @@ def test_повторное_добавление_не_крови_с_именем
     with db.get_conn() as c:
         n = c.execute("SELECT COUNT(*) FROM lab_results WHERE test_name='Индекс HOMA-IR'").fetchone()[0]
     assert n == 1
+
+
+def test_строка_без_единицы_не_затирает_канон_с_единицей(db):
+    """Лечение регресса LDL (ревью починки 2026-11-22-8696fb3a): повторный промоут бланка, где
+    в колонке единицы пусто, удалял строку канона с проставленной вручную единицей (30.07, be7cd43)
+    и вставлял безразмерную. С гейтом no-unit строка staging блокируется, а старая строка канона
+    остаётся (Гейт-2: непокрытое не удаляется). Значения выдуманы."""
+    import lab_promote
+    with db.get_conn() as c:
+        c.execute("INSERT INTO lab_results(date,source,test_name,value,unit) VALUES(?,?,?,?,?)",
+                  ("2025-03-11", "doc:lab_a.pdf", "LDL", 120.0, "mg/dL"))
+        c.execute("INSERT INTO lab_results_staging(run_id,extractor_version,source_file,date,panel,"
+                  "canonical_name,raw_name,value,value_agreement,review_status,unit) "
+                  "VALUES('r1','v','lab_a.pdf','2025-03-11','chemistry','LDL','LDL calculated-B',"
+                  "120.0,'agree','auto',NULL)")
+        c.commit()
+    lab_promote.plan("r1", None, execute=True)
+    with db.get_conn() as c:
+        ldl = c.execute("SELECT value, unit FROM lab_results WHERE test_name='LDL'").fetchall()
+    assert [(r["value"], r["unit"]) for r in ldl] == [(120.0, "mg/dL")], ldl

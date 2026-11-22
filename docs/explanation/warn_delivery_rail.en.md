@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/warn_delivery_rail.md sha256:008c672dfc40 -->
+<!-- translation-of: docs/explanation/warn_delivery_rail.md sha256:fd5c25a32ee7 -->
 **English** · [Русский](warn_delivery_rail.md)
 
 # The warn delivery rail: why it died for 13 days

@@ -160,6 +160,9 @@
 1442d70b0dcd:
   ru: воспалит. прокси
   en: inflammatory proxy
+14a5328c8b2b:
+  ru: До какой даты кэш вообще содержит события (time_max фетчера). Отсутствие события позже неё —
+  en: The upper date boundary of events contained in the cache (fetcher time_max). Absence of an event after it —
 14b093da96d2:
   ru: 'Отложенный опросник, чей срок настал, снова ложится в outbox: status=''open'', sent_at=NULL.'
   en: 'A deferred assessment whose due date has arrived is placed back in outbox: status=''open'', sent_at=NULL.'
@@ -277,6 +280,12 @@
 20ea02bc417f:
   ru: 'Возвращает {domain: [keyword,...]}. Special key ''__full__'' содержит'
   en: 'Returns {domain: [keyword,...]}. Special key ''__full__'' contains'
+21d4fed1e46b:
+  ru: Карточка нового протокола придержана до ответа ассистента (protocol-fit). Если её не отправили
+  en: New protocol card is held until the assistant responds (protocol-fit). If it was not sent
+22459443e103:
+  ru: Поездки с началом не позже сегодня+days, по дате начала.
+  en: Trips with start no later than today+days, ordered by start date.
 2251dc3bf10d:
   ru: Отказ гейта — событие с читателем, а не «строки просто нет».
   en: Gate failure is an event with a reader, not "the row is simply absent".
@@ -364,6 +373,9 @@
 2a3e950f0266:
   ru: 'UC-B-09: каждое `r=0.X` в свежих отчётах агентов подтверждено ПРИНЯТОЙ верой.'
   en: 'UC-B-09: every `r=0.X` in recent agent reports is confirmed by an ACCEPTED belief.'
+2a5c6b1d5796:
+  ru: 'Чистая. Ночи СО СНОМ по возрастанию даты: True — градусы температуры пришли.'
+  en: 'Pure. Nights WITH SLEEP in ascending date order: True — temperature degrees have arrived.'
 2a72484fcc9f:
   ru: 'Объявление границы окна лаб-блока: что показано и что лежит ЗА границей.'
   en: 'Declares the boundary of a lab block window: what is shown and what lies beyond the boundary.'
@@ -373,6 +385,9 @@
 2b3c28c69af0:
   ru: Последний literature_search покрывает последний плановый запуск по живому плисту
   en: The latest literature_search covers the latest scheduled run against the live plist
+2b98ec40f2f5:
+  ru: 'Автоматизация HAE «Workouts» жива (решение владельца 12.11, нить temp-guards): Oura записал'
+  en: 'HAE Workouts automation is alive (owner decision 12.11, thread temp-guards): Oura has recorded'
 2b9d8a2d6bba:
   ru: 'Открытые вопросы, на которые НЕКУДА ответить: нет обратного адреса.'
   en: 'Open questions with nowhere to reply: no return address.'
@@ -442,6 +457,9 @@
 31982289584d:
   ru: Сохраняет протокол в таблицу protocols.
   en: Saves a protocol to the protocols table.
+31e472214c6f:
+  ru: протоколы исполнимы и пересматриваются
+  en: protocols are executable and reviewed
 322c1550917c:
   ru: Читает параметр конфигурации из БД.
   en: Reads a configuration parameter from the DB.
@@ -517,6 +535,9 @@
 3a4a7b1e6d78:
   ru: живость арбитра памяти
   en: memory arbiter liveness
+3a5ef2bc314d:
+  ru: data.workouts пакета HAE → строки для workouts_db.upsert_workout (source='AppleHealth').
+  en: data.workouts from HAE package → rows for workouts_db.upsert_workout (source='AppleHealth').
 3b0251e6ac4f:
   ru: Покрытие strand-резолюции effect_allele (genome strand-fix Ф7).
   en: strand-resolution coverage of effect_allele (genome strand-fix F7).
@@ -562,6 +583,9 @@
 3ea76370fc06:
   ru: реестр производителей полон (context_gate_orphan)
   en: producer registry is complete (context_gate_orphan)
+3ee2fd4fe2d8:
+  ru: Каталог провенанса пакетов HAE, принятых по REST (/hae/ingest), — для ночного сторожа.
+  en: Provenance catalog of HAE packets received via REST (/hae/ingest) — for the night watchdog.
 3fc5755139e9:
   ru: 'Принять ответ на задачу-вопрос: закрыть задачу и доставить ответ потребителям.'
   en: 'Accept an answer to a question-task: close the task and deliver the answer to consumers.'
@@ -607,6 +631,9 @@
 43e4507ef745:
   ru: 'F-03: per-file ошибка посчитана и напечатана, но не доехала до кода возврата. Зелёным станет в Фазе C.'
   en: 'F-03: per-file error is counted and printed but did not reach the return code. Will go green in Phase C.'
+443bc10e1165:
+  ru: Сохраняет протокол в таблицу protocols, затем его прогноз (если модель его дала и он годен).
+  en: Saves a protocol to the protocols table, then its forecast (if the model provided one and it is valid).
 4441d5253fc7:
   ru: '{канон: {due, last, interval_days, priority, source, note}} для аналитов из names,'
   en: '{canon: {due, last, interval_days, priority, source, note}} for analytes from names,'
@@ -667,6 +694,9 @@
 4b9077c6f68d:
   ru: 'PubMed egress нейтрален (нить diagnosis-hardcode B: нет сырого диагноза в запросе)'
   en: 'PubMed egress is neutral (thread diagnosis-hardcode B: no raw diagnosis in query)'
+4bb872272a16:
+  ru: карточки новых протоколов доставлены
+  en: new protocol cards delivered
 4bc15baf6fd1:
   ru: 'партнёрский кран литературы: гаситель'
   en: 'literature partner tap: suppressor'
@@ -937,6 +967,9 @@
 64e688b5089f:
   ru: нормы не просрочены (next_review)
   en: norms not expired (next_review)
+6505df77d4d7:
+  ru: 'Действующий протокол обязан нести поведение и дату пересмотра (нить assistant-loop, 10.11):'
+  en: 'An active protocol must carry behavior and a review date (assistant-loop thread, 10.11):'
 6552a3c426ce:
   ru: Рекомендации сдать аналит, у которого строка СВЕЖЕЕ окна мониторинга и дата не названа.
   en: Recommendations to retest an analyte whose record is NEWER than the monitoring window and whose date has not been named.
@@ -1105,9 +1138,15 @@
 75d7d2392861:
   ru: 'Возвращает {rsid: genotype} для списка rsID.'
   en: 'Returns {rsid: genotype} for a list of rsIDs.'
+76357e2cbde9:
+  ru: Чистая функция. workout_pkts/metric_pkts — времена пакетов (UTC, aware), oura_ends —
+  en: Pure function. workout_pkts/metric_pkts — packet times (UTC, aware), oura_ends —
 7675343665f0:
   ru: '§9: единственный рантайм-источник клинической нормы — таблица absolute_thresholds.'
   en: '§9: the sole runtime source of clinical norms is the absolute_thresholds table.'
+7676f99ec855:
+  ru: автоматизация тренировок HAE жива
+  en: HAE workout automation is alive
 7681d3f9fa71:
   ru: 'Блокировки гарда не молчат: счётчик за сутки виден человеку.'
   en: 'Guard blocks are not silent: the daily counter is visible to a human.'
@@ -1390,6 +1429,9 @@
 93a7e27ccaab:
   ru: build_context(yesterday) содержит данные
   en: build_context(yesterday) contains data
+93b1e86cd751:
+  ru: Время приёма пакета (UTC) из имени файла HealthAutoExport-REST-YYYYmmddTHHMMSS.json.
+  en: Packet receipt time (UTC) from filename HealthAutoExport-REST-YYYYmmddTHHMMSS.json.
 93eeb6874b24:
   ru: Помечает запись как 'уведомление отправлено' (ждём ответа пользователя).
   en: Marks a record as 'notification sent' (awaiting user reply).
@@ -1564,6 +1606,12 @@ a3a2a0d684a5:
 a3c2c038cb2b:
   ru: GP-отчёт есть и не старше 8 дней
   en: GP report exists and is not older than 8 days
+a3df40912400:
+  ru: пульс плановых задач приёма (Withings, сторож Apple Health)
+  en: Pulse of scheduled intake tasks (Withings, Apple Health watchdog).
+a41ae7f956b3:
+  ru: Прогнозы протоколов оценивает код раз в неделю (check_hypothesis_evaluations). Если оценщик
+  en: Protocol forecasts are evaluated by code once a week (check_hypothesis_evaluations). If the evaluator
 a4955f5d618f:
   ru: protocols_db.py — доменный модуль protocols.
   en: protocols_db.py — domain module protocols.
@@ -1654,6 +1702,9 @@ ab658bfcc697:
 aba4687cac1a:
   ru: 'След того, что судья повторов НЕ создал задачу: строка со статусом ''duplicate''.'
   en: 'Trace that the duplicate judge did NOT create a task: row with status ''duplicate''.'
+abe690bab77e:
+  ru: температура ночью приходит вместе со сном
+  en: temperature at night arrives together with sleep
 ac0ac232dd10:
   ru: FAIL, если конституции сгенерированы на ПУСТОМ effect_allele (полые).
   en: FAIL if constitutions are generated on EMPTY effect_allele (hollow).
@@ -1999,6 +2050,9 @@ cd74a02c0515:
 cdaf9a077259:
   ru: hai_reports — утренний, еженедельный, ежемесячный отчёты + расширенный контекст-блок.
   en: hai_reports — morning, weekly, monthly reports + extended context block.
+cdf0d72a4850:
+  ru: §14 для двух плановых задач приёма (карточка warn:producer_registry 24.09, закрыта 14.11).
+  en: §14 for two scheduled intake tasks (card warn:producer_registry 24.09, closed 14.11).
 ce45cc800cc5:
   ru: longitudinal гейт применён
   en: longitudinal gate applied
@@ -2077,6 +2131,9 @@ d3c32cfe5d66:
 d3e62cc6773d:
   ru: Ежемесячный GP отчёт — стратегический взгляд, 30/90 дней.
   en: Monthly GP report — strategic view, 30/90 days.
+d40c01e97fbc:
+  ru: 'Действующие протоколы без поведения или без даты пересмотра: их нельзя ни выполнить,'
+  en: 'Active protocols without behavior or without a review date: they cannot be executed,'
 d4195c5326b4:
   ru: НЕЗАКОММИЧЕННАЯ РАБОТА НА MacBook — судится отсюда, по снимку, а не по опросу ноутбука.
   en: UNCOMMITTED WORK ON MACBOOK — judged from here, from snapshot, not by polling the laptop.
@@ -2251,6 +2308,9 @@ e6e7c312344a:
 e77d906ce520:
   ru: Возвращает незакрытые задачи, отсортированные по приоритету.
   en: Returns unclosed tasks sorted by priority.
+e7b194b5e4b2:
+  ru: оценщик прогнозов протоколов жив
+  en: protocol forecast evaluator is alive
 e84702ad651d:
   ru: живость uncommitted_watchdog (§14)
   en: uncommitted_watchdog liveness (§14)
@@ -2272,6 +2332,9 @@ e947468b627e:
 ea5d3134e840:
   ru: 'Какие наши имена образуют ОДИН тренд с этим. Чистая: индекс аргументом.'
   en: 'Which of our names form ONE trend with this one. Pure: index as argument.'
+ea5ec2be95b2:
+  ru: 'Действующие протоколы с прошедшей датой пересмотра — по строке на каждый:'
+  en: 'Active protocols with a past review date — one row per each:'
 ea9a0a513dff:
   ru: тенант-БД достижимы (анти-усечёнка per-tenant чеков)
   en: tenant DBs reachable (anti-silent-truncation for per-tenant checks)
@@ -2416,6 +2479,9 @@ fa0c4f57b18a:
 fadacf6893ce:
   ru: consult_sessions_db.py — доменный модуль consult_sessions. Вынесен из health_db.py (Поток C, strangler-фасад).
   en: consult_sessions_db.py — domain module consult_sessions. Extracted from health_db.py (Stream C, strangler facade).
+fb2a22b5a221:
+  ru: Сон за ночь пришёл, а градусов температуры нет (решение владельца 12.11, нить temp-guards).
+  en: Sleep for the night has arrived but temperature degrees have not (owner decision 12.11, thread temp-guards).
 fb918e43d69d:
   ru: Сохраняет гипотезу в memory (category='hypothesis').
   en: Saves a hypothesis to memory (category='hypothesis').

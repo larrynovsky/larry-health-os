@@ -1,4 +1,4 @@
-<!-- translation-of: USE_CASES.md sha256:f6d0177de1f9 -->
+<!-- translation-of: USE_CASES.md sha256:e27d7584dae8 -->
 **English** · [Русский](USE_CASES.md)
 
 # USE_CASES.md — Larry Health OS use cases

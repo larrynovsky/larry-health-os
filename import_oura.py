@@ -162,6 +162,10 @@ def parse_readiness(data: list) -> dict:
             "readiness_score": r.get("score"),
             "hrv_balance": c.get("hrv_balance"),
             "body_temperature": c.get("body_temperature"),
+            # Градусы, а не балл вклада (11.11): до этого выбрасывались — бриф не мог
+            # сказать о ночи +0.5 °C, видел только балл 64, которого никто не читал.
+            "temperature_deviation": r.get("temperature_deviation"),
+            "temperature_trend_deviation": r.get("temperature_trend_deviation"),
             "recovery_index": c.get("recovery_index"),
             "resting_hr_contrib": c.get("resting_heart_rate"),
         }

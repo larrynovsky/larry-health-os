@@ -44,6 +44,9 @@ _DETAIL_RULES = (
      re.compile(r"tests/(?:[a-z0-9_]+/)*test_[a-z0-9_]+\.py(?:::(?:Test[A-Za-z0-9_]+|test_[a-z0-9_]+)){1,2}")),
     (re.compile(r"monthly_consilium|consilium_roster"),
      re.compile(r"[a-z_]+:(?:[A-Z][A-Za-z_]*|unanswered)")),
+    # Класс сбоя импорта Oura (stderr_watch.exception_class, 22.11): имя исключения или исход без него.
+    (re.compile(r"oura_refresh"),
+     re.compile(r"(?:[A-Z][A-Za-z0-9_]*|no_traceback|unparsed|signal_[0-9]+)")),
     (re.compile(r"llm_admission"),
      re.compile(_IDENT + r":(?:o[134](?:-[a-z0-9]+)*|(?:claude|gpt|gemini|deepseek|qwen|llama|mistral)(?:[.-][a-z0-9]+)+):"
                 r"(?:all_failed|next_not_admitted|removed|call_error)")),

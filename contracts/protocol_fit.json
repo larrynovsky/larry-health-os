@@ -1,0 +1,74 @@
+{
+  "module": "protocol_fit",
+  "public": [
+    "request",
+    "parse_fit",
+    "record_fit_from_letter",
+    "due_cards",
+    "mark_delivered",
+    "awaiting",
+    "fit_line",
+    "overdue"
+  ],
+  "depends_on": [
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn",
+        "get_active_protocols"
+      ],
+      "why": "таблица protocol_fit_checks (миграция _migrate_protocol_fit); соседние действующие протоколы — в письмо ассистенту"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config"
+      ],
+      "why": "срок ожидания protocols.fit_wait_hours и запас доставки protocols.fit_delivery_slack_hours",
+      "legacy": "контракта config_db ещё нет; используется только get_config — стабилен с 2026-06"
+    },
+    {
+      "module": "agent_reply",
+      "uses": [
+        "allowed_peers"
+      ],
+      "why": "кого спрашивать и от кого принимать ответ — ассистент хозяина"
+    },
+    {
+      "module": "agent_mail",
+      "uses": [
+        "send"
+      ],
+      "why": "письмо ассистенту вида protocol_fit"
+    },
+    {
+      "module": "i18n",
+      "uses": [
+        "t"
+      ],
+      "why": "тексты письма и карточки — ключи protocol_fit.* и protocols.reply.*"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "замораживаемое «сейчас» для отметок и срока",
+      "legacy": "шов времени без контракта; get_now — единственное используемое имя"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен: спросить ассистента, впишется ли новый протокол, и выдать одну карточку с его ответом или по сроку; отправку в Telegram делает джоб jobs/scheduled, рождение протокола — hai_hypotheses",
+      "D2": "восемь публичных функций — вход (request), разбор и приём ответа, выдача и отметка карточки, признак ожидания для /confirm, строка для читателей, датчик; служебное — _wait, _card, _item, _evidence",
+      "D3": "только стабильные контракты: get_conn, get_active_protocols, get_config, allowed_peers, agent_mail.send, i18n.t",
+      "D4": "~160 строк",
+      "D5": "tests/unit/test_protocol_fit.py — 8 тестов; 9 мутаций модуля и проводки краснят каждую (отправитель, запись в protocols, вердикт, ожидание ответа, повтор карточки, слепой датчик, рождение без вопроса, отметка до отправки, слепой консилиум)",
+      "D6": "общие инварианты в схеме: CHECK source='assistant_report', одна неотправленная карточка на протокол (частичный уникальный индекс); формат строки — FIT_HINT, его же цитирует письмо"
+    },
+    "rationale": "Модуль переписывается с нуля по этому контракту и тестам: таблица и её ограничения — в миграции, формат ответа — одна константа, сроки — в system_config.",
+    "date": "2026-11-11",
+    "oracle": "tests/unit/test_protocol_fit.py"
+  }
+}

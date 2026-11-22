@@ -173,6 +173,10 @@
    "mode": "read",
    "why": "второй судья дедупа гипотез; замер 04.10 на эталоне: sonnet-5-5 без думания 48 из 48"
   },
+  "hypothesis_verdict.structure": {
+   "mode": "read",
+   "why": "перевод текста прогноза в числа — чтение, вывода нет (hypothesis-predictions 11.11)"
+  },
   "import_medical_events.llm_extract": {
    "mode": "disputed",
    "why": "спорно: решает замер на эталонах (пока как чтение)"

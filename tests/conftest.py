@@ -289,6 +289,31 @@ def fault_journal(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_repeat_state(monkeypatch, request):
+    """Repeat-window writes never consume a production throttle (2026-11-21).
+
+    Keep explicitly isolated paths intact (pilot reset/unlink tests need them).
+    Redirect every other caller-owned state into this test's tmp directory, even
+    with inherited HEALTH_DATA_DIR or a connection-only database mock. Hash the
+    resolved full path so different tenants keep independent repeat windows.
+    tmp_path is requested lazily: autouse must not create a directory for each
+    of ~8000 tests, only for those that actually reach the throttle.
+    """
+    import hashlib
+    import notify
+    claim = notify.claim_repeat
+
+    def isolated(signature, state, now, repeat_s):
+        tmp = request.getfixturevalue("tmp_path")
+        path = Path(state).resolve()
+        if not path.is_relative_to(tmp.resolve()):
+            path = tmp / "repeat_state" / hashlib.sha256(str(path).encode()).hexdigest() / path.name
+        return claim(signature, path, now, repeat_s)
+
+    monkeypatch.setattr(notify, "claim_repeat", isolated)
+
+
+@pytest.fixture(autouse=True)
 def screen_trace_file(tmp_path_factory, monkeypatch):
     """«След экрана» теста не попадает в рабочие logs/ (нить bug-report). Каталог вне tmp_path:
     тесты, считающие файлы в tmp_path, его не видят (тот же урок, что у журнала сбоев)."""

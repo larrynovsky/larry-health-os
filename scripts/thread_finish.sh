@@ -52,6 +52,16 @@
 # Оракул: tests/unit/test_thread_lifecycle.py
 set -uo pipefail
 
+# Bash job control gives this worker its OWN process group, never the caller's.
+# The supervisor waits with `wait` (interruptible even during a foreground ssh).
+# No new dependency: bash 3.2 job control + kill. Oracle: test_thread_lifecycle.py.
+_finish() {
+set +m  # descendants, including pipelines/subshells, stay in the worker's group
+# Git hooks may outlive git; only the lock acquisition helpers need our fds.
+# Bash 3.2 may exec `command git` inside an async function: resolve the binary.
+_GIT="$(type -P git)"
+git() { "$_GIT" "$@" 8>&- 9>&-; }
+
 SLUG="${1:-}"
 [[ -n "$SLUG" ]] || { echo "thread_finish.sh: нужно имя нити" >&2; exit 2; }
 
@@ -158,9 +168,8 @@ fi
 # ДВА отрезка, а не всё закрытие: на пятиминутный прогон замок отпускается —
 # дрейф main во время прогона скрипт и так разбирает ниже.
 #
-# КЛЮЧЕВОЙ МОМЕНТ. Дескриптор 9 наследуют дети. Короткоживущие (git, хуки)
-# выходят и не мешают; ребёнок, который переживёт скрипт, унёс бы замок с собой
-# навсегда. Поэтому деплою дескриптор закрывается явно (`9>&-`).
+# Дети не владеют замками: git (включая хуки) закрывает fd в обёртке выше,
+# остальные долгие команды — на границе вызова. Наследуют fd только flock-помощники.
 LOCK_FILE="$("$MAIN_TREE/scripts/git-hooks/finish_lock_guard.sh" --path 2>/dev/null)"
 QUEUE_FILE="$("$MAIN_TREE/scripts/git-hooks/finish_lock_guard.sh" --queue-path 2>/dev/null)"
 JOURNAL_RE="$("$MAIN_TREE/scripts/git-hooks/finish_lock_guard.sh" --journal-regex 2>/dev/null)"
@@ -188,7 +197,7 @@ while True:
             print(f"⏳ очередь закрытий: жду, пока закроется {who}", file=sys.stderr)
             said = True
         time.sleep(1)
-' "${THREAD_FINISH_QUEUE_WAIT:-10800}" "$QUEUE_FILE"; then
+' "${THREAD_FINISH_QUEUE_WAIT:-10800}" "$QUEUE_FILE" 9>&-; then
         echo "⛔ очередь закрытий не дошла за ${THREAD_FINISH_QUEUE_WAIT:-10800} с — закрытие перед тобой висит." >&2
         echo "   Ничего не тронуто. Посмотри, чья нить держит: $QUEUE_FILE.holder" >&2
         exit 15
@@ -213,7 +222,7 @@ while True:
             print("⏳ главную копию меняет закрытие соседней нити — жду замок", file=sys.stderr)
             said = True
         time.sleep(0.5)
-' "${THREAD_FINISH_LOCK_WAIT:-600}"; then
+' "${THREAD_FINISH_LOCK_WAIT:-600}" 8>&-; then
         echo "⛔ замок главной копии не получен за ${THREAD_FINISH_LOCK_WAIT:-600} с — сосед закрывает свою нить." >&2
         echo "   Ничего не тронуто. Повтори закрытие позже." >&2
         exit 15
@@ -372,7 +381,7 @@ if ! git -C "$MAIN_TREE" merge --no-ff --no-commit "$BRANCH" >/dev/null 2>&1; th
     echo "   Главная копия возвращена (merge --abort). Повтори закрытие." >&2
     exit 14
 fi
-( cd "$MAIN_TREE" && git hook run --ignore-missing pre-merge-commit )
+( cd "$MAIN_TREE" && git hook run --ignore-missing pre-merge-commit ) 8>&- 9>&-
 GATE_RC=$?
 git -C "$MAIN_TREE" merge --abort 2>/dev/null
 if ((GATE_RC != 0)); then
@@ -390,7 +399,7 @@ _lock_drop
 # этот скрипт. Гоняем ИЗ ДЕРЕВА НИТИ — test_on_studio.sh рсинкает то дерево, из
 # которого запущен, и после ребейза это и есть будущее дерево main.
 echo "▶ полный прогон на Studio — ОДИН раз, на том дереве, что уедет"
-if ! ( cd "$TREE" && ./scripts/test_on_studio.sh ); then
+if ! ( cd "$TREE" && ./scripts/test_on_studio.sh ) 8>&- 9>&-; then
     if [[ -z "${THREAD_FINISH_ACCEPT_RED:-}" ]]; then
         echo "" >&2
         echo "⛔ полный прогон красный — не сливаю и не деплою." >&2
@@ -448,7 +457,7 @@ while [[ "$MAIN_AFTER" != "$MAIN_BEFORE" ]]; do
     # Файлы дрейфа идут построчно (в именах бывают пробелы) — массивом, не словами.
     DRIFT_ARR=()
     while IFS= read -r _f; do [[ -n "$_f" ]] && DRIFT_ARR+=("$_f"); done <<< "$DRIFT_FILES"
-    AFFECTED_OUT="$(cd "$TREE" && "$_PY" affected_tests.py "${DRIFT_ARR[@]}" 2>&1)" || AFFECTED_OUT="affected_tests: отказ"
+    AFFECTED_OUT="$(cd "$TREE" && "$_PY" affected_tests.py "${DRIFT_ARR[@]}" 8>&- 9>&- 2>&1)" || AFFECTED_OUT="affected_tests: отказ"
     if printf '%s' "$AFFECTED_OUT" | grep -q '^affected_tests:'; then
         # Отбор отказался (правка широкая / сбой) — судить нечем: fail-closed, как прежде.
         echo "⛔ затронутые тесты не отобраны ($AFFECTED_OUT) — повтори закрытие полным прогоном." >&2
@@ -457,7 +466,7 @@ while [[ "$MAIN_AFTER" != "$MAIN_BEFORE" ]]; do
     AFF_ARR=()
     while IFS= read -r _t; do [[ -n "$_t" ]] && AFF_ARR+=("$_t"); done <<< "$AFFECTED_OUT"
     if ((${#AFF_ARR[@]} > 0)); then
-        if ! ( cd "$TREE" && PYTHON="$_PY" ./scripts/run_affected_tests.sh "${AFF_ARR[@]}" ); then
+        if ! ( cd "$TREE" && PYTHON="$_PY" ./scripts/run_affected_tests.sh "${AFF_ARR[@]}" ) 8>&- 9>&-; then
             echo "⛔ после дрейфа записками затронутые тесты не зелёные — не сливаю." >&2
             echo "   Ветка переставлена на новый main; разбери в дереве нити: cd $TREE" >&2
             exit 13
@@ -510,7 +519,7 @@ MERGE_SHA="$(git -C "$MAIN_TREE" rev-parse --short HEAD)"
 # сообщений её коммитов (без модели), своим коммитом. Отказ строки закрытие НЕ
 # останавливает: работа уже
 # слита, а молчание журнала увидит сторож check_changelog_freshness.
-if [[ -n "$_PY" ]] && ( cd "$MAIN_TREE" && "$_PY" doc_agent.py --thread-merge "$MERGE_SHA" --thread "$SLUG" ); then
+if [[ -n "$_PY" ]] && ( cd "$MAIN_TREE" && "$_PY" doc_agent.py --thread-merge "$MERGE_SHA" --thread "$SLUG" ) 8>&- 9>&-; then
     echo "▶ строка журнала изменений за нить записана"
     # Своим коммитом и с обычными гейтами — не в коммите якоря ниже: тот идёт с
     # --no-verify, и расширять обход проверок здесь нельзя.
@@ -527,7 +536,7 @@ else
 fi
 NOTE_REL="docs/handoff/$SLUG/LATEST.md"
 if [[ -f "$MAIN_TREE/$NOTE_REL" && -n "$_PY" ]]; then
-    if "$_PY" - "$MAIN_TREE/$NOTE_REL" "$MERGE_SHA" <<'PYEOF'
+    if "$_PY" - "$MAIN_TREE/$NOTE_REL" "$MERGE_SHA" 8>&- 9>&- <<'PYEOF'
 import pathlib, re, sys
 path, sha = pathlib.Path(sys.argv[1]), sys.argv[2]
 line = (f"> Якорь на main: `{sha}` · проверка: "
@@ -605,3 +614,38 @@ git -C "$MAIN_TREE" branch -d "$BRANCH" 2>/dev/null || \
     echo "⚠️  ветка $BRANCH не удалилась (не слита?) — оставляю" >&2
 
 echo "✅ нить '$SLUG' закрыта и задеплоена"
+
+}
+
+_finish_cleanup() {
+    local rc=$?
+    trap '' INT TERM HUP
+    trap - EXIT
+    if ((rc != 0)) && [[ -n "${FINISH_PID:-}" ]]; then
+        # TERM reaches test_on_studio AND its blocking ssh/tee, allowing its EXIT
+        # cleanup to stop .run.pid remotely. Never signal the caller's group.
+        kill -TERM -- "-$FINISH_PID" 2>/dev/null || : # group may already be gone
+        local attempt
+        for ((attempt=0; attempt<75; attempt++)); do
+            kill -0 -- "-$FINISH_PID" 2>/dev/null || break
+            sleep 1
+        done
+        if kill -0 -- "-$FINISH_PID" 2>/dev/null; then
+            echo "⚠️  потомки закрытия не вышли за 75 с — KILL; остановка Studio не подтверждена" >&2
+            kill -KILL -- "-$FINISH_PID" 2>/dev/null || : # exit raced the check
+        fi
+        wait "$FINISH_PID" 2>/dev/null || : # interrupted worker returns nonzero
+    fi
+    exit "$rc"
+}
+trap _finish_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+set -m
+# stdin: /dev/null. The worker sits in a background process group; reading a tty
+# from there (ssh without -n does) stops it with SIGTTIN. The script reads no stdin.
+_finish "$@" </dev/null &
+FINISH_PID=$!
+wait "$FINISH_PID"
+exit $?

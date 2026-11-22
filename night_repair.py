@@ -441,7 +441,8 @@ def fix_gate(repo: Path, pending=_pending_remote):
          "  посмотреть: python3.11 night_repair.py show <id>",
          "  код:  land <id> → коммит через гейты → push → close <id>",
          "  среда: сделай шаги из NIGHT_FIX.md → close <id> \"что сделано\"",
-         "  отклонить: reject <id> \"почему\"", stale])
+         "  отклонить: reject <id> \"почему\"",
+         "  порядок целиком: docs/how-to/night_repair_respond.md", stale])
 
 
 def _fetch(rid: str) -> Path:

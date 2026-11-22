@@ -65,6 +65,30 @@ sleep `contributors` или одного из ключей `readiness_score`, `r
 
 Оракул: `tests/integration/test_uc_a_03_hae_merge.py::test_apple_sleep_read_late_update_and_oura_shape`.
 
+### Тренировки с часов (с 2026-11-11)
+
+В HAE одна автоматизация отправляет один тип данных. Метрики и тренировки — две
+автоматизации на один и тот же `POST /hae/ingest` с тем же токеном. Пакет тренировок
+несёт `data.workouts` (без `metrics`); `import_apple_health.parse_hae_workouts` пишет их в
+`workouts` с `source='AppleHealth'`. Приложение Oura само кладёт свои тренировки в
+Apple Health — такие записи (источник `com.ouraring.*`) пропускаются, они приходят через
+Oura API. Энергия в кДж переводится в ккал; имя устройства не хранится.
+Сторож `integrity_tests.check_hae_workouts_automation` (с 2026-11-12): Oura записал тренировку,
+автоматизация метрик с тех пор отработала в двух разных часах, а пакета тренировок нет → WARN.
+Оракул: `tests/unit/test_activity_temp.py`.
+
+## Oura: длительность тренировок и температура (с 2026-11-11)
+
+- `workout` в API v2 не несёт `duration`: длительность считает писатель
+  `workouts_db.upsert_workout` из start/end через `julianday` (UTC, переход на зимнее
+  время не сдвигает). История дочинена миграцией `health_db._migrate_workouts_duration`.
+- `daily_readiness.temperature_deviation` / `temperature_trend_deviation` (°C от личной
+  базы) → колонки `daily_metrics.temp_deviation` / `temp_trend_deviation`. Балл вклада
+  `readiness_body_temp` — другая, нелинейная величина.
+- Граница сигнала — параметры в `absolute_thresholds` (metric `temp_deviation`, variant `temp_pct`,
+  `temp_window_days`, `temp_min_nights`). Сторож `integrity_tests.check_temperature_arrives`: серия ночей
+  «сон есть, градусов нет» длиннее самой длинной за год → WARN.
+
 ## Лабораторные бланки (JPEG/PDF)
 
 `import_all.py` относит файл к лабораторным, если совпало **≥3 сигналов**:

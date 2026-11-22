@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/self_monitoring.md sha256:7fa44206fb7c -->
+<!-- translation-of: docs/explanation/self_monitoring.md sha256:f522707c5b3b -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](self_monitoring.md)
@@ -7,11 +7,9 @@
 
 ## What Changed
 
-- **A new invariant added: the task guard runs in shadow mode** (`task_pair_guard_is_shadow`, status=holds). Matching new tasks against already-open ones is now explicitly recorded as a subsystem invariant — this is new coverage that was not on the page before.
+- **The task guard covers the assistant's tasks and no longer drops a whole batch after one error** (`task_pair_guard_is_shadow`, wording refined, holds). Example: on 15.11 one Jev network error left 134 of 135 pairs unjudged; now the breaker opens after three consecutive errors (setting `tasks.guard_breaker_failures`). Tasks the assistant sends by letter (`assistant_fact`) used to bypass the guard — 13 tasks in two weeks, no journal rows; now they go through the same shadow. Still no blocking. (Written by hand.)
 
-**Updated:** 2026-11-07
-
-**Updated:** 2026-11-07
+**Updated:** 2026-11-21
 
 
 ## Why It Exists

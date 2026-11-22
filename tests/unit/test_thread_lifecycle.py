@@ -51,6 +51,11 @@ def _env(home: Path):
               # THREAD_FINISH_HOLDS_QUEUE=1 сделал суд очереди слепым — 1 красный.
               "THREAD_FINISH_HOLDS_QUEUE", "THREAD_FINISH_QUEUE_WAIT"):
         e.pop(v, None)
+    # Третий экземпляр того же класса (21.11): THREAD_FINISH_ACCEPT_RED, выданный закрытию,
+    # унаследовали тесты, и «красный прогон не сливает» покраснел. Класс закрыт целиком:
+    # ни одна настройка закрытия из окружения вызывающего не доходит до песочницы.
+    for v in [k for k in e if k.startswith("THREAD_FINISH_")]:
+        e.pop(v)
     # Деревья нитей живут в $HOME/.worktrees — уводим HOME в песочницу, иначе
     # тест насорил бы в настоящем каталоге владельца.
     e["HOME"] = str(home)
@@ -1238,12 +1243,12 @@ def test_thread_finish_dirty_tree(песочница, phase, state):
     _звали(журнал)
     source = FINISH.read_text(encoding="utf-8")
     if phase == "start":
-        block = source[source.index("set -uo pipefail"):source.index('\nCURRENT=')]
+        block = "set -uo pipefail\n" + source[source.index("set +m"):source.index('\nCURRENT=')]
         block += '\nprintf "start passed\\n"\n'
     else:
-        # После arch_regen до EOF: включает guard и уборку в обеих версиях.
+        # После arch_regen до конца worker: guard и уборка без supervisor.
         start = source.index('\nfi\n', source.index('if ! bash "$MAIN_TREE/scripts/arch_regen.sh"')) + 4
-        block = "set -uo pipefail\n" + source[start:]
+        block = "set -uo pipefail\n" + source[start:source.index("\n}\n\n_finish_cleanup")]
     if state == "late-write":
         # Вносим настоящую правку ПОСЛЕ status, перед настоящим git remove.
         block = ('git() {\n'
@@ -1357,3 +1362,104 @@ def test_пока_идёт_чужое_закрытие_в_главную_про�
     assert с_кодом.returncode != 0 and "[очередь закрытий]" in с_кодом.stderr, с_кодом.stderr
     assert свой.returncode == 0, "своё закрытие отбито собственной очередью"
     assert _суд(repo, home).returncode == 0, "очередь пережила держателя"
+
+
+@pytest.mark.parametrize("ending", ["TERM", "INT", "HUP", "exit"])
+def test_interrupted_finish_releases_queue_and_stops_children(песочница, ending):
+    """Real flock, real descendants: fd isolation and signal cleanup are separate oracles.
+
+    The fake Studio runner has a blocking pipeline and an EXIT cleanup, like the
+    real runner. No SSH, credentials or patient paths participate in this test.
+    """
+    import fcntl
+    import signal
+    import sys
+    import time
+
+    repo, home, _ = песочница
+    ready = repo.parent / "runner.ready"
+    cleaned = repo.parent / "runner.cleaned"
+    pids = repo.parent / "runner.pids"
+    runner = repo / "scripts/test_on_studio.sh"
+    # Python is exec'd by a pipeline child; its own child is the third level.
+    code = (
+        "import os, pathlib, subprocess, time\n"
+        "fds = []\n"
+        "for fd in (8, 9):\n"
+        "    try: os.fstat(fd); fds.append(fd)\n"
+        "    except OSError: pass\n"
+        "child = subprocess.Popen(['sleep', '60'])\n"
+        f"pathlib.Path({str(pids)!r}).write_text(f'{{os.getpgrp()}} {{os.getpid()}} {{child.pid}}')\n"
+        f"pathlib.Path({str(ready)!r}).write_text(str(fds))\n"
+        "time.sleep(60)\n"
+    )
+    import shlex
+    runner.write_text(
+        '#!/bin/bash\n'
+        f"trap 'echo cleanup > {shlex.quote(str(cleaned))}' EXIT\n"
+        "trap 'exit 143' TERM INT HUP\n"
+        f"{shlex.quote(sys.executable)} -c {shlex.quote(code)} | tee /dev/null\n"
+    )
+    if ending == "exit":
+        # An unexpected nonzero supervisor exit must use the same cleanup.
+        finish = repo / "scripts/thread_finish.sh"
+        finish.write_text(finish.read_text().replace(
+            'wait "$FINISH_PID"\nexit $?',
+            f'while [[ ! -f {shlex.quote(str(ready))} ]]; do sleep 0.1; done\nexit 23',
+        ))
+    _git(repo, "add", "-A", home=home)
+    _git(repo, "commit", "-qm", "blocking runner", home=home)
+    _start(repo, home, "interrupt")
+    tree = home / ".worktrees" / РЕПО / "interrupt"
+    _коммит_в_нити(tree, home, "work.txt", "work\n")
+    # Tool/CI launchers can ignore HUP. Bash cannot trap a signal ignored on
+    # entry; give the child a normal shell disposition, restore pytest's own.
+    # Same for INT/TERM: a background launcher (`cmd &` in a non-interactive shell)
+    # starts pytest with SIGINT ignored, and the INT case went red for that alone (09.11).
+    sigs = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
+    old = {s: signal.signal(s, signal.SIG_DFL) for s in sigs}
+    try:
+        proc = _finish_фоном(repo, home, "interrupt", repo.parent / "finish.log")
+    finally:
+        for s, handler in old.items():
+            signal.signal(s, handler)
+    descendants = []
+    group = None
+    try:
+        assert _ждать(ready, 10), (repo.parent / "finish.log").read_text()
+        group, *descendants = [int(pid) for pid in pids.read_text().split()]
+        assert ready.read_text() == "[]", "runner inherited queue/main lock fd"
+        if ending != "exit":
+            # Kill ONLY the public parent PID, not its children or our test group.
+            proc.send_signal(getattr(signal, "SIG" + ending))
+        deadline = time.monotonic() + 5
+        with _путь_очереди(repo, home).open("a") as queue:
+            while True:
+                try:
+                    fcntl.flock(queue, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    assert time.monotonic() < deadline, "orphan still holds queue"
+                    time.sleep(0.05)
+        assert proc.wait(timeout=8) == (23 if ending == "exit" else 128 + getattr(signal, "SIG" + ending))
+        assert cleaned.exists(), "runner EXIT cleanup did not execute"
+        with pytest.raises(ProcessLookupError):
+            os.killpg(group, 0)  # includes the runner shell, its subshell and tee
+        for pid in descendants:
+            with pytest.raises(ProcessLookupError):
+                os.kill(pid, 0)
+    finally:
+        # Also clean up when testing a deliberately broken trap/fd-close mutant.
+        if group is not None:
+            try:
+                os.killpg(group, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        for pid in descendants:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        if proc.poll() is None:
+            proc.terminate()
+            proc.wait(timeout=85)

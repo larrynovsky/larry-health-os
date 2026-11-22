@@ -144,6 +144,9 @@ def _blocks(signals: list[Signal]) -> str:
     return "\n\n".join(blocks) + "\n\nРешение — за ассистентом вместе с пользователем."
 
 
+_SNAPSHOT_KINDS = ("regimen", "protocols")   # письмо уходит при изменении снимка, а не по дням
+
+
 def _ledger_key(recipient: str, kind: str) -> str:
     return "agent_signals.ledger." + recipient + "." + kind
 
@@ -165,10 +168,10 @@ def _publish(recipient, kind, day, signals, *, phase="", snapshot=None):
             return None
         if kind == "lab_due" and str(day) in ledger["slots"]:
             return None
-        if kind == "regimen" and snapshot == ledger.get("snapshot"):
+        if kind in _SNAPSHOT_KINDS and snapshot == ledger.get("snapshot"):
             return None
         fresh = [s for s in signals if s["key"] not in ledger["tokens"]]
-        if kind == "regimen":
+        if kind in _SNAPSHOT_KINDS:
             fresh = signals   # A -> B -> A is a change too.
         if not fresh:
             return None
@@ -213,6 +216,31 @@ def _regimen(recipient, day):
                      "Предлагаю сверить и обновить напоминания. Примечания к схеме приведены дословно.",
                      dict(fingerprint=fingerprint), "когда удобно")
     return _publish(recipient, "regimen", day, [signal], snapshot=snapshot)
+
+
+def _protocols(recipient, day):
+    """Полный список действующих протоколов — при каждом изменении (Health OS — первичная копия,
+    у ассистента реплика по номеру; обратно идут только счётчики выполнения, protocol_outcomes)."""
+    import protocol_outcomes
+    snapshot = [{k: str(p.get(k) or "") for k in ("id", "title", "behavior", "frequency", "review_date")}
+                for p in health_db.get_active_protocols()]
+    previous = config_db.get_config(_ledger_key(recipient, "protocols"), {}).get("snapshot")
+    if previous == snapshot or (not snapshot and not previous):   # «протоколов нет» с самого начала — не повод
+        return None
+    gone = sorted({p["id"] for p in previous or []} - {p["id"] for p in snapshot}, key=int)
+    lines = [f"Протокол #{p['id']}: {p['title']}\nЧто делать: {p['behavior']}\nКак часто: "
+             f"{p['frequency'] or 'не указано'}\nПересмотр: {p['review_date'] or 'не назначен'}"
+             for p in snapshot]
+    body = "\n\n".join([*(f"Снят протокол #{pid}" for pid in gone),
+                        "Действующие протоколы здоровья (полный список):", *lines]
+                       if snapshot else [*(f"Снят протокол #{pid}" for pid in gone), "Действующих протоколов нет."])
+    fingerprint = hashlib.sha256(json.dumps(snapshot, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    signal = _signal(fingerprint, body, "Протокол работает, только если выполняется.",
+                     "Раз в неделю, когда удобно, спроси пользователя и ответь строкой на протокол: "
+                     f"«{protocol_outcomes.ADHERENCE_HINT}» (N — сколько раз сделано, M — сколько "
+                     "было по плану). Меняет протокол только health.",
+                     dict(fingerprint=fingerprint, ids=[p["id"] for p in snapshot]), "раз в неделю")
+    return _publish(recipient, "protocols", day, [signal], snapshot=snapshot)
 
 
 def _labs(recipient, day):
@@ -261,7 +289,7 @@ def run(day: date, *, phase: str = "morning") -> list[str]:
     signals = [{**s, "key": f"{day}:{s['key']}"} for s in signals]
     sent = [_publish(recipient, "state", day, signals, phase=phase)]
     if phase == "morning":
-        sent.extend([_regimen(recipient, day), _labs(recipient, day)])
+        sent.extend([_regimen(recipient, day), _protocols(recipient, day), _labs(recipient, day)])
     config_db.upsert_config(f"agent_signals.last_{phase}", value_num=get_now(timezone.utc).timestamp(),
                             category="agent_mail", source="agent_signals")
     return [mid for mid in sent if mid]

@@ -1,4 +1,4 @@
-<!-- translation-of: SECURITY.md sha256:dcc332f829e8 -->
+<!-- translation-of: SECURITY.md sha256:57820b0d14ac -->
 **English** · [Русский](SECURITY.md)
 
 # SECURITY POLICY: Larry Health OS

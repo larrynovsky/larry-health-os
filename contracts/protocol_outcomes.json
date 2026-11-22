@@ -1,0 +1,76 @@
+{
+  "module": "protocol_outcomes",
+  "public": [
+    "parse_adherence",
+    "record_from_letter",
+    "adherence",
+    "attach_prediction",
+    "score_due",
+    "scoring_stale",
+    "scoring_liveness",
+    "calibration",
+    "for_protocol",
+    "hypothesis_lines"
+  ],
+  "depends_on": [
+    {
+      "module": "prediction_core",
+      "uses": [
+        "PredictionRejected",
+        "cfg",
+        "accept_prediction",
+        "observed",
+        "judge_prediction",
+        "daily_metrics",
+        "predictable_metrics",
+        "metric_scales"
+      ],
+      "why": "ядро прогноза (база, масштаб, окно, суд) вынесено 11.11 для общего суда протоколов и гипотез; имена ре-экспортируются для прежних читателей"
+    },
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn"
+      ],
+      "why": "таблицы protocol_adherence, protocol_predictions (миграция _migrate_protocol_outcomes), читает protocols, daily_metrics, lab_results"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config",
+        "upsert_config"
+      ],
+      "why": "числа политики protocols.* и отметка прохода оценщика protocols.scored_last",
+      "legacy": "контракта config_db ещё нет; используются только get_config/upsert_config — стабильные с 2026-06"
+    },
+    {
+      "module": "agent_reply",
+      "uses": [
+        "allowed_peers"
+      ],
+      "why": "строку выполнения принимаем только от ассистента хозяина"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_today"
+      ],
+      "why": "замораживаемое «сегодня»",
+      "legacy": "шов времени без контракта; get_today — единственное используемое имя"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен: что стало с протоколом — пересказ выполнения, приём прогноза протокола и его оценка, калибровка; ядро суда прогноза — в prediction_core; письма, расписание и показ — у вызывающих",
+      "D2": "публичное — разбор/запись строки, приём прогноза, оценка, калибровка и read-model для двух читателей; служебное — _cfg, _baseline, _observed, _has_labs, _day, _num, _rate; константы SOURCE, ADHERENCE_HINT и исключение PredictionRejected — тоже часть контракта (их цитирует agent_signals и ловит hai_hypotheses)",
+      "D3": "только стабильные контракты: get_conn, get_config, allowed_peers; схема — в миграции health_db",
+      "D4": "~210 строк после выноса ядра 11.11",
+      "D5": "tests/unit/test_protocol_outcomes.py — 22 теста, 10 мутаций модуля краснят каждую (ретродикция, без-изменений, отправитель, промах, снятие, база от модели, ожидание горизонта)",
+      "D6": "общие инварианты в схеме: CHECK source='assistant_report', CHECK low<=change<=high, один прогноз на протокол; формат строки — ADHERENCE_HINT, его же цитирует письмо agent_signals"
+    },
+    "rationale": "Модуль переписывается с нуля по этому контракту и тестам: таблицы и их CHECK — в миграции, формат строки — одна константа, числа политики — в system_config.",
+    "date": "2026-11-11",
+    "oracle": "tests/unit/test_protocol_outcomes.py"
+  }
+}

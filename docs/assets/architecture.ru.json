@@ -3,62 +3,124 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Larry Health OS — что умеет система",
+    "output": "docs/assets/architecture.ru.html",
+    "locale": "ru",
     "quality_profile": "standard",
-    "viewBox": [
-      1250,
-      680
-    ],
+    "translations": {
+      "legend.title": "Обозначения",
+      "legend.architecture.frontend": "Где вы с ней говорите",
+      "legend.architecture.backend": "Обработка",
+      "legend.architecture.database": "База",
+      "legend.architecture.cloud": "Облако: сюда уходят данные",
+      "legend.architecture.security": "Проверка, фильтр",
+      "legend.architecture.external": "Снаружи: источники, врач, помощники",
+      "viewer.kind.frontend": "Где вы с ней говорите",
+      "viewer.kind.backend": "Обработка",
+      "viewer.kind.database": "База",
+      "viewer.kind.cloud": "Облако",
+      "viewer.kind.security": "Проверка, фильтр",
+      "viewer.kind.external": "Снаружи",
+      "viewer.guide.title": "Как устроена система",
+      "page.title": "{title} — схема",
+      "viewer.theme.toggle": "Сменить тему",
+      "viewer.theme.toggle.title": "Сменить тему (T)",
+      "viewer.theme.dark": "Тёмная",
+      "viewer.theme.light": "Светлая",
+      "viewer.motion.live": "Движение",
+      "viewer.motion.still": "Стоп",
+      "viewer.motion.pause": "Остановить движение",
+      "viewer.motion.resume": "Включить движение",
+      "viewer.export.button": "Экспорт",
+      "viewer.export.button.title": "Экспорт схемы (E)",
+      "viewer.present.present": "Показ",
+      "viewer.present.exit.label": "Выход",
+      "viewer.guide.eyebrow": "Путеводитель",
+      "viewer.guide.open": "Открыть путеводитель",
+      "viewer.guide.close": "Закрыть путеводитель",
+      "viewer.guide.find": "Найти блок",
+      "viewer.guide.find.hint": "Поиск по названиям и подписям.",
+      "viewer.guide.route": "Проследить путь",
+      "viewer.guide.route.hint": "Как два блока связаны по направлению стрелок.",
+      "viewer.guide.map": "Вся система",
+      "viewer.guide.present": "Режим показа",
+      "viewer.finder.title": "Найти блок",
+      "viewer.finder.placeholder": "Название блока",
+      "viewer.finder.empty": "Ничего не найдено"
+    },
     "views": [
       {
         "id": "labs",
-        "label": "Анализы",
+        "label": "Анализы и выписки",
         "focus": [
           "scans",
           "recog",
           "staging",
+          "letters",
+          "docs",
+          "cards",
           "db",
-          "band",
-          "brief"
+          "sched",
+          "o_task",
+          "provider"
         ],
-        "note": "Скан → две модели → ваше «да» → база → отчёт о сдвиге."
-      },
-      {
-        "id": "genome",
-        "label": "Геном",
-        "focus": [
-          "dna",
-          "genome",
-          "db",
-          "pgx",
-          "dash"
-        ],
-        "note": "Сырой геном → сверка цепей → фармакогенетика и риски."
+        "note": "Скан и выписка проходят проверку и ваше «да»; из плана врача — сроки анализов."
       },
       {
         "id": "insight",
         "label": "Выводы",
         "focus": [
           "db",
+          "band",
           "gate",
-          "hyp",
           "team",
-          "tasks",
-          "const",
-          "problems"
+          "rules",
+          "lit",
+          "o_brief",
+          "o_link",
+          "o_hyp",
+          "o_food",
+          "o_prob",
+          "provider"
         ],
-        "note": "Связь проходит гейт; консилиум спорит; меняете только вы."
+        "note": "Тренд — по серии дней; связь — только прошедшая гейт; консилиум спорит."
+      },
+      {
+        "id": "loop",
+        "label": "Петля с врачом",
+        "focus": [
+          "doctor",
+          "you_in",
+          "memory",
+          "db",
+          "team",
+          "sched",
+          "o_hyp",
+          "o_task"
+        ],
+        "note": "Гипотезу несёте врачу вы; его ответ возвращается в систему входом."
       },
       {
         "id": "watch",
         "label": "Самоконтроль",
         "focus": [
+          "normdocs",
+          "norms",
           "db",
           "monitor",
-          "alarm",
-          "normdocs",
-          "norms"
+          "o_find"
         ],
-        "note": "Пороги — из документов; несвежие данные — тревога, а не отчёт."
+        "note": "Пороги — из документов; сбой — карточка со статусом, а не строка в логе."
+      },
+      {
+        "id": "windows",
+        "label": "Окна наружу",
+        "focus": [
+          "db",
+          "mcp",
+          "assist",
+          "dash"
+        ],
+        "note": "Claude и ChatGPT видят ту же картину, что бот; пустота — явное «нет данных»."
       }
     ]
   },
@@ -67,14 +129,112 @@
       "id": "scans",
       "type": "external",
       "label": "Анализы: PDF, фото",
-      "sublabel": "любой язык",
+      "sublabel": "любая лаборатория, язык",
       "pos": [
         20,
-        92
+        120
       ],
       "size": [
-        160,
-        54
+        150,
+        50
+      ]
+    },
+    {
+      "id": "letters",
+      "type": "external",
+      "label": "Выписки врачей",
+      "sublabel": "файл или ссылка на облако",
+      "pos": [
+        20,
+        194
+      ],
+      "size": [
+        150,
+        50
+      ]
+    },
+    {
+      "id": "dna",
+      "type": "external",
+      "label": "Сырой геном",
+      "sublabel": "23andMe, tellmeGen, VCF",
+      "pos": [
+        20,
+        268
+      ],
+      "size": [
+        150,
+        50
+      ]
+    },
+    {
+      "id": "devices",
+      "type": "external",
+      "label": "Oura · «Здоровье»",
+      "sublabel": "сон, пульс, ВСР, давление",
+      "pos": [
+        20,
+        342
+      ],
+      "size": [
+        150,
+        50
+      ]
+    },
+    {
+      "id": "normdocs",
+      "type": "external",
+      "label": "Документы норм",
+      "sublabel": "клинические стандарты",
+      "pos": [
+        20,
+        416
+      ],
+      "size": [
+        150,
+        50
+      ]
+    },
+    {
+      "id": "context",
+      "type": "external",
+      "label": "Календарь, погода",
+      "sublabel": "и где вы сейчас",
+      "pos": [
+        20,
+        490
+      ],
+      "size": [
+        150,
+        50
+      ]
+    },
+    {
+      "id": "you_in",
+      "type": "frontend",
+      "label": "Вы отвечаете в боте",
+      "sublabel": "вопросы, опросники",
+      "pos": [
+        20,
+        564
+      ],
+      "size": [
+        150,
+        50
+      ]
+    },
+    {
+      "id": "doctor",
+      "type": "external",
+      "label": "Ваш врач",
+      "sublabel": "системой не пользуется",
+      "pos": [
+        20,
+        712
+      ],
+      "size": [
+        150,
+        50
       ]
     },
     {
@@ -83,194 +243,68 @@
       "label": "Распознавание",
       "sublabel": "две модели сверяются",
       "pos": [
-        216,
-        92
-      ],
-      "size": [
-        170,
-        54
-      ]
-    },
-    {
-      "id": "staging",
-      "type": "security",
-      "label": "Отстойник",
-      "sublabel": "ждёт вашего «да»",
-      "pos": [
-        422,
-        92
-      ],
-      "size": [
-        150,
-        54
-      ]
-    },
-    {
-      "id": "letters",
-      "type": "external",
-      "label": "Выписки врачей",
-      "sublabel": "файл, ссылка на облако",
-      "pos": [
-        20,
-        170
+        200,
+        120
       ],
       "size": [
         160,
-        54
+        50
       ]
     },
     {
       "id": "docs",
       "type": "backend",
       "label": "Разбор заключений",
-      "sublabel": "диагнозы, лекарства",
+      "sublabel": "диагнозы, лекарства, сроки",
       "pos": [
-        216,
-        170
-      ],
-      "size": [
-        170,
-        54
-      ]
-    },
-    {
-      "id": "cards",
-      "type": "security",
-      "label": "Карточки",
-      "sublabel": "в медкарту — по одобрению",
-      "pos": [
-        422,
-        170
-      ],
-      "size": [
-        150,
-        54
-      ]
-    },
-    {
-      "id": "dna",
-      "type": "external",
-      "label": "Сырой геном",
-      "sublabel": "23andMe, tellmeGen · VCF",
-      "pos": [
-        20,
-        248
+        200,
+        194
       ],
       "size": [
         160,
-        54
+        50
       ]
     },
     {
       "id": "genome",
       "type": "backend",
       "label": "Геном-конвейер",
-      "sublabel": "сверка цепей ДНК",
+      "sublabel": "неясно → «неизвестно»",
       "pos": [
-        216,
-        248
-      ],
-      "size": [
-        170,
-        54
-      ]
-    },
-    {
-      "id": "devices",
-      "type": "external",
-      "label": "Oura · «Здоровье»",
-      "sublabel": "сон, ВСР, пульс, давление",
-      "pos": [
-        20,
-        326
+        200,
+        268
       ],
       "size": [
         160,
-        54
+        50
       ]
     },
     {
       "id": "hae",
       "type": "backend",
       "label": "Импорт метрик",
-      "sublabel": "судья каждого поля",
+      "sublabel": "каждое поле проверяется",
       "pos": [
-        216,
-        326
-      ],
-      "size": [
-        170,
-        54
-      ]
-    },
-    {
-      "id": "normdocs",
-      "type": "external",
-      "label": "Документы норм",
-      "sublabel": "CTCAE · EFLM · CPIC",
-      "pos": [
-        20,
-        404
+        200,
+        342
       ],
       "size": [
         160,
-        54
+        50
       ]
     },
     {
       "id": "norms",
       "type": "backend",
       "label": "Нормы из документов",
-      "sublabel": "версия, контрольная сумма",
+      "sublabel": "с версией и источником",
       "pos": [
-        216,
-        404
-      ],
-      "size": [
-        170,
-        54
-      ]
-    },
-    {
-      "id": "chat",
-      "type": "external",
-      "label": "Вы в Telegram",
-      "sublabel": "ответы, чекины, опросники",
-      "pos": [
-        20,
-        482
+        200,
+        416
       ],
       "size": [
         160,
-        54
-      ]
-    },
-    {
-      "id": "memory",
-      "type": "backend",
-      "label": "Память",
-      "sublabel": "вечное · до смены · разовое",
-      "pos": [
-        216,
-        482
-      ],
-      "size": [
-        170,
-        54
-      ]
-    },
-    {
-      "id": "context",
-      "type": "external",
-      "label": "Календарь, погода",
-      "sublabel": "и место, где вы сейчас",
-      "pos": [
-        20,
-        560
-      ],
-      "size": [
-        160,
-        54
+        50
       ]
     },
     {
@@ -279,255 +313,361 @@
       "label": "Контекст дня",
       "sublabel": "что вокруг вас сегодня",
       "pos": [
-        216,
-        560
+        200,
+        490
       ],
       "size": [
-        170,
-        54
+        160,
+        50
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "backend",
+      "label": "Память",
+      "sublabel": "факты со сроком годности",
+      "pos": [
+        200,
+        564
+      ],
+      "size": [
+        160,
+        50
+      ]
+    },
+    {
+      "id": "staging",
+      "type": "security",
+      "label": "Ждёт вашего «да»",
+      "sublabel": "распознанные анализы",
+      "pos": [
+        390,
+        120
+      ],
+      "size": [
+        140,
+        50
+      ]
+    },
+    {
+      "id": "cards",
+      "type": "security",
+      "label": "На подтверждение",
+      "sublabel": "диагнозы, лекарства",
+      "pos": [
+        390,
+        194
+      ],
+      "size": [
+        140,
+        50
       ]
     },
     {
       "id": "db",
       "type": "database",
       "label": "health.db",
-      "sublabel": "одна база · один писатель",
+      "sublabel": "одна на человека",
+      "tag": "ваша машина",
       "pos": [
-        608,
-        92
+        555,
+        120
       ],
       "size": [
-        150,
-        522
-      ],
-      "tag": "ваш Mac"
+        130,
+        642
+      ]
     },
     {
       "id": "band",
       "type": "backend",
-      "label": "Личная полоса",
-      "sublabel": "тренд — серией, не одной ночью",
+      "label": "Ваша норма",
+      "sublabel": "тревога по серии дней, не одной",
       "pos": [
-        794,
-        92
+        710,
+        268
       ],
       "size": [
-        190,
-        54
-      ]
-    },
-    {
-      "id": "brief",
-      "type": "frontend",
-      "label": "Утренний отчёт",
-      "sublabel": "что сдвинулось",
-      "pos": [
-        1020,
-        92
-      ],
-      "size": [
-        180,
-        54
+        185,
+        50
       ]
     },
     {
       "id": "gate",
       "type": "security",
-      "label": "Гейт связей",
-      "sublabel": "случайность · плацебо во времени",
+      "label": "Проверка связей",
+      "sublabel": "отсев случайных совпадений",
       "pos": [
-        794,
-        170
+        710,
+        194
       ],
       "size": [
-        190,
-        54
+        185,
+        50
       ]
     },
     {
-      "id": "hyp",
-      "type": "frontend",
-      "label": "Гипотезы → протоколы",
-      "sublabel": "статус и история",
-      "pos": [
-        1020,
-        170
-      ],
-      "size": [
-        180,
-        54
-      ]
-    },
-    {
-      "id": "pgx",
+      "id": "team",
       "type": "backend",
-      "label": "Фармакогенетика, риски",
-      "sublabel": "CPIC · полигенные баллы",
+      "label": "ИИ-терапевт, консилиум",
+      "sublabel": "ИИ-врачи: день · неделя · месяц",
       "pos": [
-        794,
-        248
+        710,
+        120
       ],
       "size": [
-        190,
-        54
+        185,
+        50
+      ]
+    },
+    {
+      "id": "sched",
+      "type": "backend",
+      "label": "Сроки и вопросы",
+      "sublabel": "по плану врача; ответ — текстом",
+      "pos": [
+        710,
+        342
+      ],
+      "size": [
+        185,
+        50
+      ]
+    },
+    {
+      "id": "rules",
+      "type": "backend",
+      "label": "Личные правила",
+      "sublabel": "конституции · питание · CPIC",
+      "pos": [
+        710,
+        416
+      ],
+      "size": [
+        185,
+        50
+      ]
+    },
+    {
+      "id": "lit",
+      "type": "backend",
+      "label": "Литература",
+      "sublabel": "PubMed по вашим состояниям",
+      "pos": [
+        710,
+        490
+      ],
+      "size": [
+        185,
+        50
+      ]
+    },
+    {
+      "id": "monitor",
+      "type": "security",
+      "label": "Самоконтроль",
+      "sublabel": "~200 проверок, ночной разбор",
+      "pos": [
+        710,
+        564
+      ],
+      "size": [
+        185,
+        50
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "Шлюз для ИИ-помощников",
+      "sublabel": "MCP · не в общей установке",
+      "pos": [
+        710,
+        638
+      ],
+      "size": [
+        185,
+        50
       ]
     },
     {
       "id": "dash",
       "type": "frontend",
       "label": "Дашборд",
-      "sublabel": "127.0.0.1:8001",
+      "sublabel": "только на этой машине",
       "pos": [
-        1020,
-        248
+        710,
+        712
       ],
       "size": [
-        180,
-        54
+        185,
+        50
       ]
     },
     {
-      "id": "team",
-      "type": "backend",
-      "label": "Терапевт и консилиум",
-      "sublabel": "день · неделя · месяц, спор",
+      "id": "assist",
+      "type": "external",
+      "label": "Claude, ChatGPT",
+      "sublabel": "вход — код в Telegram",
       "pos": [
-        794,
-        326
+        965,
+        638
       ],
       "size": [
-        190,
-        54
+        160,
+        50
       ]
     },
     {
-      "id": "tasks",
+      "id": "o_brief",
       "type": "frontend",
-      "label": "Задачи",
-      "sublabel": "бот + Напоминания телефона",
+      "label": "Утренний отчёт",
+      "sublabel": "что сдвинулось",
       "pos": [
-        1020,
-        326
+        965,
+        268
       ],
       "size": [
-        180,
-        54
+        160,
+        50
       ]
     },
     {
-      "id": "const",
-      "type": "backend",
-      "label": "Конституции, питание",
-      "sublabel": "по доменам, из генома и данных",
-      "pos": [
-        794,
-        404
-      ],
-      "size": [
-        190,
-        54
-      ]
-    },
-    {
-      "id": "problems",
+      "id": "o_link",
       "type": "frontend",
-      "label": "Список проблем",
-      "sublabel": "меняете только вы",
+      "label": "Новая связь",
+      "sublabel": "прошла проверку на случайность",
       "pos": [
-        1020,
-        404
+        965,
+        194
       ],
       "size": [
-        180,
-        54
+        160,
+        50
       ]
     },
     {
-      "id": "lit",
-      "type": "backend",
-      "label": "Литература, наблюдение",
-      "sublabel": "PubMed, графики наблюдения",
-      "pos": [
-        794,
-        482
-      ],
-      "size": [
-        190,
-        54
-      ]
-    },
-    {
-      "id": "visit",
+      "id": "o_hyp",
       "type": "frontend",
-      "label": "К врачу",
-      "sublabel": "сводка, ответ врача — входом",
+      "label": "Гипотеза",
+      "sublabel": "да · нет · к врачу",
       "pos": [
-        1020,
-        482
+        965,
+        120
       ],
       "size": [
-        180,
-        54
+        160,
+        50
       ]
     },
     {
-      "id": "monitor",
-      "type": "security",
-      "label": "Самопроверка",
-      "sublabel": "свежесть · целостность · вред",
-      "pos": [
-        794,
-        560
-      ],
-      "size": [
-        190,
-        54
-      ]
-    },
-    {
-      "id": "alarm",
+      "id": "o_task",
       "type": "frontend",
-      "label": "Тревога в Telegram",
-      "sublabel": "пока не закрыта",
+      "label": "Срок анализа, вопрос",
+      "sublabel": "ответ — словами",
       "pos": [
-        1020,
-        560
+        965,
+        342
       ],
       "size": [
-        180,
-        54
+        160,
+        50
+      ]
+    },
+    {
+      "id": "o_food",
+      "type": "frontend",
+      "label": "Советы на день",
+      "sublabel": "еда, нагрузка",
+      "pos": [
+        965,
+        416
+      ],
+      "size": [
+        160,
+        50
+      ]
+    },
+    {
+      "id": "o_prob",
+      "type": "frontend",
+      "label": "Правка списка диагнозов",
+      "sublabel": "одобряете вы",
+      "pos": [
+        965,
+        490
+      ],
+      "size": [
+        160,
+        50
+      ]
+    },
+    {
+      "id": "o_find",
+      "type": "frontend",
+      "label": "Находка самопроверки",
+      "sublabel": "сбой, пропуск данных",
+      "pos": [
+        965,
+        564
+      ],
+      "size": [
+        160,
+        50
+      ]
+    },
+    {
+      "id": "provider",
+      "type": "cloud",
+      "label": "Облачный поставщик ИИ: Anthropic, OpenAI или Gemini",
+      "sublabel": "получает текст и сканы при каждом вызове модели",
+      "pos": [
+        200,
+        20
+      ],
+      "size": [
+        695,
+        50
       ]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "Ваш компьютер, в Docker — основная машина",
+      "label": "Ваша основная машина · Docker",
       "wraps": [
         "recog",
-        "staging",
         "docs",
-        "cards",
         "genome",
         "hae",
         "norms",
-        "memory",
         "envctx",
+        "memory",
+        "staging",
+        "cards",
         "db",
         "band",
-        "brief",
         "gate",
-        "hyp",
-        "pgx",
-        "dash",
         "team",
-        "tasks",
-        "const",
-        "problems",
+        "sched",
+        "rules",
         "lit",
-        "visit",
         "monitor",
-        "alarm"
+        "mcp",
+        "dash"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Приходит вам в Telegram",
+      "wraps": [
+        "o_brief",
+        "o_link",
+        "o_hyp",
+        "o_task",
+        "o_food",
+        "o_prob",
+        "o_find"
       ]
     }
   ],
@@ -535,244 +675,261 @@
     {
       "id": "scans-recog",
       "from": "scans",
-      "to": "recog",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "recog"
     },
     {
       "id": "recog-staging",
       "from": "recog",
-      "to": "staging",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "staging"
     },
     {
       "id": "staging-db",
       "from": "staging",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left",
-      "variant": "emphasis"
+      "to": "db"
     },
     {
       "id": "letters-docs",
       "from": "letters",
-      "to": "docs",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "docs"
     },
     {
       "id": "docs-cards",
       "from": "docs",
-      "to": "cards",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "cards"
     },
     {
       "id": "cards-db",
       "from": "cards",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left",
-      "variant": "emphasis"
+      "to": "db"
     },
     {
       "id": "dna-genome",
       "from": "dna",
-      "to": "genome",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "genome"
     },
     {
       "id": "genome-db",
       "from": "genome",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "db"
     },
     {
       "id": "devices-hae",
       "from": "devices",
-      "to": "hae",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "hae"
     },
     {
       "id": "hae-db",
       "from": "hae",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "db"
     },
     {
       "id": "normdocs-norms",
       "from": "normdocs",
-      "to": "norms",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "norms"
     },
     {
       "id": "norms-db",
       "from": "norms",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "chat-memory",
-      "from": "chat",
-      "to": "memory",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "memory-db",
-      "from": "memory",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "db"
     },
     {
       "id": "context-envctx",
       "from": "context",
-      "to": "envctx",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "envctx"
     },
     {
       "id": "envctx-db",
       "from": "envctx",
-      "to": "db",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "db"
+    },
+    {
+      "id": "youin-memory",
+      "from": "you_in",
+      "to": "memory"
+    },
+    {
+      "id": "memory-db",
+      "from": "memory",
+      "to": "db"
     },
     {
       "id": "db-band",
       "from": "db",
-      "to": "band",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "band-brief",
-      "from": "band",
-      "to": "brief",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "band"
     },
     {
       "id": "db-gate",
       "from": "db",
-      "to": "gate",
-      "fromSide": "right",
-      "toSide": "left",
-      "variant": "emphasis"
-    },
-    {
-      "id": "gate-hyp",
-      "from": "gate",
-      "to": "hyp",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "db-pgx",
-      "from": "db",
-      "to": "pgx",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "pgx-dash",
-      "from": "pgx",
-      "to": "dash",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "gate"
     },
     {
       "id": "db-team",
       "from": "db",
-      "to": "team",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "team"
     },
     {
-      "id": "team-tasks",
-      "from": "team",
-      "to": "tasks",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "db-const",
+      "id": "db-sched",
       "from": "db",
-      "to": "const",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "sched"
     },
     {
-      "id": "const-problems",
-      "from": "const",
-      "to": "problems",
-      "fromSide": "right",
-      "toSide": "left"
+      "id": "db-rules",
+      "from": "db",
+      "to": "rules"
     },
     {
       "id": "db-lit",
       "from": "db",
-      "to": "lit",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "lit-visit",
-      "from": "lit",
-      "to": "visit",
-      "fromSide": "right",
-      "toSide": "left"
+      "to": "lit"
     },
     {
       "id": "db-monitor",
       "from": "db",
-      "to": "monitor",
-      "fromSide": "right",
-      "toSide": "left",
-      "variant": "dashed"
+      "to": "monitor"
     },
     {
-      "id": "monitor-alarm",
+      "id": "db-mcp",
+      "from": "db",
+      "to": "mcp"
+    },
+    {
+      "id": "db-dash",
+      "from": "db",
+      "to": "dash"
+    },
+    {
+      "id": "gate-team",
+      "from": "gate",
+      "to": "team",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "label": "проверенные связи"
+    },
+    {
+      "id": "mcp-assist",
+      "from": "mcp",
+      "to": "assist"
+    },
+    {
+      "id": "doctor-youin",
+      "from": "doctor",
+      "to": "you_in",
+      "label": "вы пересылаете его ответ",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "band-o_brief",
+      "from": "band",
+      "to": "o_brief"
+    },
+    {
+      "id": "gate-o_link",
+      "from": "gate",
+      "to": "o_link"
+    },
+    {
+      "id": "team-o_hyp",
+      "from": "team",
+      "to": "o_hyp"
+    },
+    {
+      "id": "sched-o_task",
+      "from": "sched",
+      "to": "o_task"
+    },
+    {
+      "id": "rules-o_food",
+      "from": "rules",
+      "to": "o_food"
+    },
+    {
+      "id": "lit-o_prob",
+      "from": "lit",
+      "to": "o_prob"
+    },
+    {
+      "id": "monitor-o_find",
       "from": "monitor",
-      "to": "alarm",
+      "to": "o_find"
+    },
+    {
+      "id": "hyp-doctor",
+      "from": "o_hyp",
+      "to": "doctor",
+      "label": "вы несёте врачу: сводка, гипотеза",
       "fromSide": "right",
-      "toSide": "left"
+      "toSide": "bottom",
+      "via": [
+        [
+          1157,
+          145
+        ],
+        [
+          1157,
+          796
+        ],
+        [
+          95,
+          796
+        ]
+      ],
+      "labelSegment": 2
+    },
+    {
+      "id": "recog-provider",
+      "from": "recog",
+      "to": "provider",
+      "label": "сканы",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "team-provider",
+      "from": "team",
+      "to": "provider",
+      "label": "медконтекст",
+      "fromSide": "top",
+      "toSide": "bottom"
     }
   ],
   "cards": [
     {
-      "dot": "amber",
-      "title": "Уходит наружу",
+      "dot": "violet",
+      "title": "Петля, а не лента",
       "items": [
-        "Медконтекст и сканы — выбранному ИИ-поставщику",
-        "Сообщения — через Telegram",
-        "Позиции вариантов генома — в сервисы аннотации"
+        "Подтвердили гипотезу — она становится протоколом: что делать, что мерить, когда проверить",
+        "Ответ врача пересылаете боту — он меняет гипотезу, а не оседает в чате",
+        "Вопрос закрывается только текстом ответа, не галочкой"
       ]
     },
     {
       "dot": "rose",
       "title": "Не верит себе",
       "items": [
-        "В базу — только подтверждённое",
-        "Связи — только прошедшие гейт",
-        "Порог есть в документе — или громкий отказ"
+        "В базу — только то, что подтвердили вы",
+        "Связь доходит до вас, только пройдя проверку на случайность",
+        "Порога нет в документе — громкий отказ, не догадка",
+        "Неизменное не повторяется; молчание — штатное состояние"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Уходит наружу",
+      "items": [
+        "Каждый вызов модели — через один выход к выбранному поставщику: Anthropic, OpenAI или Gemini",
+        "Сообщения — через Telegram",
+        "Позиции вариантов генома — сервисам аннотации, без имени"
       ]
     },
     {
       "dot": "emerald",
       "title": "Вокруг",
       "items": [
-        "Docker: 4 службы, ~25 задач по расписанию",
+        "Docker: бот, разборщик файлов, дашборд и планировщик ~25 задач",
         "Бэкап каждую ночь, снимок перед рискованным",
-        "Несколько человек — у каждого своя база"
+        "Несколько человек — у каждого своя база, бот и секреты",
+        "Свои технические сбои чинит сама; ваши данные сама не меняет"
       ]
     }
   ]

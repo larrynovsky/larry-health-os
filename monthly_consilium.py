@@ -629,8 +629,14 @@ COORDINATOR_TASK = """
     "qualifiers": ["semantic Bordage qualifiers: acuteness, course, severity"],
     "differential": [{"diagnosis": "...", "rule_out_by": "..."}, ...],
     "decision_threshold": "..."
-  }
+  },
+  "forecast": [ ... ],
+  "no_forecast_reason": null | "почему числового прогноза нет"
 }
+
+ПОЛЕ forecast — ПРОГНОЗ В ЧИСЛАХ, который позже проверит программа, а не человек:
+каким станет измеримый показатель к сроку, ЕСЛИ гипотеза верна. Правила — в конце
+этой инструкции, в разделе «ПРОГНОЗ В ЧИСЛАХ».
 
 ФОРМАТ ОТВЕТА — СТРОГО валидный JSON:
 {
@@ -670,6 +676,23 @@ illness script, semantic qualifiers, два показателя, один из 
 """
 
 
+def _forecast_task() -> str:
+    """Раздел инструкции о поле forecast: формы и допустимые показатели — из одного дома с переводчиком."""
+    import hypothesis_verdict
+    return (
+        "\nПРОГНОЗ В ЧИСЛАХ (поле forecast каждой гипотезы).\n"
+        "Прогноз — это ожидаемый РЕЗУЛЬТАТ: что произойдёт с показателем, если гипотеза верна. "
+        "Прогнозом НЕ является план обследования («пересдать», «опросник»), условие для решения "
+        "(«если X ниже Y — к врачу»), действие и показатель в условии или в средстве.\n"
+        "Не выдумывай точность. Если из гипотезы не следует число по показателю из списков ниже — "
+        "\"forecast\": [] и одна фраза в \"no_forecast_reason\". Это законный ответ: гипотеза без числового "
+        "прогноза не хуже. Не подбирай тему под измеримое.\n"
+        "Прогноз по анализу имеет смысл, только если анализ пересдадут к сроку — назови это в do_now.\n"
+        "Обычно 0–2 прогноза на гипотезу. "
+        + hypothesis_verdict.forecast_forms_now()
+    )
+
+
 def _run_coordinator(input_pkg: str, round_b_findings: list[dict]) -> dict:
     client = llm_client.guarded_client()
 
@@ -683,8 +706,10 @@ def _run_coordinator(input_pkg: str, round_b_findings: list[dict]) -> dict:
     try:
         resp = client.messages.create(task="monthly_consilium._run_coordinator",
             model=hai_core.model_for("consilium_coordinator"),
-            max_tokens=20000,  # 04.10 решение владельца: замер — текст 14.6k и 15.1k при 16k (94%); 06-26: 8000→16000
-            system=COORDINATOR_TASK + hai_core.answer_language(),
+            # 12.11: прогон на копии с полем forecast — 19 702 токена при пределе 20 000 (98,5%), 7 гипотез;
+            # сам forecast — ~1 тыс. знаков из 27,5 тыс. 04.10 (решение владельца): 14.6k и 15.1k при 16k → 20k.
+            max_tokens=28000,
+            system=COORDINATOR_TASK + _forecast_task() + hai_core.answer_language(),
             messages=[{"role": "user", "content": input_pkg + findings_text}],
         )
         text = llm_client.answer_text(resp).strip()
@@ -751,6 +776,9 @@ def _save_consilium_hypothesis(hyp: dict) -> int | None:
         trigger="monthly_consilium",
         trigger_subtype=f"consensus_{consensus.get('count', 0)}",
         resolution_type="needs_specialist",
+        # нет поля или оно не список → None: прогноз разберёт переводчик прозы; кривое не отменяет рождение
+        forecast=hyp.get("forecast") if isinstance(hyp.get("forecast"), list) else None,
+        no_forecast_reason=hyp.get("no_forecast_reason"),
     )
 
     # Сохраняем полный payload в hypotheses_cbcr

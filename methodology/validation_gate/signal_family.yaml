@@ -10,7 +10,16 @@
 # Прецеденты: 7e6702d (25.09), 241d8ed (28.09).
 # Load-bearing → в git, не iCloud. Diátaxis: reference.
 
-version: 12
+version: 13
+# v13 (2026-11-11, нить activity-temp) — РЕ-ОБЪЯВЛЕНИЕ СОСТАВА ДО прогона (R1), по правилу v8:
+# каждая числовая колонка daily_metrics входит в семью. Новые колонки — отклонение ночной
+# температуры от личной базы Oura в °C (temp_deviation) и его тренд (temp_trend_deviation).
+# До 11.11 градусы выбрасывались импортом; хранился только балл вклада readiness_body_temp
+# (derived с v8). Тренд — скользящая обработка того же ряда самим Oura → derived по тому же
+# правилу, что под-индексы (пара «ряд × его сглаживание» — определение, не открытие).
+# Цена названа: m растёт на 1, BY-порог строже. Колонка войдёт в пары, набрав год общих дней
+# (min_overlap_days); история догружается из облака Oura при выкатке (11.11).
+# quarantine_epoch, frozen_at, lagged — не тронуты.
 # v12 (2026-09-27, нить d-exact-shift) — РЕ-ОБЪЯВЛЕНИЕ МЕТОДА (R1), решение владельца.
 # Перестановочный p семьи D (связи «в один день») — ТОЧНЫЙ перебор всех годных круговых
 # сдвигов в окне пары вместо B=1000 случайных. Причина — BL-MCGAP-FLIP-1: пол
@@ -140,6 +149,8 @@ daily_metrics:
   - readiness_hrv_balance      # derived (решение владельца 2026-07-12) — объявлена, из пар исключена
   - readiness_recovery_idx     # derived (то же)
   - readiness_body_temp        # derived v8 — тот же класс под-индекса readiness
+  - temp_deviation             # v13: отклонение ночной температуры, °C от личной базы Oura
+  - temp_trend_deviation       # v13: derived — сглаженный Oura ряд temp_deviation
   - activity_score             # derived v8 — композит Oura, как sleep_score/readiness
   - total_kcal
   - distance_km
@@ -226,6 +237,7 @@ derived_composites:
     - readiness_hrv_balance    # под-индекс readiness (из HRV) — исключён по решению владельца 2026-07-12
     - readiness_recovery_idx   # под-индекс readiness — исключён по решению владельца 2026-07-12
     - readiness_body_temp      # v8: под-индекс readiness — тот же класс, прецедент 2026-07-12
+    - temp_trend_deviation     # v13: сглаживание temp_deviation самим Oura — ряд × его сглаживание
     - activity_score           # v8: композит Oura (шаги+ккал+…), тот же класс, что sleep_score/readiness
     # Состав тела Fitdays (v2, 2026-07-12): весы считают всё из веса+импеданса → коллинеарно с весом.
     # НЕ новые сигналы, вес в обёртках. Добавление в семью = composite×вход ложные открытия (§6/R1).

@@ -16,9 +16,11 @@ def test_шаблоны_с_путями_владельца_равны_живым
     if not (LA / "com.larry.health.bot.plist").exists():
         pytest.skip("живых плистов владельца здесь нет (не основная машина)")
     h = Path.home()
+    # Живые плисты владельца несут явный выбор провайдера (BL-LLM-PROVIDER-STRICT-1, 09.11:
+    # рядом два файла ключа) — значит, сравнивать с рендером при явном --provider anthropic.
     out = install.render_launchd({"REPO": str(h / "health_scripts"), "HOME": str(h),
                                   "DATA": str(h / "health"), "SECRETS": str(h / ".health_secrets"),
-                                  "TZ": "UTC"})
+                                  "TZ": "UTC", "LLM_PROVIDER": "anthropic"})
     diff = [n for n, text in out.items() if (LA / n).exists()
             and plistlib.loads(text.encode()) != plistlib.loads((LA / n).read_bytes())]
     absent = [n for n in out if not (LA / n).exists()]

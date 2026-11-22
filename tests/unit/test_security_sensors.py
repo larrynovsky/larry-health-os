@@ -249,7 +249,7 @@ def test_tailscale_serve_backend_outside_canon():
 
 def test_tailscale_unexpected_endpoint_and_garbage():
     bad = json.loads(_TS_CANON)
-    bad["Web"]["studio.ts.net:8444"] = {"Handlers": {}}  # 8443 с 21.09 в каноне (сосед); чужой порт — 8444
+    bad["Web"]["studio.ts.net:8445"] = {"Handlers": {}}  # 8443 (21.09) и 8444 (14.11) в каноне — соседи; чужой порт — 8445
     found = ss._parse_tailscale(json.dumps(bad))
     assert any("неожиданный Serve-эндпоинт" in f for f in found)
     # нераспарсили = красный, не зелёный
@@ -267,6 +267,15 @@ def test_tailscale_tcp_forward_is_judged():
     found = ss._parse_tailscale(json.dumps(bad))
     assert any("неожиданный TCP-проброс :2222" in f for f in found)
     assert any("TCP-проброс :8001 → 127.0.0.1:9999" in f for f in found)
+
+
+def test_neighbour_static_8444_is_canon_on_tailnet_only():
+    """Решение владельца 14.11: статика соседа :8444 → 127.0.0.1:8080 — ожидаемая tailnet-точка; Funnel на ней — дрейф."""
+    ok = json.loads(_TS_CANON)
+    ok["Web"]["studio.ts.net:8444"] = {"Handlers": {"/trips": {"Proxy": "http://127.0.0.1:8080"}}}
+    assert ss._parse_tailscale(json.dumps(ok)) == []
+    ok["AllowFunnel"]["studio.ts.net:8444"] = True
+    assert any("ПУБЛИЧНО торчит порт :8444" in f for f in ss._parse_tailscale(json.dumps(ok)))
 
 
 def test_caldav_5232_is_canon_on_tailnet_only():

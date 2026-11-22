@@ -14,6 +14,11 @@
 {% set active = protocols | selectattr('status', 'equalto', 'active') | list %}
 {% set other = protocols | rejectattr('status', 'equalto', 'active') | list %}
 
+{% if calibration and (calibration.n_scored or calibration.n_missed) %}
+<div class="caption">как сбываются прогнозы протоколов (оценивает код)</div>
+<p class="card-description">оценено {{ calibration.n_scored }}, без измерений {{ calibration.n_missed }}{% if calibration.within_rate is not none %}; в интервал {{ (calibration.within_rate * 100) | round | int }}%{% endif %}{% if calibration.beat_persistence_rate is not none %}; лучше «без изменений» {{ (calibration.beat_persistence_rate * 100) | round | int }}%{% endif %}</p>
+{% endif %}
+
 {% if active %}
 <div class="caption">действующие</div>
 {% for p in active %}
@@ -35,6 +40,15 @@
       {% if p.behavior %}<dt>поведение</dt><dd>{{ p.behavior }}</dd>{% endif %}
       {% if p.rationale %}<dt>обоснование</dt><dd>{{ p.rationale }}</dd>{% endif %}
       {% if p.notes %}<dt>заметки</dt><dd>{{ p.notes }}</dd>{% endif %}
+      {% set o = outcomes.get(p.id) %}
+      {% if o and o.prediction %}{% set pr = o.prediction %}
+      <dt>прогноз</dt><dd>{{ pr.metric }} {{ '%+.4g' | format(pr.change) }} [{{ '%+.4g' | format(pr.low) }}; {{ '%+.4g' | format(pr.high) }}] от базы {{ '%.4g' | format(pr.baseline) }} к {{ pr.horizon }} —
+        {% if pr.status == 'scored' %}наблюдалось {{ '%.4g' | format(pr.observed) }}; в интервал: {{ 'да' if pr.within else 'нет' }}; лучше «без изменений»: {{ 'да' if pr.beat_persistence else 'нет' }}
+        {% elif pr.status == 'missed' %}в окне нет измерений
+        {% else %}окно ещё не закрыто{% endif %}</dd>
+      {% endif %}
+      {% if o %}<dt>выполнение</dt><dd>{% if o.adherence.reports %}{{ o.adherence.done }} из {{ o.adherence.planned }} со слов ассистента ({{ o.adherence.reports }} отч., последний по {{ o.adherence.last }}){% else %}данных нет — это не значит «не выполнялся»{% endif %}</dd>{% endif %}
+      {% if fits.get(p.id) %}<dt>впишется ли</dt><dd>{{ fits.get(p.id) }}</dd>{% endif %}
     </dl>
     <footer class="card-foot card-actions">
       {% if p.linked_hypothesis_id %}<span class="card-link">гипотеза № {{ p.linked_hypothesis_id }}</span>{% endif %}

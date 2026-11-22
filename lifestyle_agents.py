@@ -267,15 +267,60 @@ class MovementAgent(LifestyleAgent):
             lines.append(f"Activity score: {act_score}/100")
         lines.append(f"7d avg (n={stats7.get('n_days',0)}): {int(avg7_steps):,} steps  |  30d avg (n={stats30.get('n_days',0)}): {int(avg30_steps):,} steps")
 
+        workouts = _day_workouts(target)
+        if workouts:
+            lines.append("Тренировки: " + ", ".join(workouts))
+
         flags = []
         if steps < db.get_threshold("steps", "floor", variant="target"):
             flags.append(f"мало шагов ({steps:,}, цель >7000)")
         if avg7_steps and steps < avg7_steps * db.get_threshold("steps", "floor"):
             flags.append(f"значительно ниже личной нормы ({steps:,} vs avg {int(avg7_steps):,})")
-        if flags:
+        if flags and workouts:
+            # 10.11: фитнес 37 мин, 4677 шагов — бриф сказал «мало шагов» и ни слова о
+            # тренировке. Шаги не мерят силовую: флаг остаётся, но вывод о дне — вместе
+            # с тренировками (их вес судит модель по типу и длительности, не этот агент).
+            lines.append("ℹ " + "; ".join(flags)
+                         + " — оценивай день вместе с тренировками выше, шаги силовую не мерят")
+        elif flags:
             lines.append("⚠ " + "; ".join(flags))
 
         return "\n".join(lines)
+
+
+# Сверка «времени на свету» с прогулками: от получаса прогулок, и свет меньше трети их времени.
+# Треть, а не «равно»: прогулка в сумерках/ночью света не даёт, поэтому строгое равенство врёт.
+DAYLIGHT_CHECK_MIN_WALK = 30
+DAYLIGHT_MIN_SHARE = 1 / 3
+
+
+def _day_walk_minutes(target: date) -> float:
+    """Минуты прогулок за день (Oura + часы). Сбой чтения → 0: сверки нет, число света как было."""
+    import workouts_db
+    try:
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(duration_min), 0) FROM workouts WHERE date=? "
+                f"AND lower(activity_type) IN ({','.join('?' * len(workouts_db.WALK_TYPES))})",
+                (str(target), *workouts_db.WALK_TYPES)).fetchone()
+        return float(row[0] or 0)
+    except Exception as e:  # silent-ok: громкий warning, бриф продолжается без сверки
+        log.warning(f"_day_walk_minutes({target}): {e}")
+        return 0.0
+
+
+def _day_workouts(target: date) -> list[str]:
+    """Тренировки дня одной строкой каждая: «Core Training 37м». Oura + часы (11.11).
+    Сбой чтения → пусто и громкий лог: агент без тренировок лучше упавшего брифа."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT activity_type, duration_min FROM workouts WHERE date=? "
+                "ORDER BY start_time", (str(target),)).fetchall()
+    except Exception as e:  # silent-ok: громкий warning ниже, бриф продолжается без тренировок
+        log.warning(f"_day_workouts({target}): {e}")
+        return []
+    return [f"{r[0] or '?'}" + (f" {r[1]:.0f}м" if r[1] else "") for r in rows]
 
 
 # ── Stress / HRV ──────────────────────────────────────────────────────────────
@@ -334,7 +379,17 @@ class StressAgent(LifestyleAgent):
         if mindful > 0:
             parts.append(f"Mindfulness: {mindful}min")
         if daylight > 0:
-            parts.append(f"Daylight: {daylight}min")
+            # 19.11: «прогулки 107 мин» и «на свету 3 мин» в одном брифе — модель приняла их за
+            # две независимые меры и посоветовала выйти на свет. «Время на свету» мерит датчик
+            # часов, и под рукавом/без часов он недосчитывает. Не сходится с прогулками —
+            # говорим это вместо числа-основания для вывода.
+            walk = _day_walk_minutes(target)
+            if walk >= DAYLIGHT_CHECK_MIN_WALK and daylight < walk * DAYLIGHT_MIN_SHARE:
+                parts.append(f"Daylight: {daylight}min НЕ сходится с прогулками ({walk:.0f} мин) — "
+                             "датчик часов недосчитал (рукав, часы сняты) или прогулки были в темноте; "
+                             "выводов и советов про дневной свет по этому числу не делать")
+            else:
+                parts.append(f"Daylight: {daylight}min")
         if parts:
             lines.append("  |  ".join(parts))
 

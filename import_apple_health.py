@@ -391,6 +391,110 @@ def process_hae_json(filepath):
     return daily
 
 
+# Тренировки Apple Health (нить activity-temp, 11.11). Замер того дня: 63 из 63 пакетов
+# HAE несли только data.metrics — тренировки с часов не уходили с телефона (одна
+# автоматизация HAE = один тип данных), а и пришли бы — их никто не читал. Владелец
+# завёл вторую автоматизацию «Workouts»; формат снят с её живого пакета, не с документации.
+#
+# Приложение Oura само пишет свои тренировки в Apple Health: в первом пакете 4 из 5
+# тренировок были копиями Oura, которые уже лежат в workouts через Oura API. Копии
+# отличаются источником, поэтому отсекаем по нему, а не сличаем интервалы.
+_HAE_SKIP_SOURCES = ("com.ouraring.",)
+_KJ_PER_KCAL = 4.184   # физическая константа перевода
+
+
+def _qty(v):
+    return v.get("qty") if isinstance(v, dict) else None
+
+
+def _kcal(v):
+    q = _qty(v)
+    if q is None:
+        return None
+    return round(q / _KJ_PER_KCAL, 1) if (v.get("units") or "").lower() == "kj" else round(q, 1)
+
+
+def parse_hae_workouts(payload: dict) -> list[dict]:
+    """data.workouts пакета HAE → строки для workouts_db.upsert_workout (source='AppleHealth').
+    Копии из Oura пропускаются. Время — ISO с поясом, чтобы julianday в писателе считал верно."""
+    out = []
+    for w in ((payload or {}).get("data") or {}).get("workouts") or []:
+        src = (w.get("source") or {}).get("identifier") or ""
+        if src.startswith(_HAE_SKIP_SOURCES):
+            continue
+        try:
+            start = datetime.strptime(w["start"], "%Y-%m-%d %H:%M:%S %z")
+            end = datetime.strptime(w["end"], "%Y-%m-%d %H:%M:%S %z")
+        except (KeyError, TypeError, ValueError) as e:
+            log.warning("parse_hae_workouts: тренировка без читаемого времени пропущена: %r", e)
+            continue
+        dur = w.get("duration")
+        dist = w.get("distance") or w.get("walkingAndRunningDistance")
+        dist_km = _qty(dist)
+        if dist_km is not None and (dist.get("units") or "").lower() == "m":
+            dist_km = dist_km / 1000
+        out.append({
+            "date": start.date().isoformat(),
+            "activity_type": w.get("name"),
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+            "duration_min": round(dur / 60, 1) if isinstance(dur, (int, float)) else None,
+            "distance_km": round(dist_km, 2) if dist_km else None,
+            "calories": _kcal(w.get("activeEnergyBurned")),
+            "avg_hr": _qty(w.get("avgHeartRate")),
+            "max_hr": _qty(w.get("maxHeartRate")),
+            "source": "AppleHealth",
+            # Без имени устройства (несёт имя человека) и без поминутных рядов.
+            "hae_id": w.get("id"), "device_id": src,
+        })
+    return out
+
+
+def hae_rest_dir() -> Path:
+    """Каталог провенанса пакетов HAE, принятых по REST (/hae/ingest), — для ночного сторожа.
+    Тот же путь, что dashboard_routers.api_hae_ingest._REST_DIR; совпадение держит тест
+    test_temp_guards::test_rest_dir_matches_ingest (приём импортирует этот модуль лениво)."""
+    return Path(os.environ.get("HEALTH_DATA_DIR", str(Path.home() / "health"))) / "data" / "hae_rest"
+
+
+def hae_packet_ts(name: str):
+    """Время приёма пакета (UTC) из имени файла HealthAutoExport-REST-YYYYmmddTHHMMSS.json."""
+    from datetime import timezone
+    try:
+        return datetime.strptime(name.rsplit("-", 1)[-1][:15], "%Y%m%dT%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+# Сторож автоматизации «Workouts» (решение владельца 12.11, нить temp-guards). Прямое
+# «тренировок нет N дней» врало бы: человек может просто не тренироваться. Опора другая —
+# приложение Oura кладёт каждую свою прогулку в Apple Health, и автоматизация присылает её
+# копию. Тишина = Oura записал тренировку, соседняя автоматизация «метрики» с тех пор
+# отработала не меньше SIBLING_RUNS раз, а пакета тренировок после этой тренировки нет.
+# Замер 12.11: пакеты тренировок и метрик идут вперемешку в одном фоновом запуске телефона
+# (02:48 W, 02:50 M, 02:53 M, 03:07 W, 03:09 M), задержка копии 0.6–10.7 ч. Счёт по запускам
+# соседа, а не по часам: телефон без сети молчит целиком — это не поломка этой автоматизации.
+# Запуск = час (UTC) с пакетами метрик: внутри одного запуска W может прийти после двух M
+# (03:07 после 02:50 и 02:53), поэтому два пакета одного часа — один запуск, не два.
+SIBLING_RUNS = 2
+
+
+def workouts_automation_state(workout_pkts: list, metric_pkts: list, oura_ends: list) -> dict:
+    """Чистая функция. workout_pkts/metric_pkts — времена пакетов (UTC, aware), oura_ends —
+    окончания тренировок Oura (aware). state: not_configured | ok | silent."""
+    if not workout_pkts:
+        return {"state": "not_configured"}
+    first = min(workout_pkts)
+    for end in sorted(e for e in oura_ends if e > first):
+        if any(w > end for w in workout_pkts):
+            continue
+        runs = len({m.replace(minute=0, second=0, microsecond=0) for m in metric_pkts if m > end})
+        if runs >= SIBLING_RUNS:
+            return {"state": "silent", "oura_end": end, "metric_runs_after": runs,
+                    "last_workouts_packet": max(workout_pkts)}
+    return {"state": "ok", "last_workouts_packet": max(workout_pkts)}
+
+
 def save_daily_summaries(daily, mode="merge"):
     """
     Save daily summaries to HEALTH_DATA/YYYY-MM-DD.json.

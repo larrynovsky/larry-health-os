@@ -4,7 +4,7 @@
     "run"
   ],
   "contract": {
-    "run": "run() -> int. init_db; data dir = parent of health_db.DB_PATH. withings_access_token(data_dir) is None -> prints 'not connected', returns 0 (no device is not a failure). Otherwise fetches the WHOLE Withings history and mirrors it into bp_readings (upsert by measured_at; readings absent from Withings are deleted — the owner deletes failed readings in the app). An empty answer while bp_readings is non-empty raises WithingsError instead of wiping. Then rewrites daily_metrics.bp_systolic/bp_diastolic as the mean of all readings of the local day (region timezone) and raw bp_systolic_max/bp_diastolic_max as the day peak, marked raw.bp_source='withings'; from the first Withings day on, a day without readings is cleared. Returns 0. WithingsError propagates to the script entry, which prints the reason, writes notify.fault (person_key=None) and exits 1.",
+    "run": "run() -> int. init_db; data dir = parent of health_db.DB_PATH. withings_access_token(data_dir) is None -> prints 'not connected', returns 0 (no device is not a failure). Otherwise fetches the WHOLE Withings history and mirrors it into bp_readings (upsert by measured_at; readings absent from Withings are deleted — the owner deletes failed readings in the app). An empty answer while bp_readings is non-empty raises WithingsError instead of wiping. Then rewrites daily_metrics.bp_systolic/bp_diastolic as the mean of all readings of the local day (region timezone) and raw bp_systolic_max/bp_diastolic_max as the day peak, marked raw.bp_source='withings'; from the first Withings day on, a day without readings is cleared. Returns 0. WithingsError propagates to the script entry, which prints the reason, writes notify.fault (person_key=None) and exits 1. Since 14.11 every successful run, including 'not connected', writes the pulse system_config['withings_import.ran_at'] (reader: integrity_tests.check_import_pulses_alive); a run that raises WithingsError writes no pulse.",
     "limits": "Owner decision 06.10: when Withings is connected it is the only writer of daily blood pressure; metrics_db.upsert_metrics_from_json keeps Apple Health pressure only as raw.apple_health_bp witness while bp_readings is non-empty. Days before the first Withings reading keep their Apple Health values. Day = region timezone, not the timezone of the place of measurement."
   },
   "depends_on": [
@@ -43,6 +43,22 @@
       ],
       "why": "installation timezone for the local day of a reading",
       "legacy": ""
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "upsert_config"
+      ],
+      "why": "run pulse withings_import.ran_at in system_config",
+      "legacy": "доменный модуль без сайдкара; опора — только upsert_config(key, value_text=..., category=..., source=...)"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_now"
+      ],
+      "why": "pulse time from the injectable clock",
+      "legacy": "контракт единого времени; опора — get_now() → datetime"
     }
   ],
   "disposability": {
@@ -50,9 +66,9 @@
     "items": {
       "D1": "One responsibility: Withings readings -> bp_readings mirror and the daily pressure derived from them.",
       "D2": "One entry point run(); _mirror/_days/_write_days private.",
-      "D3": "Public functions of withings_api, health_db, notify only.",
-      "D4": "About 110 lines.",
-      "D5": "tests/unit/test_withings_bp.py: mirror with deletion, refusal to wipe, day mean, foreign value overwrite, Apple witness; plans/mutate_bp_day_withings_2026-10-06.sh.",
+      "D3": "Public functions of withings_api, health_db, notify, region_pack, config_db.upsert_config and _time_inject.get_now only.",
+      "D4": "About 120 lines.",
+      "D5": "tests/unit/test_withings_bp.py: mirror with deletion, refusal to wipe, day mean, foreign value overwrite, Apple witness; plans/mutate_bp_day_withings_2026-10-06.sh. Pulse: tests/unit/test_import_pulses.py.",
       "D6": "Ownership (Withings writes bp_readings and daily bp_* when connected; Apple Health only before/without Withings) is stated in import_withings docstring, metrics_db._bp_owned_by_withings and the device_metrics_owner registry entry."
     },
     "rationale": "Thin glue between a contracted client and one table.",

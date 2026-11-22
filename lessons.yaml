@@ -2775,7 +2775,7 @@ lessons:
   address: {kind: runtime, ref: doc_agent.py}
   subject: [llm_output]
   outcome: {kind: check, text: 'одна внешняя ограда ```json снимается; оракул tests/consistency/test_install_docs_fresh.py::test_regen_accepts_json_in_one_outer_fence краснеет без правки'}
-  status: adopted
+  status: failed
   change: 'git:1eb74c1'
   adopted_on: '2026-09-30'
   evidence: ['git:1eb74c1']
@@ -3366,7 +3366,7 @@ lessons:
   address: {kind: runtime, ref: scripts/thread_finish.sh}
   subject: [run_version, concurrency]
   outcome: {kind: check, text: 'очередь закрытий (flock thread_finish.queue) держится всё закрытие, включая прогон; пока она чужая, в главную копию проходят только журнальные файлы (finish_lock_guard.sh --journal-regex), их дрейф закрытие переживает затронутыми тестами. tests/unit/test_thread_lifecycle.py: очередь ждёт, журнальный дрейф сливается, plans/*.py отбивает, суд пропускает только журнальные; мутации «очередь не берётся», «журнал = только записки», «суд не видит очередь» — красные. Повтор 07.10 (пять срывов за утро) — решение владельца «В»'}
-  status: adopted
+  status: failed
   adopted_on: '2026-10-07'
   change: 'docs/handoff/finish-queue/2026-10-07-start.md'
   evidence: ['git:aa79f28', 'git:48c36bb', 'docs/handoff/finish-queue/2026-10-07-start.md']
@@ -3426,7 +3426,7 @@ lessons:
   address: {kind: runtime, ref: tests/conftest.py}
   subject: [test_stand, concurrency]
   outcome: {kind: check, text: 'хук фазы вызова ждёт рождённые тестом потоки ДО разборки фикстур, не дождались — красный (tests/unit/test_thread_outlives_test.py, мутации «вырезать хук» и «нет ожидания» красные); filterwarnings error::PytestUnhandledThreadExceptionWarning; решатель — только category=hypothesis'}
-  status: adopted
+  status: failed
   adopted_on: '2026-10-05'
   change: 'git:f61f01c'
   evidence: ['git:f61f01c', 'docs/handoff/test-thread-leak/LATEST.md']
@@ -3951,3 +3951,371 @@ lessons:
   evidence:
   - git:106f334
   owner: владелец
+- id: C-193
+  date: '2026-11-09'
+  thread: release-v027
+  modules:
+  - health_db
+  - secrets_paths
+  event: 'Чтение публичной зоны перед v0.2.7: health_db сеял agent_mail.assistant=«адрес ассистента владельца» при is_owner(). is_owner() истинно у ЛЮБОЙ установки — оператор своей системы, — так что каждая чужая установка получила бы ассистента владельца адресатом писем о здоровье. Код прошёл ревью нити agent-post, три раунда Кодекса и полный прогон; нашло его только чтение диффа перед выгрузкой.'
+  cost: 'выпуск v0.2.7 едва не ушёл с чужим адресатом в каждой установке; второй случай класса (первый — gp_context 20.10, «у владельца история болезни заполнена всегда»)'
+  cause: 'is_owner() читается как «это машина автора», хотя означает «оператор этой установки»; предупреждение живёт только в docstring secrets_paths.is_owner, которого пишущий значение по умолчанию не открывает, и нет проверки, которая видела бы личный литерал за этим предикатом'
+  address:
+    kind: runtime
+    ref: pii_census.py
+  subject:
+  - tenant
+  - pii
+  outcome:
+    kind: check
+    text: 'исправлено: адрес — из приватного private/agent_mail.yaml (git:4401a8f; оракул test_agent_signals::test_public_install_without_private_file_has_no_assistant). Страж: pii_census.owner_literals в --staged; оракул tests/consistency/test_owner_literals.py, включая индекс с пустым словарём и мутацию удаления вызова проверки → positive control красный (09.11.2026); слито git:d70fc6d'
+  status: adopted
+  adopted_on: '2026-11-09'
+  change: git:d70fc6d
+  evidence:
+  - docs/handoff/release-v027/LATEST.md
+  owner: следующая сессия нити release-v027
+- id: C-194
+  date: '2026-11-09'
+  thread: release-v027
+  modules:
+  - llm_client
+  - scripts/install
+  event: 'Кодекс сделал строгий выбор провайдера (без переменной и при нескольких ключах — отказ) и добавил переменную во все шаблоны launchd. Замер на Studio по именам файлов: у владельца рядом лежат anthropic_key и deepseek_key, ни один из 55 загруженных плистов переменную не задаёт — строгий выбор остановил бы все нативные службы владельца; шаблоны с переменной разошлись бы с живыми плистами (тест равенства краснеет только на Studio). Затем рендер .env перестал подставлять anthropic, и урок установки в CI упал на пустой строке.'
+  cost: 'два возврата Кодексу, один лишний полный прогон (~25 мин), один красный урок CI перед выпуском'
+  cause: 'в задании исполнителю не было живых фактов среды владельца (какие ключи лежат, что задают загруженные плисты, что пишет установщик), а песочница исполнителя их не видит; строгий режим проверялся на синтетике, где ключ всегда один'
+  address:
+    kind: ritual
+    ref: docs/how-to/agent_bridge_codex.md
+  subject:
+  - agent_delegation
+  - test_stand
+  - rollout
+  outcome:
+    kind: rule
+    text: 'в задание Кодексу на смену поведения по умолчанию (провайдер, пути, окружение) вкладывать замер живой среды владельца и установщика; строгий режим — только после переходного, когда загруженные окружения перенесены (BL-LLM-PROVIDER-STRICT-1)'
+  status: in_work
+  evidence:
+  - docs/handoff/release-v027/LATEST.md
+  owner: владелец
+- id: C-195
+  date: '2026-11-08'
+  thread: release-v027
+  modules:
+  - bug_fixes.yaml
+  - scripts/thread_finish
+  event: 'Хеш исправления, записанный в bug_fixes.yaml в нити, после thread_finish в main не существовал: закрытие переставляет ветку на свежий main (артефакты doc_agent коммитятся в main перед слиянием), 1d1082a стал 6faf867, а тот — bab2ca9.'
+  cost: 'два лишних коммита реестра; ссылка на несуществующий коммит дожила бы до ночного цикла'
+  cause: 'реестр просил хеш в момент коммита-исправления, а хеш становится окончательным только после слияния; правило не говорило, когда его ставить'
+  address:
+    kind: data
+    ref: bug_fixes.yaml
+  subject:
+  - writers_readers
+  - git_hooks
+  outcome:
+    kind: rule
+    text: 'шапка bug_fixes.yaml: хеш ставится ПОСЛЕ слияния в main; логика цикла хеш не читает'
+  status: adopted
+  adopted_on: '2026-11-08'
+  change: git:acf0cd6
+  evidence:
+  - git:acf0cd6
+  owner: владелец
+- id: C-196
+  date: '2026-11-09'
+  thread: release-v027
+  modules:
+  - scripts/thread_finish
+  - scripts/test_on_studio
+  event: 'Остановленный pkill thread_finish оставил сиротой test_on_studio.sh (родитель — launchd); он держал файл очереди закрытий, и следующее закрытие встало в очередь за мёртвой нитью. Отдельно: правка главной копии во время чужого закрытия была стёрта — закрытие сбрасывает рабочее дерево.'
+  cost: 'около 5 минут поиска по lsof; одна потерянная правка реестра, повторённая через патч'
+  cause: 'thread_finish не убивает своих детей при прерывании (нет trap на группу процессов), а очередь держится открытым дескриптором любого потомка; запрет трогать главную копию во время закрытия не записан для сессии'
+  address:
+    kind: runtime
+    ref: scripts/thread_finish.sh
+  subject:
+  - shell_scripts
+  - concurrency
+  outcome:
+    kind: check
+    text: 'исправлено git:d70fc6d: закрытие в своей группе процессов, INT/TERM/HUP и аварийный выход гасят группу (TERM, через 75 с KILL), долгие дети не наследуют fd 8/9; строка в how-to закрытия. Оракул test_thread_lifecycle::test_interrupted_finish_releases_queue_and_stops_children'
+  status: adopted
+  adopted_on: '2026-11-09'
+  change: git:d70fc6d
+  evidence:
+  - docs/handoff/release-v027/LATEST.md
+  owner: следующая сессия нити release-v027
+- id: C-197
+  date: '2026-11-09'
+  thread: provider-strict
+  modules:
+  - tests/unit/test_thread_lifecycle
+  event: 'Оракул прерванного закрытия краснел только в случае INT, и только когда pytest запускали фоном (cmd &). Codex отчитался «56 passed» — повезло с запуском; ревью сначала приписало красное своей правке stdin, потом нагрузке, и подняло срок с 5 до 15 с — тоже мимо: очередь не освобождалась вовсе.'
+  cost: около 20 минут и одна ложная правка оракула (срок 15 с), откаченная
+  cause: 'фоновое задание неинтерактивной оболочки стартует с игнорируемым SIGINT; bash не может поставить trap на сигнал, игнорируемый при входе. Тест возвращал обычную реакцию только для HUP. Отметка времени в сообщении assert («887616.73 < 887616.69») прочитана как «опоздал на 45 мс», хотя это момент истечения срока'
+  address:
+    kind: runtime
+    ref: tests/unit/test_thread_lifecycle.py
+  subject:
+  - shell_scripts
+  - test_stand
+  outcome:
+    kind: check
+    text: 'исправлено git:d70fc6d: тест ставит SIG_DFL для HUP, INT и TERM на время запуска закрытия; 56 passed при фоновом запуске'
+  status: adopted
+  adopted_on: '2026-11-09'
+  change: git:d70fc6d
+  evidence:
+  - tests/unit/test_thread_lifecycle.py
+  owner: нить provider-strict
+- id: C-198
+  date: '2026-11-09'
+  thread: provider-strict
+  modules:
+  - doc_agent
+  event: 'doc_agent --regen-intent после правки реестра переписал тело тёплых страниц night_cycle и generated_food_rules целиком, хотя поменялись две записи; в новом теле испорченная фраза («два молчаливых молчания»), пункт «Что изменилось» пересказал claim без смысла («карточка закрывается при наличии исправления»). Сторож свежести провенанса зелёный на любом теле.'
+  cost: ручная сборка четырёх страниц (тело прежнее, заголовок провенанса новый, пункты руками, хэш перевода пересчитан)
+  cause: 'регенерация пишет страницу заново моделью при каждой правке записи; сторож судит только хэш провенанса, не качество и не объём изменения тела'
+  address:
+    kind: runtime
+    ref: doc_agent.py
+  subject:
+  - intent_registry
+  - llm_output
+  outcome:
+    kind: check
+    text: 'не сделано: регенерация меняет только заголовок и «Что изменилось», тело — лишь при изменении замысла (intent) записи; до тех пор — сравнивать тело глазами и откатывать'
+  status: observation
+  evidence:
+  - docs/explanation/night_cycle.md
+  owner: адресата нет — кандидат в BACKLOG
+- id: C-199
+  date: '2026-11-09'
+  thread: provider-strict
+  modules:
+  - scripts/install
+  event: 'Миграция плистов Studio на явный HEALTH_LLM_PROVIDER шла по glob com.larry.health.*.plist и «проверена» launchctl print по тому же списку — 24 из 24 зелёные. Загруженная служба com.larry.healthbot.morningwake (другой префикс) осталась без переменной; нашёл её только оракул «шаблоны = живые плисты» на полном прогоне.'
+  cost: один красный полный прогон закрытия и повтор (~25 минут Studio)
+  cause: 'перечень мигрируемого и перечень проверяемого взяты из одного и того же glob — проверка подтверждала список, а не полноту; полнота видна только из независимого источника (рендер шаблонов)'
+  address:
+    kind: runtime
+    ref: scripts/install.py
+  subject:
+  - sensor_perimeter
+  - existing_home
+  outcome:
+    kind: check
+    text: 'исправлено git:d70fc6d: плист дописан и перезагружен; оракул test_launchd_templates_match_live сравнивает с рендером при явном anthropic и даёт 0 расхождений. Правило: перечень для миграции служб — из рендера шаблонов или launchctl list, не из glob по имени'
+  status: adopted
+  adopted_on: '2026-11-09'
+  change: git:d70fc6d
+  evidence:
+  - tests/consistency/test_launchd_templates_match_live.py
+  owner: нить provider-strict
+- id: C-200
+  date: '2026-11-11'
+  thread: activity-temp
+  modules:
+  - import_oura
+  - workouts_db
+  - import_apple_health
+  - dashboard_routers/api_hae_ingest
+  event: 'Владелец спросил, почему бриф не видит фитнес и ночную температуру. Три места потери, все молчаливые: duration_min NULL в 3388 из 3388 тренировок Oura с 2020 года (API v2 не отдаёт поле, бриф писал «0м»); temperature_deviation (°C) выбрасывался в parse_readiness, хранился только балл вклада без читателя; тренировки Apple Watch не уходили с телефона (одна автоматизация HAE = один тип данных) и не читались бы сервером (/hae/ingest разбирал только data.metrics).'
+  cost: 'три года тренировок без длительности; ночь +0.50 °C (вторая за год) не попала в бриф; фитнес 10.11 сведён к «мало шагов»'
+  cause: 'поле поставщика, которого нет в ответе, превращается в NULL без датчика; ключ пакета, который парсер не знает, лежит в файле провенанса непрочитанным — ни один сторож не сравнивал «что пришло» с «что прочитано»'
+  address:
+    kind: runtime
+    ref: workouts_db.py
+  subject:
+  - vendor_data
+  - writers_readers
+  outcome:
+    kind: check
+    text: 'длительность считает писатель из start/end (julianday, UTC), историю — миграция; градусы в daily_metrics.temp_deviation; data.workouts разбирается, копии Oura отсекаются по источнику. Оракул tests/unit/test_activity_temp.py, негативный контроль plans/mutate_activity_temp_2026-11-11.sh — 9 из 9 красные. Правило: колонка поставщика, NULL во всех строках, — дефект разбора до доказательства обратного'
+  status: adopted
+  adopted_on: '2026-11-11'
+  change: git:ed18b40
+  evidence:
+  - tests/unit/test_activity_temp.py
+  owner: нить activity-temp
+- id: C-201
+  date: '2026-11-11'
+  thread: activity-temp
+  modules:
+  - scripts/test_on_studio
+  event: 'Полный прогон закрытия нити activity-temp покраснел на test_every_column_has_a_label_and_no_orphans («подписи без колонки: temp_deviation, temp_trend_deviation»): снимок живой базы на стенде нёс схему ДО ветки, миграция ветки к нему не применялась. В проде колонки добавил первый же запуск бота (init_db).'
+  cost: один красный полный прогон закрытия (~25 минут Studio); соблазн принять красный через THREAD_FINISH_ACCEPT_RED
+  cause: 'стенд копировал канон, но не повторял шаг выкатки «бот при старте зовёт init_db» — стенд ≠ прод по одному шагу запуска; любая ветка с новой колонкой краснела бы так же, а миграции ветки ни разу не судились на настоящих данных'
+  address:
+    kind: runtime
+    ref: scripts/test_on_studio.sh
+  subject:
+  - run_version
+  - schema_migration
+  outcome:
+    kind: check
+    text: 'исправлено: test_on_studio применяет init_db ветки к снимку до прогона (строка «миграции ветки применены к снимку»); повторный прогон 8292 passed. Правило: стенд повторяет шаги запуска прода, которые меняют данные, а не только копирует данные'
+  status: adopted
+  adopted_on: '2026-11-11'
+  change: git:bb06a79
+  evidence:
+  - docs/handoff/activity-temp/2026-11-11-bb06a79.md
+  owner: нить activity-temp
+- id: C-202
+  date: '2026-11-11'
+  thread: activity-temp
+  modules:
+  - affected_tests
+  event: 'Новые колонки и русские строки прошли pre-commit (affected_tests: «затронуто 557 > 40 — гоню только сторожей согласованности (27)»), а покраснели только на полном прогоне закрытия: signal_family (числовая колонка вне семьи), i18n (русские литералы в gp_agent/safety_net), форма урока (adopted без change). Все три теста в tests/unit, вне выбранных 27.'
+  cost: один красный полный прогон закрытия (~25 минут Studio) и второй круг коммитов
+  cause: 'при широкой правке отбор сужается до tests/consistency, а сторожа схемы и словаря живут в tests/unit — правка, которая добавляет колонку или строку, их не будит до полного прогона'
+  address:
+    kind: runtime
+    ref: affected_tests.py
+  subject:
+  - test_stand
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: 'не сделано: кандидат — при широкой правке добавлять к 27 сторожам тесты-«законы» из tests/unit (test_all_metrics_block, test_i18n_no_hardcoded_ru, test_project_context_lessons). До правки — гнать эти три руками перед thread_finish'
+  status: observation
+  evidence:
+  - docs/handoff/activity-temp/2026-11-11-bb06a79.md
+  owner: адресата нет — кандидат в BACKLOG
+- id: C-203
+  date: '2026-11-21'
+  thread: task-guard-cover
+  modules:
+  - task_guard
+  event: 'Сверка теневого сторожа задач за две недели: 76% пар без оценки. 15.11 одна http_error Jev открыла размыкатель на всю пачку gp_weekly — 134 пары из 135 остались unjudged/breaker_open; сверка нечего было калибровать (0 положительных вердиктов).'
+  cost: две недели тени, из которых живой сигнал — 52 пары; решение о блокировке отложено ещё на две недели
+  cause: 'размыкатель открывался на ПЕРВОЙ транспортной ошибке пачки — защита от задержки купила полную слепоту на единичном сбое; датчика доли unjudged не было, увидела только ручная сверка'
+  address:
+    kind: runtime
+    ref: task_guard.py
+  subject:
+  - sensor_perimeter
+  - measurement_path
+  outcome:
+    kind: check
+    text: 'исправлено git:cef5ff2: размыкатель после N ошибок подряд (tasks.guard_breaker_failures, seed 3), успех Jev сбрасывает счёт; оракулы test_task_guard. Не сделано: датчик доли unjudged по reason'
+  status: adopted
+  adopted_on: '2026-11-21'
+  change: git:cef5ff2
+  evidence:
+  - docs/handoff/task-guard-cover/LATEST.md
+  owner: нить task-guard-cover
+- id: C-204
+  date: '2026-11-21'
+  thread: task-guard-cover
+  modules:
+  - agent_reply
+  - task_guard
+  event: 'Задачи от ассистента (source assistant_fact:*, agent_reply.queue_fact_questions) писались мимо теневого сторожа: 13 задач за две недели, 0 строк журнала — ровно там, где дубли вероятнее всего. Журнал после 15.11 был пуст, и это читалось как «сторож молчит», а не «сторож слеп».'
+  cost: половина новых задач владельца вне сверки две недели
+  cause: 'сторож подключали к писателю task_agent по имени модуля; писателя с тем же ключом (tasks.save_task) в agent_reply не искали по данным'
+  address:
+    kind: runtime
+    ref: agent_reply.py
+  subject:
+  - writers_readers
+  - sensor_perimeter
+  outcome:
+    kind: check
+    text: 'исправлено git:cef5ff2: assistant_fact проходит ту же тень, пачка на письмо; оракул test_task_guard (строки журнала для задачи ассистента, мутация «убрать вызов» красная)'
+  status: adopted
+  adopted_on: '2026-11-21'
+  change: git:cef5ff2
+  evidence:
+  - docs/handoff/task-guard-cover/LATEST.md
+  owner: нить task-guard-cover
+- id: C-205
+  date: '2026-11-21'
+  thread: task-guard-cover
+  modules:
+  - tests/conftest
+  - notify
+  event: 'Метка суточного дросселя task_guard_fault.json рядом с БОЕВОЙ базой получила отметку 21.11 08:02 во время ночного прогона тестов в контейнере (HEALTH_DATA_DIR явный). Четыре теста question_* подменяли соединение, но не DB_PATH. Отметку сначала приняли за настоящий сбой сторожа.'
+  cost: около 20 минут разбора; суточное окно дросселя съедено — настоящий сбой сторожа до следующего утра не дошёл бы до владельца
+  cause: 'подмена соединения не уводит пути, вычисляемые от health_db.DB_PATH; общего глушителя записей состояния рядом с базой не было — класс «тест достаёт до продакшн-канала» (глушитель Telegram уже был, глушителя файлов состояния — нет)'
+  address:
+    kind: runtime
+    ref: tests/conftest.py
+  subject:
+  - test_stand
+  - state_lifetime
+  outcome:
+    kind: check
+    text: 'исправлено git:cef5ff2: autouse-изоляция notify.claim_repeat уводит любой путь вне tmp теста во временный каталог (tmp_path лениво); оракул test_fault_throttle_cannot_touch_inherited_database_directory, мутация красная'
+  status: adopted
+  adopted_on: '2026-11-21'
+  change: git:cef5ff2
+  evidence:
+  - tests/unit/test_task_guard.py
+  owner: нить task-guard-cover
+- id: C-206
+  date: '2026-11-21'
+  thread: admission-null-name
+  modules:
+  - llm_admission
+  event: 'Две разные модели (sonnet-4-6 05.10 и sonnet-5-5 12.11, по две попытки) не прошли допуск с одной и той же единственной ошибкой «RDW_SD: пропущен» на одной странице. Диагностический вызов: строка прочитана верно, но второму «RDW» модель не дала canonical_name. Ночной разбор назвал это «вероятно, разброс модели».'
+  cost: роль sonnet шесть недель без допущенной модели; недельный сигнал all_failed
+  cause: 'судья сопоставлял только по canonical_name, а боевой путь держит безымянную строку по raw_name и выводит имя при промоуте (lab_promote.canon_of) — судья строже работы. Совпадение ошибки у двух моделей — признак дефекта мерила, а не модели; его не проверили шесть недель'
+  address:
+    kind: runtime
+    ref: llm_admission.py
+  subject:
+  - classifier_rules
+  - measurement_path
+  outcome:
+    kind: check
+    text: 'исправлено git:6984308: безымянная строка судится через canon_of(raw_name) + _identity; оракул test_unnamed_rdw_uses_production_name_rule. Правило: одна и та же ошибка у двух моделей → сначала проверить судью'
+  status: adopted
+  adopted_on: '2026-11-21'
+  change: git:6984308
+  evidence:
+  - tests/unit/test_llm_admission.py
+  owner: нить admission-null-name
+- id: C-207
+  date: '2026-11-21'
+  thread: task-guard-cover
+  modules:
+  - integrity_tests
+  event: 'Чтобы проверить один датчик секретов, сессия выполнила import integrity_tests внутри контейнера бота — импорт исполнил весь ночной монитор. Прогон кончился «Система целостна», без тревог, но мог бы разослать находки.'
+  cost: лишний полный прогон монитора в боевом контейнере
+  cause: 'правило «import integrity_tests исполняет монитор» жило в памяти сессий, но не в lessons.yaml и не в коде: модуль не защищён от импорта ради одной функции'
+  address:
+    kind: runtime
+    ref: integrity_tests.py
+  subject:
+  - probes
+  - state_lifetime
+  outcome:
+    kind: check
+    text: 'не сделано: проверку одного датчика — через CLI с выбором чека или вынос предиката из модуля монитора; до тех пор — не импортировать integrity_tests ради одной функции'
+  status: observation
+  evidence:
+  - integrity_tests.py
+  owner: адресата нет — кандидат в BACKLOG
+- id: C-208
+  date: '2026-11-21'
+  thread: admission-null-name
+  modules:
+  - scripts/thread_finish
+  event: 'Закрытие admission-null-name шло с THREAD_FINISH_ACCEPT_RED, выписанной под чужой красный (4 owner-теста IMD). Быстрый прогон покраснел на ДРУГОМ, своём (записка нити без распознаваемого статуса), полный прогон из-за этого не запускался вовсе — и квитанция слила нить без полного прогона.'
+  cost: слияние без полного прогона; полный прогон main догоняющим запуском; правка записки отдельным коммитом
+  cause: 'квитанция чужого красного — свободный текст, закрытие не сверяет, КАКИЕ тесты красные, с тем, что в квитанции названо; сессия выдала её заранее, не увидев, какой красный будет'
+  address:
+    kind: runtime
+    ref: scripts/thread_finish.sh
+  subject:
+  - git_hooks
+  - probes
+  outcome:
+    kind: check
+    text: 'не сделано: квитанция называет id тестов, и закрытие принимает красный, только если упавшие ⊆ названных (и fail-fast зелёный). До тех пор — выдавать квитанцию только после красного прогона, сверив список упавших'
+  status: observation
+  evidence:
+  - docs/handoff/admission-null-name/LATEST.md
+  owner: адресата нет — кандидат в BACKLOG

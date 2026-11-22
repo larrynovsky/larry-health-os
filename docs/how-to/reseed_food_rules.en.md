@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/reseed_food_rules.md sha256:b61ee443b8ad -->
+<!-- translation-of: docs/how-to/reseed_food_rules.md sha256:d0c211e2442b -->
 **English** · [Русский](reseed_food_rules.md)
 
 # How-to: extend food rules (medical record/genome → diet)

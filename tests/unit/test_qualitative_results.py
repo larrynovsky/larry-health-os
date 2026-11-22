@@ -113,8 +113,9 @@ def canon(tmp_path, monkeypatch):
         with health_db.get_conn() as c:
             c.executemany(
                 f"INSERT INTO lab_results_staging({cols}) VALUES({','.join('?' * 13)})",
+                # Пятый элемент — единица: число без шкалы промоут не пускает (2026-10-21).
                 [("r1", "v", "form.pdf", "2021-11-03", "urine", cn, rn, v, vt,
-                  "", "agree", "pending", "data") for cn, rn, v, vt in rows])
+                  (u or [""])[0], "agree", "pending", "data") for cn, rn, v, vt, *u in rows])
             c.commit()
     return health_db, put
 
@@ -236,7 +237,7 @@ def test_same_analyte_other_specimen_survives_the_promote(canon):
             [("2021-11-03", "doc:old.pdf", "WBC", 11.42, "10^9/л", "blood"),
              ("2021-11-03", "doc:old.pdf", "WBC", 6.0, "кл/мкл", "urine")])
         c.commit()
-    put([("WBC", "Лейкоциты (колич.)", 9.0, None)])     # новая строка — МОЧА
+    put([("WBC", "Лейкоциты (колич.)", 9.0, None, "кл/мкл")])     # новая строка — МОЧА
     LP.plan("r1", None, execute=True)
     with health_db.get_conn() as c:
         got = sorted(tuple(r) for r in c.execute(

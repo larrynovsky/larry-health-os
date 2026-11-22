@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/data_ingestion_paths.md sha256:162beec57a4f -->
+<!-- translation-of: docs/reference/data_ingestion_paths.md sha256:07f3f2b43360 -->
 **English** · [Русский](data_ingestion_paths.md)
 
 # Data ingestion — paths, trigger conditions, schedules
@@ -64,6 +64,30 @@ report rewrite, or automatic resend. SQLite failures roll back the write;
 the importer logs a warning and retains the JSON archive for replay.
 
 Oracle: `tests/integration/test_uc_a_03_hae_merge.py::test_apple_sleep_read_late_update_and_oura_shape`.
+
+### Workouts from the watch (since 2026-11-11)
+
+In HAE one automation sends one data type. Metrics and workouts are two automations
+posting to the same `POST /hae/ingest` with the same token. A workouts packet carries
+`data.workouts` (no `metrics`); `import_apple_health.parse_hae_workouts` writes them into
+`workouts` with `source='AppleHealth'`. The Oura app itself writes its workouts into
+Apple Health — such records (source `com.ouraring.*`) are skipped, they arrive through the
+Oura API. Energy in kJ is converted to kcal; the device name is not stored.
+Watcher `integrity_tests.check_hae_workouts_automation` (since 2026-11-12): Oura recorded a workout,
+the metrics automation has run in two different hours since, and no workouts packet came → WARN.
+Oracle: `tests/unit/test_activity_temp.py`.
+
+## Oura: workout duration and temperature (since 2026-11-11)
+
+- `workout` in API v2 carries no `duration`: the writer `workouts_db.upsert_workout`
+  computes it from start/end via `julianday` (UTC, so the switch to winter time does not
+  shift it). History is repaired by the migration `health_db._migrate_workouts_duration`.
+- `daily_readiness.temperature_deviation` / `temperature_trend_deviation` (°C from the
+  personal baseline) → columns `daily_metrics.temp_deviation` / `temp_trend_deviation`.
+  The contributor score `readiness_body_temp` is a different, non-linear quantity.
+- The signal limit's parameters live in `absolute_thresholds` (metric `temp_deviation`, variant `temp_pct`,
+  `temp_window_days`, `temp_min_nights`). Watcher `integrity_tests.check_temperature_arrives`: a run of nights
+  "sleep present, no degrees" longer than the longest in a year → WARN.
 
 ## Lab reports (JPEG/PDF)
 

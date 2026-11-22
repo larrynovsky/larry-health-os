@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/generated_food_rules.md sha256:7e315425808f -->
+<!-- translation-of: docs/explanation/generated_food_rules.md sha256:a8dd12a14940 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](generated_food_rules.md)
@@ -7,11 +7,9 @@
 
 ## What Changed
 
-- **`dead_rule_not_stored`** — the claim wording has been refined: active status alone
-  does not prove that a rule's condition fires on the current profile. Applicability
-  must be checked with the same predicate used by the consumer.
+- **Without a clinical pack, food advice is "not assessed"** (`no_clinical_pack_not_assessed`, new invariant, holds). Example: the pack was never downloaded on an installation. Before, an empty safety floor read as "no restrictions", and the bot could advise food to a person with restrictions the system simply did not know about. Now the nutrition profile is marked "not assessed" and the floor returns `floor_unavailable` instead of an empty list. (Written by hand.)
 
-**Updated:** 2026-09-01
+**Updated:** 2026-11-09
 
 
 ## Why It Exists

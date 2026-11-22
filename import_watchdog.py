@@ -24,6 +24,9 @@ log = logging.getLogger(__name__)
 
 SOURCE = "apple_health"
 ALERT_COOLDOWN_S = 12 * 3600
+# Пульс прогона (13.11, карточка warn:producer_registry): сторож сам молчит, когда всё свежо,
+# поэтому его смерть неотличима от «всё хорошо». Читатель — integrity_tests.check_import_pulses_alive.
+PULSE_KEY = "import_watchdog.ran_at"
 
 
 def _state_path() -> Path:
@@ -48,6 +51,10 @@ def main(now: float | None = None) -> int:
     from notify import notify_operator
 
     is_stale, age_h = import_status_db.get_import_staleness(SOURCE)
+    import config_db
+    from _time_inject import get_now
+    config_db.upsert_config(PULSE_KEY, value_text=get_now().isoformat(timespec="seconds"),
+                            category="liveness", source="import_watchdog")
     if not is_stale:
         print(f"ok: {SOURCE} свеж (возраст метки {age_h}ч)")
         return 0

@@ -25,7 +25,9 @@ def save_hypothesis(observation: str, mechanism: str, prediction: str,
                     linked_experiment_id: int = None,
                     status: str = "open",
                     resolution_type: str = "self_managed",
-                    trigger_subtype: str | None = None) -> int:
+                    trigger_subtype: str | None = None,
+                    forecast: list | None = None,
+                    no_forecast_reason: str | None = None) -> int:
     """
     Сохраняет гипотезу в memory (category='hypothesis').
     trigger_subtype (W5E-4): для proactive specialist review — 'cardiology'/'sleep_coach'/...
@@ -49,6 +51,10 @@ def save_hypothesis(observation: str, mechanism: str, prediction: str,
         "created_date":         str(get_today()),
         "resolution_type":      resolution_type,
     }
+    if isinstance(forecast, list):      # прогноз в числах от генератора; судит код (hypothesis_verdict)
+        payload["forecast"] = [f for f in forecast if isinstance(f, dict)]
+        if not payload["forecast"] and no_forecast_reason:
+            payload["no_forecast_reason"] = str(no_forecast_reason)[:300]
     key_suffix = f"_{trigger_subtype}" if trigger_subtype else ""
     key = f"hyp_{get_today()}_{trigger}{key_suffix}_{observation[:30].replace(' ','_')}"
     hyp_id = db.save_memory(
@@ -493,6 +499,10 @@ def get_specialist_hypotheses(n: int = 20) -> list[dict]:
 
 # ── Протоколы ─────────────────────────────────────────────────────────────
 
+class ProtocolIncomplete(ValueError):
+    """Модель вернула протокол без исполнимого поведения."""
+
+
 def _judge_protocol(raw: str) -> None:
     """Судит текст протокола против канона и КРИЧИТ, но текста не меняет.
 
@@ -531,6 +541,17 @@ def generate_protocol_from_hypothesis(hypothesis: dict) -> dict:
     except Exception:  # silent-ok: БД недоступна → нейтральный контекст, без досье
         _pctx = "Профиль пациента временно недоступен."
 
+    try:
+        import protocol_outcomes
+        # Уровень и разброс рядом с именем: модель видит масштаб и единицы (баг 11.11: «+45» сна
+        # в минутах при уровне 5,85 часа). Предел интервала по разбросу стоит в attach_prediction.
+        _predictable = [m if sd is None else f"{m} (сейчас {base:.3g}, обычный разброс ±{sd:.2g})"
+                        for m, (base, sd) in protocol_outcomes.metric_scales().items()]
+    except Exception as e:  # silent-ok: без списка прогноз просто не будет принят; громко — в fault
+        import notify
+        notify.fault(f"protocol prediction metrics unavailable ({type(e).__name__})", person_key=None)
+        _predictable = []
+
     client = get_client()
     prompt = (
         f"Гипотеза подтверждена:\n"
@@ -544,14 +565,23 @@ def generate_protocol_from_hypothesis(hypothesis: dict) -> dict:
         '  "rationale": почему это работает — одно предложение,\n'
         '  "frequency": как часто выполнять ("ежедневно", "3 раза в неделю", и т.д.),\n'
         '  "reminder_days": через сколько дней напомнить о проверке протокола (число, например 30),\n'
-        '  "retire_condition": когда протокол можно отменить или пересмотреть.\n'
+        '  "retire_condition": когда протокол можно отменить или пересмотреть,\n'
+        '  "prediction": что изменится, если протокол выполнять — объект {"metric": имя показателя,\n'
+        '     "change": ожидаемое изменение относительно нынешнего уровня (число, в единицах показателя),\n'
+        '     "low": нижняя граница изменения, "high": верхняя граница изменения,\n'
+        '     "horizon_days": через сколько дней проверить (целое)}. Показатель — один из дневных:\n'
+        f'     {", ".join(_predictable)}; или точное имя анализа из лабораторных данных пациента.\n'
+        '     Изменение — в тех же единицах, что уровень в скобках, и соразмерно обычному разбросу;\n'
+        '     нынешний уровень посчитает система сама; честный широкий интервал лучше узкого.\n'
         f"Контекст пациента (из его данных):\n{_pctx}\n"
         "Протокол должен быть конкретным, реалистичным, проверяемым, учитывая профиль пациента выше."
     ) + hai_core.answer_language()
 
     resp = client.messages.create(task="hai_hypotheses.generate_protocol_from_hypothesis",
         model=hai_core.get_model("haiku_pinned"),
-        max_tokens=500,
+        # 500 → 1000 (10.11): ответ из 6 полей по-русски + прогноз не влезал бы в 500;
+        # у двух протоколов 01.11 ответ, вероятно, оборвался внутри behavior.
+        max_tokens=1000,
         messages=[{"role": "user", "content": prompt}]
     )
     raw = llm_client.answer_text(resp).strip()
@@ -582,21 +612,45 @@ def generate_protocol_from_hypothesis(hypothesis: dict) -> dict:
     except Exception:
         rd = [30, 60]
 
+    behavior = parsed.get("behavior", "")
+    if not isinstance(behavior, str) or not behavior.strip():
+        # 01.11 два протокола легли без поведения: JSON не разобрался, запасной разбор
+        # нашёл только title (обоснование и дни напоминания — значения по умолчанию).
+        # Протокол без действия не о чем выполнять и не о чем спрашивать — громкий отказ.
+        raise ProtocolIncomplete("ответ модели без поля behavior — протокол не создан")
+
     return {
         "title":                 parsed.get("title", hypothesis.get("observation", "")[:50]),
-        "behavior":              parsed.get("behavior", ""),
+        "behavior":              behavior.strip(),
+        "review_in_days":        rd[0] if isinstance(rd, list) and rd and isinstance(rd[0], int) else 30,
         "rationale":             parsed.get("rationale", hypothesis.get("mechanism", "")),
         "frequency":             parsed.get("frequency", ""),
         "reminder_days":         _json.dumps(rd),
         "linked_hypothesis_id":  hypothesis.get("memory_id"),
         "linked_experiment_id":  hypothesis.get("linked_experiment_id"),
+        "prediction":            parsed.get("prediction"),
     }
 
 
 def save_protocol(protocol: dict) -> int:
-    """Сохраняет протокол в таблицу protocols."""
+    """Сохраняет протокол в таблицу protocols, затем его прогноз (если модель его дала и он годен).
+    Отказ прогноза протокол не отменяет: долю протоколов без прогноза считает ночной датчик."""
     protocol_id = db.save_protocol(protocol)
     log.info(f"Протокол #{protocol_id} сохранён: {protocol['title']}")
+    import protocol_outcomes
+    try:
+        protocol_outcomes.attach_prediction(protocol_id, protocol.get("prediction"))
+    except protocol_outcomes.PredictionRejected as e:
+        log.warning("протокол #%s: прогноз не принят: %s", protocol_id, e)
+    except Exception as e:  # silent-ok: протокол уже сохранён; поломка прогноза — громко в fault
+        import notify
+        notify.fault(f"protocol #{protocol_id}: prediction not attached ({type(e).__name__})", person_key=None)
+    import protocol_fit
+    try:   # «впишется ли» у ассистента хозяина — карточка придержана до ответа (protocol-fit, 11.11)
+        protocol_fit.request(protocol_id, protocol)
+    except Exception as e:  # silent-ok: не спросили — карточка уходит сразу, как раньше; громко в fault
+        import notify
+        notify.fault(f"protocol #{protocol_id}: fit check not requested ({type(e).__name__})", person_key=None)
     return protocol_id
 
 

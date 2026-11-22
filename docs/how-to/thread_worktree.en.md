@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/thread_worktree.md sha256:799ace14f023 -->
+<!-- translation-of: docs/how-to/thread_worktree.md sha256:37039aea0d5d -->
 **English** · [Русский](thread_worktree.md)
 
 # How to work on a thread in its own worktree
@@ -45,6 +45,8 @@ Use Latin letters, digits, and hyphens for the thread name: it becomes part of t
 after creating the worktree: the hooks directory is shared (`--git-common-dir`), and the installer knows that.
 
 ## Close a thread
+
+while your own or someone else's thread is closing, do not edit the main copy — closing resets the working tree; keep the edit in the thread's worktree
 
 ```bash
 scripts/thread_finish.sh <short-name>

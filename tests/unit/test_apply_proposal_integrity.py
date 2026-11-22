@@ -51,6 +51,14 @@ def prdb(db, monkeypatch):
     # длинное описание: заголовок — первые 120 символов, описание остаётся целым
     ({"action": "add", "problem_id": "X_LONG", "description": "д" * 130},
      ("X_LONG", "д" * 120, "д" * 130, "active_monitoring")),
+    # new_value СТРОКОЙ (замер 22.11, предложение 81 → пустая P008): строка — описание,
+    # из него заголовок; раньше суть терялась и заголовком становился id
+    ({"action": "add", "problem_id": "X_NV_STR", "field": "problem", "old_value": "",
+      "new_value": "Выдуманное наблюдение " + "ж" * 120},
+     ("X_NV_STR", ("Выдуманное наблюдение " + "ж" * 120)[:120],
+      "Выдуманное наблюдение " + "ж" * 120, "active_monitoring")),
+    ({"action": "add", "problem_id": "X_NV_SHORT", "new_value": "Короткое выдуманное"},
+     ("X_NV_SHORT", "Короткое выдуманное", None, "active_monitoring")),
 ])
 def test_add_variants_apply_with_exact_fields(prdb, ch, want):
     pid = _proposal([ch])

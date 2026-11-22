@@ -19,6 +19,7 @@
     "mcp_tools",
     "notify",
     "patient_context",
+    "task_guard",
     "tasks_db"
   ],
   "agent_reports_db": [
@@ -33,6 +34,7 @@
     "lab_canon",
     "labs_db",
     "profile_db",
+    "protocol_outcomes",
     "safety_net",
     "treatment_db"
   ],
@@ -103,6 +105,8 @@
     "secrets_paths"
   ],
   "beliefs": [
+    "_time_inject",
+    "calendar_client",
     "health_db",
     "memory_facts_db"
   ],
@@ -572,7 +576,10 @@
     "health_db",
     "i18n",
     "llm_client",
+    "notify",
     "patient_context",
+    "protocol_fit",
+    "protocol_outcomes",
     "secrets_paths"
   ],
   "hai_reports": [
@@ -653,12 +660,16 @@
     "consilium_roster",
     "hai_core",
     "health_db",
+    "hypothesis_verdict",
     "i18n",
     "lab_canon",
     "labs_db",
     "lifestyle_agents",
     "llm_client",
+    "notify",
     "patient_context",
+    "protocol_fit",
+    "protocol_outcomes",
     "wellally_consult"
   ],
   "hypothesis_lab_linker": [
@@ -678,6 +689,15 @@
     "hai_core",
     "health_db",
     "llm_client"
+  ],
+  "hypothesis_verdict": [
+    "_time_inject",
+    "hai_core",
+    "health_db",
+    "i18n",
+    "llm_client",
+    "notify",
+    "prediction_core"
   ],
   "i18n": [
     "profile_db"
@@ -735,11 +755,15 @@
     "health_db"
   ],
   "import_watchdog": [
+    "_time_inject",
+    "config_db",
     "health_db",
     "import_status_db",
     "notify"
   ],
   "import_withings": [
+    "_time_inject",
+    "config_db",
     "health_db",
     "notify",
     "region_pack",
@@ -779,7 +803,10 @@
     "health_db",
     "heldout_readiness",
     "i18n",
+    "import_apple_health",
     "import_medical_events",
+    "import_watchdog",
+    "import_withings",
     "infra_config",
     "intent_registry",
     "lab_canon",
@@ -803,6 +830,9 @@
     "producer_registry",
     "profile_reconciler",
     "proposals_db",
+    "protocol_fit",
+    "protocol_outcomes",
+    "protocols_db",
     "pubmed_client",
     "quarantine_db",
     "region_pack",
@@ -934,7 +964,8 @@
     "health_db",
     "llm_client",
     "patient_context",
-    "promethease_context"
+    "promethease_context",
+    "workouts_db"
   ],
   "link_fetch": [
     "genome_intake",
@@ -958,6 +989,7 @@
     "health_db",
     "i18n",
     "lab_canon",
+    "lab_promote",
     "lab_recognizer",
     "llm_client",
     "notify",
@@ -1073,6 +1105,7 @@
     "hai_hypotheses",
     "health_db",
     "hypothesis_semantic_check",
+    "hypothesis_verdict",
     "i18n",
     "llm_client",
     "notify",
@@ -1206,6 +1239,12 @@
     "infra_config",
     "secrets_paths"
   ],
+  "prediction_core": [
+    "_time_inject",
+    "config_db",
+    "health_db",
+    "lab_canon"
+  ],
   "problems_db": [
     "_time_inject",
     "clinical_kb",
@@ -1241,6 +1280,21 @@
   ],
   "propose_uc": [
     "_time_inject"
+  ],
+  "protocol_fit": [
+    "_time_inject",
+    "agent_mail",
+    "agent_reply",
+    "config_db",
+    "health_db",
+    "i18n"
+  ],
+  "protocol_outcomes": [
+    "_time_inject",
+    "agent_reply",
+    "config_db",
+    "health_db",
+    "prediction_core"
   ],
   "protocols_db": [
     "_time_inject",

@@ -432,6 +432,7 @@ ALLOWED_RU.update({
         "'Readiness {readiness} — тело требует восстановления'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
         "'HRV {hrv_today:.0f}ms — падение {drop_pct:.0f}% vs 30d avg {hrv_30d:.0f}ms'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
         "'ЧСС покоя {rhr_today} — рост +{rise:.0f} bpm vs 30d avg {rhr_30d}'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
+        "'отклонение {value:+.2f} °C от личной нормы — выше границы {ceiling:+.2f} °C, за которую уходит 1 ночь из {one_in} за год. Признак того, что организм с чем-то борется (простуда, перегрев, алкоголь, поздняя еда): проверь самочувствие, дай себе восстановиться сегодня'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
         "'🚨 Срочно: пройдена опасная граница'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
         "'⚠️ Важно: заметное ухудшение'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
         "'Сегодня я нашёл у себя сбой данных, поэтому эти цифры могут быть неточными. Если самочувствие обычное — перемерь, прежде чем тревожиться.'": 'Emergency reserve: exact Russian text when the dictionary or formatting fails (K1 rule 3)',
@@ -910,7 +911,8 @@ ALLOWED_RU.update({
         'monthly_consilium.py': {
             '2240a65c20fc3aa1c186e7b13a493917364595eb8c280e45925f857088f0bbd8': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',
             '0a5944ff18c047d0805d0f0009f0e88da079ec74cb98915ba19c44ec04a987c4': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',
-            '76e006026dc4cff2a53f0002fd778955cb32f1b804bde8a6adbc43bb5364e297': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',
+            '18ed8323fb91536abbc5cfcbcc450cea1884c764ef78426cca2f2e0fcaa4ffec': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',
+            '514bca6815fe04e136b4035581fc056337c3b32b96d8c342bda023d86daf7737': 'MODEL: _forecast_task prompt/context; outside K8 PERSON occurrences',
             'fe38f7311c86a467bff979a7fe40aa282ab372461ffeac5047de2c000384d1fb': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',
             'bd9428a6619f767ed4c2e25605e03326474b4fc59ca7118b214f07778176779e': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',
             'eb38b64c15780d00727383eac505750b301fe7bab969bacb29617ccb0509b642': 'MODEL: <module> prompt/context; outside K8 PERSON occurrences',

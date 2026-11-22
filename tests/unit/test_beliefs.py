@@ -92,43 +92,67 @@ def _seed_state(value: str, days_ago: int, confirmations: int = 0):
                   "VALUES ('state', ?, ?, 1, ?)", (value, vf, confirmations))
 
 
-def test_travel_default_planned(db, monkeypatch):
+def test_travel_memory_notes_ignored(db, monkeypatch):
+    """Решение владельца 15.11: поездки только из календаря. Никакая заметка памяти — ни «вылетел»
+    (даже подтверждённая), ни «отменили», ни «аэропорт» — не создаёт веры о поездке."""
     _profile(monkeypatch, "Тестовая страна")
-    _seed_fact("travel_plans", "Pineville trip planned", days_ago=0, confirmations=0)
-    import beliefs
-    assert beliefs.resolve("travel").status == "planned"
-
-
-def test_travel_cancelled_from_keyless_state(db, monkeypatch):
-    """Правда лежит в keyless-стейте — резолвер его читает по паттерну."""
-    _profile(monkeypatch, "Тестовая страна")
-    _seed_fact("travel_plans", "Pineville trip planned", days_ago=2, confirmations=0)
-    _seed_state("2032-04-12 night: early wake due to cancelled flight", days_ago=0)
-    import beliefs
-    assert beliefs.resolve("travel").status == "cancelled"
-
-
-def test_travel_unconfirmed_flew_NOT_occurred(db, monkeypatch):
-    """Неподтверждённое сообщение: неподтверждённое «вылетел» НЕ ставит occurred — безопасный дефолт."""
-    _profile(monkeypatch, "Тестовая страна")
-    _seed_state("2032-04-12: вылетел в Сосновск рейсом 11:45", days_ago=0, confirmations=0)
-    import beliefs
-    assert beliefs.resolve("travel").status != "occurred"
-
-
-def test_travel_confirmed_flew_occurred(db, monkeypatch):
-    _profile(monkeypatch, "Тестовая страна")
+    _seed_fact("travel_plans", "Pineville trip planned", days_ago=0, confirmations=1)
     _seed_state("вылетел в Сосновск, уже на месте", days_ago=0, confirmations=1)
+    _seed_state("2032-04-12 night: early wake due to cancelled flight", days_ago=0, confirmations=1)
+    _seed_state("короткая ночь: везти друзей в аэропорт", days_ago=0, confirmations=0)
     import beliefs
-    assert beliefs.resolve("travel").status == "occurred"
-
-
-def test_header_travel_says_not_occurred(db, monkeypatch):
-    _profile(monkeypatch, "Тестовая страна")
-    _seed_state("cancelled flight, slept at home", days_ago=0)
-    import beliefs
+    b = beliefs.resolve("travel")
+    assert b.status == "unknown" and b.value is None and b.events == []
     h = beliefs.render_header()
-    assert "НЕ состоялось" in h and "НЕ считай, что это произошло" in h
+    assert "поездка" not in h, h
+
+
+# ── поездки из календаря (15.11: купленная поездка через месяц была «не состоялась») ──
+# География и номер рейса — вымышленные; формат кэша — как у google_calendar_fetcher.
+
+def _install_calendar(tmp_path, monkeypatch, fetched_at: str):
+    import json, calendar_client as cc
+    cache = {"fetched_at": fetched_at, "account": None,
+             "calendars": [{"id": "x", "summary": "primary"}],
+             "events": [
+                 {"summary": "XX 1746 Homecity → Sandport", "start": "2032-12-17T05:00:00Z",
+                  "end": "2032-12-17T08:00:00Z", "is_all_day": False, "location": "Homecity airport",
+                  "event_type": "default"},
+                 {"summary": "Sandport", "start": "2032-12-17", "end": "2032-12-21", "is_all_day": True,
+                  "location": "Sandport", "event_type": "default"},
+             ]}
+    p = tmp_path / "calendar_cache.json"
+    p.write_text(json.dumps(cache))
+    monkeypatch.setattr(cc, "_cache_path", lambda: p)
+    monkeypatch.setattr(cc, "_expected_account", lambda: None)
+
+
+def test_calendar_trip_planned_despite_old_notes(db, monkeypatch, tmp_path):
+    """Купленная поездка в календаре — «планируется» с датами, даже когда в памяти лежат
+    неподтверждённые «at home after flight» и «cancelled flight» (как в живой базе 15.11)."""
+    import _time_inject, beliefs
+    _profile(monkeypatch, "Тестовая страна")
+    _install_calendar(tmp_path, monkeypatch, "2032-11-15T06:00:00Z")
+    _time_inject.set_test_clock("2032-11-15T08:00")
+    _seed_state("2032-08-31: first full night at home after flight", days_ago=1, confirmations=0)
+    _seed_state("2032-07-08 night: early wake due to cancelled flight", days_ago=2, confirmations=0)
+    b = beliefs.resolve("travel")
+    assert b.status == "planned" and [e["start_date"] for e in b.events] == ["2032-12-17", "2032-12-17"]
+    assert b.events[1]["end_date"] == "2032-12-20", "all-day end у Google исключительный"
+    h = beliefs.render_header()
+    assert "Sandport, 17.12.2032–20.12.2032 — планируется" in h, h
+    assert "отменено" not in h and "НЕ состоялось" not in h, h
+
+
+def test_calendar_trip_ongoing_not_claimed_occurred(db, monkeypatch, tmp_path):
+    """Идёт по календарю — план, не факт: не «состоялось», а «не подтверждено»."""
+    import _time_inject, beliefs
+    _profile(monkeypatch, "Тестовая страна")
+    _install_calendar(tmp_path, monkeypatch, "2032-12-18T06:00:00Z")
+    _time_inject.set_test_clock("2032-12-18T08:00")
+    h = beliefs.render_header()
+    assert "Sandport, 17.12.2032–20.12.2032 — по календарю идёт сейчас" in h and "не подтверждено" in h, h
+    assert "состоялось" not in h, h
 
 
 def test_belief_header_in_all_profile_readers(db, monkeypatch):

@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/night_cycle_respond.md sha256:6778ec90310e -->
+<!-- translation-of: docs/how-to/night_cycle_respond.md sha256:e13ca4d951a3 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](night_cycle_respond.md)

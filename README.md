@@ -23,12 +23,14 @@ you on its own — when there is something to say.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture.en.dark.png">
-  <img alt="Diagram: seven data streams converge into one database and fan out into briefs, tasks and alerts" src="docs/assets/architecture.en.light.png">
+  <img alt="Diagram: data streams pass your confirmation into one local database; findings come to you in Telegram; you take hypotheses to your doctor and forward the answer back; model calls go to a cloud AI provider" src="docs/assets/architecture.en.light.png">
 </picture>
 
-<sub>Seven streams — lab results, doctors' letters, Oura, Apple Health, genome, day context
-(calendar, weather, air), questionnaires — go into one local database; out of it come the morning
-brief, tasks and alerts. Interactive diagram with guided views and zoom — [`docs/assets/architecture.en.html`](docs/assets/architecture.en.html).</sub>
+<sub>Lab results, doctors' letters, Oura and Apple Health, genome, day context and your answers to the bot
+go into one database per person on your machine — lab results and diagnoses only after your “yes”. Out of it,
+via the trend, chance and document checks, come the morning brief, hypotheses, due dates and findings in Telegram.
+You take a hypothesis to your doctor and forward the answer to the bot: it comes back as input. Every model call
+sends text and scans to the provider you chose. Interactive diagram with guided views and zoom — [`docs/assets/architecture.en.html`](docs/assets/architecture.en.html).</sub>
 
 ---
 

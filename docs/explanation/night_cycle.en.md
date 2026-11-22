@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/night_cycle.md sha256:0f584590ec0b -->
+<!-- translation-of: docs/explanation/night_cycle.md sha256:44fef435fcbf -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](night_cycle.md)
@@ -7,13 +7,11 @@
 
 ## What Changed
 
-- **The bell depends on the repair-session mark — and that is now a fixed boundary.** Clarified: without the `notify.repair_provisioned` mark, the bell does not ring at all, including the case where the desk has lost its memory. Cards are preserved in that case, but the owner never learns about them. The age of the mark and the liveness of the repair do not silence the bell — only its absence does.
+- **A fifth closing author — "fixed"** (`decision_has_an_author`). A /bug report card can now be closed by a fix from the `bug_fixes.yaml` registry: that is neither the owner's word nor silence, so the author is recorded separately. The code has had it since v0.2.7; the registry caught up. (Written by hand.)
 
-- **Resolution paths in the bot do not yet exist.** As of 08.11.2026, not a single finding class (`KINDS`) has an implemented resolution path in the bot. This is stated explicitly, not hidden behind the phrasing "default may record a resolution."
+- **A report card is closed by a fix; recurrence is judged by the fault's version** (`bug_card_closed_by_fix`, new invariant, holds). Example: a fault came from v0.2.6, the fix shipped in v0.2.7 — the card is closed; the same fault again from v0.2.6 — the card stays closed, the old version is still running somewhere; from v0.2.7 — it reopens, the fix did not work. Boundary: only reports from v0.2.7 on carry the fault version. (Written by hand.)
 
-- **The oracle for bell behavior is defined.** The behavior is verified by the test `test_repair_provisioning_controls_bell` in `tests/unit/test_owner_nag.py` — this is the source of truth for this boundary.
-
-**Updated:** 2026-11-08
+**Updated:** 2026-11-09
 
 
 ## Why It Exists

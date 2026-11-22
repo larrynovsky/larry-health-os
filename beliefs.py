@@ -27,8 +27,7 @@ TOPICS: dict[str, dict] = {
                  "authority_source": "device_gps"},  # GPS (5:00 локально) — единственный авторитет локации; conversation/backfill демот
     "travel": {"kind": "event",
                "fact_keys": ("travel_plans", "upcoming_travel", "travel_plan"),
-               "state_patterns": ("рейс", "вылет", "flight", "поездк", "trip",
-                                  "аэропорт", "перелёт")},
+               "calendar": True},   # поездки — ТОЛЬКО из Google Calendar (calendar_client), решение владельца 15.11
 }
 
 
@@ -50,14 +49,13 @@ class Belief:
     valid_from: str | None
     confirmed: bool
     history: list = field(default_factory=list)   # demoted кандидаты (траектория, не стёрта)
-    status: str = "n/a"   # event-топики: planned | occurred | cancelled | unknown
+    status: str = "n/a"   # event-топики: planned (есть поездки в календаре) | unknown
+    events: list = field(default_factory=list)    # travel: поездки из календаря с датами (дом планов)
 
 
-# Сигналы модальности события. Безопасный дефолт — planned: НЕ ставим occurred без
-# ПОДТВЕРЖДЁННОГО сигнала (иначе воссоздаём баг «вылетел» из плана/догадки).
-_CANCEL_SIGNALS = ("не улет", "не полет", "не состоя", "cancel", "отмен", "перенёс",
-                   "перенес", "postpone", "дома", "at home", "не в отел")
-_OCCUR_SIGNALS = ("улетел", "вылетел", "прилетел", "flew", "arrived", "в отеле", "in hotel")
+# Все поездки в горизонте календаря (фетчер берёт 30 дней — их единицы, не сотни). 18.11: срез до 6
+# прятал купленный рейс 17.12, а шапка «авторитетна» — бот отвечал «рейса нет». Потолок — от разрастания.
+_CALENDAR_TRIPS_MAX = 25
 
 
 def _is_confirmed(f: dict) -> bool:
@@ -105,44 +103,28 @@ def _fact_candidates(spec: dict) -> list[Candidate]:
     return out
 
 
-def _state_candidates(spec: dict) -> list[Candidate]:
-    """Keyless-стейты, чей текст матчит паттерн топика (детерминировано, но брит­ко — v1)."""
-    pats = tuple(p.lower() for p in spec.get("state_patterns", ()))
-    if not pats:
-        return []
-    out: list[Candidate] = []
+def _calendar_trips() -> list[dict]:
+    """Поездки из календаря (дом планов): ближайшие, с датами. Прошедшие календарь уже отбросил,
+    отменённые в Google — фетчер (status=cancelled). Нет календаря → пусто, вера по памяти."""
     try:
-        import memory_facts_db as mf
-        states = mf.get_facts("state")
-    except Exception:  # silent-ok
-        return out
-    for s in states:
-        v = s.get("value") or ""
-        if any(p in v.lower() for p in pats):
-            out.append(Candidate(v, "state", (s.get("valid_from") or "")[:10],
-                                 _is_confirmed(s), s.get("id"), origin=s.get("source")))
-    return out
+        import calendar_client
+        evs = calendar_client.get_travel_events()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("beliefs: календарь недоступен — %s", exc)
+        return []
+    evs = [e for e in evs if e.get("start_date")]
+    return sorted(evs, key=lambda e: e["start_date"])
 
 
 def _resolve_event(topic: str, spec: dict) -> Belief:
-    """Event-топик: значение + СТАТУС из свежайших сигналов. Безопасный дефолт planned —
-    occurred только при ПОДТВЕРЖДЁННОМ occur-сигнале (не воссоздаём «вылетел» из догадки)."""
-    cands = _fact_candidates(spec) + _state_candidates(spec)
-    if not cands:
-        return Belief(topic, None, None, None, False, status="unknown")
-    ranked = sorted(cands, key=lambda c: c.valid_from, reverse=True)  # свежайшее первым
-    status = "planned"
-    for c in ranked:
-        low = c.value.lower()
-        if any(s in low for s in _CANCEL_SIGNALS):
-            status = "cancelled"
-            break
-        if c.confirmed and any(s in low for s in _OCCUR_SIGNALS):
-            status = "occurred"
-            break
-    top = ranked[0]
-    return Belief(topic, top.value, top.source, top.valid_from, top.confirmed,
-                  history=list(ranked[1:]), status=status)
+    """Event-топик (поездка): ТОЛЬКО из календаря — решение владельца 15.11 («Убрать»). Заметки памяти
+    по словам давали ложное («короткая ночь: везти друзей в аэропорт» → «поездка планируется»,
+    «first night at home after flight» → «отменено» для купленной поездки). Статус события —
+    по датам календаря (_render_calendar); «состоялось» система не утверждает никогда."""
+    events = _calendar_trips()
+    return Belief(topic, None, None, None, False, status="planned" if events else "unknown",
+                  events=events)
 
 
 def resolve(topic: str) -> Belief:
@@ -204,8 +186,41 @@ def authoritative_source_for_key(key: str | None) -> str | None:
 
 
 _TOPIC_RU = {"location": "локация", "travel": "поездка/перелёт"}
-_STATUS_RU = {"planned": "планируется", "cancelled": "отменено/перенесено", "occurred": "состоялось"}
 _AUTH_RU = {"device_gps": "по GPS телефона, 5:00 локально"}  # авторитетный источник → показываем его, не голое «подтверждено»
+
+
+def _render_calendar(topic: str, events: list) -> list[str]:
+    """Поездки из календаря: даты и статус по датам. Идущая по календарю — НЕ доказательство,
+    что вылет состоялся (план ≠ факт), поэтому так и пишем."""
+    from _time_inject import get_today
+    today = get_today().isoformat()
+    out = []
+    for e in events[:_CALENDAR_TRIPS_MAX]:
+        a, z = e["start_date"], e.get("end_date") or e["start_date"]
+        span = _ru_span(a, z)
+        st = ("по календарю идёт сейчас — что поездка началась, не подтверждено" if a <= today
+              else "планируется")
+        out.append(f"- {_TOPIC_RU.get(topic, topic)} по календарю: {e['title']}, {span} — {st}")
+    if len(events) > _CALENDAR_TRIPS_MAX:
+        out.append(f"- {_TOPIC_RU.get(topic, topic)}: … и ещё {len(events) - _CALENDAR_TRIPS_MAX} позже — "
+                   f"спроси query_calendar(travel_only), прежде чем говорить, что поездки нет")
+    try:
+        import calendar_client
+        hz = calendar_client.horizon_date()
+    except Exception:  # silent-ok: горизонт — пояснение к списку, без него список остаётся верным
+        hz = None
+    if hz:
+        head = (f"выше — ВСЕ поездки календаря до {hz:%d.%m.%Y}" if 0 < len(events) <= _CALENDAR_TRIPS_MAX
+                else f"поездки календаря загружены до {hz:%d.%m.%Y}" if events
+                else f"по календарю поездок до {hz:%d.%m.%Y} нет")
+        out.append(f"- {_TOPIC_RU.get(topic, topic)}: {head}; позже календарь не загружен — "
+                   f"отсутствие поездки там НЕ значит отмену")
+    return out
+
+
+def _ru_span(a: str, z: str) -> str:
+    d = lambda s: f"{s[8:10]}.{s[5:7]}.{s[:4]}"
+    return d(a) if a == z else f"{d(a)}–{d(z)}"
 
 
 def render_header() -> str:
@@ -215,11 +230,7 @@ def render_header() -> str:
     lines = []
     for t, b in all_beliefs().items():
         if TOPICS[t].get("kind") == "event":
-            if b.status == "occurred":
-                lines.append(f"- {_TOPIC_RU.get(t, t)}: состоялось")
-            elif b.status in ("planned", "cancelled"):
-                lines.append(f"- {_TOPIC_RU.get(t, t)}: НЕ состоялось (статус: "
-                             f"{_STATUS_RU[b.status]}) — НЕ считай, что это произошло")
+            lines += _render_calendar(t, b.events)
         elif b.value:
             if b.source in _AUTH_RU:
                 lines.append(f"- {_TOPIC_RU.get(t, t)}: {b.value} ({_AUTH_RU[b.source]})")

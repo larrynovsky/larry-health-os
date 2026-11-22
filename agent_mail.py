@@ -101,7 +101,8 @@ def send(to: list[str], subject: str, body: str, *, kind: str, reply_to=None, ta
     _text(body, "body", empty=True)
     if len(body) > 8000:
         raise ValueError("agent_mail: body exceeds 8000 characters")
-    if kind not in ("probe", "state", "lab_due", "regimen", "answer", "task", "nudge"):
+    if kind not in ("probe", "state", "lab_due", "regimen", "protocols", "protocol_fit", "answer", "task",
+                    "nudge"):
         raise ValueError("agent_mail: invalid kind")
     if reply_to is not None:
         _text(reply_to, "reply_to")

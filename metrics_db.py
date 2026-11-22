@@ -321,6 +321,8 @@ def upsert_metrics_from_json(day_str: str, data: dict, source: str = "Oura"):
             "readiness_hrv_balance":    data.get("hrv_balance"),
             "readiness_body_temp":      data.get("body_temperature"),
             "readiness_recovery_idx":   data.get("recovery_index"),
+            "temp_deviation":           data.get("temperature_deviation"),
+            "temp_trend_deviation":     data.get("temperature_trend_deviation"),
             "spo2_avg":                 spo2.get("avg") if isinstance(spo2, dict) else None,
             "breathing_disturbance":    data.get("breathing_disturbance"),
             "stress_summary":           stress.get("day_summary"),
@@ -511,6 +513,8 @@ METRIC_LABELS: dict[str, tuple[str, str]] = {
     "readiness": ("Готовность Oura", "баллы"),
     "readiness_hrv_balance": ("Готовность: баланс ВСР", "баллы"),
     "readiness_body_temp": ("Готовность: температура тела", "баллы"),
+    "temp_deviation": ("Отклонение температуры ночью от личной нормы", "°C"),
+    "temp_trend_deviation": ("Тренд отклонения температуры", "°C"),
     "readiness_recovery_idx": ("Готовность: индекс восстановления", "баллы"),
     "spo2_avg": ("SpO2 ночью", "%"),
     "breathing_disturbance": ("Индекс нарушений дыхания во сне", ""),
@@ -553,6 +557,23 @@ METRIC_LABELS: dict[str, tuple[str, str]] = {
 }
 _NOT_METRICS = ("date", "raw")
 _CLOCK_COLUMNS = ("sleep_start", "sleep_end")
+
+
+def temp_missing_runs(has_temp_by_night: list[bool]) -> tuple[int, int]:
+    """Чистая. Ночи СО СНОМ по возрастанию даты: True — градусы температуры пришли.
+    Возвращает (текущая серия ночей без градусов в конце ряда, самая длинная серия до неё).
+    Сторож (решение владельца 12.11): тревога, когда текущая серия длиннее всего, что бывало
+    в окне, — граница из своего ряда, не литерал (замер 12.11: у владельца 4 таких ночи за год,
+    самая длинная серия — 2)."""
+    runs, cur = [], 0
+    for has in has_temp_by_night:
+        if has:
+            if cur:
+                runs.append(cur)
+            cur = 0
+        else:
+            cur += 1
+    return cur, max(runs, default=0)
 
 
 def metric_columns(conn=None) -> list[str]:

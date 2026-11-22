@@ -75,13 +75,24 @@ def upsert_problem(problem_id: str, title: str, description: str = None,
             return cur.lastrowid
 
 
-def _add_text(ch: dict) -> str:
-    """Текст предложения «добавить проблему»: title+description с любого уровня вложенности
-    (GP кладёт поля либо в ch, либо в ch["new_value"])."""
+def _add_fields(ch: dict) -> dict:
+    """Поля предложения «добавить проблему» одним словарём — ЕДИНЫЙ дом слияния (было пять копий).
+    GP кладёт поля в ch, в ch["new_value"] словарём — или СТРОКОЙ. Замер 22.11: предложение 81
+    (одобрено 15.11) пришло с new_value-строкой — вся формулировка проблемы одной строкой; копии брали только
+    словарь, и в медкарту легла пустая проблема P008 (title «P008», description NULL).
+    Строка становится описанием, если своего нет; заголовок из описания делает apply_proposal."""
     src = dict(ch)
     nv = ch.get("new_value")
     if isinstance(nv, dict):
         src.update(nv)
+    elif isinstance(nv, str) and nv.strip() and not str(src.get("description") or "").strip():
+        src["description"] = nv.strip()
+    return src
+
+
+def _add_text(ch: dict) -> str:
+    """Текст предложения «добавить проблему»: title+description с любого уровня вложенности."""
+    src = _add_fields(ch)
     return " ".join(str(src.get(k) or "") for k in ("title", "description", "reason")).strip()
 
 
@@ -182,9 +193,7 @@ def _plain_for_add(ch: dict, source: str, prev_payload: str | None = None) -> st
     видел пропуск уже в медкарте. Порядок: готовое поле → прошлый текст той же правки (повтор
     не зовёт модель заново) → слова человека (онбординг — он сам так сказал) → модель.
     Неудача модели → None: карточка уходит без него, пропуск увидит датчик."""
-    src = dict(ch)
-    if isinstance(ch.get("new_value"), dict):
-        src.update(ch["new_value"])
+    src = _add_fields(ch)
     if (src.get("plain_summary") or "").strip():
         return src["plain_summary"].strip()
     if prev_payload:

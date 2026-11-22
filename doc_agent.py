@@ -731,6 +731,12 @@ def translate_page(page: str, *, entry: dict | None = None, dry_run: bool = Fals
         with client.messages.stream(task="doc_agent.translate_page", model=_model(), max_tokens=8000,
                                     messages=[{"role": "user", "content": prompt}]) as _s:
             resp = _s.get_final_message()
+        # Обрубок по max_tokens форма не видит (хвост таблицы без заголовков и ссылок), а хеш
+        # ставится от полного оригинала: duplicate_catch_log.en.md 08.10 ушёл так оборванным
+        # и пять недель числился свежим. Повтор с тем же лимитом не поможет — отказ сразу.
+        if getattr(resp, "stop_reason", None) == "max_tokens":
+            problems = ["ответ модели обрезан по max_tokens"]
+            break
         en_body = llm_client.answer_text(resp).strip() + "\n"
         problems = _en_problems(entry, ru_body, en_body)
         if not problems:

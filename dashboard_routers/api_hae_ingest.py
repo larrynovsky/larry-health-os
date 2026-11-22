@@ -83,6 +83,20 @@ async def hae_ingest(
         log.error("hae_ingest: парсинг/запись упали: %s", e, exc_info=True)
         raise HTTPException(400, f"не удалось обработать payload: {type(e).__name__}: {e}")
 
+    # Тренировки (11.11): у HAE отдельная автоматизация «Workouts» шлёт data.workouts сюда же.
+    # До этого ключ лежал в файле и не читался — фитнес с часов не доходил до брифа.
+    workouts_written = 0
+    try:
+        import json as _json
+        import import_apple_health as _iaw
+        import workouts_db as _wdb
+        for w in _iaw.parse_hae_workouts(_json.loads(body)):
+            _wdb.upsert_workout(w["date"], w)
+            workouts_written += 1
+    except Exception as e:  # noqa: BLE001 — метрики уже приняты; тренировки — громко, но не 500
+        log.error("hae_ingest: тренировки не записаны: %s", e, exc_info=True)
+        raise HTTPException(400, f"не удалось записать тренировки: {type(e).__name__}: {e}")
+
     # У каждой пришедшей метрики — хозяин (26.09). Прежний файловый скан (hae_checker.run_check,
     # снят 26.09) смотрел iCloud-каталоги, пустые после миграции на REST (06.07) — реестр не видел
     # НИ одной метрики, и давление тонометра пропадало молча. Судим здесь, на приёме; отказ судьи
@@ -107,9 +121,10 @@ async def hae_ingest(
     except Exception as _e:  # noqa: BLE001 — маркер не должен ронять уже принятые данные
         log.warning("hae_ingest: не удалось пометить свежесть apple_health: %s", _e)
 
-    log.info("hae_ingest: %d дней, %d строк, fresh=%s из %s",
-             len(daily), rows, marked_fresh, fpath.name)
-    return {"ok": True, "days": len(daily), "rows_written": rows, "marked_fresh": marked_fresh}
+    log.info("hae_ingest: %d дней, %d строк, тренировок %d, fresh=%s из %s",
+             len(daily), rows, workouts_written, marked_fresh, fpath.name)
+    return {"ok": True, "days": len(daily), "rows_written": rows,
+            "workouts_seen": workouts_written, "marked_fresh": marked_fresh}
 
 
 @router.post("/ecg")

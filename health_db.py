@@ -353,6 +353,10 @@ def _migrate_daily_metrics_v2():
         ("readiness_hrv_balance",   "INTEGER"),
         ("readiness_body_temp",     "INTEGER"),
         ("readiness_recovery_idx",  "INTEGER"),
+        # 11.11: отклонение температуры в °C от личной базы Oura (балл вклада выше — другая
+        # величина, нелинейная); до этого градусы выбрасывались в import_oura.parse_readiness.
+        ("temp_deviation",          "REAL"),
+        ("temp_trend_deviation",    "REAL"),
         ("total_kcal",              "REAL"),
         ("distance_km",             "REAL"),
         ("activity_score",          "INTEGER"),
@@ -871,6 +875,16 @@ def _seed_absolute_thresholds():
          'code_migration_F_2026-06-28', '2026-06-28', 'absolute', None, '', 'target'),
         ('spo2',  'floor', 94.0,   i18n.t('health_db.reason.spo2_low', "ru"),
          'code_migration_F_2026-06-28', '2026-06-28', 'absolute', None, '', ''),
+        # ── Ночная температура (решение владельца 12.11, нить temp-guards): одиночная ночь
+        # теплее pct% своих ночей за window дней — сигнал safety; судим от min ночей истории.
+        # Это ПАРАМЕТРЫ личного перцентиля, не норма: граница в °C считается из ряда тенанта
+        # на каждом прогоне (safety_net._temperature_alert). Поменять уровень — одна строка.
+        ('temp_deviation', 'ceiling', 95.0, i18n.t('health_db.reason.temp_pct', "ru"),
+         'owner_personal_2026-11-12', '2026-11-12', 'percentile', 'own_nights', '', 'temp_pct'),
+        ('temp_deviation', 'ceiling', 365.0, i18n.t('health_db.reason.temp_window', "ru"),
+         'owner_personal_2026-11-12', '2026-11-12', 'percentile', 'window_days', '', 'temp_window_days'),
+        ('temp_deviation', 'ceiling', 60.0, i18n.t('health_db.reason.temp_min_nights', "ru"),
+         'owner_personal_2026-11-12', '2026-11-12', 'percentile', 'min_nights', '', 'temp_min_nights'),
     ]
     with get_conn() as conn:
         # 26.09: порог давления переехал со среднего (bp_*) на пик дня (bp_*_max). INSERT OR
@@ -1327,6 +1341,37 @@ def _migrate_workouts_dedup():
         conn.execute(
             "CREATE UNIQUE INDEX idx_workouts_unique ON workouts(date, start_time)"
         )
+
+
+def _migrate_workouts_duration():
+    """Длительность тренировки из start/end там, где её нет (нить activity-temp, 11.11).
+
+    Oura v2 не отдаёт поле `duration`: замер 11.11 — NULL в 3388 из 3388 строк владельца
+    и 318 из 318 у партнёра. Писатель (workouts_db.upsert_workout) теперь считает сам; эта
+    миграция чинит историю тем же выражением. Идемпотентна: трогает только NULL."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE workouts SET duration_min = "
+            "ROUND((julianday(end_time) - julianday(start_time)) * 1440, 1) "
+            "WHERE duration_min IS NULL AND julianday(start_time) IS NOT NULL "
+            "AND julianday(end_time) IS NOT NULL")
+
+
+def _migrate_workouts_implausible_distance():
+    """Дистанция-сбой трекера → NULL в истории (нить brief-daylight-walks, 19.11).
+
+    Тот же потолок, что у писателя (workouts_db._plausible_distance): у владельца 10 прогулок
+    Oura >15 км, вплоть до 253 км. Исходное значение остаётся в raw. Идемпотентна."""
+    import workouts_db as _wdb
+    walk = ", ".join(f"'{k}'" for k in _wdb.MAX_KMH)
+    with get_conn() as conn:
+        n = conn.execute(
+            "UPDATE workouts SET distance_km = NULL WHERE distance_km > 0 AND duration_min > 0 "
+            f"AND distance_km / (duration_min / 60.0) > CASE WHEN lower(activity_type) IN ({walk}) "
+            "THEN ? ELSE ? END",
+            (max(_wdb.MAX_KMH.values()), _wdb.MAX_KMH_OTHER)).rowcount
+    if n:
+        log.warning("workouts: дистанция-сбой трекера обнулена в %d строках", n)
 
 
 def _migrate_lab_staging():
@@ -2082,8 +2127,11 @@ def _derive_metric_percentile(conn, metric: str, pct: int = 10, days: int = 90, 
     (brief-neutralization Фаза 3a). Метрика — только из белого списка (не user-input)."""
     import math
     if metric not in ("hrv", "readiness", "sleep_deep", "sleep_score", "sleep_total",
-                      "sleep_awake", "stress_high_min"):
+                      "sleep_awake", "stress_high_min", "temp_deviation"):
         return None
+    # Отклонение температуры — величина со знаком вокруг нуля: отбрасывать ≤0 значило бы
+    # выкинуть половину ночей и сдвинуть перцентиль вверх.
+    signed = metric == "temp_deviation"
     since = (reference_date or get_today()) - timedelta(days=days)
     try:
         rows = conn.execute(
@@ -2096,7 +2144,7 @@ def _derive_metric_percentile(conn, metric: str, pct: int = 10, days: int = 90, 
         return None
     vals = sorted(float(r[0]) for r in rows if r[0] is not None
                   and math.isfinite(float(r[0]))
-                  and (float(r[0]) >= 0 if metric == "stress_high_min" else float(r[0]) > 0))
+                  and (signed or (float(r[0]) >= 0 if metric == "stress_high_min" else float(r[0]) > 0)))
     if len(vals) < min_n:
         return None
     idx = max(0, math.ceil(pct / 100 * len(vals)) - 1)
@@ -2474,6 +2522,9 @@ def init_db():
     _ensure_data_repair_log()       # журнал вмешательств в значения (2026-07-31)
     _migrate_patient_profile_and_config()
     _migrate_agent_mail()
+    _migrate_protocol_outcomes()    # assistant-loop 10.11: выполнение и прогноз протокола
+    _migrate_protocol_fit()         # protocol-fit 11.11: «впишется ли» у ассистента до карточки
+    _migrate_hypothesis_predictions()   # hypothesis-predictions 11.11: прогноз гипотезы судит код
     _migrate_consultation_sessions()
     _migrate_visual_intake()        # symptom-intake WP0: visual_case/photo/domains (domain-agnostic)
     _migrate_pending_doc_reviews()
@@ -2512,6 +2563,8 @@ def init_db():
     _migrate_constitutions()        # 2026-06-18: constitutions DB-as-source (Option 3)
     _migrate_pharmaco_tables()      # 2026-06-26: фармакогенетика — genome_imports + pharmaco_phenotypes
     _migrate_workouts_dedup()    # 2026-06-28: dedup workouts + UNIQUE(date,start_time)
+    _migrate_workouts_duration() # 2026-11-11: длительность из start/end (Oura не отдаёт duration)
+    _migrate_workouts_implausible_distance()  # 2026-11-19: дистанция-сбой трекера → NULL
     _migrate_lab_staging()       # 2026-06-29: staging перераспознавания анализов (lab-recognizer)
     _migrate_lab_freshness_twotier()  # 2026-07-01: two-tier сроки валидности (stable + doctor)
     _migrate_lab_value_op()          # 2026-07-31: оператор сравнения в каноне
@@ -3882,6 +3935,136 @@ def _owner_assistant() -> str:
         return ""
 
 
+def _migrate_protocol_outcomes():
+    """Дом «что стало с протоколом» (protocol_outcomes, нить assistant-loop 10.11).
+    Выполнение — только пересказ ассистента (CHECK source); прогноз — один на протокол."""
+    with get_conn() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS protocol_adherence (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id INTEGER NOT NULL REFERENCES protocols(id),
+            period_from TEXT NOT NULL,
+            period_to   TEXT NOT NULL,
+            done        INTEGER NOT NULL CHECK(done >= 0),
+            planned     INTEGER NOT NULL CHECK(planned >= 1 AND done <= planned),
+            source      TEXT NOT NULL CHECK(source = 'assistant_report'),
+            letter_key  TEXT,
+            recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+            CHECK(period_from <= period_to),
+            UNIQUE(protocol_id, period_from, period_to));
+        CREATE TABLE IF NOT EXISTS protocol_predictions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id   INTEGER NOT NULL UNIQUE REFERENCES protocols(id),
+            metric        TEXT NOT NULL,
+            kind          TEXT NOT NULL CHECK(kind IN ('daily','lab')),
+            baseline      REAL NOT NULL,
+            baseline_from TEXT,
+            baseline_to   TEXT,
+            unit          TEXT,
+            change        REAL NOT NULL,
+            low           REAL NOT NULL,
+            high          REAL NOT NULL,
+            horizon       TEXT NOT NULL,
+            created       TEXT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','scored','missed','void')),
+            observed      REAL,
+            n_points      INTEGER,
+            within        INTEGER,
+            beat_persistence  INTEGER,
+            direction_correct INTEGER,
+            scored_at     TEXT,
+            CHECK(low <= change AND change <= high));
+        """)
+        for key, value in (("protocols.baseline_days", 30), ("protocols.score_window_days", 14),
+                           ("protocols.score_min_points", 7), ("protocols.lab_window_days", 45),
+                           ("protocols.horizon_min_days", 14), ("protocols.horizon_max_days", 365),
+                           ("protocols.scoring_max_age_days", 8)):   # оценщик еженедельный + сутки
+            conn.execute("INSERT OR IGNORE INTO system_config(key,value_num,category,source) "
+                         "VALUES (?,?,'protocols','assistant-loop_2026-11-10')", (key, value))
+        # Интервал прогноза — не шире 5 обычных разбросов показателя. Замер 11.11 (30 дней):
+        # «+45» сна при разбросе 0,60 ч = 75 разбросов (баг единиц); hrv −5…+1 при разбросе 4,05 = 1,2;
+        # реалистичные «+1,5 ч сна» = 2,5, «+10 readiness» при 4,1 = 2,4.
+        conn.execute("INSERT OR IGNORE INTO system_config(key,value_num,category,source) "
+                     "VALUES ('protocols.max_change_spread',5,'protocols','prediction-scale_2026-11-11')")
+
+
+def _migrate_hypothesis_predictions():
+    """Числовые прогнозы гипотез, которые оценивает код (hypothesis_verdict, нить hypothesis-predictions
+    11.11, Э1 плана plsi). Строка — один прогноз версии гипотезы; разбор версии — одна строка журнала."""
+    with get_conn() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS hypothesis_predictions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            memory_id     INTEGER NOT NULL,
+            version       INTEGER NOT NULL,
+            metric        TEXT NOT NULL,
+            kind          TEXT NOT NULL CHECK(kind IN ('daily','lab')),
+            baseline      REAL NOT NULL,
+            baseline_from TEXT,
+            baseline_to   TEXT,
+            unit          TEXT,
+            change        REAL NOT NULL,
+            low           REAL NOT NULL,
+            high          REAL NOT NULL,
+            horizon       TEXT NOT NULL,
+            created       TEXT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','scored','missed','void')),
+            observed      REAL,
+            n_points      INTEGER,
+            within        INTEGER,
+            beat_persistence  INTEGER,
+            direction_correct INTEGER,
+            scored_at     TEXT,
+            CHECK(low <= change AND change <= high),
+            UNIQUE(memory_id, version, metric));
+        CREATE TABLE IF NOT EXISTS hypothesis_prediction_runs (
+            memory_id   INTEGER NOT NULL,
+            version     INTEGER NOT NULL,
+            run_at      TEXT NOT NULL,
+            outcome     TEXT NOT NULL CHECK(outcome IN ('numeric','not_numeric','rejected','unparsed')),
+            note        TEXT,
+            PRIMARY KEY(memory_id, version));
+        """)
+        # 11.11 forecast-core: пороговый прогноз «не меньше / не больше X» — вид, сторона и сам порог.
+        have = {r[1] for r in conn.execute("PRAGMA table_info(hypothesis_predictions)")}
+        for col, ddl in (("form", "TEXT NOT NULL DEFAULT 'change' CHECK(form IN ('change','threshold'))"),
+                         ("bound", "TEXT CHECK(bound IN ('at_least','at_most'))"), ("threshold", "REAL")):
+            if col not in have:
+                conn.execute(f"ALTER TABLE hypothesis_predictions ADD COLUMN {col} {ddl}")
+        # Предел платных вызовов структуратора за проход: действующих гипотез 24 (замер 11.11),
+        # первый проход разбирает их все; дальше — единицы в неделю.
+        conn.execute("INSERT OR IGNORE INTO system_config(key,value_num,category,source) "
+                     "VALUES ('hypotheses.structure_per_pass',30,'hypotheses','hypothesis-predictions_2026-11-11')")
+
+
+def _migrate_protocol_fit():
+    """Проверка «впишется ли протокол в жизнь» у ассистента хозяина (protocol_fit, нить protocol-fit 11.11).
+    Ответ — только пересказ (CHECK source); одна неотправленная карточка на протокол."""
+    with get_conn() as conn:
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS protocol_fit_checks (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id   INTEGER NOT NULL REFERENCES protocols(id),
+            peer          TEXT NOT NULL,
+            letter_key    TEXT,
+            card          TEXT NOT NULL,
+            asked_at      TEXT NOT NULL,
+            verdict       TEXT CHECK(verdict IN ('fits','conflict')),
+            reason        TEXT,
+            answered_at   TEXT,
+            answer_letter TEXT,
+            source        TEXT NOT NULL CHECK(source = 'assistant_report'),
+            delivered_at  TEXT);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_protocol_fit_open
+            ON protocol_fit_checks(protocol_id) WHERE delivered_at IS NULL;
+        """)
+        # Срок ожидания: проба 10.11 — ответ ассистента через 17 минут, ассистент на всегда
+        # включённом MacBook; 4 ч — запас с карточкой в тот же день. Запас доставки — джоб почты раз в 5 минут.
+        for key, value in (("protocols.fit_wait_hours", 4), ("protocols.fit_delivery_slack_hours", 1)):
+            conn.execute("INSERT OR IGNORE INTO system_config(key,value_num,category,source) "
+                         "VALUES (?,?,'protocols','protocol-fit_2026-11-11')", (key, value))
+
+
 def _migrate_agent_mail():
     """Metadata only; agent_mail owns lifecycle writes. Reentrant fresh/upgrade migration."""
     with get_conn() as conn:
@@ -3954,11 +4137,15 @@ def _migrate_patient_profile_and_config():
         conn.execute("""INSERT OR IGNORE INTO system_config
                         (key, value_num, category, source)
                         VALUES ('tasks.guard_timeout_seconds', 2.0, 'tasks', 'task_guard')""")
-        from config_db import TASK_GUARD_BUDGET_SECONDS
+        from config_db import TASK_GUARD_BUDGET_SECONDS, TASK_GUARD_BREAKER_FAILURES
         conn.execute("""INSERT OR IGNORE INTO system_config
                         (key, value_num, category, source)
                         VALUES ('tasks.guard_budget_seconds', ?, 'tasks', 'task_guard')""",
                      (TASK_GUARD_BUDGET_SECONDS,))
+        conn.execute("""INSERT OR IGNORE INTO system_config
+                        (key, value_num, category, source)
+                        VALUES ('tasks.guard_breaker_failures', ?, 'tasks', 'task_guard')""",
+                     (TASK_GUARD_BREAKER_FAILURES,))
         # Раздел строки профиля — префикс ключа. Если category потеряна,
         # её можно восстановить из ключа, не меняя содержимое записи.
         conn.execute("UPDATE patient_profile SET category = substr(key, 1, instr(key, '.') - 1) "
@@ -4701,7 +4888,8 @@ from experiments_db import (  # noqa: E402
 
 # ── Поток C (2026-06-27): домен protocols вынесен в protocols_db.py ──
 from protocols_db import (  # noqa: E402
-    get_active_protocols, save_protocol, retire_protocol,
+    get_active_protocols, save_protocol, retire_protocol, unactionable_protocol_ids,
+    overdue_review_details,
 )
 
 
@@ -4758,7 +4946,7 @@ from labs_db import (  # noqa: E402
 # ── Поток C (2026-06-27): домен metrics → metrics_db.py ──
 from metrics_db import (  # noqa: E402
     get_day, get_window, get_stats, get_metric_percentiles, upsert_metrics_from_json, build_context,
-    render_all_metrics, metric_columns, data_sources,
+    render_all_metrics, metric_columns, data_sources, temp_missing_runs,
 )
 
 

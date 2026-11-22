@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/llm_provider.md sha256:95b2cd2fc262 -->
+<!-- translation-of: docs/how-to/llm_provider.md sha256:3c19883781dc -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](llm_provider.md)
@@ -63,13 +63,12 @@ containers will be recreated, and the database and keys will remain.
 - How the system selects a model and what happens when a provider disables it —
   [explanation](../explanation/model_choice.md).
 
-## Unset provider: migration release
+## Unset provider
 
-A nonempty `HEALTH_LLM_PROVIDER` wins. Without it, this migration release keeps
-Anthropic when `anthropic_key` exists, even alongside other keys, and logs a
-warning to set the variable. Otherwise it selects the sole key file from
-`methodology/llm_providers.json`. No keys, multiple non-Anthropic keys, or an
-invalid explicit value block AI calls and produce a log plus ru/en bot instructions
+A nonempty `HEALTH_LLM_PROVIDER` wins. Without it, the sole key file from
+`methodology/llm_providers.json` decides. No key files, several key files
+(including `anthropic_key` next to another key: since 2026-11-09 Anthropic has no
+seniority), or an invalid explicit value block AI calls and produce a log plus ru/en bot instructions
 at startup. Acknowledged instructions are suppressed until recovery; failed sends
 are retried at the next startup.
 
@@ -81,11 +80,12 @@ to Anthropic only when the Compose environment / `.env` value is empty.
 
 ## Native/tenant deployment and rollout order
 
-`native_environment` in `templates/launchd/placement.yaml` supplies the common
-environment for every native template, including host/env/none. `render_tenant`
-retains it for every ready service in `tenant_services.yaml`. `install.py
---provider openai` also works with `--tenant`; absent that flag, the installer
-uses `HEALTH_LLM_PROVIDER` from its environment, or the native Anthropic setting.
+Native plists (`render_launchd`, `render_tenant`, the shadow agent) carry
+`HEALTH_LLM_PROVIDER` only with an explicit `install.py --provider <name>` (also
+with `--tenant`); without the flag the template is unchanged byte for byte and the
+sole key file decides. `native_environment` in `templates/launchd/placement.yaml`
+is the fallback for the owner Compose override only; plists do not use it. The
+Colima agent gets no variable: it runs no Python.
 
 The native partner's LLM key remains shared: `Path.home()/.health_secrets`,
 not `HEALTH_SECRETS_DIR`. Under the same macOS account, owner and partner read
@@ -111,8 +111,12 @@ Rollout order (code inspected 2026-11-08):
    `--apply` against the frozen native owner database just to render plists: it calls
    `init_db`. Renderer functions can be called separately without installation.
 5. Only after verifying every installed AND loaded carrier, including partner
-   processes, ship strict multi-key rejection. This release has no automatic deadline
-   or strict-mode activation.
+   processes, ship strict multi-key rejection. Done 2026-11-09: 55 plists (all but
+   Colima, including `com.larry.healthbot.morningwake`, whose prefix a plain
+   `com.larry.health.*` glob misses) carry `anthropic`, 25 loaded jobs were reloaded and checked with
+   `launchctl print`, every Compose service was checked with `printenv`, and Studio
+   ssh sessions get the value from `~/.zshenv`. Backups:
+   `~/health_backups/backup-provider-<date>` on Studio.
 
 The all-service rendering guard covers owner/tenant plists, compose and optional
 services. An executable shell test verifies that container cron inherits OpenAI

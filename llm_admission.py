@@ -202,6 +202,8 @@ def judge_lab(text: str, gold: list[dict], complete: bool = False, page_date: st
     а судья, верящий «распознаватель поставит дату страницы», пропускал это.
     Совпадение с эталоном ищется сначала с той же датой (одно значение в текущей и прошлой
     колонке — не ошибка), затем любое.
+    Если кандидатов по имени нет, безымянная строка с raw_name получает имя через
+    публичный lab_promote.canon_of и _identity; значение, оператор и дата судятся как прежде.
     complete=True — эталон полный (синтетика): лишняя строка допустима, ТОЛЬКО если это значение
     прошлой колонки (history: {date, gold}) с её датой и без выдуманного оператора.
     У настоящих страниц эталон — promoted-строки, владелец мог часть отклонить: лишнее не судим."""
@@ -217,11 +219,18 @@ def judge_lab(text: str, gold: list[dict], complete: bool = False, page_date: st
 
     pool: dict = {}
     for r in rows:   # имя — по правилу канона, как у эталона (gold_from_promoted)
-        pool.setdefault(_identity(r), []).append(r)
+        pool.setdefault(_identity(r) or None, []).append(r)
     errs = []
     for g in gold:
         want = g.get("date") or page_date
         cands = pool.get(g["canonical_name"]) or []
+        if not cands:
+            from lab_promote import canon_of
+            cands = [c for c in pool.get(None, []) if c.get("raw_name")
+                     and _identity(dict(c, canonical_name=canon_of(dict(c, canonical_name=None)))) == g["canonical_name"]]
+            for c in cands:
+                pool[None].remove(c)
+            pool[g["canonical_name"]] = cands
         same = [c for c in cands if _eq(c.get("value"), g["value"])
                 and (c.get("value_op") or None) == (g.get("value_op") or None)]
         hit = next((c for c in same if not want or eff(c) == str(want)), None) or (same[0] if same else None)

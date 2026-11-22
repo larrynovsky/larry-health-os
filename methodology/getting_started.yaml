@@ -127,7 +127,7 @@ capabilities:
 
   - id: hyp
     group: time
-    intent: [hypothesis_experiment, consilium]
+    intent: [hypothesis_experiment, consilium, protocol_outcomes, protocol_fit, prediction_core, hypothesis_verdict]
     title: {ru: "Гипотезы о причинах", en: "Hypotheses about causes"}
     sub: {ru: "/hypotheses", en: "/hypotheses"}
     need: {ru: "Недели данных прибора и медкарта", en: "Weeks of device data and a medical record"}

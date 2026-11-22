@@ -1,59 +1,65 @@
-<!-- translation-of: docs/explanation/agent_signals.md sha256:8b8a883b374e -->
+<!-- translation-of: docs/explanation/agent_signals.md sha256:eeff39a4a49a -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](agent_signals.md)
 
-# Actions for a Personal Health-Signal Assistant: the Warm Layer
+# Actions for a Personal Health-Signal Assistant: Intent Explanation
 
 ## What Changed
 
-- **The `lab_interval_provenance_and_noise` invariant has been added (status: holds).** It is now explicitly recorded that a lab-test reminder includes the source of the due date — a physician, a manual setting, or an automatic system decision. This is a new promise, not prior behaviour under a new name.
-- **The limits of verification for this invariant have been recorded at the same time.** "Holds" means the invariant holds under the conditions that have been checked — not across the full possible range of configurations and edge cases. This is a scoping clarification, not an expansion of guarantees.
+- **The subsystem intent has been clarified.** A second responsibility is now explicitly stated: synchronising protocols with the assistant. Previously the emphasis was placed only on signal filtering and reminders; it is now recorded that the assistant receives the full, up-to-date list of protocols on every change and returns only execution counters — no interpretation, no right to change statuses.
 
-**Updated:** 2026-11-06
+- **The `protocols_primary_copy` invariant added (status: holds).** Explicitly established: the source of truth for protocols is always the system, not the assistant. The assistant does not keep "its own version" — the current list always comes from the system, including removed items. This is a new promise that now has a name and a status.
 
-**Updated:** 2026-11-07
+- **'Holds' means verified in the intended scenarios, not everywhere.** The *holds* status on the new invariant — as with the others — does not mean coverage of edge cases, non-standard configurations, or partial failures. This is a constraint, not an expansion of guarantees.
+
+**Updated:** 2026-11-10
 
 
 ## Why It Exists
 
-Imagine an assistant that is silent most of the time. Not because it is lazy, but because silence is also an answer: everything is fine, there is no reason to disturb you.
+When the body is working normally, the best thing the system can do is stay silent. Not send another "everything is fine", not remind about something it already reminded about yesterday, not create a background of notifications that people start ignoring by day three.
 
-But sometimes something changes. Load has persisted for too long. A lab test is due. A supplement you take is running out. In those moments the assistant needs to say something — once, to the point, without unnecessary noise.
+But staying silent *always* is also not an option: sometimes something genuinely deserves attention — it may be worth reconsidering workload, the time has come to get a lab test, an supplement needs to be remembered. This subsystem solves exactly that problem: speak only when there is a reason, and do not repeat without cause.
 
-That is exactly what this subsystem exists for. Its intent is simple: stay out of the way when everything is fine, and give a gentle reminder when there is a concrete reason to do so. This decision was made by the system owner — deliberately and explicitly.
+The second intent is to keep the assistant up to date on current protocols. Not relay them in pieces or trust it to remember old versions: on every change it receives the full, fresh list. In return the assistant reports exactly one thing — how many times each item was completed. It does not interpret, does not change statuses, does not make judgements about health.
 
-## What It Does, in Plain Words
+## What It Does, in Plain Terms
 
-Each morning the subsystem looks at your health signals and asks itself several questions.
+The subsystem acts as a filter and a courier at the same time.
 
-**Should the load be reconsidered?** If the data indicate that load has gone on too long, the assistant will suggest taking a look at it. If it already tried to do that yesterday, it will not repeat itself on the same day. But it will not "forget" either: it keeps a count of its attempts.
+**As a filter** it looks at health signals and decides whether anything should be sent. If indicators are within normal range — no message. If a signal of the same kind has already been sent today — no repeat. A new signal can only appear if something has genuinely changed — for example, stress that was not present in the morning has arisen.
 
-**Is it time to get lab work done?** If a lab-test due date is approaching or has already arrived, a reminder will come. It will honestly state where that due date came from: assigned by a physician, set by you manually, or decided by the system. This is not a minor detail — it matters to understand whose decision it is.
+When there is a reason, the subsystem composes one of several types of message:
 
-**Is a supplement reminder needed?** If it is time to restock or to take something on schedule, the assistant will say so.
+- **A prompt to reconsider workload** — not a command, but a signal for reflection.
+- **A supplement reminder** — taking into account how many times it has already been sent: repeated noise is not endless.
+- **A lab-test reminder** — and honesty matters here: the message shows where the due date came from. If the interval was set by a doctor at an appointment, that is visible. If it was set manually or came from system settings — that is visible too. When the system-derived due date has long passed, a soft note "at the nearest draw" is added — but only in that case.
 
-Several simple rules apply that the system always observes:
+There is one additional special signal: the sensor notices if the morning full pass was not completed and reports it if a recipient is configured.
 
-- **Normal means no message.** If everything is fine, no message will be sent. Silence means "all is well," not "something is broken."
-- **A repeat is not duplicated.** The same event will not disturb you twice in one day.
-- **An empty recipient switches everything off.** If no message recipient is configured, the subsystem goes completely silent. This is not an error; it is an intentional safeguard.
-- **Numbers and thresholds are not its concern.** The subsystem does not decide what counts as normal or abnormal. Those decisions are stored separately, in the parts of the system responsible for them. The assistant only acts on their signal.
+**As a courier** the subsystem synchronises protocols. When the protocol list changes, the assistant receives it in full — including items that were removed. If the list is empty from the start, nothing is sent. The assistant does not keep "its own version" of the protocols — the current one always comes from the system.
 
-Each morning the subsystem also checks whether a full morning data review has taken place. If it did not happen or is stale, that too is noticed.
+Feedback from the assistant is intentionally narrow: only execution counters in the established format. Nothing else. Protocol status is changed only by the system, not by the assistant.
 
-## What Should Be Honestly Said About Its limits
+All of this operates within a single database: the recipient, data, and attempt log belong to a specific process. If no recipient is configured — the entire path is disabled, no messages go anywhere.
 
-The subsystem works as described above, and all of its core promises hold at the time of writing. But it is important to understand that "holds" and "verified under any conditions" are different things.
+Numerical thresholds, percentiles, and lab-test intervals are not held by the system itself — it reads them from a shared configuration where each such value has its own owner.
 
-The rules about silence when normal, about no duplicates, about the provenance of lab due dates, about counting attempts — all of these hold. However, none of them has been checked across the full range of possible situations: rare data combinations, non-standard configurations, edge cases at the boundaries of the schedule.
+## What Is Honest to Say About Its Limits
 
-This does not mean the system is unreliable. It means the system is honest in its claims: it does what it promises, under the conditions that have been checked. Beyond those conditions lies reasonable caution, not a guarantee.
+All stated properties of the subsystem — that normal range stays silent, that there are no repeats, that the origin of the interval is shown, that protocols are sent as a full snapshot — have been verified and hold. This does not mean they have been verified under every possible condition. "Holds" and "verified everywhere" are different claims, and only the former is appropriate here.
 
-If you notice that something arrived at the wrong time, arrived twice, or did not arrive at all — that is worth reporting. The system does not claim perfection; it claims honesty.
+More specifically: the subsystem's behaviour was verified in the scenarios that were anticipated during development. Edge cases — unusual combinations of signals, non-standard configurations, behaviour under partial failures — are not declared as fully covered.
+
+There are no invariants that honestly need to be described as "does not hold" or "open": all stated properties have *holds* status at the time of this description.
+
+It is also worth understanding separately what the subsystem **is not**: it does not make diagnoses, does not interpret deviations on its own, and does not replace a doctor. It passes signals and synchronises protocols — nothing more.
 
 ## Where This Lives in the System
 
-The subsystem lives in the file **`agent_signals.py`** — that is where the logic resides that looks at signals and decides whether anything needs to be done. The intentions and rules it follows are described in **`subsystem_intent.yaml`** — that is something like its constitution: what it must do and what it must never do.
+The signal-filtering logic, message composition, and attempt tracking live in **`agent_signals.py`**. The morning-pass sensor and the protocol-synchronisation mechanism are there as well.
 
-These two files read each other. One knows the rules; the other executes them. If you want to understand why the assistant behaved the way it did, it is best to start with `subsystem_intent.yaml`: it is written in human terms, explaining why everything is arranged exactly this way.
+The subsystem's intent — why it is structured this way, what decisions were made and why — is recorded in **`subsystem_intent.yaml`**. This is not a technical config but an intent document: it explains what is considered correct behaviour and what the system promises to uphold.
+
+Together these two files give the complete picture: one says *what* happens, the other — *why*.

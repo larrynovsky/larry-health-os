@@ -1001,3 +1001,38 @@ def test_inferred_foreign_provider_never_receives_owner_admission(monkeypatch, t
     monkeypatch.setattr(admission, "admission_budget", lambda: {"cap": 1})
     monkeypatch.setattr(hai_core, "get_client", lambda: pytest.fail("foreign transport opened"))
     assert "--provider" in admission.run_admission()["skipped"]
+
+
+@pytest.mark.parametrize("change,expected", [
+    ({}, []),
+    ({"value": 49.0}, ["RDW_SD: 49.0 вместо 43.0"]),
+    ({"raw_name": None}, ["RDW_SD: пропущен"]),
+    ({"raw_name": "unknown synthetic analyte"}, ["RDW_SD: пропущен"]),
+    ({"raw_name": "Hemoglobin"}, ["RDW_SD: пропущен"]),
+    ({"value_op": "<"}, ["RDW_SD: <43.0 вместо 43.0"]),
+    ({"date": "2026-01-02"}, ["RDW_SD: дата 2026-01-02 вместо 2026-01-01"]),
+    ({"unit": "%"}, ["RDW_SD: пропущен"]),
+    ({"canonical_name": "Hemoglobin"}, ["RDW_SD: пропущен"]),
+])
+def test_unnamed_rdw_uses_production_name_rule(change, expected):
+    """Синтетическая страница: RDW напечатан дважды; значения выдуманы."""
+    gold = [{"canonical_name": "RDW", "value": 13.0},
+            {"canonical_name": "RDW_SD", "value": 43.0}]
+    rows = [{"canonical_name": "RDW", "raw_name": "RDW", "unit": "%", "value": 13.0, "date": "2026-01-01"},
+            {"canonical_name": None, "raw_name": "RDW", "unit": "фл", "value": 43.0,
+             "date": "2026-01-01", **change}]
+    assert la.judge_lab(json.dumps({"tests": rows}), gold, page_date="2026-01-01") == expected
+    if not change:
+        assert la.judge_lab(json.dumps({"tests": rows}), gold, complete=True,
+                            page_date="2026-01-01") == []
+
+
+def test_unnamed_fallback_preserves_named_priority_and_consumes_once():
+    """Значения выдуманы; запасная строка не скрывает ошибку именованной."""
+    gold = [{"canonical_name": "RDW_SD", "value": 43.0}]
+    unnamed = {"raw_name": "RDW", "unit": "фл", "value": 43.0}
+    assert la.judge_lab(json.dumps({"tests": [unnamed]}), gold, complete=True) == []
+    assert la.judge_lab(json.dumps({"tests": [unnamed]}), gold * 2) == ["RDW_SD: пропущен"]
+    assert la.judge_lab(json.dumps({"tests": [{"value": 43.0}]}), gold) == ["RDW_SD: пропущен"]
+    named = {"canonical_name": "RDW_SD", "value": 49.0}
+    assert la.judge_lab(json.dumps({"tests": [unnamed, named]}), gold) == ["RDW_SD: 49.0 вместо 43.0"]

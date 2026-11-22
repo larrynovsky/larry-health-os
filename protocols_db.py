@@ -13,17 +13,43 @@ def get_active_protocols(domain=None):
         if domain:
             rows = conn.execute(
                 "SELECT id,title,behavior,rationale,frequency,domain,"
-                "reminder_days,linked_hypothesis_id,created_at "
+                "reminder_days,linked_hypothesis_id,created_at,review_date "
                 "FROM protocols WHERE status='active' AND domain=? ORDER BY id",
                 (domain,)
             ).fetchall()
         else:
             rows = conn.execute(
                 "SELECT id,title,behavior,rationale,frequency,domain,"
-                "reminder_days,linked_hypothesis_id,created_at "
+                "reminder_days,linked_hypothesis_id,created_at,review_date "
                 "FROM protocols WHERE status='active' ORDER BY id"
             ).fetchall()
     return [dict(r) for r in rows]
+
+
+def unactionable_protocol_ids(protocols: list[dict]) -> list[int]:
+    """Действующие протоколы без поведения или без даты пересмотра: их нельзя ни выполнить,
+    ни спросить о выполнении, ни пересмотреть вовремя."""
+    return [p["id"] for p in protocols
+            if not str(p.get("behavior") or "").strip() or not p.get("review_date")]
+
+
+def overdue_review_details(protocols: list[dict], today) -> list[str]:
+    """Действующие протоколы с прошедшей датой пересмотра — по строке на каждый:
+    «#id «название» — просрочен на N дн. (review_date)», самые старые первыми.
+    Без имён и сроков предупреждение датчика нельзя превратить в вопрос владельцу
+    (карточка 2026-11-12: «4 протоколов…» — и больше ничего)."""
+    from datetime import date as _date
+    out = []
+    for p in protocols:
+        rd = str(p.get("review_date") or "")[:10]
+        try:
+            days = (today - _date.fromisoformat(rd)).days
+        except ValueError:
+            continue  # silent-ok: нет даты или не разбирается — это unactionable_protocol_ids
+        if days > 0:
+            title = str(p.get("title") or "").strip() or "без названия"
+            out.append((days, f"#{p['id']} «{title[:60]}» — просрочен на {days} дн. ({rd})"))
+    return [line for _, line in sorted(out, key=lambda x: -x[0])]
 
 
 def save_protocol(protocol: dict) -> int:
@@ -34,6 +60,8 @@ def save_protocol(protocol: dict) -> int:
       review_in_days (int)         — вычисляет review_date от сегодня.
     """
     from datetime import datetime as _dt, timedelta as _td
+    if not str(protocol.get("behavior") or "").strip():
+        raise ValueError("protocol without behavior is not saved")
     review_date = protocol.get("review_date")
     if protocol.get("review_in_days") and not review_date:
         review_date = str(get_today() + _td(days=int(protocol["review_in_days"])))

@@ -427,3 +427,19 @@ def test_resolver_never_writes_a_row_of_another_category(db):
     assert ok is False
     assert hr._read_hypothesis_row(mid) is None
     assert db.fetchone("SELECT value FROM memory WHERE id=?", (mid,))["value"] == "plain text"
+
+
+def test_пересмотр_не_переносит_числовой_прогноз_на_новую_версию(db):
+    """Прогноз в числах принадлежит версии текста: иначе код судил бы новый текст по старым числам."""
+    old = [{"metric": "hrv", "horizon_days": 30, "threshold": 22, "bound": "at_least"}]
+    hyp_id = _add_hyp(db, {"observation": "x", "prediction": "ВСР удержится ≥22", "test": "t", "version": 0,
+                           "forecast": old, "no_forecast_reason": None})
+    verdict = {"verdict": "partial", "confidence": 0.7, "reasoning": "ok",
+               "revised_hypothesis": {"observation": "x2", "prediction": "ВСР вырастет", "test": "t2"}}
+    with patch("hypothesis_resolution.generate_protocol_from_hypothesis", return_value={}), \
+         patch("hypothesis_resolution.save_protocol", return_value=1):
+        from hypothesis_resolution import resolve_hypothesis
+        resolve_hypothesis(hyp_id, verdict)
+    p = _load_payload(db, hyp_id)["payload"]
+    assert "forecast" not in p and "no_forecast_reason" not in p
+    assert p["history"][0]["forecast"] == old and p["version"] == 1

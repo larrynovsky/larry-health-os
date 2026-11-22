@@ -48,8 +48,10 @@ RUN set -eu; \
 # PYSEC-2026-3447 — setuptools). Обе уязвимости срабатывают при установке и сборке пакетов, не в работе
 # служб, но образ ставит пакеты при каждой сборке. Версии закреплены (§9): «последняя» дала бы другой
 # образ через месяц. Обновлять — docs/how-to/dependency_updates.md, раздел про образ.
+# setuptools 83.0.0 → 84.1.0: GHSA-xmj3-9gf7-h52w (pip-audit, карточка security:pip_audit).
+# Пол версий стережёт tests/unit/test_docker_installer_pins.py.
 ARG PIP_VERSION=26.2.1
-ARG SETUPTOOLS_VERSION=83.0.0
+ARG SETUPTOOLS_VERSION=84.1.0
 RUN pip install --no-cache-dir --timeout 120 --retries 10 "pip==${PIP_VERSION}" "setuptools==${SETUPTOOLS_VERSION}"
 
 COPY --from=wheels /wheels /wheels

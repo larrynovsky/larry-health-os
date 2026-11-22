@@ -413,8 +413,8 @@ def test_all_rendered_services_have_explicit_provider(tmp_path, provider):
     tenant = install.render_tenant(values, "t2", 8002)
     assert {n.removesuffix(".plist") for n in owner} == set(install.placement())
     assert len(tenant) == sum(st == "ready" for st in install.tenant_services().values())
-    # Плисты несут переменную только при явном выборе: живые плисты владельца её пока не
-    # несут (миграция — BL-LLM-PROVIDER-STRICT-1), до неё держит переходный режим provider().
+    # Плисты несут переменную только при явном выборе; без него решает единственный файл
+    # ключа, несколько — отказ provider() (BL-LLM-PROVIDER-STRICT-1, строгий с 09.11).
     for name, body in {**owner, **tenant}.items():
         pl = plistlib.loads(body.encode() if isinstance(body, str) else body)
         assert pl.get("EnvironmentVariables", {}).get("HEALTH_LLM_PROVIDER") == provider, name

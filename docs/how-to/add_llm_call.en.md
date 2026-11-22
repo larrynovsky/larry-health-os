@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/add_llm_call.md sha256:42e9858ab6e2 -->
+<!-- translation-of: docs/how-to/add_llm_call.md sha256:f8985ea65d41 -->
 **English** · [Русский](add_llm_call.md)
 
 # How to add a new model call

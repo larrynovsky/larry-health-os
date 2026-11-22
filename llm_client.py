@@ -81,10 +81,14 @@ class ProviderConfigurationError(ValueError):
 
 
 def provider() -> str:
-    """Explicit environment wins; otherwise infer with a staged legacy migration.
+    """Explicit environment wins; otherwise exactly one key file decides.
 
     Legacy installer defaults have no provenance: a nonempty value must be
     treated as explicit. Inspect filenames only, never key contents.
+    Several key files without HEALTH_LLM_PROVIDER refuse, Anthropic included:
+    the migration release that preferred anthropic_key ended 2026-11-09
+    (BL-LLM-PROVIDER-STRICT-1) after loaded launchd, Compose and Studio ssh
+    environments were given an explicit value.
     """
     import logging
     import os
@@ -93,14 +97,6 @@ def provider() -> str:
     if not p:
         found = [name for name, profile in choices.items()
                  if (_KEY_FILE.parent / profile["key_file"]).is_file()]
-        if "anthropic" in found:
-            # Migration release: native launchd jobs predate the variable and can
-            # share an Anthropic key with optional admission keys. Remove only
-            # after installed AND loaded job environments have been migrated.
-            logging.getLogger(__name__).warning(
-                "HEALTH_LLM_PROVIDER is unset: keeping legacy Anthropic because anthropic_key exists; "
-                "set HEALTH_LLM_PROVIDER=anthropic in launchd/compose before strict provider selection")
-            return "anthropic"
         if len(found) == 1:
             return found[0]
         reason = "no provider key files" if not found else "multiple provider key files"

@@ -147,9 +147,19 @@ def protocols(request: Request):
         FROM protocols
         ORDER BY status DESC, created_at DESC
     """)
+    import protocol_fit
+    import protocol_outcomes
+    protos = [dict(r) for r in rows]
     return templates.TemplateResponse(request, "protocols.html", {
         "request": request,
-        "protocols": [dict(r) for r in rows],
+        "protocols": protos,
+        # До первой миграции новой версии таблиц ещё нет — страница остаётся прежней.
+        "outcomes": ({p["id"]: protocol_outcomes.for_protocol(p["id"]) for p in protos if p["status"] == "active"}
+                     if _has_table("protocol_predictions") else {}),
+        "calibration": protocol_outcomes.calibration() if _has_table("protocol_predictions") else None,
+        # «Впишется ли» — ответ ассистента при рождении протокола (protocol-fit, 11.11).
+        "fits": ({p["id"]: protocol_fit.fit_line(p["id"]) for p in protos}
+                 if _has_table("protocol_fit_checks") else {}),
     })
 
 
@@ -279,10 +289,10 @@ def proposals(request: Request):
                     lines.append(i18n.t("dashboard.proposal.literature", lang, tag=tag,
                                         summary=str(ch.get("summary") or "")[:180]))
                 elif act in ("add", "add_problem", "create_problem"):
-                    _nv = ch.get("new_value") if isinstance(ch.get("new_value"), dict) else {}
+                    import problems_db as _pdb
+                    _nv = _pdb._add_fields(ch)   # new_value словарём или строкой (22.11)
                     lines.append(i18n.t("dashboard.proposal.new_problem", lang,
-                                        title=ch.get("title") or _nv.get("title") or
-                                        str(ch.get("description") or _nv.get("description") or "")[:140]))
+                                        title=_nv.get("title") or str(_nv.get("description") or "")[:140]))
                 else:
                     lines.append(f"{act}{tag}: {str(ch.get('summary') or ch.get('title') or ch)[:160]}")
         except Exception:

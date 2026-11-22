@@ -38,6 +38,12 @@ KNOWN_NAME_READERS = {
     "assessment_scheduler.py",
     "constitution_analysis.py",
     "dashboard_routers/views.py",
+    # 10.11 assistant-loop, 11.11 вынесено в ядро: оценка прогноза (протокола и гипотезы) — одна
+    # точка против базы, по lab_canon.normalize и той же единице (не тренд); другая единица = пропуск.
+    "prediction_core.py",
+    # 11.11 hypothesis-predictions: только СПИСОК имён анализов до даты прогноза — для промпта
+    # структуратора (значения не читаются); суд по аналиту — в prediction_core.
+    "hypothesis_verdict.py",
     "doc_reviews_db.py",
     "health_db.py",
     "import_coordinator.py",

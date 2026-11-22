@@ -121,6 +121,49 @@ _ARBITER_EXTRACT_PROMPT = """
 
 # ── Data package для оценки ──────────────────────────────────────────────────
 
+def _protocol_block(memory_id) -> list[str]:
+    """Что стало с протоколами гипотезы: выполнение (пересказ ассистента) и оценка прогноза кодом.
+    Ответ возвращается входом (doctor_in_loop), а не репликой; сбой блока не роняет пакет — громко."""
+    if not memory_id:
+        return []
+    try:
+        import protocol_outcomes
+        lines = protocol_outcomes.hypothesis_lines(int(memory_id))
+    except Exception as e:  # silent-ok: громко в notify.fault, пакет без блока
+        import notify
+        notify.fault(f"eval package: protocol block failed ({type(e).__name__})", person_key=None)
+        return []
+    try:   # «впишется ли» — ответ ассистента при рождении (protocol-fit); сбой не прячет оценку выше
+        import protocol_fit
+        with db.get_conn() as conn:
+            ids = [r[0] for r in conn.execute(
+                "SELECT id FROM protocols WHERE linked_hypothesis_id=? ORDER BY id", (int(memory_id),))]
+        lines += [f"  {line}" for pid in ids if (line := protocol_fit.fit_line(pid))]
+    except Exception as e:  # silent-ok: громко в notify.fault, блок без строк ассистента
+        import notify
+        notify.fault(f"eval package: protocol fit lines failed ({type(e).__name__})", person_key=None)
+    if not lines:
+        return []
+    import i18n
+    return [i18n.t("hypothesis_consilium.package.protocols_header"), *lines, ""]
+
+
+def _verdict_block(memory_id) -> list[str]:
+    """Вердикт кода по числовым прогнозам гипотезы (hypothesis_verdict): консилиум видит уже
+    поставленную оценку, а не ставит её сам. Сбой блока не роняет пакет — громко."""
+    if not memory_id:
+        return []
+    try:
+        import hypothesis_verdict
+        lines = hypothesis_verdict.verdict_lines(int(memory_id))
+    except Exception as e:  # silent-ok: громко в notify.fault, пакет без блока
+        import notify
+        notify.fault(f"eval package: verdict block failed ({type(e).__name__})", person_key=None)
+        return []
+    import i18n
+    return [i18n.t("hypothesis_verdict.package_header"), *lines, ""]
+
+
 def _build_eval_data_package(hypothesis: dict) -> str:
     """Строит data package: гипотеза + полная история лабных данных."""
     db.init_db()
@@ -172,6 +215,8 @@ def _build_eval_data_package(hypothesis: dict) -> str:
         labs_db.declared_boundary(730, unjudged=True),
         "",
         *([codraw, ""] if codraw else []),
+        *_protocol_block(hypothesis.get("memory_id")),
+        *_verdict_block(hypothesis.get("memory_id")),
         "═══════════════════════════════════════",
         "ЗАДАЧА КОНСИЛИУМА:",
         f"Оцените, подтвердилась ли гипотеза. Предсказание: «{pred}».",

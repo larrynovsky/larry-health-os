@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/epistemic_discipline.md sha256:b3798e5923df -->
+<!-- translation-of: docs/explanation/epistemic_discipline.md sha256:9e76a13de519 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](epistemic_discipline.md)

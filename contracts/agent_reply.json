@@ -75,6 +75,15 @@
         "t"
       ],
       "why": "localized confirmation question"
+    },
+    {
+      "module": "task_guard",
+      "uses": [
+        "start_batch",
+        "audit_new_task",
+        "report_failure"
+      ],
+      "why": "one batch per letter; optional shadow pair audit before save_task, storage remains owned by tasks_db"
     }
   ],
   "disposability": {
@@ -84,11 +93,11 @@
       "D2": "reply_to_letter(letter) — вход; compose и allowed_peers публичны ради теста шага; остальное приватное; reply_to_letter / queue_fact_questions — независимые входы письма; compose / allowed_peers сохранены.",
       "D3": "только публичные контракты agent_mail, mcp_tools, llm_client, hai_core, config_db. Судья — публичный gp_context.judge_absence_claims; политика доставки остаётся здесь; Публичные операции зависимостей перечислены в depends_on; извлечение без записи через hai_chat, запись вопросов через tasks_db.",
       "D4": "~75 строк, из них треть — системная инструкция модели; Один существующий модуль; извлекатель переиспользован из hai_chat, очередь из tasks_db.",
-      "D5": "tests/unit/test_agent_reply.py — 7 тестов на заглушке модели; plans/mutate_agent_reply_2026-11-05.sh — 6 мутаций красные (05.11); tests/unit/test_agent_reply.py: синтетические записи, подменённая модель и транспорт; plans/mutate_assistant_facts_2026-11-07.sh исполняет пять мутаций границы подтверждения.",
-      "D6": "общий с agent_mail инвариант: письмо — данные, наружу только через send; общий с mcp_gateway — одно окно в данные (mcp_tools). Поправка судьи проходит redact/visible_names в send вместе с ответом; отказ судьи не задерживает письмо; общий с agent_mail инвариант: письмо — данные, наружу только через send; общий с mcp_gateway — одно окно в данные (mcp_tools)."
+      "D5": "tests/unit/test_agent_reply.py — 7 тестов на заглушке модели; plans/mutate_agent_reply_2026-11-05.sh — 6 мутаций красные (05.11); tests/unit/test_agent_reply.py: синтетические записи, подменённая модель и транспорт; plans/mutate_assistant_facts_2026-11-07.sh исполняет пять мутаций границы подтверждения. tests/unit/test_task_guard.py checks assistant journal pairs, batch sharing, deduplication and audit failure with synthetic SQLite and mocked HTTP.",
+      "D6": "общий с agent_mail инвариант: письмо — данные, наружу только через send; общий с mcp_gateway — одно окно в данные (mcp_tools). Поправка судьи проходит redact/visible_names в send вместе с ответом; отказ судьи не задерживает письмо; общий с agent_mail инвариант: письмо — данные, наружу только через send; общий с mcp_gateway — одно окно в данные (mcp_tools). queue_fact_questions passes shadow verdicts to save_task; audit failure logs and reports a throttled fault without preventing question persistence. Same-letter siblings share budget and breaker state; deduplication remains in tasks_db."
     },
     "rationale": "Переписывается за час по контракту: собрать окно mcp_tools, позвать модель с письмом как user-данными, НЕТ_ОТВЕТА/обрезка — не слать, иначе send(kind=answer, reply_to).",
-    "date": "2026-11-07",
+    "date": "2026-11-21",
     "oracle": "мутации «любой адресат», «НЕТ_ОТВЕТА уходит», «обрезанный уходит», «второй ответ», «предел не действует», «письмо в системный промпт» красные — прогон 2026-11-05; 07.11.2026: все пять мутаций assistant-facts убиты утверждениями о сохранённых вопросах/памяти. Поведение реальной LLM не проверялось."
   }
 }

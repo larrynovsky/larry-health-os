@@ -48,14 +48,13 @@ def test_container_real_stale_key_still_flagged(tmp_path, monkeypatch):
     assert "machine-check" not in stale[0] and ".partner" not in stale[0]
 
 
-def test_container_only_import_watchdog_left_unclassified(tmp_path, monkeypatch):
-    """Ревью 721aefad, п.2: constitutions классифицирована (датчик с 25.09), единственная
-    ожидаемая находка «без датчика» в контейнере — import-watchdog (решение — следующей сессии).
-    Снять constitutions из MONITORED → здесь красное, а не только в ночной строке."""
+def test_container_has_no_unclassified_job(tmp_path, monkeypatch):
+    """Ревью 721aefad, п.2: constitutions классифицирована (датчик с 25.09). До 13.11 здесь
+    ожидалась одна находка — import-watchdog; её закрыл check_import_pulses_alive (карточка
+    warn:producer_registry). Снять constitutions или import-watchdog из MONITORED → красное."""
     _container(monkeypatch, _container_plists(tmp_path))
     orphans = [f for f in pr.collect_producer_findings() if "без датчика" in f]
-    assert len(orphans) == 1 and "com.larry.health.import-watchdog" in orphans[0], orphans
-    assert "com.larry.health.constitutions" not in orphans[0]
+    assert not orphans, orphans
 
 
 def test_unknown_placement_is_an_error_not_a_foreign_service():

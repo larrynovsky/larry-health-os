@@ -124,6 +124,7 @@ def queue_fact_questions(letter: dict) -> list[int]:
     import hai_chat
     import i18n
     import tasks_db
+    import task_guard
 
     if letter.get("peer") not in allowed_peers():
         return []
@@ -165,14 +166,24 @@ def queue_fact_questions(letter: dict) -> list[int]:
                                      name=item["name"], note=item.get("note", "")))
     ids = []
     seen = set()
+    guard_batch = task_guard.start_batch()
     for claim in claims:
         claim = " ".join(mcp_tools.redact(claim).split())
         if not claim or claim.casefold() in seen:
             continue
         seen.add(claim.casefold())
         fingerprint = hashlib.sha256((source + "\n" + claim.casefold()).encode()).hexdigest()
-        tid = tasks_db.save_task(source, "question", i18n.t("tasks.assistant_fact.question", claim=claim),
-                                 fingerprint=fingerprint, max_per_source=int(limit))
+        content = i18n.t("tasks.assistant_fact.question", claim=claim)
+        try:
+            guard_verdicts = task_guard.audit_new_task(
+                {"source": source, "type": "question", "content": content}, batch=guard_batch)
+        except Exception:  # optional audit must never prevent saving a confirmation question
+            log.warning("task_guard: evaluation unavailable; assistant question retained without pair audit")
+            task_guard.report_failure()
+            guard_verdicts = []
+        tid = tasks_db.save_task(source, "question", content,
+                                 fingerprint=fingerprint, max_per_source=int(limit),
+                                 guard_verdicts=guard_verdicts)
         if tid is not None:
             ids.append(tid)
     return ids

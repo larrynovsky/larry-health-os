@@ -86,7 +86,7 @@
 Нужен клон: `git clone https://github.com/larrynovsky/larry-health-os.git`. Здесь все
 остальные инструкции: [Git](git_workflow.md), [тесты](run_tests.md),
 [упавший ночной прогон](handle_test_failure.md), [вторая машина](two_machine_setup.md),
-[своё дерево для нити](thread_worktree.md), [дашборд](extend_dashboard.md),
+[своё дерево для нити](thread_worktree.md), [коммит в main встал — ночные починки](night_repair_respond.md), [дашборд](extend_dashboard.md),
 [домены](add_domain.md), [опросники](add_instrument.md), [зависимости](dependency_updates.md),
 [документация](update_docs.md), [выпуск образа](release.md),
 [открытый репозиторий](publish_mirror.md).

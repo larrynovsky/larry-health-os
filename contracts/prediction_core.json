@@ -1,0 +1,60 @@
+{
+  "module": "prediction_core",
+  "public": [
+    "cfg",
+    "daily_metrics",
+    "predictable_metrics",
+    "metric_scales",
+    "accept_prediction",
+    "judge_prediction",
+    "observed",
+    "refutes"
+  ],
+  "depends_on": [
+    {
+      "module": "health_db",
+      "uses": [
+        "get_conn"
+      ],
+      "why": "читает daily_metrics и lab_results — база, разброс, наблюдение"
+    },
+    {
+      "module": "config_db",
+      "uses": [
+        "get_config"
+      ],
+      "why": "числа политики protocols.* (общие для протоколов и гипотез)",
+      "legacy": "контракта config_db ещё нет; используется только get_config — стабилен с 2026-06"
+    },
+    {
+      "module": "lab_canon",
+      "uses": [
+        "normalize"
+      ],
+      "why": "имя аналита в прогнозе — через единственный дом имён",
+      "legacy": "контракта lab_canon ещё нет; используется только normalize — единственный дом имени аналита, стабилен с 2026-07"
+    },
+    {
+      "module": "_time_inject",
+      "uses": [
+        "get_today"
+      ],
+      "why": "замораживаемое «сегодня»",
+      "legacy": "шов времени без контракта; get_today — единственное используемое имя"
+    }
+  ],
+  "disposability": {
+    "verdict": "disposable",
+    "items": {
+      "D1": "один домен: прогноз, который оценивает код, — приём (база, масштаб, горизонт), окно наблюдения и суд; где хранить прогноз и кому показывать — у вызывающих (protocol_outcomes, hypothesis_verdict)",
+      "D2": "семь публичных функций — числа политики, допустимые показатели и их масштаб для промпта, приём, наблюдение, суд; служебное — _baseline, _spread, _has_labs, _num, _sign; исключение PredictionRejected — часть контракта (его ловят вызывающие)",
+      "D3": "только стабильные контракты: get_conn, get_config, lab_canon.normalize",
+      "D4": "~190 строк",
+      "D5": "tests/unit/test_prediction_core.py, test_protocol_outcomes.py (22), test_hypothesis_predictions.py (19); мутации: mutate_protocol_outcomes (10) и mutate_hypothesis_verdict (16, из них 7 по ядру) — все красные",
+      "D6": "общие инварианты: без ретродикции (наблюдение строго после даты прогноза), сравнение с «ничего не изменится», масштаб по разбросу; схема хранения — у вызывающих"
+    },
+    "rationale": "Перенесён дословно из protocol_outcomes, поведение закреплено прежними тестами и мутациями; переписывается с нуля по ним.",
+    "date": "2026-11-11",
+    "oracle": "tests/unit/test_protocol_outcomes.py"
+  }
+}

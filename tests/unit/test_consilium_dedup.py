@@ -63,3 +63,33 @@ def test_save_consilium_hypothesis_proceeds_when_semcheck_errors():
 
     mock_save.assert_called_once()
     assert result == 7
+
+
+def test_консилиум_передаёт_прогноз_в_числах_а_старое_поле_не_меняется():
+    """Этап В (11.11): forecast едет рядом; prediction по-прежнему how_to_check — его читают люди."""
+    import monthly_consilium as mc
+    fc = [{"metric": "hrv", "horizon_days": 30, "threshold": 22, "bound": "at_least"}]
+    for given, expected in ((fc, fc), ("не список", None), (None, None)):
+        with patch("hypothesis_semantic_check.check", return_value=(False, None, "")), \
+             patch("hai_hypotheses.save_hypothesis", return_value=5) as mock_save, \
+             patch.object(mc.db, "save_cbcr_payload", return_value=None):
+            assert mc._save_consilium_hypothesis({**_HYP, "forecast": given, "no_forecast_reason": "нет"}) == 5
+        kw = mock_save.call_args.kwargs
+        assert kw["forecast"] == expected and kw["prediction"] == "сравнить HRV и шаги за месяц"
+
+
+def test_инструкция_координатора_несёт_раздел_прогноза(monkeypatch):
+    import monthly_consilium as mc
+    monkeypatch.setattr("hypothesis_verdict.forecast_forms_now", lambda: "ФОРМЫ-И-ПОКАЗАТЕЛИ")
+    seen = {}
+
+    class Client:
+        class messages:
+            @staticmethod
+            def create(**kw):
+                seen.update(kw)
+                raise RuntimeError("стоп")
+    monkeypatch.setattr(mc.llm_client, "guarded_client", lambda: Client)
+    assert mc._run_coordinator("пакет", [])["hypotheses"] == []
+    assert "ФОРМЫ-И-ПОКАЗАТЕЛИ" in seen["system"] and "no_forecast_reason" in seen["system"]
+    assert "Не подбирай тему под измеримое" in seen["system"]

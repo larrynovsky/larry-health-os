@@ -1350,15 +1350,20 @@ def generate_daily_report(target: date = None, gate_sink: dict = None) -> str:
     try:
         with db.get_conn() as _wcon:
             _wkts = _wcon.execute(
-                "SELECT activity_type, duration_min, distance_km, calories, avg_hr "
+                "SELECT activity_type, duration_min, distance_km, calories, avg_hr, source "
                 "FROM workouts WHERE date=? ORDER BY start_time",
                 (str(activity_date),)
             ).fetchall()
         if _wkts:
-            context_lines.append("ТРЕНИРОВКИ:")
+            # Шаги не мерят силовую и велосипед: тренировка — нагрузка дня наравне с ними (11.11).
+            context_lines.append(i18n.t("gp.workouts.header"))
             for _w in _wkts:
-                _dur = _w["duration_min"] or 0
-                _wl = f"  {_w['activity_type'] or '?'}: {_dur:.0f}м"
+                # Длительности нет → не печатаем «0м» (так было у всех тренировок Oura до 11.11).
+                _wl = f"  {_w['activity_type'] or '?'}"
+                if _w["duration_min"]:
+                    _wl += i18n.t("gp.workouts.minutes", n=_w["duration_min"])
+                if _w["source"] == "AppleHealth":
+                    _wl += i18n.t("gp.workouts.watch")
                 if _w["distance_km"]:
                     _wl += f"  {_w['distance_km']:.1f}км"
                 if _w["calories"]:

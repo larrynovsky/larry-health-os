@@ -26,14 +26,15 @@ def test_absolute_thresholds_migration_creates_table(db):
 
 def test_absolute_thresholds_seed_populates_records(db):
     """Seed создаёт 11 floors (6 absolute: hrv/readiness/sleep_deep/sleep_score/sleep_total/spo2
-    + 5 relative/singles: hrv×3, steps×2) + 3 ceilings (bp_sys/bp_dia + персонализируемый sleep_awake)."""
+    + 5 relative/singles: hrv×3, steps×2) + 6 ceilings (bp_sys/bp_dia + персонализируемый sleep_awake
+    + 3 параметра сигнала температуры temp_deviation, нить temp-guards 12.11: уровень/окно/минимум ночей)."""
     import health_db
     health_db._migrate_absolute_thresholds()
     health_db._seed_absolute_thresholds()
     floors = db.fetchall("SELECT * FROM absolute_thresholds WHERE direction='floor'")
     ceilings = db.fetchall("SELECT * FROM absolute_thresholds WHERE direction='ceiling'")
     assert len(floors) == 11
-    assert len(ceilings) == 3
+    assert len(ceilings) == 6
 
 
 def test_absolute_thresholds_seed_is_idempotent(db):
@@ -44,7 +45,7 @@ def test_absolute_thresholds_seed_is_idempotent(db):
     health_db._seed_absolute_thresholds()
     health_db._seed_absolute_thresholds()
     rows = db.fetchall("SELECT * FROM absolute_thresholds")
-    assert len(rows) == 14
+    assert len(rows) == 17
 
 
 def test_get_absolute_thresholds_returns_floors_only(db):
@@ -64,9 +65,13 @@ def test_get_absolute_thresholds_returns_ceilings_only(db):
     health_db._migrate_absolute_thresholds()
     health_db._seed_absolute_thresholds()
     ceilings = health_db.get_absolute_thresholds("ceiling")
-    assert len(ceilings) == 3
+    assert len(ceilings) == 6
     metrics = {c["metric"] for c in ceilings}
-    assert metrics == {"bp_systolic_max", "bp_diastolic_max", "sleep_awake"}  # пик дня (26.09)
+    assert metrics == {"bp_systolic_max", "bp_diastolic_max", "sleep_awake", "temp_deviation"}  # пик дня (26.09)
+    # параметры температуры — не абсолютные потолки: kind=percentile, свой variant (потребители
+    # абсолютных потолков их не берут — services/recommendations._own фильтрует variant/kind)
+    temp = {c["variant"]: c["kind"] for c in ceilings if c["metric"] == "temp_deviation"}
+    assert temp == {"temp_pct": "percentile", "temp_window_days": "percentile", "temp_min_nights": "percentile"}
 
 
 def test_get_absolute_thresholds_no_filter_returns_all(db):
@@ -74,7 +79,7 @@ def test_get_absolute_thresholds_no_filter_returns_all(db):
     health_db._migrate_absolute_thresholds()
     health_db._seed_absolute_thresholds()
     all_thr = health_db.get_absolute_thresholds()
-    assert len(all_thr) == 14   # 11 floors + 3 ceilings
+    assert len(all_thr) == 17   # 11 floors + 6 ceilings
 
 
 def test_get_absolute_thresholds_ignores_inactive(db):

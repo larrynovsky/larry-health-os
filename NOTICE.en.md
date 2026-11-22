@@ -1,4 +1,4 @@
-<!-- translation-of: NOTICE.md sha256:7842e27f6b8e -->
+<!-- translation-of: NOTICE.md sha256:5d640f9ad219 -->
 **English** · [Русский](NOTICE.md)
 
 # License and third-party data

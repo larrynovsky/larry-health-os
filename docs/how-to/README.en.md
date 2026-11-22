@@ -1,4 +1,4 @@
-<!-- translation-of: docs/how-to/README.md sha256:839554eca8d3 -->
+<!-- translation-of: docs/how-to/README.md sha256:d8a8f8f89c0a -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](README.md)
@@ -90,7 +90,7 @@ from the image need them.
 A clone is required: `git clone https://github.com/larrynovsky/larry-health-os.git`. All
 remaining guides are here: [Git](git_workflow.md), [tests](run_tests.md),
 [failed nightly run](handle_test_failure.md), [second machine](two_machine_setup.md),
-[worktree for a thread](thread_worktree.md), [dashboard](extend_dashboard.md),
+[worktree for a thread](thread_worktree.md), [a commit to main is blocked — night repairs](night_repair_respond.md), [dashboard](extend_dashboard.md),
 [domains](add_domain.md), [questionnaires](add_instrument.md), [dependencies](dependency_updates.md),
 [documentation](update_docs.md), [image release](release.md),
 [public mirror](publish_mirror.md).

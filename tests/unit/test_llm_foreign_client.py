@@ -404,17 +404,19 @@ def test_explicit_admission_client_uses_its_own_key(monkeypatch, tmp_path):
     assert received == [{"api_key": "synthetic-anthropic"}]
 
 
-def test_migration_keeps_owner_with_two_keys_but_warns(monkeypatch, tmp_path, caplog):
+def test_two_keys_without_choice_refuse_even_with_anthropic(monkeypatch, tmp_path, caplog):
+    """BL-LLM-PROVIDER-STRICT-1: anthropic_key no longer wins by seniority."""
     monkeypatch.delenv("HEALTH_LLM_PROVIDER", raising=False)
     monkeypatch.setattr(lc, "_KEY_FILE", tmp_path / "anthropic_key")
     (tmp_path / "anthropic_key").write_text("synthetic-owner")
     (tmp_path / "deepseek_key").touch()
-    assert lc.provider() == "anthropic"
-    assert lc.api_key() == "synthetic-owner"
-    assert "keeping legacy Anthropic" in caplog.text
-    assert "HEALTH_LLM_PROVIDER=anthropic" in caplog.text
+    with pytest.raises(lc.ProviderConfigurationError, match="multiple provider key files"):
+        lc.provider()
     assert "synthetic-owner" not in caplog.text
     caplog.clear()
+    monkeypatch.setenv("HEALTH_LLM_PROVIDER", "anthropic")
+    assert lc.provider() == "anthropic"
+    assert lc.api_key() == "synthetic-owner"
     monkeypatch.setenv("HEALTH_LLM_PROVIDER", "deepseek")
     assert lc.provider() == "deepseek"
     assert not caplog.records
@@ -430,7 +432,7 @@ def test_partner_provider_and_api_key_share_home_not_tenant_secrets(monkeypatch,
     partner = home / ".health_secrets_partner"
     partner.mkdir()
     (shared / "anthropic_key").write_text("synthetic-shared")
-    (shared / "deepseek_key").touch()
+    (partner / "deepseek_key").touch()   # tenant secrets are NOT the LLM key directory
     env = {**os.environ, "HOME": str(home), "PYTHONPATH": site.getusersitepackages(),
            "HEALTH_DATA_DIR": str(home / "health_partner"), "HEALTH_SECRETS_DIR": str(partner)}
     env.pop("HEALTH_LLM_PROVIDER", None)
@@ -442,4 +444,3 @@ assert lc.provider() == 'anthropic'
 assert lc.api_key() == 'synthetic-shared'
 """], env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert "keeping legacy Anthropic" in result.stderr

@@ -102,6 +102,11 @@ async def _confirm_hypothesis(message, hyp_id):
         )
         protocol_id = await asyncio.to_thread(hai.save_protocol, protocol_data)
 
+        import protocol_fit
+        if await asyncio.to_thread(protocol_fit.awaiting, protocol_id):
+            # Карточка придёт одна, вместе с ответом ассистента (protocol-fit, 11.11).
+            await message.reply_text(i18n.t("protocols.reply.fit_pending", protocol_id=protocol_id))
+            return
         lines = [
             i18n.t("protocols.reply.created", protocol_id=protocol_id),
             "",

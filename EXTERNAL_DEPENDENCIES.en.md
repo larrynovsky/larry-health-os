@@ -1,4 +1,4 @@
-<!-- translation-of: EXTERNAL_DEPENDENCIES.md sha256:22e202e4f3e5 -->
+<!-- translation-of: EXTERNAL_DEPENDENCIES.md sha256:edd78e1cbfdc -->
 **English** · [Русский](EXTERNAL_DEPENDENCIES.md)
 
 # EXTERNAL_DEPENDENCIES.md — External artifact registry

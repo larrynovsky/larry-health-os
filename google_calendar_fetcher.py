@@ -321,6 +321,7 @@ def fetch_and_cache() -> bool:
 
     cache = {
         "fetched_at": now_utc.isoformat(),
+        "time_max":   time_max,   # горизонт выборки: позже этого события в кэше нет вообще (читатель говорит об этом)
         "account":    account,
         "calendars":  calendars,
         "events":     all_events,

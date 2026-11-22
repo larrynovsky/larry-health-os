@@ -11,8 +11,9 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-# Engineering latency budget; shared by schema seed and runtime fallback.
+# Engineering batch limits; shared by schema seeds and runtime fallbacks.
 TASK_GUARD_BUDGET_SECONDS = 20.0
+TASK_GUARD_BREAKER_FAILURES = 3
 
 
 def default_visit_specialist() -> str:

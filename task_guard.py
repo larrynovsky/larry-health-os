@@ -34,6 +34,8 @@ class _Batch:
     started_at: float
     deadline: float | None = None
     breaker_open: bool = False
+    transport_failures: int = 0
+    breaker_failures: int | None = None
     not_configured: bool = False
 
 
@@ -173,6 +175,17 @@ def audit_new_task(new: dict, *, batch: _Batch | None = None, judge=None) -> lis
             log.warning("task_guard: invalid budget; using default")
             budget = config_db.TASK_GUARD_BUDGET_SECONDS
         batch.deadline = batch.started_at + budget
+    if batch.breaker_failures is None:
+        try:
+            raw = config_db.get_config("tasks.guard_breaker_failures",
+                                       config_db.TASK_GUARD_BREAKER_FAILURES)
+            failures = float(raw)
+            if isinstance(raw, bool) or not 1 <= failures <= 20 or not failures.is_integer():
+                raise ValueError("invalid breaker failures")
+            batch.breaker_failures = int(failures)
+        except (TypeError, ValueError, OverflowError):
+            log.warning("task_guard: invalid breaker failures; using default")
+            batch.breaker_failures = config_db.TASK_GUARD_BREAKER_FAILURES
     opened = tasks_db.get_open_tasks(limit=-1)
     candidate = {**new, "id": -1, "status": "open", "type": new.get("type", "action")}
     evaluated_at = get_now().isoformat()
@@ -194,7 +207,10 @@ def audit_new_task(new: dict, *, batch: _Batch | None = None, judge=None) -> lis
             else:
                 verdict = (judge or judge_pair)(new, task, timeout=min(timeout, remaining))
                 if verdict["reason"] in {"provider_unavailable", "http_error"}:
-                    batch.breaker_open = True
+                    batch.transport_failures += 1
+                    batch.breaker_open = batch.transport_failures >= batch.breaker_failures
+                elif verdict["verdict"] in _CHOICES:
+                    batch.transport_failures = 0
                 elif verdict["reason"] == "not_configured":
                     batch.not_configured = True
         out.append({**verdict, "open_task_id": task["id"], "evaluated_at": evaluated_at})

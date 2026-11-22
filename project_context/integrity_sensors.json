@@ -1050,6 +1050,132 @@
           "verdict": "ПОКРАСНЕЛ"
         }
       ]
+    },
+    "check_protocols_actionable": {
+      "harness": "tests/unit/test_protocols_actionable.py",
+      "ran_at": "2026-11-10",
+      "mutations": [
+        {
+          "tag": "predicate-absent",
+          "statement": "protocols_db без unactionable_protocol_ids и без отказа на пустой behavior (HEAD-версия) проваливает тест датчика и тест дома.",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "generator-unguarded",
+          "statement": "hai_hypotheses без ProtocolIncomplete (HEAD-версия) проваливает тест оборванного ответа и тест даты пересмотра.",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_protocol_scoring_alive": {
+      "harness": "tests/unit/test_protocol_outcomes.py",
+      "ran_at": "2026-11-10",
+      "mutations": [
+        {
+          "tag": "never-stale",
+          "statement": "scoring_stale, всегда отвечающий «не просрочен», проваливает test_датчик_оценщика.",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_protocol_fit_cards_delivered": {
+      "harness": "tests/unit/test_protocol_fit.py",
+      "ran_at": "2026-11-11",
+      "mutations": [
+        {
+          "tag": "never-overdue",
+          "statement": "overdue, всегда отвечающий пустым списком, проваливает test_датчик_доставки_краснеет_на_застрявшей_карточке.",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_temperature_arrives": {
+      "harness": "plans/mutate_temp_guards_2026-11-12.sh",
+      "ran_at": "2026-11-12",
+      "mutations": [
+        {
+          "tag": "runs-not-counted",
+          "statement": "серии ночей без градусов не считаются — текущая серия всегда ноль",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "guard-not-judging",
+          "statement": "сторож не сравнивает текущую серию с самой длинной за год",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_hae_workouts_automation": {
+      "harness": "plans/mutate_temp_guards_2026-11-12.sh",
+      "ran_at": "2026-11-12",
+      "mutations": [
+        {
+          "tag": "run-is-packet",
+          "statement": "запуск соседней автоматизации считается пакетом, а не часом — один сеанс телефона даёт два «запуска»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "copy-ignored",
+          "statement": "пакет тренировок после окончания тренировки Oura не снимает тревогу",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "no-workout-alarm",
+          "statement": "тревога без тренировки Oura после первого пакета — человек просто не тренировался",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "guard-unplugged",
+          "statement": "состояние «молчит» не превращается в предупреждение",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
+    },
+    "check_import_pulses_alive": {
+      "harness": "plans/mutate_import_pulses_2026-11-14.sh",
+      "ran_at": "2026-11-14",
+      "mutations": [
+        {
+          "tag": "withings-not-judged",
+          "statement": "импорт Withings без отметки после планового запуска не даёт предупреждения",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "watchdog-tolerance-back",
+          "statement": "сторожу свежести Apple Health прощается один пропущенный запуск (допуск в два интервала)",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "watchdog-no-pulse-silent",
+          "statement": "сторож, ни разу не отметившийся, не даёт предупреждения",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "unjudged-silent",
+          "statement": "нет плиста сторожа — датчик молчит вместо «не судимо»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "watchdog-writes-no-pulse",
+          "statement": "import_watchdog не пишет пульс прогона",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "withings-no-pulse-when-not-connected",
+          "statement": "import_withings не пишет пульс на прогоне «не подключён»",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "pulse-key-drift",
+          "statement": "ключ пульса у писателя разошёлся с тем, что читает датчик",
+          "verdict": "ПОКРАСНЕЛ"
+        },
+        {
+          "tag": "registry-orphan",
+          "statement": "import-watchdog выпал из реестра производителей",
+          "verdict": "ПОКРАСНЕЛ"
+        }
+      ]
     }
   },
   "_harm": "Кого задевает поломка, которую ловит датчик (нить repair-order, решение владельца 02.10): person — человек получает неверное или не получает нужное (совет, отчёт, бриф, ответ бота); data — портятся или устаревают данные, на которых всё строится; system — только внутренняя кухня (гейты, документы, журналы, тесты). Читатель — night_repair.pick_cards: первое место ночи самой вредной карточке, второе — старейшей. Новый датчик приходит с пометкой: tests/consistency/test_sensor_harm_declared.py краснеет на датчике без неё. Разметка 02.10 — суждение по имени и метке датчика; спорные отнесены к system и перечислены в записке нити.",
@@ -1078,6 +1204,9 @@
       "check_problem_plain_summary",
       "check_promote_conflicts",
       "check_proposals_delivered",
+      "check_protocol_fit_cards_delivered",
+      "check_protocol_scoring_alive",
+      "check_protocols_actionable",
       "check_public_genotype_profile",
       "check_pubmed_egress_neutral",
       "check_question_answer_integrity",
@@ -1094,6 +1223,7 @@
       "check_schedule_vs_guideline",
       "check_stale_visual_cases",
       "check_symptom_prompt_discipline",
+      "check_temperature_arrives",
       "check_tenant_triage_alive",
       "check_triage_delivery_liveness",
       "check_unrepeated_draw_not_swamping",
@@ -1136,6 +1266,8 @@
       "check_glossary_targets_known",
       "check_gp_schedule",
       "check_hae_arrivals_have_owner",
+      "check_hae_workouts_automation",
+      "check_import_pulses_alive",
       "check_lab_canon_health",
       "check_lab_class_verdicts_complete",
       "check_lab_freshness",
@@ -1152,6 +1284,7 @@
       "check_literature_freshness_partner",
       "check_loinc_decisions_possible",
       "check_longitudinal_freshness",
+      "check_macbook_health_jobs",
       "check_memory_facts_growth",
       "check_memory_facts_invariants",
       "check_norm_coverage",
@@ -1196,8 +1329,7 @@
       "check_unresolved_evaluations",
       "check_urine_name_convention",
       "check_visual_orphans",
-      "check_wellness_genome_sync",
-      "check_macbook_health_jobs"
+      "check_wellness_genome_sync"
     ],
     "system": [
       "check_arbiter_liveness",

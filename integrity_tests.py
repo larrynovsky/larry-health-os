@@ -472,6 +472,40 @@ def check_protocols():
 check("протоколы читаются", check_protocols)
 
 
+def check_protocols_actionable():
+    """Действующий протокол обязан нести поведение и дату пересмотра (нить assistant-loop, 10.11):
+    01.11 два протокола легли без поведения молча, у всех восьми не было даты пересмотра."""
+    import protocols_db
+    bad = protocols_db.unactionable_protocol_ids(db.get_active_protocols())
+    assert not bad, (f"{len(bad)} действующих протоколов без поведения или даты пересмотра: "
+                     f"#{', #'.join(map(str, bad))}")
+
+
+check("протоколы исполнимы и пересматриваются", check_protocols_actionable)
+
+
+def check_protocol_scoring_alive():
+    """Прогнозы протоколов оценивает код раз в неделю (check_hypothesis_evaluations). Если оценщик
+    не ходит, консилиум читает «окно ещё не закрыто» вечно — это тихая ложь, а не пауза."""
+    import protocol_outcomes
+    stale, n_open, last = protocol_outcomes.scoring_liveness()
+    assert not stale, f"оценщик прогнозов не ходил с {last or 'никогда'}, открытых прогнозов: {n_open}"
+
+
+check("оценщик прогнозов протоколов жив", check_protocol_scoring_alive)
+
+
+def check_protocol_fit_cards_delivered():
+    """Карточка нового протокола придержана до ответа ассистента (protocol-fit). Если её не отправили
+    через срок ожидания + запас доставки, человек так и не узнаёт о протоколе — это тихая потеря."""
+    import protocol_fit
+    stuck = protocol_fit.overdue()
+    assert not stuck, f"карточки протоколов не отправлены после срока: проверки {stuck}"
+
+
+check("карточки новых протоколов доставлены", check_protocol_fit_cards_delivered)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 if not JSON_OUTPUT:
     print(f"\n[5] Задачи — pipeline постановки задач")
@@ -866,6 +900,14 @@ def check_llm_answer_parsed():
 check("ответ модели разбирается", check_llm_answer_parsed)
 
 
+# Отчёты agent_reports, чей текст до человека не доходит: читатель — следующий шаг конвейера.
+# Причина обязательна (как у _ABSENCE_SURFACE_ACCEPTED ниже). Замер 22.11: тревогу «Folate» дала
+# сырая аннотация PubMed («Anemia in Infants and Children…») в отчёте 552, а не совет пациенту.
+_RECO_MACHINE_ONLY = {
+    "literature_search": "сырые аннотации PubMed (pubmed_searcher); читает publication_reader, не человек",
+}
+
+
 def check_reco_repeats_fresh_lab():
     """Текст советует сдать анализ, который уже сдан СВЕЖЕЕ окна мониторинга.
 
@@ -896,13 +938,19 @@ def check_reco_repeats_fresh_lab():
     # возврата (JSON координатора, строки задач), а у монитора она есть. Класс тот же.
     texts = []
     with db.get_conn() as conn:
+        # Машинные склады вне периметра: их текст читает код, а не человек (_RECO_MACHINE_ONLY).
+        _skip = tuple(_RECO_MACHINE_ONLY)
         for r in conn.execute(
                 "SELECT date, agent_name, COALESCE(recommendations,'') AS a, "
-                "COALESCE(findings,'') AS b FROM agent_reports WHERE date >= ?",
-                (since,)).fetchall():
+                "COALESCE(findings,'') AS b FROM agent_reports WHERE date >= ? "
+                f"AND COALESCE(agent_type, '') NOT IN ({','.join('?' * len(_skip))})",
+                (since, *_skip)).fetchall():
             texts.append((f"отчёт {r['agent_name']}", (r["a"] + " " + r["b"]).strip()))
+        # 'duplicate' — след судьи повторов (tasks_db.record_duplicate_skip): задача НЕ создана,
+        # человек её не видит, текст хранится сырым (замер 22.11: задача 332 «Сдать магний»).
         for r in conn.execute(
-                "SELECT source, content FROM tasks WHERE COALESCE(source_date, '') >= ?",
+                "SELECT source, content FROM tasks WHERE COALESCE(source_date, '') >= ? "
+                "AND COALESCE(status, '') != 'duplicate'",
                 (since,)).fetchall():
             texts.append((f"задача {r['source']}", r["content"] or ""))
         try:
@@ -6471,11 +6519,82 @@ def check_review_dates():
     if op > 0:
         warn(f"{op} проблем с просроченным review_date", "требуют пересмотра")
     if oc > 0:
-        warn(f"{oc} протоколов с просроченным review_date", "требуют пересмотра")
+        import protocols_db
+        lines = protocols_db.overdue_review_details(db.get_active_protocols(), today)
+        warn(f"{oc} протоколов с просроченным review_date",
+             "требуют пересмотра: " + "; ".join(lines) if lines else "требуют пересмотра")
     return (op, oc)
 
 
 check("review_date проблем и протоколов", check_review_dates)
+
+
+def check_temperature_arrives():
+    """Сон за ночь пришёл, а градусов температуры нет (решение владельца 12.11, нить temp-guards).
+    Без градусов сигнал «ночь теплее обычного» молчит, и молчание читается как «всё в норме».
+    Тревога — когда серия таких ночей длиннее самой длинной за год (граница из своего ряда)."""
+    import metrics_db
+    with db.get_conn() as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_metrics)")}
+        if "temp_deviation" not in cols:
+            warn("температура ночью: колонки temp_deviation нет", "миграция не прошла — сигнал температуры не работает")
+            return None
+        rows = conn.execute(
+            "SELECT temp_deviation IS NOT NULL FROM daily_metrics "
+            "WHERE date >= date(?, '-365 day') AND date <= ? AND sleep_total IS NOT NULL "
+            "ORDER BY date", (str(today), str(today))).fetchall()
+    cur, longest = metrics_db.temp_missing_runs([bool(r[0]) for r in rows])
+    if cur > longest:
+        warn(f"температура ночью не приходит {cur} ноч. подряд",
+             f"сон есть, градусов нет; за год самая длинная такая серия — {longest}. "
+             "Проверь ответ Oura daily_readiness (поле temperature_deviation) и import_oura.parse_readiness")
+    return (cur, longest)
+
+
+check("температура ночью приходит вместе со сном", check_temperature_arrives)
+
+
+def check_hae_workouts_automation():
+    """Автоматизация HAE «Workouts» жива (решение владельца 12.11, нить temp-guards): Oura записал
+    тренировку, соседняя автоматизация «метрики» с тех пор отработала, а копии тренировки нет.
+    Тенант без пакетов тренировок вовсе — «не настроено», не тревога."""
+    import json as _json
+    from datetime import datetime as _dt, timedelta as _td
+    import import_apple_health as ia
+    d = ia.hae_rest_dir()
+    since = _dt.combine(today - _td(days=30), _dt.min.time())
+    wp, mp = [], []
+    for f in sorted(d.glob("HealthAutoExport-REST-*.json")) if d.is_dir() else []:
+        ts = ia.hae_packet_ts(f.stem)
+        if ts is None or ts.replace(tzinfo=None) < since:
+            continue
+        try:
+            data = (_json.loads(f.read_text(encoding="utf-8")).get("data") or {})
+        except (OSError, ValueError) as e:
+            warn("пакет Health Auto Export не читается", f"{f.name}: {e}")
+            continue
+        (wp if data.get("workouts") else mp).append(ts)
+    with db.get_conn() as conn:
+        ends = [r[0] for r in conn.execute(
+            "SELECT end_time FROM workouts WHERE source='Oura' AND date >= ? AND end_time IS NOT NULL",
+            (str(today - _td(days=30)),))]
+    oura_ends = []
+    for e in ends:
+        try:
+            oura_ends.append(_dt.fromisoformat(e))
+        except ValueError:
+            warn("время окончания тренировки Oura не в ISO", repr(e))
+            continue
+    st = ia.workouts_automation_state(wp, mp, oura_ends)
+    if st["state"] == "silent":
+        warn("автоматизация тренировок Health Auto Export молчит",
+             f"Oura записал тренировку, окончание {st['oura_end']:%d.%m %H:%M}; метрики с телефона с тех пор "
+             f"пришли {st['metric_runs_after']} раз, а пакета тренировок нет (последний — "
+             f"{st['last_workouts_packet']:%d.%m %H:%M} UTC). Проверь автоматизацию «Workouts» в HAE на телефоне")
+    return st["state"]
+
+
+check("автоматизация тренировок HAE жива", check_hae_workouts_automation)
 
 
 # check_hypothesis_experiments снят (BL-EXP-1, 2026-07-10): мерил мёртвую модель
@@ -7925,6 +8044,57 @@ def check_logrotate_liveness():
 
 
 check("Ротация логов жива и чиста", check_logrotate_liveness)
+
+
+WITHINGS_IMPORT_LABEL = "com.larry.health.withings-import"
+IMPORT_WATCHDOG_LABEL = "com.larry.health.import-watchdog"
+
+
+def check_import_pulses_alive():
+    """§14 для двух плановых задач приёма (карточка warn:producer_registry 24.09, закрыта 14.11).
+
+    import_withings — единственный писатель давления; import_watchdog — единственный сторож
+    свежести Apple Health. Оба молчат, когда всё хорошо, поэтому смерть задачи неотличима от
+    нормы. Каждый успешный прогон пишет пульс в system_config; судится он против живого плиста
+    и ОДНИМ «сейчас» на обе задачи — дата модуля `today` + время часов, как у `_schedule_covers`
+    (два разных «сейчас» в одном датчике дали бы тесту зелёный по календарю машины, §20):
+    withings — против последнего планового запуска; сторож (StartInterval) — отметка старше
+    интервала значит пропущенный запуск. Допуска-числа нет: общее правило владельца 23.09,
+    как у ротации логов (одиночный пропуск тоже звонит — цена правила, принятая владельцем)."""
+    if skip := _owner_judged_in_container("пульс приёма"):
+        return skip
+    import config_db
+    import import_watchdog as _iw
+    import import_withings as _iwt
+    import plist_env_liveness as _pl
+    from datetime import datetime as _dt
+    now = _dt.combine(today, get_now().time())
+    out = {}
+    at = config_db.get_config(_iwt.PULSE_KEY)
+    covered, fire = _schedule_covers(WITHINGS_IMPORT_LABEL, at, now)
+    if covered is None:
+        _schedule_unjudged("импорт Withings", WITHINGS_IMPORT_LABEL)
+    elif not covered:
+        warn(f"импорт Withings не отметился после планового запуска {fire:%d.%m %H:%M}",
+             f"последняя отметка: {at or 'ни разу'} — задача {WITHINGS_IMPORT_LABEL} не бежит "
+             "или падает; давление не приходит")
+    out["withings"] = at
+    at = config_db.get_config(_iw.PULSE_KEY)
+    every_s = _pl.start_interval_s(IMPORT_WATCHDOG_LABEL)
+    if every_s is None:
+        _schedule_unjudged("сторож свежести Apple Health", IMPORT_WATCHDOG_LABEL)
+    else:
+        age_s = ((now - _dt.fromisoformat(str(at)).replace(tzinfo=None)).total_seconds()
+                 if at else None)
+        if age_s is None or age_s > every_s:
+            warn("сторож свежести Apple Health не отмечается",
+                 f"последняя отметка: {at or 'ни разу'} при интервале {every_s // 60} мин — "
+                 f"{IMPORT_WATCHDOG_LABEL} пропустил запуск; обрыв приёма HAE пройдёт молча")
+    out["import_watchdog"] = at
+    return out
+
+
+check("пульс плановых задач приёма (Withings, сторож Apple Health)", check_import_pulses_alive)
 
 
 def check_secret_scope_matches_reality():

@@ -28,6 +28,16 @@ from withings_api import WithingsError, fetch_bp, withings_access_token
 log = logging.getLogger("import_withings")
 BP_SOURCE = "withings"      # метка в raw дня: день написан отсюда (по ней чистится день без замеров)
 _RAW_BP_KEYS = ("bp_systolic", "bp_diastolic", "bp_systolic_max", "bp_diastolic_max")
+# Пульс прогона (13.11, карточка warn:producer_registry): пишется в конце КАЖДОГО успешного
+# прогона, включая «не подключён». Читатель — integrity_tests.check_import_pulses_alive.
+PULSE_KEY = "withings_import.ran_at"
+
+
+def _mark_ran() -> None:
+    import config_db
+    from _time_inject import get_now
+    config_db.upsert_config(PULSE_KEY, value_text=get_now().isoformat(timespec="seconds"),
+                            category="liveness", source="import_withings")
 
 
 def _mirror(conn, rows: list[dict]) -> int:
@@ -92,6 +102,7 @@ def run() -> int:
     token = withings_access_token(data_dir)
     if token is None:
         print("Withings не подключён — пропуск")
+        _mark_ran()
         return 0
     rows = fetch_bp(token, 0)                 # вся история: только так видно удалённое в приложении
     tz = ZoneInfo(region_pack.value("timezone", "UTC"))
@@ -100,6 +111,7 @@ def run() -> int:
         touched = _write_days(conn, _days(conn, tz))
     print(f"Withings: замеров давления {len(rows)}, удалено как удалённых в Withings {gone}, "
           f"дней давления пересчитано {touched}")
+    _mark_ran()
     return 0
 
 

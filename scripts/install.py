@@ -140,9 +140,9 @@ def render_launchd(values: dict[str, str]) -> dict[str, str]:
     (для второго тенанта это чужая база). Метки сервисов com.larry.health.* — имя продукта."""
     import plistlib
     values = {"PYTHON": NATIVE_PYTHON, **values}
-    # Плисты получают переменную только при явном выборе (--provider): живые плисты владельца
-    # её пока не несут, их миграция — BL-LLM-PROVIDER-STRICT-1; до неё держит переходный режим
-    # llm_client.provider() (есть anthropic_key — Anthropic).
+    # Плисты получают переменную только при явном выборе (--provider). Без него provider()
+    # берёт единственный файл ключа; несколько ключей без выбора — отказ (BL-LLM-PROVIDER-STRICT-1,
+    # 09.11: живые плисты владельца несут anthropic явно, дописаны отдельно от рендера).
     shared_env = ({"HEALTH_LLM_PROVIDER": values["LLM_PROVIDER"]}
                   if values.get("LLM_PROVIDER") else {})
     out = {}

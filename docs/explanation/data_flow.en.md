@@ -1,4 +1,4 @@
-<!-- translation-of: docs/explanation/data_flow.md sha256:f0469ceb0d54 -->
+<!-- translation-of: docs/explanation/data_flow.md sha256:0c9688b5a807 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](data_flow.md)

@@ -86,6 +86,80 @@ def test_rotation_does_not_fire(env):
     assert len(sw.new_errors()) == 1
 
 
+def test_traceback_sample_is_exception_line_not_header(env):
+    """Карточка 18.11: у бота «+4: Traceback (most recent call last):» — образец нёс
+    заголовок трассировки, по которому причину не назвать. Образец обязан нести итог
+    трассировки (последнее исключение цепочки). Значения выдуманы."""
+    agents, logs = env
+    log = logs / "bot.err.log"
+    log.write_text("start\n", encoding="utf-8")
+    _agent(agents, "com.larry.health.bot", log)
+    sw.new_errors()
+    with log.open("a", encoding="utf-8") as f:
+        f.write("Traceback (most recent call last):\n"
+                '  File "x.py", line 1, in <module>\n'
+                "    raise KeyError('a')\n"
+                "KeyError: 'a'\n\n"
+                "During handling of the above exception, another exception occurred:\n\n"
+                "Traceback (most recent call last):\n"
+                '  File "x.py", line 3, in <module>\n'
+                "telegram.error.NetworkError: выдуманная сеть\n")
+    found = sw.new_errors()
+    assert len(found) == 1 and found[0]["hits"] == 2
+    assert found[0]["sample"] == "telegram.error.NetworkError: выдуманная сеть"
+
+
+def test_truncated_traceback_falls_back_to_header(env):
+    """Граница: трассировка, обрезанная концом дописанного куска, — образец остаётся
+    заголовком, а не пустотой и не чужой строкой."""
+    agents, logs = env
+    log = logs / "cut.err.log"
+    log.write_text("start\n", encoding="utf-8")
+    _agent(agents, "com.larry.health.cut", log)
+    sw.new_errors()
+    with log.open("a", encoding="utf-8") as f:
+        f.write('Traceback (most recent call last):\n  File "x.py", line 1\n')
+    assert sw.new_errors()[0]["sample"] == "Traceback (most recent call last):"
+
+
+def _sample_of(env, name, text):
+    agents, logs = env
+    log = logs / f"{name}.err.log"
+    log.write_text("start\n", encoding="utf-8")
+    _agent(agents, f"com.larry.health.{name}", log)
+    sw.new_errors()
+    with log.open("a", encoding="utf-8") as f:
+        f.write(text)
+    return sw.new_errors()[0]["sample"]
+
+
+def test_foreign_line_after_unclosed_traceback_is_not_sample(env):
+    """Ревью 18.11, п.1–2: после незакрытой трассировки идёт строка лога — она не итог."""
+    assert _sample_of(env, "foreign", 'Traceback (most recent call last):\n  File "x.py", line 1\n'
+                      "2031-01-01 INFO выдуманная строка лога\n") == "Traceback (most recent call last):"
+
+
+def test_exception_group_sample_is_group_line(env):
+    """Ревью 18.11, п.1: у группы исключений все строки с отступом — итог из «| ExceptionGroup: …»,
+    а не следующая строка лога без отступа."""
+    text = ("  + Exception Group Traceback (most recent call last):\n"
+            '  |   File "x.py", line 1, in <module>\n'
+            "  | ExceptionGroup: выдуманная группа (1 sub-exception)\n"
+            "  +-+---------------- 1 ----------------\n"
+            "    | ValueError: выдумка\n"
+            "    +------------------------------------\n"
+            "2031-01-01 INFO выдуманная строка лога\n")
+    assert _sample_of(env, "group", text) == "ExceptionGroup: выдуманная группа (1 sub-exception)"
+
+
+def test_chain_cut_after_during_handling_falls_back_to_header(env):
+    """Ревью 18.11, п.3: обрыв после «During handling…» — не первое исключение, а заголовок."""
+    text = ('Traceback (most recent call last):\n  File "x.py", line 1\nKeyError: \'a\'\n\n'
+            "During handling of the above exception, another exception occurred:\n\n"
+            'Traceback (most recent call last):\n  File "x.py", line 3\n')
+    assert _sample_of(env, "chaincut", text) == "Traceback (most recent call last):"
+
+
 def test_plist_without_stderr_path_is_skipped(env):
     agents, logs = env
     (agents / "com.larry.health.quiet.plist").write_bytes(

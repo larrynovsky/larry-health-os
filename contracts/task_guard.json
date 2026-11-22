@@ -11,9 +11,10 @@
       "module": "config_db",
       "uses": [
         "get_config",
-        "TASK_GUARD_BUDGET_SECONDS"
+        "TASK_GUARD_BUDGET_SECONDS",
+        "TASK_GUARD_BREAKER_FAILURES"
       ],
-      "why": "tenant mode, per-request timeout and one shared batch-budget default",
+      "why": "tenant mode, timeout and single definitions of batch budget and breaker defaults",
       "legacy": "Existing module has no sidecar; public operations named here and exercised by guard integration tests."
     },
     {
@@ -79,11 +80,11 @@
       "D2": "start_batch() returns run-local state; pass it to audit_new_task(new, batch=...) for every task in one creation loop. judge_pair returns verdict/confidence/judge/reason; report_failure emits throttled operational fault.",
       "D3": "Only named public operations; HTTP is stdlib and fixed endpoint. No private neighbor calls.",
       "D4": "One module; mutable breaker/budget/configuration state is explicit and run-scoped. Only log suppression is process-scoped, keyed by tenant secret path.",
-      "D5": "tests/unit/test_task_guard.py exercises real SQLite, mocked HTTP, redaction, missing key, invalid responses, off, enforce, both producers and throttle.",
-      "D6": "Same-tenant snapshot; det always precedes model guards. First transport error opens breaker for the entire batch. Monotonic budget gates HTTP admission and caps socket timeout by remaining time. Missing key file is not_configured, no fault; empty key is a fault. Every skipped pair remains a journal row, countable by reason and saved task IDs."
+      "D5": "tests/unit/test_task_guard.py exercises real SQLite, mocked HTTP, redaction, missing key, invalid responses, off, enforce, report, memory and assistant-fact producers and throttle.",
+      "D6": "Same-tenant snapshot; det always precedes model guards. Consecutive provider_unavailable/http_error results increment a batch-local streak; a valid Jev verdict resets it. tasks.guard_breaker_failures is an integer 1..20 (seed/fallback config_db.TASK_GUARD_BREAKER_FAILURES); invalid values warn. Reaching the threshold opens the breaker for the rest of the batch. Deterministic findings do not reset transport state. Monotonic budget gates HTTP admission and caps socket timeout by remaining time. Missing key file is not_configured, no fault; empty key is a fault. Every skipped pair remains a journal row, countable by reason and saved task IDs."
     },
     "rationale": "Can replace the pair judge using the documented mapping contract; no client SDK, UI, or lifecycle decisions.",
-    "date": "2026-11-07",
-    "oracle": "tests/unit/test_task_guard.py; executed mutations recorded in docs/handoff/task-guard-jev/LATEST.md"
+    "date": "2026-11-21",
+    "oracle": "tests/unit/test_task_guard.py; executed mutations recorded in docs/handoff/task-guard-jev/LATEST.md and docs/handoff/task-guard-cover/LATEST.md"
   }
 }

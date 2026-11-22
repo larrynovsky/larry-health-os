@@ -13,6 +13,9 @@
                               поэтому живёт в приватной зоне и в публикацию не едет.
   private/pii_baseline.json — долг: число находок на публичный файл. Ходит только вниз.
 
+Дополнительно C-193: AST-гейт owner_literals блокирует литералы данных, выбранные
+предикатами is_owner/is_owner_dir/is_owner_data, независимо от словаря и долга.
+
 ЧТО СУДИТ: публичный путь И содержимое файла, без учёта регистра, по подстроке.
 ЧЕГО НЕ ЛОВИТ (вслух, чтобы зелёный не читали шире, чем он есть):
   * личное, которого нет в словаре — перепись знает только названное;
@@ -331,6 +334,131 @@ def private_imports(root: Path = ROOT, paths: list[str] | None = None,
     return found
 
 
+# C-193: exact (file, function, value) exceptions, never blanket branch exemptions.
+OWNER_LITERAL_ALLOW: dict[tuple[str, str, object], str] = {
+    ('dashboard_routers/api_lab_review.py', '_tenant_dir', 403):
+        'HTTP forbidden status; denies cross-tenant access.',
+    ('jobs/scheduled.py', '_send_doc_review_message', 1048576):
+        'Delivery diagnostics and byte-to-MiB conversion, no patient defaults.',
+    ('jobs/scheduled.py', '_send_doc_review_message', 'scheduled.doc_review: attachment owner-only review_id='):
+        'Delivery diagnostics and byte-to-MiB conversion, no patient defaults.',
+    ('jobs/scheduled.py', '_send_doc_review_message', 'scheduled.doc_review: file missing review_id='):
+        'Delivery diagnostics and byte-to-MiB conversion, no patient defaults.',
+    ('jobs/scheduled.py', '_send_doc_review_message', 'doc_review id=%s: send_document отклонён (%s) → шлём текстом'):
+        'Delivery diagnostics and byte-to-MiB conversion, no patient defaults.',
+    ('jobs/scheduled.py', '_send_doc_review_message', 'scheduled.doc_review: attachment rejected review_id='):
+        'Delivery diagnostics and byte-to-MiB conversion, no patient defaults.',
+    ('jobs/scheduled.py', '_send_doc_review_message', ': '):
+        'Delivery diagnostics and byte-to-MiB conversion, no patient defaults.',
+    ('reminders_sync.py', 'reminders_list_name', 'Health'):
+        'Generic application list name Health, shared installation convention.',
+    ('reminders_sync.py', 'native_allowed', 'osascript'):
+        'Platform executable lookup for the native Reminders backend.',
+    ('reminders_sync.py', 'get_completed_task_ids', 'Reminders не подключены (нет caldav.json и osascript) — читать нечего'):
+        'Diagnostic for an unconfigured Reminders channel.',
+    ('secrets_paths.py', 'secrets_dir', 'secrets_dir: HEALTH_DATA_DIR='):
+        'Fail-closed missing tenant secrets diagnostic.',
+    ('secrets_paths.py', 'secrets_dir', ' (тенант), но HEALTH_SECRETS_DIR не задан — отказ (иначе взяли бы секреты владельца → кросс-тенант утечка).'):
+        'Fail-closed missing tenant secrets diagnostic.',
+    ('task_agent.py', 'create_macos_reminder', 'Reminders не подключены — напоминание не создаётся'):
+        'Diagnostic for an unconfigured Reminders channel.',
+    ('vcf_import_pipeline.py', '_default_vcf', 'genome_vcf'):
+        'Private configuration schema key and text encoding, not a genome path.',
+    ('vcf_import_pipeline.py', '_default_vcf', 'utf-8'):
+        'Private configuration schema key and text encoding, not a genome path.',
+}
+_OWNER_PREDICATES = {'is_owner', 'is_owner_dir', 'is_owner_data'}
+
+
+def owner_literals(src: str, path: str = '') -> list[int]:
+    """Lines of data literals selected by direct owner predicates (both branches).
+
+    Syntax only: no alias/data-flow resolution or implicit branch after early return.
+    Numbers other than -1/0/1 are non-trivial. Comparison operands are
+    predicates, not data defaults. Exceptions match a value within one file/function, not a line.
+    Invalid Python raises SyntaxError: an unreadable candidate cannot pass this guard.
+    """
+    import ast
+
+    def owner(node):
+        return any(isinstance(n, ast.Call) and
+                   (getattr(n.func, 'id', '') or getattr(n.func, 'attr', '')) in _OWNER_PREDICATES
+                   for n in ast.walk(node))
+
+    def home_path(node):
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            return home_path(node.left) and isinstance(node.right, ast.Constant)
+        if isinstance(node, ast.Subscript):
+            return ast.unparse(node.value) == 'os.environ'
+        if isinstance(node, ast.Call):
+            name = ast.unparse(node.func)
+            if name == 'Path' and len(node.args) == 1:
+                return home_path(node.args[0])
+            return name in {'Path.home', 'os.getenv', 'os.environ.get'}
+        return False
+
+    hits = set()
+
+    def visit(node, selected=False, scope=''):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            scope = node.name
+        if isinstance(node, ast.Constant):
+            v = node.value
+            if selected and ((isinstance(v, str) and v) or
+                             (type(v) in (int, float, complex) and v not in (-1, 0, 1))):
+                if (path, scope, v) not in OWNER_LITERAL_ALLOW:
+                    hits.add(node.lineno)
+            return
+        if isinstance(node, (ast.If, ast.IfExp)):
+            visit(node.test, selected, scope)
+            for branch in (node.body, node.orelse):
+                for child in branch if isinstance(branch, list) else [branch]:
+                    visit(child, selected or owner(node.test), scope)
+            return
+        if isinstance(node, ast.BoolOp):
+            for child in node.values:
+                visit(child, selected, scope)
+                selected = selected or owner(child)
+            return
+        if isinstance(node, ast.keyword) and node.arg == 'person_key':
+            return
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(t, ast.Name) and t.id == 'person_key' for t in targets):
+                return
+        if isinstance(node, ast.BinOp) and home_path(node):
+            visit(node.left, selected, scope)
+            return
+        if isinstance(node, ast.Subscript) and home_path(node):
+            return  # environment variable name, not its value
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == 'os.path.join':
+            if node.args and home_path(node.args[0]):
+                for child in [node.args[0], *node.keywords]:
+                    visit(child, selected, scope)
+                return
+        if isinstance(node, ast.Call) and ast.unparse(node.func) in {
+                'os.getenv', 'os.environ.get'}:
+            for child in [*node.args[1:], *node.keywords]:
+                visit(child, selected, scope)
+            return
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == 'i18n.t':
+            # Only the translation key is exempt; interpolation arguments remain data.
+            for child in [*node.args[1:], *node.keywords]:
+                visit(child, selected, scope)
+            return
+        if isinstance(node, ast.Compare):
+            # Constants here are predicates, but call arguments may still carry data.
+            for child in ast.iter_child_nodes(node):
+                if not isinstance(child, ast.Constant):
+                    visit(child, selected, scope)
+            return
+        for child in ast.iter_child_nodes(node):
+            visit(child, selected, scope)
+
+    visit(ast.parse(src))
+    return sorted(hits)
+
+
 def _staged(root: Path) -> int:
     """Судит ПРИРОСТ застейдженного файла против его же версии в HEAD под ТЕКУЩИМ словарём.
     Сравнение с HEAD, а не с долгом: устаревший (завышенный) долг иначе давал бы право
@@ -355,6 +483,18 @@ def _staged(root: Path) -> int:
         print("Что сделать: тест разового скрипта из plans/ — в приватную зону (publication_zones.yaml,")
         print("  рядом с прочими tests/unit/*); проверки публичного кода — отдельным публичным тестом.")
         return 1
+    for p in public:
+        if not p.endswith('.py'):
+            continue
+        try:
+            hits = owner_literals(_show(root, f":{p}"), p)
+        except SyntaxError as exc:
+            print(f"⛔ pii_census: {p}:{exc.lineno}: invalid Python; owner-literal check refused")
+            return 1
+        if hits:
+            print(f"⛔ pii_census: {p}: owner-selected data literal at lines {hits} (C-193)")
+            print("Move installation data to private config, or add an exact OWNER_LITERAL_ALLOW reason.")
+            return 1
     baseline = _load_baseline(root)
     grew, shrank = {}, {}
     for p in public:

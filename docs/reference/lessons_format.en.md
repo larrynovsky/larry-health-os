@@ -1,4 +1,4 @@
-<!-- translation-of: docs/reference/lessons_format.md sha256:db41622ad9c6 -->
+<!-- translation-of: docs/reference/lessons_format.md sha256:7c65859ffa23 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](lessons_format.md)

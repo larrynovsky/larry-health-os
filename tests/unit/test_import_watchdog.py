@@ -16,6 +16,8 @@ def sent(monkeypatch, tmp_path):
     monkeypatch.setattr(notify, "notify_operator", lambda msg, fallback=True: out.append(msg) or "telegram")
     monkeypatch.setattr(import_watchdog, "_state_path", lambda: tmp_path / "state.json")
     monkeypatch.setattr(import_status_db, "get_conit_limit", lambda src: 41.0)
+    import config_db   # пульс прогона (check_import_pulses_alive) — не в базу машины
+    monkeypatch.setattr(config_db, "upsert_config", lambda *a, **kw: None)
     return out
 
 

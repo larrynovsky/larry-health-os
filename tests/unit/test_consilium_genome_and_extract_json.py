@@ -222,11 +222,12 @@ class TestConsiliumGenomeBlock:
         assert "данные недоступны" in pkg
         assert "ГЕНОМНЫЙ КОНТЕКСТ" in pkg
 
-    def test_coordinator_max_tokens_is_at_least_20000(self):
-        """Регресс: max_tokens координатора не должен быть меньше 20000.
+    def test_coordinator_max_tokens_is_at_least_28000(self):
+        """Регресс: max_tokens координатора не должен быть меньше 28000.
 
         Баг: 8000 приводил к truncation genome-enriched гипотез → JSON parse fail.
         04.10 замер: текст 14.6k и 15.1k при 16000 — решение владельца поднять до 20000.
+        12.11 замер: 19 702 при 20000 (98,5%) на прогоне с полем forecast — поднято до 28000.
         """
         import ast, inspect
         import monthly_consilium as mc
@@ -242,8 +243,8 @@ class TestConsiliumGenomeBlock:
 
         assert max_tokens_values, "max_tokens должен быть задан в _run_coordinator"
         for val in max_tokens_values:
-            assert val >= 20000, \
-                f"max_tokens={val} в _run_coordinator слишком мало; минимум 20000 " \
+            assert val >= 28000, \
+                f"max_tokens={val} в _run_coordinator слишком мало; минимум 28000 " \
                 f"(genome-enriched гипотезы превышают 8000 токенов output)"
 
 

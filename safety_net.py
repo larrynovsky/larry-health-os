@@ -83,6 +83,10 @@ _SAFETY_TEXT_FALLBACKS = {
         'ru': 'HRV {hrv_today:.0f}ms — падение {drop_pct:.0f}% vs 30d avg {hrv_30d:.0f}ms',
         'en': 'HRV {hrv_today:.0f}ms — a drop of {drop_pct:.0f}% vs 30d avg {hrv_30d:.0f}ms',
     },
+    'safety.note.temperature': {
+        'ru': 'отклонение {value:+.2f} °C от личной нормы — выше границы {ceiling:+.2f} °C, за которую уходит 1 ночь из {one_in} за год. Признак того, что организм с чем-то борется (простуда, перегрев, алкоголь, поздняя еда): проверь самочувствие, дай себе восстановиться сегодня',
+        'en': 'deviation {value:+.2f} °C from the personal baseline — above the limit of {ceiling:+.2f} °C that only 1 night in {one_in} crosses over a year. A sign the body is fighting something (a cold, overheating, alcohol, a late meal): check how you feel and give yourself a recovery day',
+    },
     'safety.note.resting_hr': {
         'ru': 'ЧСС покоя {rhr_today} — рост +{rise:.0f} bpm vs 30d avg {rhr_30d}',
         'en': 'Resting heart rate {rhr_today} — a rise of +{rise:.0f} bpm vs 30d avg {rhr_30d}',
@@ -790,7 +794,62 @@ def check_lifestyle_alerts(target: date = None, *, initialize: bool = True) -> l
             "note": f"{label} {today_val:g} — ниже личного p5 ({p5:.0f}) за 30+ дней",
         })
 
+    temp_alert = _temperature_alert(target)
+    if temp_alert:
+        alerts.append(temp_alert)
+
     return alerts
+
+
+# Решение владельца 11.11 (нить activity-temp): повышенная ночная температура — сигнал
+# «принять меры» уже в ОДИНОЧНУЮ ночь, полоса safety. Граница — личный верхний перцентиль
+# окна истории. Параметры (уровень, окно, минимум ночей) — строки absolute_thresholds
+# (metric=temp_deviation, variant=temp_*; решение владельца 12.11, нить temp-guards): менять
+# уровень — одна запись, не код. Окно в год: болезнь внутри короткого окна расширяет полосу и
+# прячет следующую.
+def _temperature_params() -> tuple[float, int, int]:
+    """(уровень перцентиля, окно дней, минимум ночей) из таблицы порогов. KeyError — сид не
+    засеян: громкий отказ (§9), а не литерал по умолчанию."""
+    import rules_db as _rd
+    get = lambda v: _rd.get_threshold("temp_deviation", "ceiling", variant=v)  # noqa: E731
+    return float(get("temp_pct")), int(get("temp_window_days")), int(get("temp_min_nights"))
+
+
+def _temperature_alert(target: date) -> dict | None:
+    """WARN, если отклонение температуры ночью выше личного верхнего перцентиля.
+    Порог считается по ночам ДО target (сегодняшняя ночь не сдвигает собственную границу).
+    Мало истории (< минимума ночей) → молчим: судить нечем, а не «норма».
+    Нет параметров в таблице → громкий сигнал оператору и молчание карточки."""
+    try:
+        pct, window, min_nights = _temperature_params()
+    except KeyError as e:
+        _emit_fallback_alert("temperature", e)
+        return None
+    except Exception as e:  # silent-ok: БД недоступна целиком — это судят свои датчики; safety net не падает из-за одной карточки
+        log.warning(f"_temperature_alert({target}): параметры не прочитаны: {e}")
+        return None
+    try:
+        conn = db.get_conn()
+        row = conn.execute("SELECT temp_deviation FROM daily_metrics WHERE date=?",
+                           (str(target),)).fetchone()
+        value = row[0] if row else None
+        if value is None:
+            return None
+        ceiling = db._derive_metric_percentile(conn, "temp_deviation", pct=pct,
+                                               days=window, min_n=min_nights,
+                                               reference_date=target)
+    except Exception as e:  # silent-ok: колонки/БД нет — карточка не собирается, остальной safety net жив
+        log.warning(f"_temperature_alert({target}): {e}")
+        return None
+    if ceiling is None or value <= ceiling:
+        return None
+    return {
+        "source": "lifestyle", "level": WARN, "direction": "high",
+        "metric": "Body temperature", "value": f"{value:+.2f}", "unit": " °C",
+        "limit": ceiling,
+        "note": _safety_text('safety.note.temperature', value=value, ceiling=ceiling,
+                             one_in=round(100 / (100 - pct))),
+    }
 
 
 # ── Текст человеку ────────────────────────────────────────────────────────

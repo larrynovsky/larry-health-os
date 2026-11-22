@@ -37,6 +37,9 @@ FLIGHT_KEYWORDS = [
     "flight", "рейс", "перелёт", "перелет", "fly", "вылет", "departure", "boarding",
 ]
 
+_REGULAR_MAX = 12   # обычных событий в контексте; остальное — через query_calendar
+_TRAVEL_MAX = 25    # поездок: в горизонте фетчера (30 дней) их меньше — фактически все
+
 # Предупреждать если кэш старше N часов, не показывать если старше M часов
 _CACHE_WARN_AGE_H  = 3
 _CACHE_ERROR_AGE_H = 25
@@ -223,11 +226,23 @@ def _read_cache() -> list[dict]:
             text      = (title + " " + location).lower()
             is_travel = any(kw in text for kw in TRAVEL_KEYWORDS) or bool(location)
 
+            # Машинные даты (ГГГГ-ММ-ДД, включительно) — для веры о поездках (beliefs): date_raw
+            # человекочитаем и без конца события. У all-day Google отдаёт end ИСКЛЮЧИТЕЛЬНО (день после).
+            start_d = start_dt.date() if is_all_day else start_dt.astimezone().date()
+            if end_dt is None:
+                end_d = start_d
+            elif is_all_day:
+                end_d = max(start_d, (end_dt - timedelta(days=1)).date())
+            else:
+                end_d = end_dt.astimezone().date()
+
             events.append({
                 "title":    title,
                 "date_raw": date_raw,
                 "location": location,
                 "is_travel": is_travel,
+                "start_date": start_d.isoformat(),
+                "end_date":   end_d.isoformat(),
             })
 
         except Exception as exc:
@@ -248,6 +263,23 @@ def _read_cache() -> list[dict]:
 
 # ── Публичный API ─────────────────────────────────────────────────────────────
 
+def horizon_date() -> date | None:
+    """До какой даты кэш вообще содержит события (time_max фетчера). Отсутствие события позже неё —
+    «не загружено», а не «нет». None — кэш старого формата или недоступен."""
+    try:
+        tm = json.loads(_cache_path().read_text()).get("time_max")
+        return _parse_iso(tm).astimezone().date() if tm else None
+    except Exception as exc:  # silent-ok: без кэша горизонт неизвестен — читатель так и пишет
+        log.debug("horizon_date: %s", exc)
+        return None
+
+
+def _within(e: dict, days: int) -> bool:
+    """Начало события не позже сегодня+days; идущие — всегда. Без машинной даты — включаем."""
+    sd = e.get("start_date")
+    return not sd or sd <= (get_today() + timedelta(days=days)).isoformat()
+
+
 def is_birthday(e: dict) -> bool:
     return "birthday" in e["title"].lower()
 
@@ -256,31 +288,28 @@ def format_calendar_context(days: int = 14) -> str:
     """Форматированный блок событий для AI-контекста."""
     all_events = _read_cache()
 
-    # Фильтруем события за пределами горизонта days
-    today    = get_today()
-    cutoff   = today + timedelta(days=days)
-    filtered = []
-    for e in all_events:
-        if "ongoing" in e["date_raw"]:
-            filtered.append(e)
-            continue
-        # Пытаемся извлечь дату из date_raw; если не получается — включаем
-        filtered.append(e)  # сортировка уже правильная, горизонт в cache_path
+    # Горизонт days соблюдается по машинной дате (раньше параметр не применялся вовсе)
+    filtered = [e for e in all_events if _within(e, days)]
 
     regular = [e for e in filtered if not is_birthday(e)]
-    travel  = [e for e in filtered if e["is_travel"] and not is_birthday(e)]
+    # Поездки — все в горизонте, по дате. 18.11: срез [:6] прятал купленный рейс 17.12 (11-й по счёту),
+    # и бот уверенно отвечал «такого рейса нет».
+    travel  = sorted((e for e in filtered if e["is_travel"] and not is_birthday(e)),
+                     key=lambda e: e.get("start_date") or "")
 
     lines = []
 
     if regular:
         lines.append(f"Календарь (ближайшие {days} дней):")
-        for e in regular[:12]:
+        for e in regular[:_REGULAR_MAX]:
             loc = f" [{e['location']}]" if e["location"] else ""
             lines.append(f"  {e['date_raw']}: {e['title']}{loc}")
+        if len(regular) > _REGULAR_MAX:
+            lines.append(f"  … и ещё {len(regular) - _REGULAR_MAX} событий (полный список — query_calendar)")
 
     if travel:
         lines.append("\nПоездки / перелёты:")
-        for e in travel[:6]:
+        for e in travel[:_TRAVEL_MAX]:
             loc = f" [{e['location']}]" if e["location"] else ""
             tag = _classify_travel(e)
             label = {
@@ -290,13 +319,20 @@ def format_calendar_context(days: int = 14) -> str:
                 "travel":  "",
             }[tag]
             lines.append(f"  {e['date_raw']}: {e['title']}{loc}{label}")
+        if len(travel) > _TRAVEL_MAX:
+            lines.append(f"  … и ещё {len(travel) - _TRAVEL_MAX} поездок/перелётов (полный список — query_calendar)")
+    hz = horizon_date()
+    if hz:
+        lines.append(f"(календарь загружен до {hz:%d.%m.%Y}; событий позже в нём нет — это не значит, что их нет у владельца)")
 
     return "\n".join(lines)
 
 
 def get_travel_events(days: int = 60) -> list[dict]:
+    """Поездки с началом не позже сегодня+days, по дате начала."""
     events = _read_cache()
-    return [e for e in events if e["is_travel"] and not is_birthday(e)]
+    return sorted((e for e in events if e["is_travel"] and not is_birthday(e) and _within(e, days)),
+                  key=lambda e: e.get("start_date") or "")
 
 
 # Обратная совместимость: parse_events больше не нужен (кэш структурированный)

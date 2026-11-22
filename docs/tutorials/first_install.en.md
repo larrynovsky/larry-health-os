@@ -1,4 +1,4 @@
-<!-- translation-of: docs/tutorials/first_install.md sha256:dd3c30836114 -->
+<!-- translation-of: docs/tutorials/first_install.md sha256:83863c160961 -->
 <!-- Machine translation by doc_agent --translate-intent; regenerated with the Russian page, do not edit by hand. -->
 
 **English** · [Русский](first_install.md)

@@ -36,6 +36,18 @@ jobs:
           mkdir -p dist
           cp build/docker/compose.yaml dist/compose.yaml
           cp build/docker/.env dist/health.env
+      - name: public MCP and bug-report contracts (offline)
+        # Fresh image, no installation volumes or inherited credentials. Loopback remains
+        # available for synthetic HTTP fixtures; external networking is disabled.
+        run: |
+          docker run --rm --network none "$IMAGE" \
+            env -u HEALTH_DATA_DIR -u HEALTH_SECRETS_DIR \
+            python3 -m pytest -q \
+              tests/unit/test_mcp_auth.py \
+              tests/unit/test_mcp_tools.py \
+              tests/unit/test_mcp_lab_boundary.py \
+              tests/unit/test_bug_report.py \
+              tests/unit/test_bug_channel.py
       - name: урок, помеченные блоки
         run: python3 scripts/tutorial_run.py docs/tutorials/first_install.md --dist "$PWD/dist"
       - name: система жива так, как обещает урок
@@ -118,8 +130,14 @@ jobs:
           done
       - name: журналы при провале
         if: failure()
-        working-directory: /home/runner/health-docker
         run: |
-          docker compose ps; docker compose logs --tail 80
+          tutorial_dir=/home/runner/health-docker
+          if [ ! -f "$tutorial_dir/compose.yaml" ]; then
+            echo "Tutorial Compose configuration was not created; see the failed build, contract-test, or tutorial step above."
+            exit 0
+          fi
+          cd "$tutorial_dir"
+          docker compose ps || true
+          docker compose logs --tail 80 || true
           ls -ln ~/health-docker/secrets || true
           docker compose exec -T cron sh -c 'id; tail -n 40 /app/logs/bot_err.log /app/logs/bot.log' || true
